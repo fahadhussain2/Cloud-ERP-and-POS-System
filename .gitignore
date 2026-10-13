@@ -1,0 +1,2 @@
+# Legacy database dump: contains customer personal data and legacy credentials. Never commit.
+sql_dump/
