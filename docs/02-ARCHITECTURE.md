@@ -214,7 +214,8 @@ After a server restore to time T, devices re-push documents from their 30-day lo
 ### 6.3 Authentication and authorization
 - **Back office:** username/email and password (Argon2id), HTTP-only `SameSite=Strict` session cookie, optional TOTP for Owner/Accountant (Phase 2).
 - **POS device:** device token (short-lived access + rotating refresh) plus ECDSA document signatures. The user is identified by PIN (§4.3).
-- **Authorization:** permission strings (e.g. `pos.sale.create`, `pos.price.below_floor`, `pos.void`, `pos.return.no_receipt`, `cash.session.close`, `inv.adjust`, `pur.receive`, `acc.journal.post`, `cost.view`) plus numeric limits per role. They are evaluated by `packages/domain` on the device and again on the server.
+- **Authorization:** permission strings (e.g. `pos.sale.create`, `pos.price.below_floor`, `pos.void`, `pos.return.create`, `pos.return.no_receipt`, `pos.return.outside_policy`, `cash.session.close`, `inv.adjust`, `pur.receive`, `acc.journal.post`, `cost.view`) plus numeric limits per role. They are evaluated by `packages/domain` on the device and again on the server.
+- **Missing permission at the POS:** when an action needs a permission the unlocked user doesn't have (e.g. `pos.return.create`), the screen asks for the PIN of a user who has it. The approval is stored as an `override` on the document. It is never a reason to block the work entirely.
 
 ### 6.4 Audit
 - An append-only `audit_log` records master-data changes (before/after JSON), logins, device events, overrides, voids, period locks and settings.

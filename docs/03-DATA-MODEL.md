@@ -158,7 +158,7 @@ This keeps the one-screen exchange (D-006) to one document, one number, one rece
 
 **payment_methods:** `code (cash|bank_transfer|raast|jazzcash|easypaisa|card|on_account), name, gl_account_id, requires_reference, is_cash, is_active`
 
-**overrides:** `document_id, line_id (nullable), kind (below_list|below_floor|credit_limit|offline_cap|no_receipt_return|void|reprint), requested_by_user_id, approved_by_user_id, reason_code, note, values jsonb, at_device`
+**overrides:** `document_id, line_id (nullable), kind (below_list|below_floor|credit_limit|offline_cap|no_receipt_return|return_permission|return_outside_policy|void|reprint), requested_by_user_id, approved_by_user_id, reason_code, note, values jsonb, at_device`
 
 **legacy_sales / legacy_sale_lines** (read-only, migrated, last 90 days): `legacy_period, legacy_doc_no, date, customer_party_id, total` / `item_id, qty, rate, amount, returned_qty†`
 

@@ -71,13 +71,13 @@ Role **templates** ship with the product. Tenants can copy and adjust them, or c
 | Role | Main jobs | Key limits / permissions |
 |---|---|---|
 | **Owner** | Everything, all reports, settings | All |
-| **Manager** | Approvals (PIN overrides), voids, returns without a receipt, price changes, stock adjustments | Max override discount %, can approve below-floor sales, can void |
+| **Manager** | Approvals (PIN overrides), voids, returns without a receipt or outside policy, price changes, stock adjustments | Max override discount %, can approve below-floor sales, can void, can approve out-of-policy returns |
 | **Cashier** | Cash desk: handovers, refunds, collections, cash-out, day close. Can also sell. | Cannot change prices beyond the role limit. Cannot approve their own variance. |
-| **Salesman** | Sell, hold bills, start returns and exchanges, take payments | Discount down to the floor, credit sales only if allowed, cannot void |
+| **Salesman** | Sell, hold bills, process returns and exchanges, take payments | Discount down to the floor, credit sales only if allowed, cannot void. Return permission on by default; it can be removed, in which case returns need an approver's PIN. |
 | **Purchaser / Storekeeper** | POs, goods receipts, labels, transfers, counts, repricing proposals | Can see cost, cannot post journals |
 | **Accountant** | Receipts, payments, expenses, journals, period close, financial reports | No POS selling |
 
-Configurable role limits include: max discount % below list, whether the role can sell below floor, whether it can sell on credit, whether it can void (and within what window), whether it can refund without a receipt, whether it can view cost and margin, and whether it can approve overrides.
+Configurable role limits include: max discount % below list, whether the role can sell below floor, whether it can sell on credit, whether it can void (and within what window), **whether it can process returns**, whether it can refund without a receipt, whether it can approve out-of-policy returns, whether it can view cost and margin, and whether it can approve overrides.
 
 ## 5. Core workflows
 
@@ -122,7 +122,8 @@ A finalized bill is never edited. A Manager or Cashier with the permission voids
 3. Optionally add replacement items. The screen shows the net amount: the customer pays the difference or receives a refund.
 4. Refunds are at the **price originally paid**.
 5. **No-receipt return:** needs a manager PIN. It is refunded at the lowest selling price for that item in the last 90 days, falling back to the current price.
-6. The return window and non-returnable categories are tenant settings.
+6. The return window and non-returnable categories are tenant settings. Returning an item **outside the window** or from a **non-returnable category** needs the PIN of a user with the "approve out-of-policy returns" permission (Manager by default).
+7. **Who can process returns** is a role permission ("can process returns", D-051). A salesman whose role lacks it can still open the screen and prepare the return. To complete it, they enter the PIN of a user who has the permission (e.g. a manager or senior salesman), on the same screen. The approver is recorded on the document, the same way as a price override. **Delux default:** the Salesman role *has* the permission.
 
 ### W7. Refund payout
 Refunds follow the original payment method:
@@ -189,7 +190,7 @@ Printing to the shared network printer keeps working, because it only needs the 
 | PLT-04 | Users with personal accounts. Back-office login by username/email and password. **POS unlock by personal PIN** on an enrolled device. Auto-lock after inactivity. | 1 |
 | PLT-05 | Role templates (§4) with permissions and limits. | 1 |
 | PLT-06 | Custom role editor (copy a template, edit the permission checklist and limits). | 2 |
-| PLT-07 | Manager override = manager's PIN on the same screen, with a reason. Recorded on the document. | 1 |
+| PLT-07 | Override = the PIN of a user who has the required permission (usually a manager), entered on the same screen with a reason. Recorded on the document. It covers price, credit, void and return approvals, including a user who lacks a permission (e.g. returns). | 1 |
 | PLT-08 | Append-only audit log for master data changes (before and after), logins, overrides, voids, settings. | 1 |
 | PLT-09 | Device health page: last sync, unsynced documents, app version, persistent-storage status, clock skew. | 1 |
 | PLT-10 | Tenant data isolation enforced in the database (row-level security). | 1 |
@@ -221,7 +222,7 @@ Printing to the shared network printer keeps working, because it only needs the 
 | POS-09 | Finalize → print the bill silently to the device's default printer (local or shared network printer) using its print profile (POS-16). The bill shows the shop header, bill number, date and time, salesman, lines, totals, tender, cash received and change, return policy line, and a scannable **bill code** (barcode or signed QR). | 1 |
 | POS-10 | Reprint (marked REPRINT, logged). | 1 |
 | POS-11 | **Void** with permission, PIN and reason within the void window; optional linked **reissue**. | 1 |
-| POS-12 | **Return / exchange** screen per W6, including legacy bill lookup (90 days), reason and condition, no-receipt flow with PIN, return window and non-returnable category rules. | 1 |
+| POS-12 | **Return / exchange** screen per W6, including legacy bill lookup (90 days), reason and condition, no-receipt flow with PIN, return window and non-returnable category rules (approver PIN when out of policy), and the role permission "can process returns" (approver PIN when missing). | 1 |
 | POS-13 | Per-device document numbering, gapless and never reused (e.g. `C03-S000412`). | 1 |
 | POS-14 | Status bar: online/offline, last sync, unsynced count, warnings when offline longer than a threshold. | 1 |
 | POS-15 | Cash rounding per tenant rule (e.g. to the nearest whole rupee), posted to a rounding account. | 1 |

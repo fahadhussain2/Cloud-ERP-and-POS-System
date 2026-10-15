@@ -250,3 +250,13 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - device management guidance.
 - iPad/Safari is not targeted.
 - **Status:** Accepted
+
+### D-051 Returns are a role permission, with PIN approval as the fallback (2026-10-15)
+- **Decision:**
+  - "Can process returns" (`pos.return.create`) is an explicit role permission. **Delux default: the Salesman role has it.** The owner can remove it per role, e.g. allow only a "Senior Salesman" role.
+  - A user without the permission can still prepare a return. They complete it with the PIN of a user who has the permission, recorded as an override.
+  - Returns **outside the return window** or from a **non-returnable category** need the PIN of a user with `pos.return.outside_policy` (Manager by default).
+  - No-receipt returns stay as in D-005 (`pos.return.no_receipt`, manager PIN).
+- **Why:** returns are frequent, so requiring a manager for every one would create a bottleneck. The default controls are already strong: the return is linked to the original bill, the reason and condition are recorded, and the cashier pays out every cash refund. The permission lets the owner tighten this without code changes.
+- **Not decided:** a refund value limit per role (e.g. a manager PIN above Rs 10,000). This can be added later as a role limit.
+- **Status:** Accepted
