@@ -17,9 +17,9 @@ flowchart LR
     C1["Counter PWA ×8<br/>UI + local SQLite (OPFS)<br/>outbox + sync agent"]
     CD["Cash desk PWA<br/>(sells + cash station)"]
     PH["Phones<br/>(cycle counts, pickup sheet)"]
-    PR["80mm thermal printers<br/>(default printer, silent)"]
-    C1 --- PR
-    CD --- PR
+    PR["Shared network printer at cash counter<br/>(Delux: A4 dot matrix)<br/>default Windows printer on every counter"]
+    C1 -->|"LAN print (silent)"| PR
+    CD -->|LAN print| PR
   end
 
   subgraph Cloud["Hetzner VPS (Singapore) - Docker"]
@@ -74,8 +74,8 @@ apps/
 packages/
   domain/         # PURE TS business rules shared by pos + api (no I/O): money, pricing,
                   # bill math, tender/change, returns eligibility, credit checks,
-                  # role limits, numbering, QR codec, document validation
-  contracts/      # Zod schemas: REST DTOs, sync payloads (versioned), QR payload
+                  # role limits, numbering, bill code (barcode/QR) codec, document validation
+  contracts/      # Zod schemas: REST DTOs, sync payloads (versioned), bill code payloads
   db/             # Drizzle schema, SQL migrations, RLS policies, seed templates (CoA, roles)
   posting/        # Posting engine: document -> stock/party/GL entries (server-side)
   ui/             # Shared React components, keyboard shortcut system, i18n setup
@@ -106,7 +106,7 @@ The bootstrap download is ~20 MB uncompressed (a few MB gzipped).
 ### 4.2 Storage guardrails (mandatory, D-010)
 1. On first run, call `navigator.storage.persist()`. If it is not granted, show a blocking setup screen. **Selling is disabled** until it is granted.
 2. Every time the app opens, check that the local DB is readable, that its schema version matches, and that the outbox is intact. If a check fails, show a blocking alert and call the manager.
-3. Counter PC setup: Chrome/Edge policies disable clearing browsing data and site data, the PWA is installed and launched with `--kiosk-printing`, and the thermal printer is set as the default printer. A setup script and checklist are provided in `infra/`.
+3. Counter PC setup: Chrome/Edge policies disable clearing browsing data and site data, the PWA is installed and launched with `--kiosk-printing`, and the bill printer (Delux: the shared network dot-matrix printer) is installed in Windows and set as the default printer. For half-page bills, a custom paper size is defined in Windows. A setup script and checklist are provided in `infra/`.
 4. **Never drop or rebuild the local DB while the outbox holds unsynced documents.** Schema migrations run in place. A full rebuild from a server snapshot is only allowed when the outbox is empty.
 5. App updates (service worker): a new version downloads in the background and **activates only when no bill is open**. The server accepts push payloads from version N-1.
 6. The architecture is **wrapper-ready**: no PWA-only assumptions leak into the domain layer, so the same app can be packaged as a desktop app (e.g. Tauri) later.
@@ -122,23 +122,41 @@ The bootstrap download is ~20 MB uncompressed (a few MB gzipped).
 - **Revocation:** revoking a device in the back office blocks its next sync. Documents it already created are still accepted, flagged for review.
 
 ### 4.4 Document numbering and time
-- Number series per device and family: `S` sales/returns/exchanges, `R` collections, `M` cash movements, `Z` cash session close. Format: `{deviceCode}-{family}{seq:6}`, e.g. `C03-S000412`. Gapless and never reused (voids keep their number).
+- Number series per device and family: `S` sales/returns/exchanges, `H` cash handovers and refund payouts, `R` collections, `M` cash movements, `Z` cash session close. Format: `{deviceCode}-{family}{seq:6}`, e.g. `C03-S000412`. Gapless and never reused (voids keep their number).
 - `uuid` (UUIDv7) generated on the device is the identity. The number is for humans.
 - **Business date** = local date (tenant timezone) of `created_at − day_cutoff_hours` (default cutoff 04:00). Every device can compute it with no coordination.
 - The device sends its clock with every push. If skew is greater than 5 minutes, the device health page and the exceptions report flag it. The server also stores `received_at`.
 
-### 4.5 Signed receipt QR
-Purpose: an offline cash handover, refund payout or return of a bill from another counter, without trusting paper.
+### 4.5 Bill code (barcode or signed QR)
+Every printed bill carries a scannable code. Its main use is as the **offline path** for cash handovers and refund payouts. When online, the cashier normally confirms from the live queue (D-047), and scanning is just a shortcut to the exact bill. The code is also used to find the original bill for a return. The **print profile** chooses the code type (D-048).
 
-- **Payload** (versioned, compact, base64url): payload version, document UUID, device code, sequence, business date, document kind, total, cash due / refund due, amount tendered. When the bill has **≤ 15 lines**, it also includes the full line list (item code, qty, unit price), so the cash desk holds a copy of the bill even if the counter's PC dies before syncing.
+**Barcode** (for dot-matrix printers; Delux):
+- Code128 of the bill number and the amount due, e.g. `C03-S000412` + cash due. The exact format is fixed after the Wave 1 scannability test on the real printer.
+- Not signed. That is acceptable when bills print on a shared printer at the cash counter, because the cashier takes the bill straight off the system's own printer, so a fake bill isn't practical.
+- **Offline:** the cash desk records the handover from the bill number and amount in the code, and the server matches it when the counter syncs. It carries no line items, so an offline return of a bill from another unsynced counter uses the no-receipt PIN flow.
+
+**Signed QR** (for thermal or laser printers):
+- **Payload** (versioned, compact, base64url): payload version, document UUID, device code, sequence, business date, document kind, total, cash due / refund due, cash received. When the bill has **≤ 15 lines**, it also includes the full line list (item code, qty, unit price), so the cash desk holds a copy of the bill even if the counter's PC dies before syncing.
 - **Signature:** ECDSA P-256 over the payload with the issuing device's private key. The public keys of all of a branch's devices are synced to every device, so any counter or cash desk can verify offline.
 - A forged or altered QR fails verification. The cash desk refuses it and logs the attempt.
+- Use it when receipts print at the counters and are carried to the cash desk by hand, because paper from outside the system then becomes possible.
 
-### 4.6 Cross-device situations while offline
+### 4.6 Cash desk live queue
+- When online, a counter pushes a finalized bill **immediately** (SYN-02). The server commits it and sends an SSE `queue-changed` event to the branch's cash desk devices, which then pull the queue delta. Target: ≤ 5 s from finalize to visible.
+- The queue lists cash bills with `handover_status = pending` and refunds awaiting payout, grouped by salesman.
+- Confirming creates a `cash_handover` document in the cash desk's own outbox (local-first, like any POS document). If the cashier corrects the cash received, the correction is stored on that handover record. The sale document is never touched.
+- If the same bill is confirmed twice (queue plus scan, or a re-scan), the second attempt is rejected locally and also deduplicated by the server (unique per bill and kind).
+- **Tenant setting `cash_handover_mode` (D-049):**
+  - `required` (default; Delux) behaves as described above.
+  - `off` hides the queue and handover scanning. When the server accepts a cash bill or refund, it creates an **automatic handover** (`method = auto`) in the same transaction. The handover is attached to the branch's cash session that was open at the bill's finalize time. If that session has already closed, the bill is listed as "late" on the day reconciliation.
+  - Postings and reports are identical in both modes. Cash in transit simply clears automatically.
+
+### 4.7 Cross-device situations while offline
 | Situation | Behaviour |
 |---|---|
-| Cash desk scans a bill from a counter that hasn't synced | Verified through the QR signature. Handover recorded. The server matches it when the bill arrives. |
-| Return of a bill made today at another, unsynced counter | Lines taken from the QR (≤ 15 lines). Otherwise the no-receipt flow with a manager PIN, linked by bill number for later reconciliation. |
+| Live queue during an internet outage | It stops updating. The cashier scans each bill's code instead. Printing still works over the LAN. |
+| Cash desk scans a bill from a counter that hasn't synced | Barcode: handover recorded from the bill number and amount. QR: also verified through its signature. The server matches it when the bill arrives. |
+| Return of a bill made today at another, unsynced counter | QR profile: lines taken from the QR (≤ 15 lines). Otherwise, and always with the barcode profile: the no-receipt flow with a manager PIN, linked by bill number for later reconciliation. |
 | Two counters sell the last unit | Both sales are accepted. Stock goes negative and an alert is raised. |
 | Mechanic buys on credit at three counters | Each counter applies the limit plus the **offline daily cap**. Breaches are flagged at sync. |
 | Price changed in the back office during an outage | Counters keep selling at the old price until sync. This is expected and not flagged. |
@@ -158,7 +176,7 @@ Purpose: an offline cash handover, refund payout or return of a bill from anothe
 POST /sync/push  { deviceId, clientVersion, deviceClock, documents: [ {id, family, seq, payload, signature} ... ] }
 → 200 { results: [ {id, status: accepted|duplicate|rejected, exceptions:[...], serverSeq} ... ] }
 ```
-- The client sends outbox entries **in sequence order**, in batches of up to 100.
+- The client sends outbox entries **in sequence order**, in batches of up to 100. When online, a push is triggered **immediately on finalize** (not on a timer), so the bill reaches the cash desk queue within seconds (§4.6).
 - The server, per document, in **one database transaction**:
   1. verifies the device token and signature
   2. validates the schema (`packages/contracts`)
@@ -222,12 +240,25 @@ After a server restore to time T, devices re-push documents from their 30-day lo
 
 | Output | Where | How |
 |---|---|---|
-| 80 mm receipt (sale, return, exchange, collection, cash-out, Z report) | Counters, cash desk | HTML/CSS receipt template, printed silently with `--kiosk-printing` to the default printer. One keystroke. |
+| Bill / receipt (sale, return, exchange, collection, cash-out, Z report) | Counters, cash desk | HTML/CSS template chosen by the device's **print profile** (A4, A5/half page, 80 mm, 58 mm). Printed silently with `--kiosk-printing` to the device's **default Windows printer**, which may be a shared network printer. One keystroke. |
 | A4/A5 invoice, PO, statement | Back office | Print-optimized HTML/PDF with the browser print dialog |
 | Barcode labels (legacy format) | Back office | PDF at the label size, printed to the label printer through the dialog |
 | Pickup run sheet, count sheets | Back office / phone | Responsive HTML, optional print |
 
-The cash drawer opens through the thermal printer driver's "open drawer on print" option at the cash desk, or with its manual key.
+**Print profiles (D-048):**
+- **Fields:** paper format, bill code type (barcode or signed QR), copies (1–2; a second copy is rendered as a second page of the same print job), and template options (header lines, policy text).
+- **Defaults:** a tenant default, overridable per device.
+- **Constraint:** silent printing can only target the device's default printer, so each device has exactly one bill printer.
+
+**Shared network printer (Delux):** one network-attached A4 dot-matrix printer at the cash counter is installed in Windows on every counter and set as the default printer. Printing goes over the LAN, so it keeps working when the internet is down.
+
+**Dot-matrix considerations:**
+- Browsers send pages as graphics, not in the printer's fast plain-text mode, so printing is slower and noisier than an old desktop app's.
+- The layout is kept light: no shading, monospace-friendly, a large barcode.
+- **Wave 1, week 1:** measure print speed and barcode scannability on the real printer.
+- **Fallback if it's too slow:** a small local print helper on each counter that sends plain text (ESC/P) directly to the printer. This adds an install step, so it is used only if the test fails.
+
+**Cash drawer:** it opens through a thermal printer's "open drawer on print" option where one is attached, otherwise with the drawer's own key or button. Dot-matrix printers can't trigger the drawer.
 
 ## 9. Deployment and operations (Hetzner VPS)
 

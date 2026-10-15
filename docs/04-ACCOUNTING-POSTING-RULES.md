@@ -111,6 +111,10 @@ A reversing journal entry with every line of the original entry swapped, dated t
 | Drawer close, shortage | `Dr CASH_SHORT_OVER / Cr CASH_DRAWER`: variance |
 | Drawer close, overage | `Dr CASH_DRAWER / Cr CASH_SHORT_OVER`: variance |
 
+With `cash_handover_mode = off`, the automatic handover posts the same entry in the same transaction as the sale, so the posting logic is the same in both modes.
+
+A handover always posts the bill's **cash due** (or refund amount). The salesman's "cash received", any correction by the cashier, and the change given are operational records only, and they don't post. If the drawer ends up short or over because of them, it shows in the drawer-close variance.
+
 **Control property:** at the end of a fully synced business day, `CASH_IN_TRANSIT` should be **zero**. Any balance means cash bills that were never handed over, or refunds never paid out. This matches the "missing handover" list on the day reconciliation report.
 
 ## 5. Purchasing and inventory

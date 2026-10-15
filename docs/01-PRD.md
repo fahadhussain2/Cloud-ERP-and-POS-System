@@ -53,14 +53,16 @@ Sales tax and FBR/e-invoicing integration, multi-currency, multiple branches in 
 ### 3.3 Success metrics (measured during the pilot)
 | Metric | Target |
 |---|---|
-| Keyboard-only checkout of a 3-line cash bill, from search to printed receipt | ≤ 20 s for a trained salesman |
+| Keyboard-only checkout of a 3-line cash bill, from search to finalized (sent to print) | ≤ 20 s for a trained salesman |
+| Finalized cash bill visible in the cashier's live queue (online) | ≤ 5 s |
+| Bill printed on the shared dot-matrix printer after finalize | Measured on the real printer in Wave 1. Target: before the salesman reaches the cash counter (≈ 15 s). |
 | Search result latency on a counter PC (20k items) | ≤ 100 ms per keystroke |
 | Lost or duplicated bills after offline periods | **0** |
 | Time for an offline counter to fully sync after reconnecting | ≤ 2 min for one day of bills |
 | Bills edited after printing | 0 (impossible by design) |
 | Returns linked to the original bill or approved by PIN | 100% |
 | Cash variance at day close traceable to a session and cashier | 100% |
-| Bills whose cash never reached the drawer | Shown on the day-close report, every day |
+| Bills whose cash never reached the drawer (handover confirmation **Required**) | Shown on the day-close report, every day |
 
 ## 4. Users and roles
 
@@ -83,9 +85,9 @@ Configurable role limits include: max discount % below list, whether the role ca
 1. The salesman unlocks the counter with a **personal PIN**. The bill is attributed to them.
 2. They search by name words, code, OEM part number or vehicle, or scan a label, then add lines with the keyboard (quantity, price within the allowed range).
 3. Optionally they choose the customer (walk-in by default) and price tier (Retail by default; a customer's tier applies automatically).
-4. On **Pay**, they choose the tender: cash, with the amount tendered (change is calculated).
-5. The bill is **finalized** and printed on the 80 mm printer. The receipt carries a **signed QR code**.
-6. The salesman takes the customer's cash and the receipt to the cash desk (W4) and returns with the change and the receipt.
+4. On **Pay**, they choose the tender: cash. **Cash received** is optional. Pressing Enter means the exact amount; the salesman types a figure only when the customer hands over more, and the change is calculated.
+5. The bill is **finalized** and printed silently to the counter's default printer, using the device's print profile (POS-16). **Delux:** all counters print to one shared network dot-matrix printer at the cash counter. The bill shows the cash received and the change, plus a scannable code (barcode or signed QR, per the print profile).
+6. The salesman takes the customer's cash to the cash desk, where the bill is already printed (W4). The salesman returns to the customer with the change and the bill.
 
 ### W2. Credit sale (customer account)
 As W1, but the customer is a credit account. The counter checks:
@@ -98,18 +100,24 @@ If either is exceeded, a manager PIN is needed. No cash moves, and the receipt s
 A bill can have several payment lines, for example cash + Raast, or JazzCash + card. Every non-cash line needs a **reference** (transaction ID or slip number). Only the cash portion goes through the handover.
 
 ### W4. Cash handover at the cash desk
-1. The cashier scans the receipt QR. The cash desk shows the bill, the amount due, the amount tendered and the change to give.
-2. The cashier confirms. The bill is marked **cash received** and the change paid out is recorded.
-3. When online, the cash desk also shows a **live queue** of finalized cash bills not yet handed over, grouped by salesman.
-4. Bills sold on the cash desk device itself are handed over automatically.
+1. **Live queue (normal path):** the cash desk shows finalized cash bills awaiting handover, and refunds awaiting payout, within seconds of finalizing. They are grouped by salesman and show counter, bill number, time, amount due, cash received and change.
+2. The cashier matches the salesman and the printed bill to the queue entry and presses **Enter** to confirm. No scan is needed. Scanning the bill's code is an optional shortcut that jumps straight to the exact bill.
+3. If the cash counted differs from the salesman's "cash received" (e.g. a typing mistake), the cashier corrects it while confirming. The correction is stored on the handover record with the cashier's name. The bill itself never changes.
+4. The bill is marked **cash received** and the change given is recorded.
+5. Bills sold on the cash desk device itself are handed over automatically.
 
-This works offline: the QR carries the bill ID, amount, device and a signature, so the cash desk can record the handover before the counter has synced.
+**Offline:** the queue stops updating while the internet is down. The cashier reads the change from the printed bill and **scans its code** to record the handover (one beep). The code carries the bill number and amount due, so this works before the counter has synced, and the server matches it later.
+
+**Handover confirmation setting (tenant):** steps 1–4 apply when it is **Required** (default; **Delux: Required**). When it is **Off**, every finalized cash bill and cash refund counts as handed over automatically: no queue, no confirmation and no scan. The trade-offs:
+- A shortage is known only per cash session, not per bill or salesman.
+- Bills where the customer walked away aren't flagged as unpaid.
+- The drawer's expected cash only becomes final once all counters have synced (W10).
 
 ### W5. Void and reissue
 A finalized bill is never edited. A Manager or Cashier with the permission voids it, with a **PIN and a reason**, and optionally issues a corrected bill linked to it. Default rule: voids are allowed until the business day closes **and** before the cash handover. After that, use a return. The voided bill keeps its number and prints as VOID.
 
 ### W6. Return and exchange (one screen)
-1. Scan the receipt QR, or search the bill by number, phone or date. This includes pre-cutover legacy bills from the last 90 days.
+1. Scan the bill's code, or search the bill by number, phone or date. This includes pre-cutover legacy bills from the last 90 days.
 2. Mark the lines coming back (up to the quantity originally sold, minus earlier returns). For each, record a **reason** (wrong part, unused option, defective, changed mind, other) and a **condition** (resellable goes back to Shop; defective goes to the Damaged location).
 3. Optionally add replacement items. The screen shows the net amount: the customer pays the difference or receives a refund.
 4. Refunds are at the **price originally paid**.
@@ -118,7 +126,7 @@ A finalized bill is never edited. A Manager or Cashier with the permission voids
 
 ### W7. Refund payout
 Refunds follow the original payment method:
-- **Cash refund:** the receipt shows "Refund due Rs X, collect at cash desk". The cashier scans it and pays out (the reverse of the handover).
+- **Cash refund:** the receipt shows "Refund due Rs X, collect at cash desk". The refund appears in the cashier's live queue. The cashier confirms it there (or scans the code, e.g. when offline) and pays out. This is the reverse of the handover.
 - **Credit customer:** the account is credited.
 - **Bank or wallet payers:** a manager decides between a cash payout and a transfer, with a reference.
 
@@ -133,7 +141,8 @@ The cashier records each cash-out with a category, amount, note and an optional 
 
 ### W10. Day close (two-step)
 1. **Drawer close (cash desk):** the cashier counts the drawer by **denomination**. The system calculates expected cash as: opening float + cash handovers + collections − refunds − cash-outs. The variance is recorded on the cash session. A manager acknowledges it.
-2. **Business-day reconciliation (cloud):** once all counters have synced, the day report lists any **finalized cash bill without a handover** (by salesman), offline cap breaches, below-floor sales without a valid override, and negative stock events. If a counter is still offline, the day stays *provisional*.
+   - *Handover setting Off:* "cash handovers" means every finalized cash bill of the session's period, from any counter. If some counters haven't synced yet, the variance is **provisional** until they do.
+2. **Business-day reconciliation (cloud):** once all counters have synced, the day report lists offline cap breaches, below-floor sales without a valid override and negative stock events. With the handover setting **Required**, it also lists any **finalized cash bill without a handover** (by salesman). If a counter is still offline, the day stays *provisional*.
 
 ### W11. Purchasing
 1. Draft a PO, optionally from the **reorder suggestion list**. The list shows items below minimum with 30 and 90 day sales, stock in Shop and Godown, open PO quantity and last supplier and cost, grouped by supplier.
@@ -165,7 +174,7 @@ With no internet, every counter still:
 - searches the full catalog, applies prices and tiers, and enforces credit limits using cached balances plus the offline cap
 - verifies PINs locally.
 
-The cash desk still handles handovers by QR scan, collections, cash-outs, refunds and the drawer close. The following need the internet: the back office (purchasing, receiving, reports, master data), the live cash queue, and cross-counter stock accuracy. A status bar always shows *Offline since HH:MM · N bills waiting to sync*. On reconnect, everything syncs automatically with no user action.
+Printing to the shared network printer keeps working, because it only needs the LAN. The cash desk still handles handovers and refund payouts (by scanning the bill's code), collections, cash-outs and the drawer close. The following need the internet: the back office (purchasing, receiving, reports, master data), the live cash queue, and cross-counter stock accuracy. A status bar always shows *Offline since HH:MM · N bills waiting to sync*. On reconnect, everything syncs automatically with no user action.
 
 ## 6. Functional requirements
 
@@ -174,7 +183,7 @@ The cash desk still handles handovers by QR scan, collections, cash-outs, refund
 ### 6.1 Platform (PLT)
 | ID | Requirement | Wave |
 |---|---|---|
-| PLT-01 | Tenant with base currency, timezone, locale, fiscal year start month (fixed once the first period is closed), cash rounding rule and receipt header. | 1 |
+| PLT-01 | Tenant with base currency, timezone, locale, fiscal year start month (fixed once the first period is closed), cash rounding rule, receipt header, and **cash handover confirmation** (Required / Off; Delux: Required; see W4). | 1 |
 | PLT-02 | Branch → Locations (Shop / Godown / Damaged, flagged sellable or not). One branch in the MVP UI, many in the model. | 1 |
 | PLT-03 | Device enrollment: a manager registers a counter or cash desk browser to a branch with a one-time code. Devices can be named, given a type (counter / cash desk) and revoked. | 1 |
 | PLT-04 | Users with personal accounts. Back-office login by username/email and password. **POS unlock by personal PIN** on an enrolled device. Auto-lock after inactivity. | 1 |
@@ -206,28 +215,30 @@ The cash desk still handles handovers by QR scan, collections, cash-outs, refund
 | POS-03 | Fully keyboard-driven: function-key map, no mouse needed, visible shortcut hints. | 1 |
 | POS-04 | Bill lines: quantity, unit price (from tier). A price below list requires a role limit or override; below floor requires a manager PIN. Optional bill-level discount under the same rules. | 1 |
 | POS-05 | Customer selection: walk-in by default, fast search by name, phone or code. Optional phone capture for walk-ins (so bills can be found later without a receipt). | 1 |
-| POS-06 | Tender: cash (tendered amount → change), bank/Raast, JazzCash, Easypaisa, card. **Split tender**, with a reference on non-cash lines. Credit account. | 1 |
+| POS-06 | Tender: cash (optional cash received, Enter = exact amount → change), bank/Raast, JazzCash, Easypaisa, card. **Split tender**, with a reference on non-cash lines. Credit account. | 1 |
 | POS-07 | Credit control: limit check (synced balance + local unsynced) and offline daily cap per customer. Over the limit requires a manager PIN. | 1 |
 | POS-08 | **Hold / park** bills and resume them on the same device. Held bills expire at day close. | 1 |
-| POS-09 | Finalize → print 80 mm receipt silently. Receipt shows the shop header, bill number, date and time, salesman, lines, totals, tender and change, return policy line, and a **signed QR**. | 1 |
+| POS-09 | Finalize → print the bill silently to the device's default printer (local or shared network printer) using its print profile (POS-16). The bill shows the shop header, bill number, date and time, salesman, lines, totals, tender, cash received and change, return policy line, and a scannable **bill code** (barcode or signed QR). | 1 |
 | POS-10 | Reprint (marked REPRINT, logged). | 1 |
 | POS-11 | **Void** with permission, PIN and reason within the void window; optional linked **reissue**. | 1 |
 | POS-12 | **Return / exchange** screen per W6, including legacy bill lookup (90 days), reason and condition, no-receipt flow with PIN, return window and non-returnable category rules. | 1 |
 | POS-13 | Per-device document numbering, gapless and never reused (e.g. `C03-S000412`). | 1 |
 | POS-14 | Status bar: online/offline, last sync, unsynced count, warnings when offline longer than a threshold. | 1 |
 | POS-15 | Cash rounding per tenant rule (e.g. to the nearest whole rupee), posted to a rounding account. | 1 |
+| POS-16 | **Print profiles:** a tenant default, overridable per device. Paper format: A4, A5/half page, 80 mm or 58 mm thermal. Bill code: barcode (bill number + amount due) or signed QR. Copies: 1 or 2. Templates suited to dot-matrix and thermal printers. **Delux:** A4 dot matrix, barcode, 1 copy. | 1 |
 
 ### 6.4 Cash desk (CSH)
 | ID | Requirement | Wave |
 |---|---|---|
 | CSH-01 | Cash session: open with float, belongs to one cash desk device and cashier. Can hand over to another cashier (close/open). | 1 |
-| CSH-02 | **QR handover** of cash bills (W4), recording change paid out. Duplicate scans are detected. | 1 |
-| CSH-03 | **Live queue** of bills awaiting handover, when online. | 2 |
-| CSH-04 | Refund payout by QR (W7). | 1 |
+| CSH-02 | **Live queue** of cash bills awaiting handover and refunds awaiting payout, updated within seconds when online and grouped by salesman. Confirm with Enter; the cashier can correct the cash received (logged); change given is recorded. Duplicate confirmations are detected. This is the primary handover path (W4). Only active when handover confirmation is Required. | 1 |
+| CSH-03 | **Scan handover:** scanning a bill's code jumps to it in the queue. When offline, the scan records the handover from the code's bill number and amount. Only active when handover confirmation is Required. | 1 |
+| CSH-04 | Refund payout from the queue, or by scanning (W7). | 1 |
 | CSH-05 | Customer collections with receipt print (W8). | 1 |
 | CSH-06 | Cash-out: expense (category), supplier payment (party), bank deposit (bank account), each with a note and reference (W9). | 1 |
 | CSH-07 | Drawer close by denomination, expected vs counted, variance with a reason and manager acknowledgement (W10.1). | 1 |
-| CSH-08 | Business-day reconciliation report (W10.2): missing handovers, exceptions, provisional/final status. | 1 |
+| CSH-08 | Business-day reconciliation report (W10.2): missing handovers (when Required), exceptions, provisional/final status. | 1 |
+| CSH-09 | Handover confirmation **Off** mode: automatic handovers for all cash bills and refunds, and the drawer close expects every finalized cash bill (W4, W10). Not needed by Delux at go-live. | 2 |
 
 ### 6.5 Inventory (INV)
 | ID | Requirement | Wave |
@@ -286,7 +297,7 @@ All reports filter by date range and export to CSV. PDF/print is offered where i
 | ID | Requirement | Wave |
 |---|---|---|
 | SYN-01 | Each counter holds a local copy of: catalog, identifiers, vehicle tags, prices, floors, customers (with balance snapshot and limits), users/PIN verifiers, roles and settings, its own documents for 30 days, and 90 days of the branch's sale bills (headers + lines, for returns). | 1 |
-| SYN-02 | Upload of finalized documents through an outbox. Idempotent, ordered per device, retried with backoff, no user action. | 1 |
+| SYN-02 | Upload of finalized documents through an outbox. Idempotent, ordered per device, retried with backoff, no user action. When online, a finalized bill is pushed **immediately** (not on a timer), so it reaches the cashier's live queue within seconds. | 1 |
 | SYN-03 | **The server never rejects a completed sale on business-rule grounds.** It accepts it and raises an exception for review. It rejects only malformed, unauthenticated or tampered payloads. | 1 |
 | SYN-04 | Incremental download of reference data changes, plus a "changes available" push when online. | 1 |
 | SYN-05 | After a server restore, a counter can re-push its last 30 days of documents safely (deduplicated by ID). | 1 |
@@ -304,13 +315,13 @@ All reports filter by date range and export to CSV. PDF/print is offered where i
 
 | Area | Requirement |
 |---|---|
-| **Performance** | POS cold start ≤ 5 s, warm ≤ 1 s. Search ≤ 100 ms. Finalize + print ≤ 2 s. Back-office pages ≤ 2 s at p95. |
+| **Performance** | POS cold start ≤ 5 s, warm ≤ 1 s. Search ≤ 100 ms. Finalize and send to the printer ≤ 2 s (the physical print time depends on the printer). Back-office pages ≤ 2 s at p95. |
 | **Offline** | Full POS and cash desk operation offline for at least 1 business day without data loss. Longer works, with warnings. |
 | **Durability** | A finalized document is committed to local storage before printing. Server RPO ≤ 5 min (continuous WAL archiving), plus counters re-pushing 30 days. RTO ≤ 4 h. |
 | **Integrity** | Money in integer minor units. Documents immutable after finalization. GL and stock ledgers append-only and rebuildable from documents. |
 | **Security** | Tenant isolation by RLS. Passwords hashed with Argon2id. PINs never stored in plain text. TLS everywhere. Least-privilege roles. Audit log. Legacy passwords are not migrated. |
 | **Scale (design)** | 1,000 tenants. 100k items per tenant. 2,000 bills/day per tenant. 30 devices per tenant. Without re-architecture. |
-| **Browser / hardware** | Chrome or Edge (current), Windows 10/11 counters. 80 mm thermal printer as the default printer on counters. Keyboard-wedge barcode scanners. Label and A4 printing from the back office. |
+| **Browser / hardware** | Chrome or Edge (current), Windows 10/11 counters. Each counter's **default Windows printer** receives its bills. This can be a local printer or a shared network printer, thermal or A4/A5 (print profiles, POS-16). **Delux:** one network-attached A4 dot-matrix printer at the cash counter, the default printer on every counter. Keyboard-wedge barcode scanners (including one at the cash desk). Labels and other A4 documents print from the back office. |
 | **i18n** | English only, but all UI strings go through translation keys, CSS uses logical properties (RTL-ready), and numbers, dates and currency are formatted by locale. |
 | **Observability** | Structured logs, error tracking, uptime monitoring, device health telemetry. |
 
@@ -319,7 +330,7 @@ All reports filter by date range and export to CSV. PDF/print is offered where i
 | Dates (2026) | Phase | Content |
 |---|---|---|
 | Mon 12 Oct – Sun 25 Oct | **Wave 0: foundations** | Monorepo, CI, VPS + Docker + backups, database + RLS, auth (users, devices, PIN), roles, tenant setup, **legacy importer first** (so all development uses the real 19.5k items). |
-| Mon 26 Oct – Sun 22 Nov | **Wave 1: critical path** | POS PWA (local DB, search, bill, tender, receipt + QR, hold, void, return/exchange), sync, cash desk, credit control, stock ledger, goods receipt, purchase return, supplier/customer ledgers, posting engine, labels. |
+| Mon 26 Oct – Sun 22 Nov | **Wave 1: critical path** | POS PWA (local DB, search, bill, tender, print profiles + bill code, hold, void, return/exchange), sync, cash desk (**live queue** + scan handover), credit control, stock ledger, goods receipt, purchase return, supplier/customer ledgers, posting engine, labels. **First week: print test on the shop's dot-matrix printer** (speed, layout, barcode scannability). |
 | Mon 23 Nov – Sun 6 Dec | **Wave 2: rest of MVP** | POs, sharing, pickup sheet, reorder list, repricing, cycle counts, custom roles, financial statements, remaining reports. |
 | Tue 1 Dec – Fri 18 Dec | **Shadow pilot** | 1–2 counters + the cash desk run the new system in parallel (legacy remains official). Daily reconciliation. Includes a deliberate **8-hour offline drill**. |
 | **Fri 18 Dec** | **Go / no-go** | Checklist below. |
@@ -347,8 +358,10 @@ Warranty and supplier claims · sale-on-approval challans · quotations · bank 
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Aggressive timeline, solo developer | Bugs at go-live | Build order by criticality. Strict scope. Pilot + go/no-go gate. Rollback plan. |
-| Browser storage wiped (cleaners, "clear history") | Unsynced bills lost | Persistent storage required. Chrome policies on counters. Unsynced count always visible. Paper receipts + QR as a backstop. |
-| Counter PC dies during a long outage | Its unsynced bills exist only on paper | Full bill encoded in the QR (when short), so the cash desk holds a copy. Re-entry tool from paper. |
+| Browser storage wiped (cleaners, "clear history") | Unsynced bills lost | Persistent storage required. Chrome policies on counters. Unsynced count always visible. Printed bills as a backstop. |
+| Counter PC dies during a long outage | Its unsynced bills exist only on paper | With a signed-QR profile, the full bill is encoded in the QR (when short), so the cash desk holds a copy. With a barcode profile (Delux), only the bill number and amount are captured at handover. Re-entry tool from paper. |
+| Single shared printer (Delux) | If it jams or runs out of paper, no counter can print | Bills are saved before printing and can be reprinted (POS-10) once it's fixed. Keep a spare printer and paper stock. |
+| Browser printing on dot matrix | Browsers print as graphics, which is slower than the plain-text printing older apps use. Barcodes may scan poorly. | Test on the real printer in Wave 1 week 1. Light layout, half-page paper. Fallback: a small local print helper sending plain text to the printer (adds an install step). |
 | Staff resist "no edits" and personal PINs | Workarounds, shared PINs | Training. Fast void/reissue. Overrides by PIN are faster than calling admin. Audit reports reviewed weekly. |
 | Legacy data quality | Bad search, wrong stock | Cleanup reports. Opening stock from legacy, then Q1 cycle counts. |
 | Single VPS | Back office down, data risk | Counters keep selling offline. WAL backups off-site. Restore drills. Portable Docker setup. |
@@ -365,7 +378,7 @@ Warranty and supplier claims · sale-on-approval challans · quotations · bank 
 | Q4 | **Void window**: until handover and same business day, as proposed? | Yes |
 | Q5 | **Cash rounding**: to the nearest whole rupee? | Nearest Rs 1 |
 | Q6 | Default **credit limits** and the **offline daily cap** for credit customers? | Limit set per customer; offline cap Rs 25,000/day |
-| Q7 | Printer models (thermal and label) and label size, for layout testing? | — |
+| Q7 | Model of the shared dot-matrix printer and the label printer. Is the paper continuous (tractor-feed) or single sheets? Full A4 or half page per bill? Label size? | Needed before the Wave 1 print test |
 | Q8 | Are the legacy accounts "Cheque in hand", "Cash memo" and "Cash for payment" still used? | Migrate them as asset accounts |
 | Q9 | How should stock be split between **Shop and Godown** at go-live? Legacy has a single figure. | All in Shop. Godown counted and transferred in January. |
 | Q10 | Counter PCs: Windows version and browser? (Chrome no longer supports Windows 7/8.) | Windows 10/11 + Chrome |
