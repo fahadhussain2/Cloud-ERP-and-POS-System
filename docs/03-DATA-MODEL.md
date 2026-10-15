@@ -29,18 +29,21 @@ Data in this document is grouped by area. Fields marked † are derived and main
 
 ## 2. Platform
 
-**tenants:** `name, legal_name, base_currency (ISO 4217), currency_minor_units, timezone (e.g. Asia/Karachi), locale, fiscal_year_start_month (1–12), fiscal_year_locked bool, tax_mode (none|inclusive|exclusive), cash_rounding_increment (minor units, e.g. 100 = Rs 1), day_cutoff_hour, lock_date, settings jsonb, status`
+**tenants:** `name, legal_name, base_currency (ISO 4217), currency_minor_units, timezone (e.g. Asia/Karachi), locale, fiscal_year_start_month (1–12), fiscal_year_locked bool, tax_mode (none|inclusive|exclusive), cash_rounding_increment (minor units, e.g. 100 = Rs 1), day_cutoff_hour, cash_handover_mode (required|off; Delux: required), lock_date, settings jsonb, status`
 
 **branches:** `code, name, address, phone, receipt_header jsonb`
 
 **locations:** `branch_id, code, name, kind (shop|storage|damaged), is_sellable`
 - Delux: `SHOP` (sellable), `GODOWN` (storage), `DAMAGED` (not sellable).
 
-**devices:** `branch_id, code (e.g. C03, D01), name, kind (counter|cash_desk|mobile), public_key (ECDSA P-256), status (active|revoked), enrolled_at, revoked_at, last_seen_at, app_version, health jsonb`
+**devices:** `branch_id, code (e.g. C03, D01), name, kind (counter|cash_desk|mobile), public_key (ECDSA P-256), print_profile_id (nullable → tenant default), status (active|revoked), enrolled_at, revoked_at, last_seen_at, app_version, health jsonb`
+
+**print_profiles:** `name, paper_format (a4|a5|thermal_80|thermal_58), code_type (barcode|signed_qr), copies (1|2), template_options jsonb (header lines, policy text, font size), is_tenant_default`
+- Delux: one profile `A4 dot matrix`, `barcode`, 1 copy, the default for every device.
 
 **device_enrollment_codes:** `branch_id, code_hash, expires_at, used_at, created_by_user_id`
 
-**device_series** (server mirror for gap detection): `device_id, family (S|R|M|Z), last_accepted_seq, missing_seqs int[]`
+**device_series** (server mirror for gap detection): `device_id, family (S|H|R|M|Z), last_accepted_seq, missing_seqs int[]`
 
 **users:** `username, email, full_name, short_code (for quick PIN unlock), password_hash (Argon2id), pin_verifier (slow hash + salt), status`
 - Unique per tenant: `username`, `short_code`.
@@ -151,7 +154,7 @@ This keeps the one-screen exchange (D-006) to one document, one number, one rece
 | `override_id` | if a below-list/floor price was approved |
 | `unit_cost`† | set at posting (avg cost for sales; the original line's cost for returns) |
 
-**sales_payments:** `document_id, method_id, amount (negative for refunds), tendered (cash), change_given (cash), reference`
+**sales_payments:** `document_id, method_id, amount (negative for refunds), cash_received (cash; optional, entered by the salesman; null = exact amount), change_due (cash; printed on the bill), reference`
 
 **payment_methods:** `code (cash|bank_transfer|raast|jazzcash|easypaisa|card|on_account), name, gl_account_id, requires_reference, is_cash, is_active`
 
@@ -167,9 +170,11 @@ Held bills are **device-local only** and never sent to the server.
 
 **cash_sessions:** `branch_id, device_id, number, cashier_user_id, opened_at, opening_float, closed_at, expected_cash†, counted_cash, variance, denominations jsonb ({"5000":3,"1000":12,…}), variance_reason_code, acknowledged_by_user_id, status (open|closed)`
 
-**cash_handovers:** `session_id, sales_document_id, kind (in|payout), amount, change_given, cashier_user_id, device_id, at_device`
-- Unique `(sales_document_id, kind)`, so a second scan of the same receipt is reported as a duplicate.
-- A sale created on the cash desk device itself gets an automatic `in` handover.
+**cash_handovers:** `session_id, sales_document_id, bill_number, kind (in|payout), amount (cash due or refund; the posted figure), received_amount (cash actually handed over, as confirmed by the cashier), change_given, corrected_from (the salesman's cash received, if the cashier changed it), method (queue|scan|auto), cashier_user_id, device_id, at_device`
+- This is a POS document created by the cash desk (own outbox and series). The sale document itself is never modified.
+- Unique `(tenant_id, bill_number, kind)`, so a second confirmation of the same bill (queue + scan, or a re-scan) is reported as a duplicate. The key is the bill number rather than the document ID, so it works for offline scans too.
+- An offline scan of a bill that hasn't synced yet is stored with `bill_number` and `amount` from the code. `sales_document_id` is linked when the sale arrives.
+- A sale created on the cash desk device itself gets an automatic `in` handover (`method = auto`). With `cash_handover_mode = off`, the server creates an automatic handover for **every** cash bill and refund on acceptance.
 
 **payments** (party money movements): `number, direction (in = customer collection | out = supplier payment), party_id, method_id, amount, reference, business_date, session_id (if at the cash desk), bank_account_id (if via bank), device_id, created_by_user_id`
 

@@ -51,7 +51,8 @@ PostgreSQL 17+, Docker Compose on a Hetzner VPS (Singapore), Caddy, WAL archivin
 |---|---|
 | Counter | A POS device where a salesman sells and prints bills |
 | Cash desk | The single device with the cash drawer. It sells **and** receives handovers, pays refunds, takes collections and closes the drawer. |
-| Handover | Salesman brings a bill's cash to the cash desk; the cashier scans the receipt QR |
+| Handover | Salesman brings a bill's cash to the cash desk; the cashier confirms it from the live queue, or scans the bill code (always when offline). Tenant setting `cash_handover_mode`: Required (Delux) or Off (automatic). |
+| Print profile | Per-tenant/per-device bill printing setup: paper format, bill code (barcode or signed QR), copies. Delux: shared network A4 dot matrix, barcode. |
 | Cash in transit | GL account holding cash from finalized counter bills not yet handed over. It must be 0 after a fully synced day. |
 | Floor price | Lowest price allowed without a manager PIN |
 | Tier | Price list (Retail / Mechanic / Wholesale) |

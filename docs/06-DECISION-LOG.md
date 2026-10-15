@@ -28,7 +28,7 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 ### D-003 Cash handover by signed QR, plus a live queue when online
 - **Decision:** Every receipt carries a signed QR code. The cashier scans it to record the cash handover, which works offline. When online, the cash desk also shows a live queue of bills awaiting handover. The day close flags bills whose cash never arrived.
 - **Alternatives:** live queue only (needs a LAN server); no tracking.
-- **Status:** Accepted
+- **Status:** Accepted. **Partly superseded by D-047** (2026-10-14): the live queue is now the primary path, and scanning is the shortcut and offline fallback.
 
 ### D-004 Pricing: tiers + floor + PIN override
 - **Decision:** Price tiers (Retail / Mechanic / Wholesale). Salesmen can bargain down to their role limit and the floor price. Going below that needs a manager PIN. Every override is logged.
@@ -47,7 +47,7 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 
 ### D-007 Refunds follow the payment method
 - **Decision:** Cash refunds are paid out at the cash desk by QR (the reverse of the handover). Account customers get an account credit. Bank and wallet payers get a cash payout or a transfer, as the manager decides.
-- **Status:** Accepted
+- **Status:** Accepted. **Partly superseded by D-047** (2026-10-14): cash refund payouts use the live queue or a scan.
 
 ### D-008 Warranty and supplier claims are deferred
 - **Decision:** No claims workflow in the MVP. Returns still record the condition, and defective items go to a non-sellable DAMAGED location.
@@ -195,5 +195,45 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 | D-042 | Custom sync protocol: outbox push + `xid8`-safe change-feed pull + SSE nudge | PowerSync / ElectricSQL (extra moving parts) |
 | D-043 | New CoA template with legacy codes searchable | Keep the legacy `10-01-0001` structure |
 | D-044 | Returns valued back into stock at the original sale line's cost | Current average cost |
-| D-045 | Receipt QR signed with per-device ECDSA P-256 keys; ≤ 15 lines embedded | Unsigned QR (forgeable) |
+| D-045 | Receipt QR signed with per-device ECDSA P-256 keys; ≤ 15 lines embedded. **Partly superseded by D-048:** applies only to print profiles that use the signed QR. | Unsigned QR (forgeable) |
 | D-046 | Business-day cutoff at 04:00 local (late sales count to the same day) | Midnight |
+
+## Decisions added during review
+
+### D-047 Shared LAN printer and queue-first cash handover (2026-10-14)
+- **Context:** Delux counters have no printers of their own. All of them print to one network-attached A4 dot-matrix printer at the cash counter, and the salesman brings the cash there.
+- **Decision:**
+  - The salesman finalizes the bill and enters the **cash received** (optional; Enter = exact amount).
+  - The bill prints silently over the LAN at the cash counter, showing the cash received and the change.
+  - The cashier confirms the bill from a **live queue** (online, ≤ 5 s after finalize) by pressing Enter, and can correct the cash received. The correction is logged on the handover record; the bill never changes.
+  - Scanning the bill's code is an optional shortcut, and **the** method when the internet is down. Printing over the LAN keeps working offline.
+  - Cash refund payouts follow the same queue / scan flow (replaces "by QR" in D-007).
+- **Consequences:**
+  - The live queue moves from Wave 2 to **Wave 1** (CSH-02).
+  - Bills are pushed immediately on finalize (SYN-02).
+  - Handovers become their own POS document (`H` series).
+- **Alternatives:**
+  - **Scan every bill** (the original D-003 flow): rejected as more work for the cashier on normal days.
+  - **In-shop LAN hub**, so the queue also works offline: rejected for the MVP. It costs about 2–3 weeks plus a new failure point. It's a candidate for Phase 2 if outages stay frequent after the 4G failover router.
+- **Status:** Accepted
+
+### D-048 Configurable print profiles; barcode for dot-matrix printers (2026-10-14)
+- **Decision:**
+  - **Print profiles** (paper: A4 / A5 / 80 mm / 58 mm; bill code: barcode or signed QR; copies: 1–2), with a tenant default and an override per device.
+  - The bill code is a **barcode** (bill number + amount due) on dot-matrix profiles, and a **signed QR** on thermal or laser profiles.
+  - **Delux:** A4 dot matrix, barcode, 1 copy.
+- **Why:** other tenants will use thermal printers. Dot matrix can't print a dense QR reliably. An unsigned barcode is safe when bills print on the shop's own printer at the cash counter.
+- **Trade-off:** with the barcode profile there's no offline copy of the bill lines at the cash desk. An offline return of another counter's unsynced bill uses the no-receipt PIN flow.
+- **Open:**
+  - Browser printing on dot matrix (graphics mode) must pass a speed and scannability test in Wave 1 week 1.
+  - The fallback is a small local plain-text print helper.
+- **Status:** Accepted
+
+### D-049 Cash handover confirmation is a tenant setting (2026-10-15)
+- **Decision:** `cash_handover_mode` = **Required** or **Off**. **Delux: Required.**
+  - **Required:** every cash bill and refund is confirmed at the cash desk (Enter in the queue, or a scan when offline), as in D-047.
+  - **Off:** the server creates an automatic handover for every cash bill and refund. There is no per-bill cashier action.
+- **Why:** finalizing a bill records the sale; confirming records that the cash actually reached the drawer. Required gives per-bill and per-salesman accountability and flags bills where the customer walked away. Off suits shops that are happy with drawer-level reconciliation. Supporting both is cheap and useful for SaaS tenants.
+- **Trade-off of Off:** a shortage is known only per cash session; walk-away bills aren't flagged; the drawer's expected cash is provisional until all counters sync.
+- **Build:** Required in Wave 1 (Delux). Off mode in Wave 2 (CSH-09).
+- **Status:** Accepted
