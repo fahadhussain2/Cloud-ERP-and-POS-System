@@ -237,3 +237,16 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Trade-off of Off:** a shortage is known only per cash session; walk-away bills aren't flagged; the drawer's expected cash is provisional until all counters sync.
 - **Build:** Required in Wave 1 (Delux). Off mode in Wave 2 (CSH-09).
 - **Status:** Accepted
+
+### D-050 POS platform: Windows PCs in the MVP, Android tablets in a later phase (2026-10-15)
+- **Decision:** The MVP POS supports Chrome/Edge on Windows 10/11 only. Android tablet support (Chrome on Android) is a later phase.
+- **Why:**
+  - The local database and offline sync already work on Chrome for Android.
+  - What's missing there is silent printing (Android always shows a print dialog and handles dot matrix poorly), a touch layout, and protection against staff clearing the app's storage.
+  - Delux uses Windows PCs, so none of this is needed for go-live.
+- **Later-phase scope:**
+  - a touch layout with an on-screen number pad
+  - silent printing to Bluetooth/USB thermal printers driven directly by the app
+  - device management guidance.
+- iPad/Safari is not targeted.
+- **Status:** Accepted
