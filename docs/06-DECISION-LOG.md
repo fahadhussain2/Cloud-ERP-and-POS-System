@@ -279,3 +279,8 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Alternatives:**
   - **Quick-cash buttons on the main screen:** one click faster, but rejected. The amounts change with every bill, the screen gets busier, and a misclick would finalize a bill (which then needs a manager-approved void).
 - **Status:** Accepted
+
+### D-054 Windows 7 counters get the same upgrade as Windows 8 (2026-10-17)
+- **Context:** the owner found that some Delux billing counters also run Windows 7. Chrome/Edge stopped updating there at version 109 (January 2023), the same situation as Windows 8 (D-052).
+- **Decision:** Windows 7 counters are **upgraded to Windows 10 by 30 Nov**, together with the Windows 8 counters. The supported counter platform stays Windows 10/11 with current Chrome/Edge (D-050). Windows 7 is not supported.
+- **Status:** Accepted
