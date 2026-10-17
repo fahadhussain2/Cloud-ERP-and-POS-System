@@ -284,3 +284,11 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Context:** the owner found that some Delux billing counters also run Windows 7. Chrome/Edge stopped updating there at version 109 (January 2023), the same situation as Windows 8 (D-052).
 - **Decision:** Windows 7 counters are **upgraded to Windows 10 by 30 Nov**, together with the Windows 8 counters. The supported counter platform stays Windows 10/11 with current Chrome/Edge (D-050). Windows 7 is not supported.
 - **Status:** Accepted
+
+### D-055 Delux bill: A5 landscape with a Code 39 barcode, matching the legacy bill (2026-10-18)
+- **Evidence:** a legacy bill exported to PDF from Crystal Reports. Page 210 × 148 mm (A5 landscape, half A4). It uses Windows fonts (Arial, Tahoma), a logo image and an IDAutomation **Code 39** barcode font. The PDF does not record the printer model.
+- **Decision:**
+  - The Delux print profile is **A5 landscape** with a **Code 39** barcode (bill number + amount due), 1 copy. This replaces the A4 / Code128 assumption in D-048 for Delux; other tenants still choose per profile.
+- **Consequence:** the legacy app already prints graphics-mode output (TrueType fonts and an image) on this printer, so browser printing should be about as fast as today. Barcode scannability on this printer is already proven. The Wave 1 print test stays, now as a confirmation.
+- **Still open (PRD Q7):** printer model, paper type, label printer and label size.
+- **Status:** Accepted

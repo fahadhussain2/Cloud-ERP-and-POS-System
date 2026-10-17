@@ -131,7 +131,7 @@ The bootstrap download is ~20 MB uncompressed (a few MB gzipped).
 Every printed bill carries a scannable code. Its main use is as the **offline path** for cash handovers and refund payouts. When online, the cashier normally confirms from the live queue (D-047), and scanning is just a shortcut to the exact bill. The code is also used to find the original bill for a return. The **print profile** chooses the code type (D-048).
 
 **Barcode** (for dot-matrix printers; Delux):
-- Code128 of the bill number and the amount due, e.g. `C03-S000412` + cash due. The exact format is fixed after the Wave 1 scannability test on the real printer.
+- **Code 39** of the bill number and the amount due, e.g. `C03-S000412` + cash due. Code 39 is what the legacy bill already prints and scans on the Delux printer (D-055). Code 39 supports digits, capital letters, `-`, `.`, `/` and space, which fits this format. The exact format is confirmed in the Wave 1 print test.
 - Not signed. That is acceptable when bills print on a shared printer at the cash counter, because the cashier takes the bill straight off the system's own printer, so a fake bill isn't practical.
 - **Offline:** the cash desk records the handover from the bill number and amount in the code, and the server matches it when the counter syncs. It carries no line items, so an offline return of a bill from another unsynced counter uses the no-receipt PIN flow.
 

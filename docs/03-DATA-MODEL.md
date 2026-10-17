@@ -39,7 +39,7 @@ Data in this document is grouped by area. Fields marked † are derived and main
 **devices:** `branch_id, code (e.g. C03, D01), name, kind (counter|cash_desk|mobile), public_key (ECDSA P-256), print_profile_id (nullable → tenant default), status (active|revoked), enrolled_at, revoked_at, last_seen_at, app_version, health jsonb`
 
 **print_profiles:** `name, paper_format (a4|a5|thermal_80|thermal_58), code_type (barcode|signed_qr), copies (1|2), template_options jsonb (header lines, policy text, font size), is_tenant_default`
-- Delux: one profile `A4 dot matrix`, `barcode`, 1 copy, the default for every device.
+- Delux: one profile `A5 landscape dot matrix` (`paper_format = a5`), `barcode` (Code 39), 1 copy, the default for every device.
 
 **device_enrollment_codes:** `branch_id, code_hash, expires_at, used_at, created_by_user_id`
 
