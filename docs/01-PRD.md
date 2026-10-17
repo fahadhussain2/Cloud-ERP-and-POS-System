@@ -85,7 +85,11 @@ Configurable role limits include: max discount % below list, whether the role ca
 1. The salesman unlocks the counter with a **personal PIN**. The bill is attributed to them.
 2. They search by name words, code, OEM part number or vehicle, or scan a label, then add lines with the keyboard (quantity, price within the allowed range).
 3. Optionally they choose the customer (walk-in by default) and price tier (Retail by default; a customer's tier applies automatically).
-4. On **Pay**, they choose the tender: cash. **Cash received** is optional. Pressing Enter means the exact amount; the salesman types a figure only when the customer hands over more, and the change is calculated.
+4. To pay, they click **Cash** in the payment pad under the total, or press **F9** (POS-17). The Cash popup shows the total in large green figures. **Cash received** is optional:
+   - Enter, or the **Exact** button, means the exact amount.
+   - The salesman types the figure, or clicks a **quick-cash** button (the next three round amounts, each showing its change), when the customer hands over more.
+   - The change is shown in large figures.
+   - A quick-cash click finalizes immediately.
 5. The bill is **finalized** and printed silently to the counter's default printer, using the device's print profile (POS-16). **Delux:** all counters print to one shared network dot-matrix printer at the cash counter. The bill shows the cash received and the change, plus a scannable code (barcode or signed QR, per the print profile).
 6. The salesman takes the customer's cash to the cash desk, where the bill is already printed (W4). The salesman returns to the customer with the change and the bill.
 
@@ -97,7 +101,9 @@ As W1, but the customer is a credit account. The counter checks:
 If either is exceeded, a manager PIN is needed. No cash moves, and the receipt shows "On account".
 
 ### W3. Split and non-cash tender
-A bill can have several payment lines, for example cash + Raast, or JazzCash + card. Every non-cash line needs a **reference** (transaction ID or slip number). Only the cash portion goes through the handover.
+- **Single non-cash payment:** a click on **Bank / Raast**, **JazzCash**, **Easypaisa** or **Card** in the payment pad opens a popup with only the reference field (transaction ID or slip number).
+- **Several methods on one bill**, for example cash + Raast or JazzCash + card: use **Split payment** (Shift+F9). Every non-cash line needs a **reference**.
+- Only the cash portion goes through the handover.
 
 ### W4. Cash handover at the cash desk
 1. **Live queue (normal path):** the cash desk shows finalized cash bills awaiting handover, and refunds awaiting payout, within seconds of finalizing. They are grouped by salesman and show counter, bill number, time, amount due, cash received and change.
@@ -213,10 +219,10 @@ Printing to the shared network printer keeps working, because it only needs the 
 |---|---|---|
 | POS-01 | Installable PWA on Chromium (Chrome/Edge). Refuses to start selling unless persistent storage is granted and the local database passes a health check. | 1 |
 | POS-02 | **Omni-search:** one input that matches code, barcode scan, OEM/alternate numbers (normalized), name words in any order, and vehicle tags. Ranked: exact code/barcode → identifier → name/vehicle. Shows Shop and Godown stock, tier price and bin location. ≤ 100 ms. | 1 |
-| POS-03 | Fully keyboard-driven: function-key map, no mouse needed, visible shortcut hints. | 1 |
+| POS-03 | Fully keyboard-driven: function-key map, no mouse needed, visible shortcut hints. **Every keyboard action also has a clickable equivalent**: every popup ends with a button bar, *Cancel (Esc)* on the left and a main button named after its action (e.g. *Finalize & print (Enter)*) on the right. Clicking it does exactly what Enter does. | 1 |
 | POS-04 | Bill lines: quantity, unit price (from tier). A price below list requires a role limit or override; below floor requires a manager PIN. Optional bill-level discount under the same rules. | 1 |
 | POS-05 | Customer selection: walk-in by default, fast search by name, phone or code. Optional phone capture for walk-ins (so bills can be found later without a receipt). | 1 |
-| POS-06 | Tender: cash (optional cash received, Enter = exact amount → change), bank/Raast, JazzCash, Easypaisa, card. **Split tender**, with a reference on non-cash lines. Credit account. | 1 |
+| POS-06 | Tender: cash (optional cash received, Enter = exact amount → change), bank/Raast, JazzCash, Easypaisa, card. **Split tender**, with a reference on non-cash lines. Credit account. Entered through the payment pad (POS-17). | 1 |
 | POS-07 | Credit control: limit check (synced balance + local unsynced) and offline daily cap per customer. Over the limit requires a manager PIN. | 1 |
 | POS-08 | **Hold / park** bills and resume them on the same device. Held bills expire at day close. | 1 |
 | POS-09 | Finalize → print the bill silently to the device's default printer (local or shared network printer) using its print profile (POS-16). The bill shows the shop header, bill number, date and time, salesman, lines, totals, tender, cash received and change, return policy line, and a scannable **bill code** (barcode or signed QR). | 1 |
@@ -227,6 +233,7 @@ Printing to the shared network printer keeps working, because it only needs the 
 | POS-14 | Status bar: online/offline, last sync, unsynced count, warnings when offline longer than a threshold. | 1 |
 | POS-15 | Cash rounding per tenant rule (e.g. to the nearest whole rupee), posted to a rounding account. | 1 |
 | POS-16 | **Print profiles:** a tenant default, overridable per device. Paper format: A4, A5/half page, 80 mm or 58 mm thermal. Bill code: barcode (bill number + amount due) or signed QR. Copies: 1 or 2. Templates suited to dot-matrix and thermal printers. **Delux:** A4 dot matrix, barcode, 1 copy. | 1 |
+| POS-17 | **Payment pad** under the bill total. The buttons are disabled while the bill is empty.<br>• **Cash (F9)**: large, accent colour.<br>• **Bank / Raast, JazzCash, Easypaisa, Card**: one button each. A click opens a reference popup.<br>• **On account**: only active for a credit customer. Its popup shows limit and balance before/after, with a manager PIN if over the limit.<br>• **Split payment (Shift+F9)**: several methods on one bill.<br>**Cash popup:** the total in large green figures, an optional cash-received field, and quick-cash buttons (*Exact* plus the next three round amounts above the total, e.g. 4,500 / 5,000 / 10,000, each showing its change; one click finalizes). The change is shown in large figures.<br>**Every payment popup** shows its amount in the same large band: green for money in, orange for refunds.<br>**Returns:** when money goes back, the pad switches to *Refund cash at desk* / *Credit to account*; when net is zero, to *Finalize even exchange*. Quick cash lives only inside the popup, not on the main screen, to keep it uncluttered and avoid misclicks (D-053). | 1 |
 
 ### 6.4 Cash desk (CSH)
 | ID | Requirement | Wave |

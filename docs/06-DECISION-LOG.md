@@ -268,3 +268,14 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - **Q11:** the owner provides SSMS script dumps in the current format: a current 2026 dump by ~31 Oct, then the rehearsal dumps and the final dump on 31 Dec.
 - **Still open:** Q7 (printer models and paper), to be found during the hardware spike.
 - **Status:** Accepted
+
+### D-053 Payment pad, quick cash inside the Cash popup, and clickable popup buttons (2026-10-17)
+- **Context:** owner review of the clickable POS prototype (published as a private artifact, "Tijara POS Prototype").
+- **Decision:**
+  - **Payment pad** under the bill total: Cash (F9), Bank / Raast, JazzCash, Easypaisa, Card, On account (credit customers only), Split payment (Shift+F9). See POS-17.
+  - **Quick cash lives inside the Cash popup**, not on the main screen: *Exact* plus the next three round amounts, each showing its change. One click finalizes.
+  - **Payment popups show the amount large:** green for money in, orange for refunds. The change is shown large in the Cash popup.
+  - **Every popup has a button bar**, *Cancel (Esc)* plus a main button named after its action, so every keyboard action can also be done with the mouse (POS-03).
+- **Alternatives:**
+  - **Quick-cash buttons on the main screen:** one click faster, but rejected. The amounts change with every bill, the screen gets busier, and a misclick would finalize a bill (which then needs a manager-approved void).
+- **Status:** Accepted
