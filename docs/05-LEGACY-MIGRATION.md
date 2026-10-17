@@ -18,7 +18,7 @@
 | Format | One `.sql` file per object, **UTF-16 LE**, CRLF, `INSERT ... VALUES` statements |
 | Dates | `CAST(0x<16 hex> AS DateTime)` = 4-byte signed days since 1900-01-01 + 4-byte ticks of 1/300 s |
 | Scope keys | `CompanyID = 1`, `ChartOfAccountID = 1`, `PeriodID = 1` (period "07-2025": 2025-07-01 → 2025-12-31) |
-| Period databases | The DB name (`2024`) differs from its period (Jul–Dec 2025). Legacy appears to create **a new database per period**, and document numbers restart (`000001`) in each one. The final migration must use the database that is current on 31 Dec 2026 (open question Q11). |
+| Period databases | The DB name (`2024`) differs from its period (Jul–Dec 2025). Legacy appears to create **a new database per period**, and document numbers restart (`000001`) in each one. The final migration must use the database that is current on 31 Dec 2026. The owner provides it as an SSMS script dump in the same format, plus a current 2026 dump by ~31 Oct (PRD Q11). |
 | Row counts (Dec 2025 copy) | Items 19,552 · Business partners 375 (281 supplier roles, 131 customer roles, 39 parties with both) · Categories 267 · Brands 330 · Origins ("Make") 23 · Manufacture 214 · Size 74 · Units 5 · CoA 77 · Sale headers 22,644 / lines 35,152 · Purchase headers 1,280 / lines 10,736 · GL headers 24,976 / lines 53,799 · Users 17 (13 enabled) |
 
 ## 2. Pipeline (`tools/legacy-import`)
@@ -103,8 +103,7 @@ The tenant gets the [template CoA](04-ACCOUNTING-POSTING-RULES.md#2-default-char
 | Legacy | → New |
 |---|---|
 | `10-01-0001` Cash in hand | 1110 Cash drawer |
-| `10-01-0002` Cheque in hand | 1140 Cheques in hand |
-| `10-01-0003` Cash memo, `10-01-0004` Cash for payment | New asset accounts under 1100 **if still used** (accountant Q4) |
+| `10-01-0002` Cheque in hand, `10-01-0003` Cash memo, `10-01-0004` Cash for payment | **Not migrated.** They have no transactions and a zero balance in the legacy data, and customers don't pay by cheque (PRD Q8). The final run re-checks them: any account holding a balance on 31 Dec is migrated as an asset account under 1100 and flagged. |
 | `10-02-0001` Cash sale (control) | **Retired.** Cash sales go through 1120 Cash in transit. |
 | `10-03-0001` Customers | 1200 AR control (sub-ledger by party) |
 | `10-04-0001` Soneri bank, `10-04-0002` HBL | 1150 / 1160 + `bank_accounts` rows |
@@ -188,6 +187,7 @@ The importer **never auto-deletes or auto-merges**. It reports, and the owner de
 | When | Run |
 |---|---|
 | Wave 0 (Oct) | Build the importer against the 6 Dec 2025 copy. Iterate on the cleanup reports with the owner. |
+| By ~31 Oct | Owner provides a **current 2026 dump** (same SSMS format). Re-run the importer to confirm the per-period database structure and refresh the development data. |
 | ~10 Dec 2026 | **Rehearsal 1** on a fresh dump. Full reconciliation. |
 | ~22 Dec 2026 | **Rehearsal 2.** Timed end to end. Must take < 1 h. |
 | 31 Dec 2026, after close | **Final run** → reconciliation sign-off → set the lock date → open for business 1 Jan. |

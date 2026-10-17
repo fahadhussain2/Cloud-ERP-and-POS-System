@@ -260,3 +260,11 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** returns are frequent, so requiring a manager for every one would create a bottleneck. The default controls are already strong: the return is linked to the original bill, the reason and condition are recorded, and the cashier pays out every cash refund. The permission lets the owner tighten this without code changes.
 - **Not decided:** a refund value limit per role (e.g. a manager PIN above Rs 10,000). This can be added later as a role limit.
 - **Status:** Accepted
+
+### D-052 Open questions resolved; defaults accepted (2026-10-17)
+- **Decision:** the owner accepted the defaults for PRD Q1–Q6, Q9 and Q12–Q15 (see PRD §11). Answers:
+  - **Q8:** legacy "Cheque in hand", "Cash memo" and "Cash for payment" are unused (no transactions, zero balance), so they are **not migrated** unless they hold a balance at cutover. Customers don't pay by cheque, so there is **no cheque payment method**.
+  - **Q10:** Windows 8 counters (Chrome/Edge frozen at v109 since 2023) will be **upgraded to Windows 10 before 1 Dec**. The supported counter platform stays Windows 10/11 with current Chrome/Edge (D-050).
+  - **Q11:** the owner provides SSMS script dumps in the current format: a current 2026 dump by ~31 Oct, then the rehearsal dumps and the final dump on 31 Dec.
+- **Still open:** Q7 (printer models and paper), to be found during the hardware spike.
+- **Status:** Accepted

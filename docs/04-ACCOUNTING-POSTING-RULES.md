@@ -185,4 +185,4 @@ Result: net sales 4,800, COGS 3,400, gross profit 1,400. Cash in transit is back
 1. Confirm that bill-level purchase discounts should be capitalized into inventory cost. (The legacy system had a "Purchase discount" income account.)
 2. Confirm that partner expenses (legacy `40-05-*`) are **drawings** (equity), not business expenses.
 3. Card settlements: in the MVP the accountant moves money from *Card settlement clearing* to the bank, net of fees, with a journal voucher. Is that acceptable until bank reconciliation arrives?
-4. Which legacy cash accounts are still used: "Cash memo" and "Cash for payment"?
+4. ~~Which legacy cash accounts are still used: "Cash memo" and "Cash for payment"?~~ **Resolved (PRD Q8):** unused in the legacy data, so not migrated unless they hold a balance at cutover.

@@ -333,6 +333,7 @@ All reports filter by date range and export to CSV. PDF/print is offered where i
 | Mon 12 Oct – Sun 25 Oct | **Wave 0: foundations** | Monorepo, CI, VPS + Docker + backups, database + RLS, auth (users, devices, PIN), roles, tenant setup, **legacy importer first** (so all development uses the real 19.5k items). |
 | Mon 26 Oct – Sun 22 Nov | **Wave 1: critical path** | POS PWA (local DB, search, bill, tender, print profiles + bill code, hold, void, return/exchange), sync, cash desk (**live queue** + scan handover), credit control, stock ledger, goods receipt, purchase return, supplier/customer ledgers, posting engine, labels. **First week: print test on the shop's dot-matrix printer** (speed, layout, barcode scannability). |
 | Mon 23 Nov – Sun 6 Dec | **Wave 2: rest of MVP** | POs, sharing, pickup sheet, reorder list, repricing, cycle counts, custom roles, financial statements, remaining reports. |
+| By Mon 30 Nov | **Counter readiness** | Windows 8 counters upgraded to Windows 10. Current Chrome/Edge on every counter. Device check passed (Q10). |
 | Tue 1 Dec – Fri 18 Dec | **Shadow pilot** | 1–2 counters + the cash desk run the new system in parallel (legacy remains official). Daily reconciliation. Includes a deliberate **8-hour offline drill**. |
 | **Fri 18 Dec** | **Go / no-go** | Checklist below. |
 | Sat 19 Dec – Thu 31 Dec | Freeze and prepare | Bug fixes only. Staff training and PINs. Counter PC setup (browser policies, kiosk printing). 4G failover router. Two migration rehearsals. **Final migration on the night of 31 Dec** after the legacy day close. |
@@ -366,25 +367,27 @@ Warranty and supplier claims · sale-on-approval challans · quotations · bank 
 | Staff resist "no edits" and personal PINs | Workarounds, shared PINs | Training. Fast void/reissue. Overrides by PIN are faster than calling admin. Audit reports reviewed weekly. |
 | Legacy data quality | Bad search, wrong stock | Cleanup reports. Opening stock from legacy, then Q1 cycle counts. |
 | Single VPS | Back office down, data risk | Counters keep selling offline. WAL backups off-site. Restore drills. Portable Docker setup. |
-| Old Windows / browsers on some counters | PWA will not run | Device check before the pilot (open question Q10). |
+| Old Windows / browsers on some counters | PWA will not run | Windows 8 counters upgraded to Windows 10 before 1 Dec (Q10). Device check on every counter during the hardware spike and before the pilot. |
 | December is a busy month for a pilot | Staff overload | Shadow pilot on 1–2 counters only. |
 
 ## 11. Open questions for the owner
 
-| # | Question | Default if not answered |
+Status as of 2026-10-17. All questions are resolved except Q7 (D-052).
+
+| # | Question | Resolution |
 |---|---|---|
-| Q1 | How should **Mechanic and Wholesale tier prices** be set initially? The legacy system has one sale price. | Mechanic = Retail −5%, Wholesale = Retail −10%, editable |
-| Q2 | **Floor price** default: minimum margin over cost per category? | Floor = cost + 5% |
-| Q3 | **Return window** (days) and non-returnable categories (e.g. electricals once fitted)? | 30 days, none excluded |
-| Q4 | **Void window**: until handover and same business day, as proposed? | Yes |
-| Q5 | **Cash rounding**: to the nearest whole rupee? | Nearest Rs 1 |
-| Q6 | Default **credit limits** and the **offline daily cap** for credit customers? | Limit set per customer; offline cap Rs 25,000/day |
-| Q7 | Model of the shared dot-matrix printer and the label printer. Is the paper continuous (tractor-feed) or single sheets? Full A4 or half page per bill? Label size? | Needed before the Wave 1 print test |
-| Q8 | Are the legacy accounts "Cheque in hand", "Cash memo" and "Cash for payment" still used? | Migrate them as asset accounts |
-| Q9 | How should stock be split between **Shop and Godown** at go-live? Legacy has a single figure. | All in Shop. Godown counted and transferred in January. |
-| Q10 | Counter PCs: Windows version and browser? (Chrome no longer supports Windows 7/8.) | Windows 10/11 + Chrome |
-| Q11 | Where will the **final legacy database** for 31 Dec 2026 come from? Legacy appears to create a new DB per period. | Fresh SSMS script dump on 31 Dec |
-| Q12 | **Receipt content**: NTN, address, phone, return policy text, any Urdu line? | Name, address, phone, policy line in English |
-| Q13 | **Expense categories** for cash-out (initial list)? | From legacy expense accounts |
-| Q14 | Which bank or wallet account receives each **payment method** (Raast, JazzCash, Easypaisa, card)? | Ask during setup |
-| Q15 | Partner drawings are not taken from the drawer. How are they recorded (bank)? | Journal voucher by the accountant |
+| Q1 | How should **Mechanic and Wholesale tier prices** be set initially? The legacy system has one sale price. | **Default accepted:** Mechanic = Retail −5%, Wholesale = Retail −10%, editable |
+| Q2 | **Floor price** default: minimum margin over cost per category? | **Default accepted:** floor = cost + 5% |
+| Q3 | **Return window** (days) and non-returnable categories? | **Default accepted:** 30 days, no category excluded |
+| Q4 | **Void window**: until handover and same business day? | **Default accepted:** yes |
+| Q5 | **Cash rounding**? | **Default accepted:** nearest Rs 1 |
+| Q6 | Default **credit limits** and **offline daily cap** for credit customers? | **Default accepted:** limit set per customer; offline cap Rs 25,000/day |
+| Q7 | Model of the shared dot-matrix printer and the label printer. Paper: continuous (tractor-feed) or single sheets? Full A4 or half page per bill? Label size? | **Open.** To be found during the hardware spike, before the Wave 1 print test. |
+| Q8 | Are the legacy accounts "Cheque in hand", "Cash memo" and "Cash for payment" still used? | **Resolved:** they have no transactions and a zero balance in the legacy data, so they are **not migrated**. The final migration re-checks them and migrates (and flags) any that hold a balance on 31 Dec 2026. Customers don't pay by cheque, so there is **no cheque payment method**. |
+| Q9 | How should stock be split between **Shop and Godown** at go-live? | **Default accepted:** all in Shop; the Godown is counted and transferred in January |
+| Q10 | Counter PCs: Windows version and browser? | **Resolved:** some counters run **Windows 8** (Chrome/Edge stopped updating there in 2023). They will be **upgraded to Windows 10 before the pilot (1 Dec)**. All counters: Windows 10/11 + current Chrome or Edge. |
+| Q11 | Where will the **final legacy database** for 31 Dec 2026 come from? | **Resolved:** the owner provides SSMS script dumps in the same format as the analysis copy: a **current 2026 dump within ~2 weeks** (to confirm the per-period database structure), the rehearsal dumps, and the final dump on 31 Dec. |
+| Q12 | **Receipt content**? | **Default accepted:** name, address, phone, policy line in English |
+| Q13 | **Expense categories** for cash-out? | **Default accepted:** from the legacy expense accounts |
+| Q14 | Which bank/wallet account receives each **payment method**? | **Default accepted:** set during tenant setup |
+| Q15 | How are partner drawings recorded? | **Default accepted:** journal voucher by the accountant |
