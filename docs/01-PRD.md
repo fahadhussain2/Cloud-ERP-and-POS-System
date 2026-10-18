@@ -211,7 +211,7 @@ Printing to the shared network printer keeps working, because it only needs the 
 | CAT-05 | **Floor price** per item, or a category rule (floor = cost × (1 + min margin)). | 1 |
 | CAT-06 | Category markup rules for repricing suggestions (tier prices and floor from cost). | 2 |
 | CAT-07 | Price change history (who, when, old → new, reason/source). | 1 |
-| CAT-08 | Label printing in the legacy format (Code128 item code + supplier abbreviation), from an item list or a goods receipt. Configurable template. | 1 |
+| CAT-08 | Label printing in the legacy format (Code 39 item code (D-055) + supplier abbreviation), from an item list or a goods receipt. Configurable template. From a goods receipt, the label count defaults to the quantity received, and to 0 for items that carry the maker's barcode. | 1 |
 | CAT-09 | Bulk import and export of items and prices via CSV. | 2 |
 
 ### 6.3 POS counter (POS)
@@ -263,13 +263,13 @@ Printing to the shared network printer keeps working, because it only needs the 
 | ID | Requirement | Wave |
 |---|---|---|
 | PUR-01 | Supplier records with terms, label abbreviation, contacts. A party can be supplier and customer at once. | 1 |
-| PUR-02 | **Goods receipt with supplier bill** (W11.4): partial quantities, line and bill discounts, cash or credit purchase. Without a PO, or against a PO. | 1 |
+| PUR-02 | **Goods receipt with supplier bill** (W11.4): partial quantities, line and bill discounts, cash or credit purchase. Without a PO, or against a PO. **Bill-total check:** the purchaser types the total printed on the supplier's bill, and saving is blocked until it equals the entered lines. **Line warnings:** back-ordered, more than ordered, not on the PO, cost up/down % vs last cost, and retail price at or below the new cost. | 1 |
 | PUR-03 | Purchase return / debit note (W12). | 1 |
-| PUR-04 | Purchase orders: draft → sent → partially received → received / closed / cancelled. Back-ordered quantity tracking. | 2 |
-| PUR-05 | PO sharing: WhatsApp-ready text (opens WhatsApp with a prefilled message), PDF, print. | 2 |
+| PUR-04 | Purchase orders: draft → sent → partially received → received / closed / cancelled. Back-ordered quantity tracking. Only **sent** or partly received POs can be received or appear on the pickup sheet (drafts and cancelled POs cannot). Receiving updates the status automatically (Partly received / Received). A PO can be cancelled only while nothing has been received against it. | 2 |
+| PUR-05 | PO sharing: WhatsApp-ready text (opens WhatsApp with a prefilled message), PDF, print. The message can optionally include our expected rates. | 2 |
 | PUR-06 | Pickup run sheet across open POs, grouped by supplier, mobile-friendly. | 2 |
-| PUR-07 | Reorder suggestion list (W11.1). Ticked lines become POs per supplier. | 2 |
-| PUR-08 | Repricing suggestions on receipt, with approval (W11.5). | 2 |
+| PUR-07 | Reorder suggestion list (W11.1). Ticked lines become POs per supplier. Suggested quantity = maximum − (shop + godown stock + quantity already on open POs). Items fully covered by open POs drop off the list. | 2 |
+| PUR-08 | Repricing suggestions on receipt, with approval (W11.5). Suggestions follow the category rule. **Price rises are ticked to apply by default; price drops are not**, so the purchaser decides whether to pass them on. Prices must stay Retail ≥ Mechanic ≥ Wholesale ≥ Floor. | 2 |
 | PUR-09 | Supplier ledger and ageing; payments from the back office (bank) or the cash desk (CSH-06). | 1 |
 
 ### 6.7 Accounting (ACC)
