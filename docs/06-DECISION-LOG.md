@@ -363,3 +363,18 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - **Kamal:** possible later, if zero-downtime deploys are needed.
 - **Status:** Accepted
 
+### D-064 Observability: Sentry + Grafana Cloud via OpenTelemetry, Slack alerts, document timeline (2026-10-21)
+- **Decision:**
+  - **Tools:** errors in **Sentry**; logs, metrics and traces in **Grafana Cloud** (free tier), collected by a small **Grafana Alloy** agent on the server; apps instrumented with **OpenTelemetry**; uptime checks by UptimeRobot / Better Stack.
+  - **Alerts:** to **Slack** (`#erp-critical` with phone notifications, `#erp-alerts`), with an email backup for critical alerts.
+  - **Correlation:** every log and error carries tenant, device, user, request/trace ID and the bill number where relevant.
+  - **POS:** counters keep an offline diagnostic log that's uploaded with the next sync, and a manager can send diagnostics on demand.
+  - **Support:** a **"Trace a bill"** timeline in the back office (PLT-12). Runbooks for critical alerts.
+  - **Privacy:** passwords, PINs, tokens and keys are never logged; customer phone numbers are masked.
+- **Why:** the owner wants debugging-grade observability. Hosted tools keep the 8 GB production server free and keep working if that server fails. OpenTelemetry avoids lock-in.
+- **Alternatives:**
+  - **Self-hosted Grafana/Prometheus/Loki:** about 1–1.5 GB RAM on the production server, and it fails together with the server.
+  - **Telegram alerts:** replaced by Slack.
+- **Note:** free-tier limits (retention about 14 days, volume caps) are checked at setup. Paid tiers are only needed when there are many tenants.
+- **Status:** Accepted
+

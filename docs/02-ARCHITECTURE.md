@@ -279,7 +279,7 @@ docker compose:
 | Restore drill | Monthly, into staging, timed, logged. **Before go-live: at least one full drill.** |
 | Hardening | SSH keys only, no root login, firewall (only 80/443 and SSH from allowed IPs), unattended security upgrades, fail2ban, Postgres listening only on the Docker network. |
 | Secrets | Environment files outside git. Rotated on staff changes. |
-| Monitoring | External uptime check on `/health`, error tracking (e.g. Sentry) for API, worker, POS and back office, disk and Postgres alerts, backup-freshness alert (> 15 min without a WAL push). |
+| Monitoring | See §11: Sentry, Grafana Cloud (logs, metrics, traces via OpenTelemetry + Alloy agent), uptime checks, Slack alerts with email backup for critical ones. |
 | Deploy | GitHub Actions + Docker Compose over SSH. No deploy platform (Coolify, Kamal…) on the server (D-063). See §9.1. |
 | Portability | No Hetzner-specific APIs. Moving to a UAE region or managed Postgres = restore a backup plus a DNS change. |
 
@@ -304,8 +304,87 @@ docker compose:
 - **Locale and currency:** currency minor units come from the tenant. Formatting uses the tenant locale. The UI is RTL-ready.
 - **AI agents later:** documents and ledgers are clean, append-only, and exposed through a typed OpenAPI. Agents (reorder, pricing, catalog cleanup, anomaly detection) read through the API and write **proposals** (e.g. a draft PO or price suggestion) that a human approves. They never write ledgers directly.
 
-## 11. Observability on devices
-Each device reports with every sync, and on a timer when online: app version, schema version, unsynced count, oldest unsynced age, last successful push/pull, storage persisted (yes/no), storage usage, clock skew and recent errors. This feeds the back-office **Devices** page (PLT-09) and alerts (e.g. a device with more than 4 h of unsynced documents while others are online).
+## 11. Logging, monitoring and observability (D-064)
+
+Goal: when something goes wrong, we can answer **what happened, to which bill, on which device, for which tenant, and why**, from one place, without SSH-ing into the server.
+
+### 11.1 Stack
+
+| Signal | Tool | Runs where | Cost |
+|---|---|---|---|
+| **Errors** (API, worker, POS, back office) | **Sentry**: stack traces, release/version, breadcrumbs, source maps | Hosted | Free plan to start |
+| **Logs** | Structured JSON logs (pino) → **Grafana Loki** | Hosted (Grafana Cloud free tier; limits and retention, about 14 days, checked at setup) | Free |
+| **Metrics** | OpenTelemetry / Prometheus metrics → **Grafana Cloud** (Mimir) | Hosted | Free |
+| **Traces** | **OpenTelemetry** traces for API requests, sync pushes, postings and DB queries → Grafana Tempo | Hosted | Free |
+| **Collector** | **Grafana Alloy** agent: Docker logs, server metrics, PostgreSQL metrics (exporter + `pg_stat_statements`), OTLP from the apps | On the CX33 (~150–250 MB RAM) | Free |
+| **Uptime** | UptimeRobot or Better Stack: `/health`, POS and back-office URLs, SSL expiry | Hosted | Free |
+| **Dashboards and alert rules** | Grafana Cloud | Hosted | Free |
+| **Alert delivery** | **Slack**: `#erp-critical` (phone notifications on) and `#erp-alerts`, plus **email** backup for critical alerts | Hosted | Free |
+
+- **Why hosted instead of self-hosted Grafana/Prometheus:** a full self-hosted stack would use about 1–1.5 GB of the 8 GB production server, and it would go down with the server it's watching.
+- **Vendor-neutral:** instrumentation is **OpenTelemetry**, so we can switch to self-hosted or another vendor later without code changes.
+
+### 11.2 Correlation: every log line can be traced
+
+- **Every request** gets a `request_id` and a trace ID, returned in the response header and shown in error messages ("Reference: 7F3K…").
+- **Every log line and Sentry event** carries: `tenant_id`, `branch_id`, `device_id`, `user_id`, `request_id`, `trace_id`, app version, environment (prod/staging) and, where relevant, `document_id` / `bill_number`.
+- **POS devices** send `device_id`, app version and document IDs with every sync push. The server logs each document's result (accepted / duplicate / rejected + reason) against those IDs.
+- **Database:** each transaction runs `SET LOCAL app.request_id`, so slow-query logs and the audit log link back to the request.
+
+### 11.3 POS-side diagnostics (works offline)
+
+- Each counter keeps a **local diagnostic log** (a ring buffer of the last ~5,000 events in its SQLite database): sync attempts and results, print jobs, storage checks, PIN lockouts, errors, app updates.
+- The diagnostic log, **device health** (PLT-09: app/schema version, unsynced count and oldest age, last push/pull, storage persisted, storage usage, clock skew) and **POS errors** are uploaded with the next sync, so errors that happen offline still reach Sentry and the logs later.
+- **"Send diagnostics" (manager):** on demand, uploads the full local log plus a health snapshot for support, without the customer having to describe the problem.
+
+### 11.4 Document timeline (support view)
+
+The back office (owner/platform admin only) has a **"Trace a bill"** view. Enter a bill number and see its whole life in one timeline:
+- created on device X by user Y (device time)
+- printed
+- each sync attempt and result
+- accepted on the server (received time)
+- exceptions raised
+- stock / GL / party postings
+- cash handover or offline scan, void, returns against it.
+
+This answers most "where did this bill / this cash go?" questions in seconds (PLT-12).
+
+### 11.5 Metrics we watch
+
+| Area | Metrics |
+|---|---|
+| **API** | Request rate, error rate, latency (p50/p95), by route and tenant |
+| **Sync** | Push and pull rate, batch size, rejected documents, duplicate rate, sequence gaps, **finalize → visible in cash queue** latency |
+| **Devices** | Unsynced documents per device, oldest unsynced age, offline duration, app versions in use, devices without persistent storage |
+| **Posting / accounting** | Posting duration, **posting errors (must be 0)**, unbalanced-entry attempts, rebuild diffs |
+| **Business day** | Bills, handovers pending, missing handovers, exceptions by type, provisional days |
+| **Database** | Size, connections, slow queries (`pg_stat_statements`), locks, replication/WAL archive lag, **backup age** |
+| **Server** | CPU, RAM, disk %, Docker container restarts; staging resource use |
+
+**Dashboards:** *System*, *API & sync*, *Devices*, *Business day & cash*, *Database & backups*. Every view can be filtered by tenant and environment.
+
+### 11.6 Alerts (Slack)
+
+| Severity → channel | Alert |
+|---|---|
+| **Critical → `#erp-critical` + email** | API or website down. Posting error. Backup older than 15 min (WAL) or 26 h (base). Disk > 85%. A device with unsynced bills > 4 h while others are online. Repeated sync rejections from one device. Database unreachable. Deploy health check failed / auto-rollback. |
+| **Warning → `#erp-alerts`** | New Sentry error type. Error rate or p95 latency above threshold. Sequence gap. Clock skew > 5 min. Device without persistent storage. A day provisional > 48 h. Exceptions (missing handover, cash on voided bill, offline cap breach). SSL certificate expiring within 14 days. |
+
+- Each critical alert links to a short **runbook** (`docs/runbooks/`): what it means, how to check, how to fix.
+- Alerts are grouped to avoid floods: one message per incident, plus a "resolved" message.
+
+### 11.7 Privacy and retention
+
+- **Never logged:** passwords, PINs, PIN verifiers, device tokens, private keys, full card or wallet details. A logger redaction list enforces this, with a CI test.
+- **Masked:** customer phone numbers (only the last 4 digits) and names in logs. Bill numbers and IDs are fine.
+- **Retention:**
+  - hosted logs and traces about 14 days (free-tier window)
+  - Sentry per its plan
+  - local server log files rotated, 30 days
+  - POS diagnostic buffer about 5,000 events.
+- **The audit log is separate:** it's business data in PostgreSQL, permanent, and not part of observability.
+- **Staging** uses the same instrumentation, labelled `env=staging`, so problems can be reproduced the same way.
 
 ## 12. Testing strategy (solo developer: automate the dangerous parts)
 

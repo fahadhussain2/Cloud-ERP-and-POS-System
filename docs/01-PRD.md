@@ -201,6 +201,7 @@ Printing to the shared network printer keeps working, because it only needs the 
 | PLT-09 | Device health page: last sync, unsynced documents, app version, persistent-storage status, clock skew. | 1 |
 | PLT-10 | Tenant data isolation enforced in the database (row-level security). | 1 |
 | PLT-11 | **Internal tenant setup script** (platform owner only, not customer-facing). One command creates a new tenant with:<br>• tenant settings (PLT-01)<br>• one branch with Shop / Godown / Damaged locations<br>• the retail chart-of-accounts template with system account roles<br>• default payment methods, expense categories and price tiers<br>• the role templates<br>• the owner's user account<br>• a default print profile<br>Idempotent and safe to re-run. Also used to create test and demo tenants. Item, customer and supplier data then comes in through CSV import (CAT-09). Delux is created by the legacy importer instead. A self-service onboarding wizard and signup are later phases (§9) (D-061). | 2 |
+| PLT-12 | **Support and diagnostics:**<br>• **"Trace a bill"** timeline in the back office (owner / platform admin): device, user, print, sync attempts, server acceptance, exceptions, postings, handover, void and returns for one bill number.<br>• **"Send diagnostics"** on the POS (manager) uploads the counter's local diagnostic log and a health snapshot.<br>• Every error message shows a reference ID that finds the exact request in the logs. | 1 |
 
 ### 6.2 Catalog and pricing (CAT)
 | ID | Requirement | Wave |
@@ -332,7 +333,7 @@ All reports filter by date range and export to CSV. PDF/print is offered where i
 | **Scale (design)** | 1,000 tenants. 100k items per tenant. 2,000 bills/day per tenant. 30 devices per tenant. Without re-architecture. |
 | **Browser / hardware** | Chrome or Edge (current), Windows 10/11 counters (Android tablets are a later phase, §9). Each counter's **default Windows printer** receives its bills. This can be a local printer or a shared network printer, thermal or A4/A5 (print profiles, POS-16). **Delux:** one network-attached A4 dot-matrix printer at the cash counter, the default printer on every counter. Keyboard-wedge barcode scanners (including one at the cash desk). Labels and other A4 documents print from the back office. |
 | **i18n** | English only, but all UI strings go through translation keys, CSS uses logical properties (RTL-ready), and numbers, dates and currency are formatted by locale. |
-| **Observability** | Structured logs, error tracking, uptime monitoring, device health telemetry. |
+| **Observability** | Structured, correlated logs (tenant, device, user, request, bill), error tracking, metrics, traces, uptime checks, device health and POS diagnostic upload, document timeline, Slack alerts (architecture §11, D-064). |
 
 ## 8. Release plan
 
