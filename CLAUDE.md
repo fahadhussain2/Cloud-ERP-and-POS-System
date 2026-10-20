@@ -2,9 +2,9 @@
 
 Multi-tenant cloud ERP with an offline-first POS for retail SMBs. The first tenant is **Delux Autos** (Karachi auto parts store, ~20k SKUs, 8–9 counters, one cash desk, PKR). Later it will be sold as SaaS in Pakistan and the UAE/Middle East. Go-live target: **1 Jan 2027**.
 
-## Current phase: requirements review
+## Current phase: Wave 0 (foundations)
 
-**Do not write application code until the owner approves the documents in `docs/`.** Answer questions, refine the docs, and record every change of decision as a new entry in `docs/06-DECISION-LOG.md`.
+The owner approved the documents in `docs/` on 2026-10-21 (D-060). Implementation may proceed in build-wave order (PRD §8): Wave 0 → Wave 1 → Wave 2. Keep the docs current: any change of decision is recorded as a new entry in `docs/06-DECISION-LOG.md` before or with the code that implements it.
 
 ## Source of truth
 
@@ -59,4 +59,4 @@ PostgreSQL 17+, Docker Compose on a Hetzner VPS (Singapore), Caddy, WAL archivin
 | Shop / Godown / Damaged | Stock locations: sellable / storage / not sellable |
 | Goods receipt | Receiving stock together with the supplier's bill (purchase invoice) |
 | Party | Customer and/or supplier |
-| Business date | Local date with a 04:00 cutoff |
+| Business date | Local date with a 04:00 cutoff (shop closes 20:00; late sales count to the same day) |

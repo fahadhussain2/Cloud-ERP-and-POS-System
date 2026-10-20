@@ -111,13 +111,13 @@ The tenant gets the [template CoA](04-ACCOUNTING-POSTING-RULES.md#2-default-char
 | `20-02-0001` Suppliers | 2100 AP control |
 | `20-03-0001` Cash purchase | **Retired** |
 | `30-01-0001` Sales | 4100 Sales (sale returns go to 4110) |
-| `30-02-0001` Purchase discount | **Retired** (capitalized into cost; accountant Q1) |
+| `30-02-0001` Purchase discount | **Retired** (discounts are capitalized into cost, D-057) |
 | `30-02-0002` Sale discount | 4120 Sales discounts |
 | `40-01-*` Misc expenses | 6400… (one account each, same names) |
 | `40-02-*` General expenses | 6300… |
 | `40-03-*` Utilities | 6200… |
 | `40-04-*` Salaries (per person) | 6100… (names kept; access restricted to Owner/Accountant) |
-| `40-05-*` Partner expenses | 3110 Partners' drawings **or** expenses (accountant Q2) |
+| `40-05-*` Partner expenses | 3110 Partners' drawings (D-057) |
 | `50-01-0001` Investment, `50-01-0002` Drawing | 3100 Capital, 3110 Drawings |
 
 Expense accounts used for cash-out at the desk become `expense_categories` (PRD Q13).

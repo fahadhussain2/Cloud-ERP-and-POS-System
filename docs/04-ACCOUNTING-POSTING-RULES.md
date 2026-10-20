@@ -181,8 +181,10 @@ Cost of the part = Rs 3,100. A walk-in buys it for Rs 4,350 cash, paying with a 
 
 Result: net sales 4,800, COGS 3,400, gross profit 1,400. Cash in transit is back to 0.
 
-## 9. Questions for the accountant
-1. Confirm that bill-level purchase discounts should be capitalized into inventory cost. (The legacy system had a "Purchase discount" income account.)
-2. Confirm that partner expenses (legacy `40-05-*`) are **drawings** (equity), not business expenses.
-3. Card settlements: in the MVP the accountant moves money from *Card settlement clearing* to the bank, net of fees, with a journal voucher. Is that acceptable until bank reconciliation arrives?
-4. ~~Which legacy cash accounts are still used: "Cash memo" and "Cash for payment"?~~ **Resolved (PRD Q8):** unused in the legacy data, so not migrated unless they hold a balance at cutover.
+## 9. Questions for the accountant (decided 2026-10-21, D-057)
+1. **Supplier bill discounts are capitalized into inventory cost** (§5.1). The legacy "Purchase discount" income account (Rs 10,824 over Jul–Dec 2025) is retired from go-live onward.
+2. **Partner expenses (legacy `40-05-*`) are drawings (equity)**, not business expenses (3110 Partners' drawings).
+3. **Card settlements:** in the MVP the accountant moves money from *Card settlement clearing* to the bank, net of fees, with a journal voucher, until bank reconciliation arrives.
+4. **Legacy "Cash memo" and "Cash for payment" accounts:** unused in the legacy data, so not migrated unless they hold a balance at cutover (PRD Q8).
+
+The owner accepted these as the standard treatment. The shop's accountant may still review them before go-live; any change is recorded as a new decision.

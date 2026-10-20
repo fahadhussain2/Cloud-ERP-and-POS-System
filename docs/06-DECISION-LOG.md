@@ -292,3 +292,46 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Consequence:** the legacy app already prints graphics-mode output (TrueType fonts and an image) on this printer, so browser printing should be about as fast as today. Barcode scannability on this printer is already proven. The Wave 1 print test stays, now as a confirmation.
 - **Still open (PRD Q7):** printer model, paper type, label printer and label size.
 - **Status:** Accepted
+
+### D-056 Business day: 04:00 date cutoff, 20:00 closing time (2026-10-21)
+- **Decision:** the business-date cutoff stays at **04:00**, and a separate **closing time of 20:00** is added for the day-close reminder and auto-locking idle counters. Supersedes the "Proposed" status of D-046.
+- **Why not cut off at 20:00:** the legacy data has 1,015 bills between 20:00 and 20:59 in Jul–Dec 2025 (about 5% of sales). A 20:00 cutoff would book them as the next day's sales. The cutoff must fall while the shop is closed (first sales are around 10:00).
+- **Money display (same review):** bills are always whole rupees. Supplier costs accept up to 2 decimals, and averages are kept precise internally (legacy: 0 of 22,644 bill totals had decimals; 64 purchase lines did).
+- **Status:** Accepted
+
+### D-057 Accounting treatments (2026-10-21)
+- **Decision:**
+  - Supplier bill discounts are capitalized into inventory cost.
+  - Partner expenses are drawings (equity).
+  - Card settlements are moved to the bank by journal voucher until bank reconciliation exists.
+- **Why:** these give an exact profit per item and a true business profit. Neither contradicts migration: legacy P&L balances are not migrated, and the partner-expense accounts have zero balance.
+- **Status:** Accepted by the owner. The accountant may review them before go-live.
+
+### D-058 Proposed technical defaults approved (2026-10-21)
+- **Decision:** every decision previously marked **Proposed** is accepted:
+  - **D-006:** single sales document with signed quantities.
+  - **D-011:** accept completed sales, flag rule breaks.
+  - **D-017:** weighted average valued in posting order.
+  - **D-024:** the *Cash in transit* account design.
+  - **D-036:** integer minor units, UUIDv7 IDs.
+  - **D-037 to D-045:** Fastify, Drizzle, SQLite WASM + in-memory search, Postgres job queue, Caddy + WAL-G/pgBackRest, custom sync protocol, new CoA template, returns at original cost, signed QR for QR profiles.
+  - **D-046:** business-day cutoff, as refined by D-056.
+- **Status:** Accepted
+
+### D-059 Two more handover exception types (2026-10-21)
+- **Decision:** new exceptions on the day reconciliation:
+  - **`cash_received_for_void`:** the cash desk recorded cash for a bill that was voided on the counter, so the cash must be returned or explained.
+  - **`handover_amount_mismatch`:** an offline barcode scan's amount differs from the bill when it syncs.
+- **Why:** both are possible cash leaks that only become visible after sync.
+- **Status:** Accepted
+
+### D-060 Requirements approved; Wave 0 starts (2026-10-21)
+- **Decision:** the owner approved the documents in `docs/`. Implementation may start with **Wave 0** (foundations: repo, CI, VPS, database + RLS, auth/PIN/devices, roles, tenant setup, legacy importer).
+- **Still open (do not block Wave 0):**
+  - printer model and paper (PRD Q7)
+  - a current 2026 legacy dump (by ~31 Oct)
+  - the staff test of the prototypes
+  - the optional accountant review of D-057.
+- **Schedule note:** Wave 0 was planned for 12–25 Oct and starts on 21 Oct, about a week late. The release plan is unchanged: build order by criticality, go/no-go on 18 Dec.
+- **Status:** Accepted
+

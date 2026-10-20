@@ -190,7 +190,7 @@ Printing to the shared network printer keeps working, because it only needs the 
 ### 6.1 Platform (PLT)
 | ID | Requirement | Wave |
 |---|---|---|
-| PLT-01 | Tenant with base currency, timezone, locale, fiscal year start month (fixed once the first period is closed), cash rounding rule, receipt header, and **cash handover confirmation** (Required / Off; Delux: Required; see W4). | 1 |
+| PLT-01 | Tenant with base currency, timezone, locale, fiscal year start month (fixed once the first period is closed), cash rounding rule, receipt header, and **cash handover confirmation** (Required / Off; Delux: Required; see W4). **Closing time** (Delux: 20:00) drives the day-close reminder and auto-locks idle counters. **Business-date cutoff** (Delux: 04:00) is when the date rolls over; it must fall while the shop is closed, so late sales (e.g. 20:00–20:59) count towards the same day (D-056). | 1 |
 | PLT-02 | Branch → Locations (Shop / Godown / Damaged, flagged sellable or not). One branch in the MVP UI, many in the model. | 1 |
 | PLT-03 | Device enrollment: a manager registers a counter or cash desk browser to a branch with a one-time code. Devices can be named, given a type (counter / cash desk) and revoked. | 1 |
 | PLT-04 | Users with personal accounts. Back-office login by username/email and password. **POS unlock by personal PIN** on an enrolled device. Auto-lock after inactivity. | 1 |
@@ -263,7 +263,7 @@ Printing to the shared network printer keeps working, because it only needs the 
 | ID | Requirement | Wave |
 |---|---|---|
 | PUR-01 | Supplier records with terms, label abbreviation, contacts. A party can be supplier and customer at once. | 1 |
-| PUR-02 | **Goods receipt with supplier bill** (W11.4): partial quantities, line and bill discounts, cash or credit purchase. Without a PO, or against a PO. **Bill-total check:** the purchaser types the total printed on the supplier's bill, and saving is blocked until it equals the entered lines. **Line warnings:** back-ordered, more than ordered, not on the PO, cost up/down % vs last cost, and retail price at or below the new cost. | 1 |
+| PUR-02 | **Goods receipt with supplier bill** (W11.4): partial quantities, line and bill discounts, cash or credit purchase. Without a PO, or against a PO. **Bill-total check:** the purchaser types the total printed on the supplier's bill, and saving is blocked until it equals the entered lines. **Line warnings:** back-ordered, more than ordered, not on the PO, cost up/down % vs last cost, and retail price at or below the new cost. **Supplier unit costs accept up to 2 decimals** (e.g. Rs 12.50 per piece; 64 legacy purchase lines had decimals). | 1 |
 | PUR-03 | Purchase return / debit note (W12). | 1 |
 | PUR-04 | Purchase orders: draft → sent → partially received → received / closed / cancelled. Back-ordered quantity tracking. Only **sent** or partly received POs can be received or appear on the pickup sheet (drafts and cancelled POs cannot). Receiving updates the status automatically (Partly received / Received). A PO can be cancelled only while nothing has been received against it. | 2 |
 | PUR-05 | PO sharing: WhatsApp-ready text (opens WhatsApp with a prefilled message), PDF, print. The message can optionally include our expected rates. | 2 |
@@ -297,7 +297,7 @@ Printing to the shared network printer keeps working, because it only needs the 
 | RPT-07 | Sales and gross profit by item, category, brand, salesman, period | 2 |
 | RPT-08 | Dead/slow stock (no sale in N days, with value) | 2 |
 | RPT-09 | Purchase register; item purchase vs sale rate analysis (legacy parity) | 2 |
-| RPT-10 | Exceptions: below-floor sales without override, offline cap breaches, negative stock, clock skew | 1 |
+| RPT-10 | Exceptions: below-floor sales without override, offline cap breaches, negative stock, clock skew, cash received for a voided bill, barcode amount not matching the synced bill (D-059) | 1 |
 
 All reports filter by date range and export to CSV. PDF/print is offered where it makes sense.
 
@@ -326,7 +326,7 @@ All reports filter by date range and export to CSV. PDF/print is offered where i
 | **Performance** | POS cold start ≤ 5 s, warm ≤ 1 s. Search ≤ 100 ms. Finalize and send to the printer ≤ 2 s (the physical print time depends on the printer). Back-office pages ≤ 2 s at p95. |
 | **Offline** | Full POS and cash desk operation offline for at least 1 business day without data loss. Longer works, with warnings. |
 | **Durability** | A finalized document is committed to local storage before printing. Server RPO ≤ 5 min (continuous WAL archiving), plus counters re-pushing 30 days. RTO ≤ 4 h. |
-| **Integrity** | Money in integer minor units. Documents immutable after finalization. GL and stock ledgers append-only and rebuildable from documents. |
+| **Integrity** | Money in integer minor units (paisa). **Bills are always whole rupees** (selling prices, totals and cash rounding to Rs 1); costs and averages keep 2 decimals internally so profit stays exact. Documents immutable after finalization. GL and stock ledgers append-only and rebuildable from documents. |
 | **Security** | Tenant isolation by RLS. Passwords hashed with Argon2id. PINs never stored in plain text. TLS everywhere. Least-privilege roles. Audit log. Legacy passwords are not migrated. |
 | **Scale (design)** | 1,000 tenants. 100k items per tenant. 2,000 bills/day per tenant. 30 devices per tenant. Without re-architecture. |
 | **Browser / hardware** | Chrome or Edge (current), Windows 10/11 counters (Android tablets are a later phase, §9). Each counter's **default Windows printer** receives its bills. This can be a local printer or a shared network printer, thermal or A4/A5 (print profiles, POS-16). **Delux:** one network-attached A4 dot-matrix printer at the cash counter, the default printer on every counter. Keyboard-wedge barcode scanners (including one at the cash desk). Labels and other A4 documents print from the back office. |

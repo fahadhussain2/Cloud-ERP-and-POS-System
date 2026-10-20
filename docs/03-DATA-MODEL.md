@@ -29,7 +29,7 @@ Data in this document is grouped by area. Fields marked † are derived and main
 
 ## 2. Platform
 
-**tenants:** `name, legal_name, base_currency (ISO 4217), currency_minor_units, timezone (e.g. Asia/Karachi), locale, fiscal_year_start_month (1–12), fiscal_year_locked bool, tax_mode (none|inclusive|exclusive), cash_rounding_increment (minor units, e.g. 100 = Rs 1), day_cutoff_hour, cash_handover_mode (required|off; Delux: required), lock_date, settings jsonb, status`
+**tenants:** `name, legal_name, base_currency (ISO 4217), currency_minor_units, timezone (e.g. Asia/Karachi), locale, fiscal_year_start_month (1–12), fiscal_year_locked bool, tax_mode (none|inclusive|exclusive), cash_rounding_increment (minor units, e.g. 100 = Rs 1), day_cutoff_hour (Delux 4), closing_time (Delux 20:00), cash_handover_mode (required|off; Delux: required), lock_date, settings jsonb, status`
 
 **branches:** `code, name, address, phone, receipt_header jsonb`
 
@@ -245,7 +245,7 @@ Journal vouchers written by the accountant are stored as `journal_entries` with 
 
 **sync_inbox:** `document_id (PK), device_id, family, seq, status (accepted|duplicate|rejected), result jsonb, payload_hash, received_at`
 
-**exceptions:** `kind (below_floor_no_override|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|seq_gap|clock_skew|revoked_device_doc|bad_signature), severity, document_type, document_id, device_id, user_id, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`
+**exceptions:** `kind (below_floor_no_override|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature), severity, document_type, document_id, device_id, user_id, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`
 
 ---
 
