@@ -391,3 +391,19 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - **A single domain with path-based apps:** rejected, the POS and back office would share an origin and its storage.
 - **Status:** Accepted
 
+### D-066 UI library: shadcn/ui on Radix + Tailwind CSS (2026-10-21)
+- **Decision:**
+  - **Components:** **shadcn/ui** (Radix primitives, Tailwind CSS), copied into `packages/ui` and themed with the design tokens from the approved prototypes.
+  - **Supporting libraries:** TanStack Table/Virtual, React Hook Form + Zod, TanStack Router/Query, i18next, Lucide, `Intl`.
+  - **POS keyboard shortcuts:** our own small layer in `packages/ui`.
+- **Why:**
+  - We own the component code, so it can match the prototype look.
+  - Radix gives accessible, keyboard-correct dialogs, menus and selects, which matters for the keyboard-first POS.
+  - It's RTL-ready for Arabic/Urdu.
+  - The bundle stays small, so the POS starts fast on old counter PCs.
+  - Zod schemas are shared with the API.
+- **Alternatives:**
+  - **MUI / Ant Design:** heavy and strongly styled; harder to match the prototypes and slower on old PCs.
+  - **Mantine:** good, but less control over the final look.
+- **Status:** Accepted
+

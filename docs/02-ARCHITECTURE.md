@@ -53,6 +53,8 @@ flowchart LR
 | POS local DB | **SQLite WASM** in a dedicated Web Worker, persisted on OPFS with the `opfs-sahpool` VFS **(proposed)** | Real SQL and transactions. Does not need cross-origin-isolation headers. |
 | POS search | In-memory index in a worker, built from the local DB at boot and patched on sync **(proposed)** | 20k items easily meets ≤ 100 ms. Custom normalizer for part numbers. |
 | Back office | React + Vite SPA (online only) | Shares UI and contract packages with the POS |
+| UI components | **shadcn/ui** (Radix primitives + **Tailwind CSS**), copied into `packages/ui` and themed with the prototype design tokens (D-066) | Accessible, keyboard-friendly, RTL-ready (logical utilities + Radix direction), only used components are bundled |
+| UI support libraries | TanStack Table + Virtual (tables), React Hook Form + Zod (forms, same schemas as `packages/contracts`), TanStack Router + Query (back office), i18next (i18n/RTL), Lucide (icons), `Intl` (number, currency, date formatting) | POS keeps dependencies minimal for fast start on old PCs |
 | API | Node.js (current LTS) + **Fastify** **(proposed)** | Zod-typed routes. OpenAPI generated for future integrations and AI agents. |
 | ORM / SQL | **Drizzle** **(proposed)** | SQL-first, typed. Easy to run `SET LOCAL` for RLS per transaction. |
 | Database | **PostgreSQL** (17+) | RLS, `xid8` change feed, JSONB for settings and legacy attributes |
@@ -78,7 +80,8 @@ packages/
   contracts/      # Zod schemas: REST DTOs, sync payloads (versioned), bill code payloads
   db/             # Drizzle schema, SQL migrations, RLS policies, seed templates (CoA, roles)
   posting/        # Posting engine: document -> stock/party/GL entries (server-side)
-  ui/             # Shared React components, keyboard shortcut system, i18n setup
+  ui/             # shadcn/ui components (Radix + Tailwind) themed with our tokens,
+                  # own keyboard-shortcut layer, i18next setup
 tools/
   legacy-import/  # SSMS script parser -> staging -> transform -> load (+ reports)
 docs/             # Requirements and design (this folder)

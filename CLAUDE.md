@@ -40,7 +40,7 @@ TypeScript monorepo:
 - `apps/backoffice`: React SPA
 - `apps/api`: Fastify
 - `apps/worker`
-- `packages/domain`, `packages/contracts` (Zod), `packages/db` (Drizzle + SQL migrations), `packages/posting`, `packages/ui`
+- `packages/domain`, `packages/contracts` (Zod), `packages/db` (Drizzle + SQL migrations), `packages/posting`, `packages/ui` (shadcn/ui on Radix + Tailwind, themed with the prototype tokens)
 - `tools/legacy-import`
 
 PostgreSQL 17+, Docker Compose on a Hetzner CX33 (Helsinki), Caddy, WAL archiving off-site. Apps at `pos.zorbixtechnologies.com` and `app.zorbixtechnologies.com` (staging: `staging-pos.` / `staging-app.`); the POS origin must never change (D-065).
