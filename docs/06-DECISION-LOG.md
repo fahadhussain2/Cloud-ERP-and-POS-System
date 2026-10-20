@@ -378,3 +378,16 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Note:** free-tier limits (retention about 14 days, volume caps) are checked at setup. Paid tiers are only needed when there are many tenants.
 - **Status:** Accepted
 
+### D-065 Domains: app on zorbixtechnologies.com subdomains (2026-10-21)
+- **Decision:**
+  - **App addresses:** `pos.zorbixtechnologies.com` (POS) and `app.zorbixtechnologies.com` (back office), with `staging-pos.` / `staging-app.` for staging and an optional `status.` page. The API is served at `/api` on each origin.
+  - **Marketing** uses the company site. A separate product domain is optional later, for marketing only.
+- **Why:**
+  - Each counter's offline data is tied to the POS origin, so the POS address must be permanent. A product domain bought now could turn out wrong, because the product name ("Tijara") is still a placeholder.
+  - A separate POS origin isolates POS storage from the back office.
+  - Hosting the app on the vendor's domain is a common pattern and costs nothing.
+- **Alternatives:**
+  - **Buy a product domain now:** rejected, the name isn't final.
+  - **A single domain with path-based apps:** rejected, the POS and back office would share an origin and its storage.
+- **Status:** Accepted
+

@@ -43,7 +43,7 @@ TypeScript monorepo:
 - `packages/domain`, `packages/contracts` (Zod), `packages/db` (Drizzle + SQL migrations), `packages/posting`, `packages/ui`
 - `tools/legacy-import`
 
-PostgreSQL 17+, Docker Compose on a Hetzner CX33 (Helsinki), Caddy, WAL archiving off-site.
+PostgreSQL 17+, Docker Compose on a Hetzner CX33 (Helsinki), Caddy, WAL archiving off-site. Apps at `pos.zorbixtechnologies.com` and `app.zorbixtechnologies.com` (staging: `staging-pos.` / `staging-app.`); the POS origin must never change (D-065).
 
 ## Branches and deploys (D-063)
 

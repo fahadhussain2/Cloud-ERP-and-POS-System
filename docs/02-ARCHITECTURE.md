@@ -283,6 +283,23 @@ docker compose:
 | Deploy | GitHub Actions + Docker Compose over SSH. No deploy platform (Coolify, Kamal…) on the server (D-063). See §9.1. |
 | Portability | No Hetzner-specific APIs. Moving to a UAE region or managed Postgres = restore a backup plus a DNS change. |
 
+### 9.0 Domains (D-065)
+
+| Address | What |
+|---|---|
+| `pos.zorbixtechnologies.com` | POS PWA (counters, cash desk) |
+| `app.zorbixtechnologies.com` | Back office |
+| `staging-pos.zorbixtechnologies.com`, `staging-app.zorbixtechnologies.com` | Staging |
+| `status.zorbixtechnologies.com` (optional) | Public status page (UptimeRobot) |
+
+- **POS on its own subdomain:** the browser keeps service workers, OPFS data and storage permission **per origin**, so nothing in the back office (deploys, cache, clearing site data) can touch a counter's unsynced bills.
+- **The POS origin must never change:** moving it would orphan each counter's local database and force re-enrollment.
+- **API:** served as `/api` on each app's own origin through Caddy, which avoids CORS and keeps `SameSite=Strict` cookies simple. A separate `api.` subdomain can be added later for third-party integrations.
+- **Certificates:** TLS from Let's Encrypt, issued automatically by Caddy.
+- **DNS:** A records for each subdomain point to the production (or staging) server IP. The owner adds them in Wave 0.
+- **Tenants:** all tenants share these addresses in the MVP; the tenant comes from the login or the device enrollment. Per-tenant subdomains for branding are a later option.
+- **Marketing:** a product page on `zorbixtechnologies.com`. A separate product domain is optional, once the product name is final. It would only host marketing and signup and link to the app addresses above, which never move.
+
 ### 9.1 Branches, CI/CD and environments (D-063)
 
 | Environment | Where | Deployed from | How |
