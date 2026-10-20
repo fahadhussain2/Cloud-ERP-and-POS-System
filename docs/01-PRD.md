@@ -200,6 +200,7 @@ Printing to the shared network printer keeps working, because it only needs the 
 | PLT-08 | Append-only audit log for master data changes (before and after), logins, overrides, voids, settings. | 1 |
 | PLT-09 | Device health page: last sync, unsynced documents, app version, persistent-storage status, clock skew. | 1 |
 | PLT-10 | Tenant data isolation enforced in the database (row-level security). | 1 |
+| PLT-11 | **Internal tenant setup script** (platform owner only, not customer-facing). One command creates a new tenant with:<br>• tenant settings (PLT-01)<br>• one branch with Shop / Godown / Damaged locations<br>• the retail chart-of-accounts template with system account roles<br>• default payment methods, expense categories and price tiers<br>• the role templates<br>• the owner's user account<br>• a default print profile<br>Idempotent and safe to re-run. Also used to create test and demo tenants. Item, customer and supplier data then comes in through CSV import (CAT-09). Delux is created by the legacy importer instead. A self-service onboarding wizard and signup are later phases (§9) (D-061). | 2 |
 
 ### 6.2 Catalog and pricing (CAT)
 | ID | Requirement | Wave |
@@ -360,7 +361,7 @@ All reports filter by date range and export to CSV. PDF/print is offered where i
 - [ ] Rollback plan agreed: if there is a critical failure on go-live day, return to legacy and re-enter the day's bills from printed receipts.
 
 ## 9. Later phases (not in the MVP)
-Warranty and supplier claims · sale-on-approval challans · quotations · bank and wallet statement reconciliation · landed-cost allocation · FBR POS integration and UAE e-invoicing, VAT · multi-currency · multi-branch UI and inter-branch transfers · LAN peer sync between counters · full vehicle fitment database and item images · customer loyalty and SMS/WhatsApp receipts · salesman commissions · AI agents (reorder, pricing, catalog cleanup, anomaly detection) · Arabic/Urdu UI · tenant self-signup and subscription billing · native or desktop-wrapped POS if the PWA proves limiting · **Android tablet POS** (Chrome on Android): a touch layout with an on-screen number pad, silent printing to Bluetooth/USB thermal printers driven directly by the app, and device management so staff can't clear the app's storage. The local database and offline sync already work there (iPad/Safari not targeted).
+Warranty and supplier claims · sale-on-approval challans · quotations · bank and wallet statement reconciliation · landed-cost allocation · FBR POS integration and UAE e-invoicing, VAT · multi-currency · multi-branch UI and inter-branch transfers · LAN peer sync between counters · full vehicle fitment database and item images · customer loyalty and SMS/WhatsApp receipts · salesman commissions · AI agents (reorder, pricing, catalog cleanup, anomaly detection) · Arabic/Urdu UI · self-service onboarding wizard, tenant self-signup (free trial) and subscription billing · native or desktop-wrapped POS if the PWA proves limiting · **Android tablet POS** (Chrome on Android): a touch layout with an on-screen number pad, silent printing to Bluetooth/USB thermal printers driven directly by the app, and device management so staff can't clear the app's storage. The local database and offline sync already work there (iPad/Safari not targeted).
 
 ## 10. Risks
 

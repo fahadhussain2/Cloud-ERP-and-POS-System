@@ -335,3 +335,9 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Schedule note:** Wave 0 was planned for 12–25 Oct and starts on 21 Oct, about a week late. The release plan is unchanged: build order by criticality, go/no-go on 18 Dec.
 - **Status:** Accepted
 
+### D-061 Tenant onboarding: internal setup script in the MVP (2026-10-21)
+- **Decision:** new tenants are onboarded by the platform owner with an internal, idempotent setup script (PLT-11, Wave 2). It creates the tenant, its branch and locations, the CoA template, payment methods, roles, the owner account and the print profile. Data comes in through CSV import (CAT-09).
+- **Why:** Delux is created by the legacy importer, so go-live doesn't depend on this. A second shop, or any test/demo tenant, needs a repeatable setup instead of manual database work.
+- **Later phases:** a self-service onboarding wizard in the back office, then self-signup with a free trial and subscription billing.
+- **Status:** Accepted
+
