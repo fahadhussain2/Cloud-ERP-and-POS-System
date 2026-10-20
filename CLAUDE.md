@@ -43,7 +43,14 @@ TypeScript monorepo:
 - `packages/domain`, `packages/contracts` (Zod), `packages/db` (Drizzle + SQL migrations), `packages/posting`, `packages/ui`
 - `tools/legacy-import`
 
-PostgreSQL 17+, Docker Compose on a Hetzner VPS (Singapore), Caddy, WAL archiving off-site.
+PostgreSQL 17+, Docker Compose on a Hetzner CX33 (Helsinki), Caddy, WAL archiving off-site.
+
+## Branches and deploys (D-063)
+
+- `staging` branch → auto-deploys to staging. `main` branch → production (merge `staging` → `main` to release; production deploys run only outside 10:00–20:00 Karachi time).
+- Application code goes to `staging` first, never straight to `main`.
+- Docs-only changes (`docs/**`, `*.md`) may be committed straight to `main`; they don't deploy. Merge them into `staging` afterwards.
+- TDD for `packages/domain`, `packages/posting`, sync and RLS: write the golden test cases first.
 
 ## Domain glossary
 

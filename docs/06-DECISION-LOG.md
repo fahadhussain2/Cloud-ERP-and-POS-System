@@ -341,3 +341,25 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Later phases:** a self-service onboarding wizard in the back office, then self-signup with a free trial and subscription billing.
 - **Status:** Accepted
 
+### D-062 Production on the owner's Hetzner CX33 in Helsinki (2026-10-21)
+- **Decision:** production runs on the owner's existing **Hetzner CX33** (4 vCPU, 8 GB RAM, 80 GB disk) in **Helsinki, Finland**. This supersedes the Singapore location in D-029; Singapore wasn't available. All conditions of D-029 still apply: off-site WAL backups, restore drills, hardening, Docker portability. Hetzner's own daily server backups are turned on as an extra layer.
+- **Why it's fine:** counters sell from their local database, so distance to Karachi only makes back-office screens slightly slower. The capacity is far above what Delux needs (about 140 bills a day) and is enough for the first few dozen tenants. Vertical resize takes minutes.
+- **Revisit:** before onboarding UAE tenants, as in D-029.
+- **Status:** Accepted
+
+### D-063 DevOps: GitHub Actions, `staging` → `main` branches, staging on demand, TDD for core logic (2026-10-21)
+- **Decision:**
+  - **CI:** GitHub Actions runs tests on every push and nightly end-to-end tests (free).
+  - **Branches (option B):** the `staging` branch auto-deploys to staging. Merging `staging` → `main` releases to production, which deploys automatically only outside 10:00–20:00 Karachi time, with an emergency manual override.
+  - **Docs-only changes** never deploy.
+  - **Deploys:** automatic migrations, health check and auto-rollback.
+  - **Staging** runs as a resource-limited copy on the same CX33, started only when testing. It moves to its own small CX23 before the pilot, for isolation.
+  - **No deploy platform** on the server.
+  - **TDD** for domain rules, posting, sync and RLS.
+- **Alternatives considered:**
+  - **Option A** (one `main` branch plus approved releases): simpler, but its approval button needs a paid GitHub plan on private repositories.
+  - **Free cloud tiers / Vercel / Cloudflare for staging:** rejected. Vercel's free plan is non-commercial, these platforms can't host our worker, long-lived connections or PostgreSQL, and a staging setup unlike production proves little.
+  - **Coolify / Dokploy:** rejected. They use 1–2 GB of the 8 GB server and add a web admin panel to the live server.
+  - **Kamal:** possible later, if zero-downtime deploys are needed.
+- **Status:** Accepted
+

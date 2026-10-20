@@ -22,7 +22,7 @@ flowchart LR
     CD -->|LAN print| PR
   end
 
-  subgraph Cloud["Hetzner VPS (Singapore) - Docker"]
+  subgraph Cloud["Hetzner CX33 (Helsinki) - Docker"]
     CADDY["Caddy<br/>TLS + static apps"]
     API["API (Node/TS)<br/>sync · REST · auth"]
     WK["Worker (Node/TS)<br/>jobs · reports · reconciliation"]
@@ -59,7 +59,7 @@ flowchart LR
 | Jobs | Postgres-backed queue (e.g. pg-boss / graphile-worker) **(proposed)** | No Redis to operate |
 | Realtime nudge | Server-Sent Events | "Changes available" and live cash queue when online |
 | Reverse proxy | **Caddy** **(proposed)** | Automatic TLS, serves static apps |
-| Hosting | Hetzner VPS, Singapore (D-029) | Docker Compose, no provider-specific services |
+| Hosting | Hetzner CX33 (4 vCPU, 8 GB RAM, 80 GB), Helsinki (D-062) | Docker Compose, no provider-specific services |
 | Backups | WAL-G or pgBackRest to object storage at a **different provider** **(proposed)** | RPO ≤ 5 min |
 | Testing | Vitest (unit, golden cases), Postgres integration tests, Playwright (incl. offline e2e) | See §12 |
 
@@ -261,7 +261,7 @@ After a server restore to time T, devices re-push documents from their 30-day lo
 
 **Cash drawer:** it opens through a thermal printer's "open drawer on print" option where one is attached, otherwise with the drawer's own key or button. Dot-matrix printers can't trigger the drawer.
 
-## 9. Deployment and operations (Hetzner VPS)
+## 9. Deployment and operations (Hetzner CX33, Helsinki)
 
 ```
 docker compose:
@@ -269,7 +269,8 @@ docker compose:
   api        : Node, stateless (can scale to 2 replicas on the same VPS)
   worker     : Node, background jobs
   postgres   : PostgreSQL 17+, not exposed publicly; WAL-G/pgBackRest sidecar
-  (staging)  : separate compose project + database on the same VPS for MVP
+  (staging)  : separate compose project + own database and domain on the same server, hard limits
+               (about 1.5 GB RAM / 1 vCPU), started only when testing; moves to its own small CX23 before the pilot
 ```
 
 | Concern | Requirement |
@@ -279,8 +280,22 @@ docker compose:
 | Hardening | SSH keys only, no root login, firewall (only 80/443 and SSH from allowed IPs), unattended security upgrades, fail2ban, Postgres listening only on the Docker network. |
 | Secrets | Environment files outside git. Rotated on staff changes. |
 | Monitoring | External uptime check on `/health`, error tracking (e.g. Sentry) for API, worker, POS and back office, disk and Postgres alerts, backup-freshness alert (> 15 min without a WAL push). |
-| Deploy | CI builds images → registry → SSH deploy (`compose pull && migrate && up -d`). Zero-downtime is not required (POS is offline-tolerant). Deploy outside shop hours. |
+| Deploy | GitHub Actions + Docker Compose over SSH. No deploy platform (Coolify, Kamal…) on the server (D-063). See §9.1. |
 | Portability | No Hetzner-specific APIs. Moving to a UAE region or managed Postgres = restore a backup plus a DNS change. |
+
+### 9.1 Branches, CI/CD and environments (D-063)
+
+| Environment | Where | Deployed from | How |
+|---|---|---|---|
+| **CI test runs** | GitHub Actions runners (free) | Every push and pull request | Lint, type check, unit tests, integration tests against a throwaway PostgreSQL, build. Nightly: Playwright end-to-end flows and a backup-freshness check. |
+| **Staging** | Same CX33, separate compose project with resource limits, on demand. Its own CX23 before the December pilot. | `staging` branch | **Automatic** on every merge to `staging` |
+| **Production** | Hetzner CX33, Helsinki | `main` branch | **Merging `staging` → `main` is the release.** It deploys automatically, but only **outside shop hours (10:00–20:00 Asia/Karachi)**. A merge during hours waits until after closing. Emergency override via a manual "Run workflow". |
+
+- **Work flow:** feature work → `staging` (test on staging) → pull request `staging` → `main` → merge = release.
+- **Docs-only changes** (`docs/**`, `*.md`) never trigger a deploy. They may be committed straight to `main` and are then merged into `staging` to keep the branches aligned.
+- **Each deploy:** pull images → run database migrations (if a migration fails, the old version keeps running) → start → health check. If the health check fails, the previous image is restored automatically and an alert is sent.
+- **Rollback:** revert the merge on `main`, which redeploys the previous version.
+- **Limit of the free GitHub plan:** branch protection is not enforced on private repositories, so "only merge `main` through a pull request" is a discipline rule, not a technical lock.
 
 ## 10. Extensibility built in now (cheap now, expensive later)
 - **Tax engine:** tax codes on items and tax lines on document lines exist from day 1 (all 0%). The tenant setting chooses tax-inclusive or tax-exclusive pricing.
@@ -293,6 +308,9 @@ docker compose:
 Each device reports with every sync, and on a timer when online: app version, schema version, unsynced count, oldest unsynced age, last successful push/pull, storage persisted (yes/no), storage usage, clock skew and recent errors. This feeds the back-office **Devices** page (PLT-09) and alerts (e.g. a device with more than 4 h of unsynced documents while others are online).
 
 ## 12. Testing strategy (solo developer: automate the dangerous parts)
+
+**Test-first (TDD)** for `packages/domain`, `packages/posting`, the sync protocol and RLS, where a bug means wrong money or lost bills. Each rule's golden test cases are written before the code. Screens are covered by a few end-to-end Playwright flows rather than test-first (D-063).
+
 | Layer | What | Tool |
 |---|---|---|
 | Domain | Golden test cases (JSON input → expected output) for bill math, rounding, tier/floor/limit rules, returns eligibility, credit availability. 100% branch coverage on `packages/domain`. | Vitest |
