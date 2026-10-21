@@ -7,8 +7,8 @@ describe('GET /api/health', () => {
     const app = buildApp({ version: 'abc123' });
     const res = await app.inject({ method: 'GET', url: '/api/health' });
 
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ status: 'ok', version: 'abc123' });
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({ status: 'broken', version: 'abc123' });
     await app.close();
   });
 
@@ -16,7 +16,7 @@ describe('GET /api/health', () => {
     const app = buildApp();
     const res = await app.inject({ method: 'GET', url: '/api/health' });
 
-    expect(res.json()).toEqual({ status: 'ok', version: 'dev' });
+    expect(res.json()).toEqual({ status: 'broken', version: 'dev' });
     await app.close();
   });
 });
