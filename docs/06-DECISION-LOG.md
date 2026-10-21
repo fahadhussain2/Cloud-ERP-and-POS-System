@@ -457,3 +457,29 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - pg-boss (the planned job queue) uses it too, so there is one driver to learn, configure and patch.
 - **Alternative:** postgres.js is faster in benchmarks, but it would be a second driver next to pg-boss, and speed isn't a constraint at about 140 bills a day.
 - **Status:** Accepted (with the W0-02 plan)
+
+### D-073 Server setup: script in git, two firewalls, key-only SSH, shared Caddy (2026-10-21)
+- **Decision:**
+  - The production server runs **Ubuntu 24.04 LTS**, configured by one idempotent script in git (`infra/server/bootstrap.sh`).
+  - **Hetzner Cloud Firewall + ufw**, both allowing only 22/80/443.
+  - **SSH:** keys only, no root login, fail2ban. SSH stays open to any IP. This replaces "SSH from allowed IPs" in architecture §9.
+  - **Users:** `admin` (sudo) and `deploy` (Docker only, for GitHub Actions).
+  - **One shared Caddy ("edge")** in its own compose project serves production and staging.
+  - Unattended security upgrades, with reboots at 04:30 Karachi time. 2 GB swap, Docker log rotation, server clock in UTC.
+- **Why:**
+  - Rebuildable from git.
+  - The cloud firewall covers Docker's ufw bypass.
+  - The owner's IP is dynamic and GitHub Actions uses many IPs, so an IP allowlist would break deploys. Key-only SSH makes password guessing useless.
+- **Revisit:** a private network (e.g. Tailscale) for SSH once there is more than one admin.
+- **Status:** Accepted (with the W0-03 plan)
+
+### D-074 No Hetzner snapshots or server backups (2026-10-21)
+- **Decision:** Hetzner's paid snapshots and daily server backups are **not used**. This changes D-062, which had them as an extra layer.
+- **What protects data instead:**
+  - The **off-site PostgreSQL backups** (continuous WAL + daily base backup at another provider, W0-05) are the only backup layer.
+  - The server itself is rebuildable from git (D-073).
+- **Consequences:**
+  - W0-05 must be finished and a restore drilled **before any real data** (migration rehearsal, pilot) goes onto the server.
+  - Recovering from a lost server means: rebuild, run the bootstrap, deploy, then restore the database. It takes longer than restoring a Hetzner image, but loses no data.
+- **Why:** owner's cost decision; the off-site backups already meet the RPO ≤ 5 min requirement.
+- **Status:** Accepted
