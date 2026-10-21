@@ -1,2 +1,6 @@
 # Legacy database dump: contains customer personal data and legacy credentials. Never commit.
 sql_dump/
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/bugfix-lock.json
