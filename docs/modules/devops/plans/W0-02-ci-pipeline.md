@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#3](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/3) |
 | **Module** | devops |
-| **Status** | Accepted (2026-10-21) |
+| **Status** | Done: merged into `staging` in [#16](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/pull/16) |
 | **Refs** | Architecture §9.1, §12; D-063, D-071, D-072 |
 | **Depends on** | W0-01 (merged into `staging`) |
 | **Size** | about half a day |
@@ -59,11 +59,11 @@ Every pull request, and every push to `staging` and `main`, is checked automatic
 
 ## Tests that prove it
 
-- [ ] The PR's own CI run is green: the `check` and `integration` jobs both pass. Run links go in the PR.
-- [ ] A deliberately failing unit test turns `check` red, and a failing integration test turns `integration` red. Run links go in the PR; both commits are reverted.
-- [ ] A docs-only commit to `staging` starts no run.
-- [ ] Locally, `pnpm test:integration` without `DATABASE_URL` exits non-zero with a clear message.
-- [ ] Measured run time: under 10 minutes, with about 3–5 minutes expected.
+- [x] The PR's own CI run is green: the `check` and `integration` jobs both pass. Run links go in the PR.
+- [x] A deliberately failing unit test turns `check` red, and a failing integration test turns `integration` red. Run links go in the PR; both commits are reverted.
+- [x] A docs-only commit to `staging` starts no run.
+- [x] Locally, `pnpm test:integration` without `DATABASE_URL` exits non-zero with a clear message.
+- [x] Measured run time: under 10 minutes, with about 3–5 minutes expected.
 
 ## Risks
 
@@ -76,3 +76,18 @@ Every pull request, and every push to `staging` and `main`, is checked automatic
 ## Owner actions
 
 None. GitHub Actions is already enabled on the repo.
+
+## Results
+
+| Check | Result |
+|---|---|
+| PR [#16](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/pull/16), [run 39613235031](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/actions/runs/39613235031) | Green. `check` 56 s, `integration` 45 s. |
+| Push to `staging` after the merge, [run 39613564459](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/actions/runs/39613564459) | Green. `check` 51 s, `integration` 39 s. |
+| Red check, throwaway draft PR #17 (closed without merging), [run 39614117614](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/actions/runs/39614117614) | **Both jobs red**, each on its own failing test: `expected 2 to be 3` (unit) and `expected 'xid8' to be 'bigint'` (integration). One commit tested both jobs, so nothing needed reverting. |
+| Docs-only push to `main` (commit `49db097`) | No run started. `main` and `staging` share the same `paths-ignore`. |
+| Local `pnpm test:integration` without `DATABASE_URL` | Exit 1: "DATABASE_URL is not set. Integration tests need PostgreSQL 17+…" |
+| Local run against a throwaway `postgres:17` container | 3 of 3 integration tests pass. |
+
+**Run time** is about 1 minute, so about 2 runner-minutes per run (two jobs). That is far below the 2,000 free minutes a month.
+
+**Process note:** the plan acceptance commit landed on `staging` instead of `main` (the checkout had moved to `staging`). It was copied to `main` as `49db097`, and the release merge was checked to be clean.
