@@ -407,3 +407,16 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - **Mantine:** good, but less control over the final look.
 - **Status:** Accepted
 
+### D-067 Light and dark themes with a switcher (2026-10-21)
+- **Decision:**
+  - Light and dark themes are supported everywhere through the colour tokens.
+  - Switcher with Light / Dark / System: **per user** in the back office, **per counter (set by a manager, default Light)** on the POS.
+  - Printed output is always light.
+  - Tokens from Wave 0/1; the switcher in Wave 2 (PLT-13).
+  - Per-tenant branding (logo, accent colour) is a later phase.
+- **Why:**
+  - The prototypes already use tokens for both themes, so the cost is near zero.
+  - A per-counter POS setting avoids the theme flipping between shared users.
+  - Light suits bright shop floors.
+- **Status:** Accepted
+
