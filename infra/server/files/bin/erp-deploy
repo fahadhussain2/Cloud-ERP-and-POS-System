@@ -77,8 +77,9 @@ prune() {
     while read -r tag; do
       [[ $tag == "$(state "$env" current)" || $tag == "$(state "$env" previous)" ]] && continue
       rm -rf "${ROOT:?}/$env/releases/$tag"
-    done < <(ls -1t "$ROOT/$env/releases" | tail -n +$((KEEP + 1)))
-    while read -r tag; do keep+=("$tag"); done < <(ls -1 "$ROOT/$env/releases")
+    done < <(find "$ROOT/$env/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %f\n' |
+      sort -rn | awk -v keep="$KEEP" 'NR > keep {print $2}')
+    while read -r tag; do keep+=("$tag"); done < <(find "$ROOT/$env/releases" -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
   done
   while read -r ref; do
     tag=${ref##*:}
