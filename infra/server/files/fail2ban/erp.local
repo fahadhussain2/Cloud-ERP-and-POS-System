@@ -1,0 +1,9 @@
+# Ban an IP for 1 hour after 5 failed SSH logins within 10 minutes (W0-03).
+[DEFAULT]
+backend = systemd
+bantime = 1h
+findtime = 10m
+maxretry = 5
+
+[sshd]
+enabled = true

@@ -280,7 +280,7 @@ docker compose:
 |---|---|
 | Backups | Continuous WAL archiving plus a daily base backup to S3-compatible storage at **another provider**. Retention 30 days plus monthly snapshots for 12 months. Backups encrypted. |
 | Restore drill | Monthly, into staging, timed, logged. **Before go-live: at least one full drill.** |
-| Hardening | SSH keys only, no root login, firewall (only 80/443 and SSH from allowed IPs), unattended security upgrades, fail2ban, Postgres listening only on the Docker network. |
+| Hardening | SSH keys only, no root login, no passwords; Hetzner Cloud Firewall + ufw (only 22, 80, 443); fail2ban; unattended security upgrades after hours; Postgres listening only on the Docker network. SSH is open to any IP, because the owner's IP is dynamic and GitHub Actions uses many IPs (D-073). Setup lives in `infra/` and is rebuildable from git. |
 | Secrets | Environment files outside git. Rotated on staff changes. |
 | Monitoring | See §11: Sentry, Grafana Cloud (logs, metrics, traces via OpenTelemetry + Alloy agent), uptime checks, Slack alerts with email backup for critical ones. |
 | Deploy | GitHub Actions + Docker Compose over SSH. No deploy platform (Coolify, Kamal…) on the server (D-063). See §9.1. |

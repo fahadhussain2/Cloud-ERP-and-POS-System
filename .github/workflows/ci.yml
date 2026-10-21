@@ -33,6 +33,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+      # Server and edge config (W0-03). shellcheck and Docker come with the runner.
+      - name: Check server scripts
+        run: shellcheck -x infra/server/*.sh infra/edge/*.sh
+      - name: Check edge config
+        run: |
+          docker compose -f infra/edge/compose.yaml config -q
+          docker run --rm -v "$PWD/infra/edge/caddy:/etc/caddy:ro" caddy:2.11.7-alpine \
+            caddy validate --config /etc/caddy/Caddyfile
 
   integration:
     name: Integration tests (PostgreSQL 17)

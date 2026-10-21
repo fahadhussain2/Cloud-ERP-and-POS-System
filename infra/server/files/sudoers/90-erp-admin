@@ -1,0 +1,2 @@
+# admin logs in with an SSH key only and has no password, so sudo needs none (W0-03, D-073).
+admin ALL=(ALL:ALL) NOPASSWD: ALL

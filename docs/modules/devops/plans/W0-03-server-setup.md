@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#4](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/4) |
 | **Module** | devops |
-| **Status** | Accepted (2026-10-21) |
+| **Status** | Built (2026-10-22); PR [#18](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/pull/18) waiting for the owner's merge |
 | **Refs** | Architecture §6.5, §9, §9.0; D-029, D-062, D-063, D-065, D-073, D-074 |
 | **Depends on** | W0-02 (CI checks the server config) |
 | **Size** | about 1 day, plus waiting for DNS |
@@ -56,14 +56,14 @@ A secure, reproducible production server that serves HTTPS on the four app addre
 
 ## Tests that prove it
 
-- [ ] **From outside:** only 22, 80 and 443 answer. A scan of 1–1024 plus 2375/2376 (Docker API), 3000 and 5432 finds nothing else.
-- [ ] `ssh root@…` is refused, and an SSH login with a password is refused (`Permission denied (publickey)`).
-- [ ] All four addresses serve HTTPS with a valid Let's Encrypt certificate. HTTP redirects to HTTPS, and the security headers are present (`curl -I` output in the PR).
-- [ ] `/api/health` returns 503 for now. This proves the route exists before the app does.
-- [ ] Re-running `bootstrap.sh` reports no changes.
-- [ ] `fail2ban-client status sshd` is active, and an `unattended-upgrade --dry-run` succeeds.
-- [ ] **After a reboot,** Caddy comes back on its own and all four sites serve again.
-- [ ] The Hetzner Cloud Firewall is attached (owner confirms with a screenshot).
+- [x] **From outside:** only 22, 80 and 443 answer. A scan of 1–1024 plus 2375/2376 (Docker API), 3000 and 5432 finds nothing else.
+- [x] `ssh root@…` is refused, and an SSH login with a password is refused (`Permission denied (publickey)`).
+- [x] All four addresses serve HTTPS with a valid Let's Encrypt certificate. HTTP redirects to HTTPS, and the security headers are present (`curl -I` output in the PR).
+- [x] `/api/health` returns 503 for now. This proves the route exists before the app does.
+- [x] Re-running `bootstrap.sh` reports no changes.
+- [x] `fail2ban-client status sshd` is active, and an `unattended-upgrade --dry-run` succeeds.
+- [x] **After a reboot,** Caddy comes back on its own and all four sites serve again.
+- [x] The Hetzner Cloud Firewall is attached. The owner created it, and it was proven by test: a port that Docker published past ufw was not reachable from outside.
 
 ## Risks
 
@@ -81,3 +81,38 @@ A secure, reproducible production server that serves HTTPS on the four app addre
 3. The owner logs in today as **root with an SSH key**. Claude gets its own key (`~/.ssh/zorbix_erp_admin` on the dev PC), and the owner adds its public key.
 4. The server is renamed to **erp-prod-1**.
 5. **No Hetzner snapshots or backups**, to save cost (D-074).
+
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| `admin` has **sudo without a password** | `admin` has no password at all (keys only), so sudo can't ask for one. |
+| SSH: plain `allow 22/tcp` in ufw, not `limit` | ufw's limit (6 connections per 30 s) could block a GitHub Actions deploy. fail2ban covers password guessing. |
+| `AllowUsers admin deploy`, `MaxAuthTries 3`, local port forwarding only | Small extra hardening. Local forwarding is kept for an admin tunnel to the database (`ssh -L`). |
+| The Caddyfile lives in `infra/edge/caddy/` and the folder is mounted | Docker keeps a single-file mount on the old file when it is replaced, so updates would be invisible. |
+| The upgrade timer is moved to **23:00 UTC (04:00 Karachi)**; reboots at 23:30 UTC if needed | Ubuntu's default timer runs at 06:00 UTC + up to 1 h, which is 11:00–12:00 in Karachi, inside shop hours. |
+| Two bugs fixed on the first run: `apply.sh` passed an empty option when given none, and an empty key folder (`deploy`) broke the key setup | Found by running it. Both fixed before the lockdown run. |
+| Getting in after the rebuild needed **Hetzner rescue mode** | The rebuild didn't keep a root key, and the project had no saved SSH key. The owner's key is now saved in the project as "Fahad PC". |
+
+## Results (2026-10-22)
+
+| Check | Result |
+|---|---|
+| CI on the PR | Green, including shellcheck, `docker compose config` and `caddy validate`. |
+| First bootstrap run (as root) | Packages, swap, Docker 29.9.2 + Compose v5.6.1, users, ufw, fail2ban and the upgrade timer set up. SSH left open, as designed. |
+| `admin` login tested in a separate session | Works, with passwordless sudo, before any lockdown. |
+| `--lock-ssh` run (as admin) | 1 change, the hardening file. Effective `sshd -T`: `permitrootlogin no`, `passwordauthentication no`, `authenticationmethods publickey`, `allowusers admin deploy`. |
+| `ssh root@…` with a valid key | `Permission denied (publickey)` |
+| Password login | `Permission denied (publickey)`. Only key login is offered. |
+| Re-run | `Done: no changes.` |
+| Certificates | Test run against the Let's Encrypt **staging** CA first (4 of 4 issued), then production: 4 of 4 issued by Let's Encrypt (YE2), valid until 19 Jan 2027, renewed automatically. |
+| HTTPS on all four addresses | 200, certificate valid. HTTP → 308 redirect to HTTPS. `Alt-Svc: h3` advertised. |
+| Headers | `Strict-Transport-Security: max-age=31536000`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Content-Security-Policy: frame-ancestors 'none'`, no `Server` header; staging adds `X-Robots-Tag: noindex, nofollow`. |
+| `/api/health` | 503 on all four addresses (route ready, app not deployed yet). |
+| External port scan (IPv4: 1–1024, 2019, 2375, 2376, 3000, 5432, 8080) | Only **22, 80, 443** answer. |
+| Hetzner Cloud Firewall | A test container published on port 8081 answered on the server but **not from outside**. This proves the Hetzner firewall blocks what Docker lets past ufw. Test container removed. |
+| fail2ban | The `sshd` jail is active and had already **banned an internet scanner** (`179.43.153.2`, not the owner's IP). |
+| `unattended-upgrade --dry-run` | Exit 0. Reboot time 23:30 UTC. |
+| **Reboot** | Sites back in 17 s. Caddy, swap, fail2ban, ufw and Docker all came up on their own. |
+
+**Not checked:** an IPv6 port scan, because this PC has no IPv6. The Hetzner firewall rules cover IPv6, and ufw shows the same rules for v6.
