@@ -107,7 +107,7 @@ key_files() {
   shopt -s nullglob
   files=("$HERE/keys/$1/"*.pub)
   shopt -u nullglob
-  printf '%s\n' "${files[@]}"
+  if ((${#files[@]})); then printf '%s\n' "${files[@]}"; fi
 }
 
 # authorized_keys is fully managed: a key removed from keys/<user>/ is revoked on the next run.

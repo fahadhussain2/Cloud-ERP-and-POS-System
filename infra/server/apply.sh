@@ -14,7 +14,8 @@ target=$1
 shift
 key=${ERP_SSH_KEY:-$HOME/.ssh/zorbix_erp_admin}
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-args=$(printf ' %q' "$@")
+args=''
+if (($#)); then args=$(printf ' %q' "$@"); fi
 
 tar -C "$here" --exclude=apply.sh -czf - . |
   ssh -i "$key" -o IdentitiesOnly=yes "$target" \

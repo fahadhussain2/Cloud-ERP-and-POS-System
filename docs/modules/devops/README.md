@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-01 |
+| **Status** | In progress: W0-01, W0-02, W0-03 built; next W0-04 |
 | **Requirements** | Non-functional: PRD §7 (durability, security, observability), §8 (release plan, go/no-go) |
 | **Feature spec needed** | No: architecture §9 and §11 are the spec |
 
