@@ -483,3 +483,19 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Recovering from a lost server means: rebuild, run the bootstrap, deploy, then restore the database. It takes longer than restoring a Hetzner image, but loses no data.
 - **Why:** owner's cost decision; the off-site backups already meet the RPO ≤ 5 min requirement.
 - **Status:** Accepted
+
+### D-075 Deploys: images over SSH, tagged by tree hash, restricted deploy key (2026-10-22)
+- **Decision:**
+  - Each release is three images (`api`, `worker`, `web`), built in CI and sent to the server over SSH. No container registry.
+  - **Images are tagged with the git tree hash.** Production reuses the exact image staging tested.
+  - The GitHub deploy key can run only `erp-deploy` (`status`, `load`, `deploy`, `rollback`).
+  - **Every deploy:** migrations → start → health check → automatic rollback on failure.
+  - **Migrations must be backward-compatible** with the previous release.
+  - **Production deploys starting 10:00–20:00 Karachi are deferred** to scheduled runs at 22:00 and 02:00; a manual `force` is the override.
+  - Staging can also deploy any branch on demand.
+- **Why:**
+  - No token or paid storage on GitHub's registry.
+  - "What was tested is what ships."
+  - A leaked deploy key can't open a shell.
+  - Rollback stays safe because old code works with the new schema.
+- **Status:** Accepted (with the W0-04 plan)
