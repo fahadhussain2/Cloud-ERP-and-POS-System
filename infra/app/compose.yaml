@@ -1,0 +1,58 @@
+# One release of the apps for one environment (D-075). Run by erp-deploy on the server:
+#   IMAGE_TAG=<tree hash> docker compose -p erp-<env> --env-file <env>.env -f compose.yaml up -d --wait
+# Images are loaded locally, never pulled. Secrets come from /srv/erp/<env>/app.env (not in git).
+
+x-hardening: &hardening
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  pull_policy: never
+  env_file:
+    - path: /srv/erp/${ERP_ENV:?}/app.env
+      required: false
+
+services:
+  api:
+    <<: *hardening
+    image: erp-api:${IMAGE_TAG:?}
+    networks:
+      edge:
+        aliases:
+          - erp-${ERP_ENV}-api
+    deploy:
+      resources:
+        limits:
+          memory: ${API_MEMORY:?}
+          cpus: '${API_CPUS:?}'
+
+  worker:
+    <<: *hardening
+    image: erp-worker:${IMAGE_TAG:?}
+    deploy:
+      resources:
+        limits:
+          memory: ${WORKER_MEMORY:?}
+          cpus: '${WORKER_CPUS:?}'
+
+  web:
+    <<: *hardening
+    image: erp-web:${IMAGE_TAG:?}
+    networks:
+      edge:
+        aliases:
+          - erp-${ERP_ENV}-web
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: '0.5'
+
+networks:
+  edge:
+    name: erp-edge
+    external: true

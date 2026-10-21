@@ -22,7 +22,7 @@ Every pull request is reviewed by Claude against this policy before the owner ap
 | **POS checkout path** | A network call on the checkout path; printing before the local transaction commits |
 | **Security** | Secrets in code or config; passwords/PINs/tokens logged; missing auth or permission check on an endpoint; SQL built by string concatenation; PIN accepted for back-office login |
 | **Data protection** | Anything reading `sql_dump/` outside `tools/legacy-import`; personal data in logs without masking |
-| **Migrations** | Destructive schema migration without a backfill/rollback plan; a migration that can't run on a populated database |
+| **Migrations** | Destructive schema migration without a backfill/rollback plan; a migration that can't run on a populated database; **a migration the previous release can't run against** (rollback switches code, not the schema: expand → deploy → contract later, D-075) |
 | **Tests** | Core logic (domain, posting, sync, RLS) changed without tests; a bug fix without a failing-test-first commit; tests weakened to pass |
 
 ## Major (🟠)

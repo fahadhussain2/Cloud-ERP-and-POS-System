@@ -1,0 +1,28 @@
+# The `web` container: serves the built POS (:8080) and back office (:8081) to the edge (D-075).
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+(spa) {
+	encode zstd gzip
+	# Built assets have content hashes in their names, so they never change.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	# index.html and everything else: always check for a new release.
+	@other not path /assets/*
+	header @other Cache-Control "no-cache"
+	try_files {path} /index.html
+	file_server
+}
+
+:8080 {
+	root * /srv/pos
+	import spa
+}
+
+:8081 {
+	root * /srv/backoffice
+	import spa
+}

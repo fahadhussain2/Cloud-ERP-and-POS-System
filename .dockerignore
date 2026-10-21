@@ -1,0 +1,14 @@
+# Keep the build context small and free of anything private.
+**/node_modules
+**/dist
+**/coverage
+.git
+.github
+.claude
+docs
+infra/server
+sql_dump
+**/.env
+**/.env.*
+!**/.env.example
+*.md

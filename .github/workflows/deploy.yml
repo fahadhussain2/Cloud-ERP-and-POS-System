@@ -1,0 +1,182 @@
+# Deploys a release to staging or production (W0-04, D-063, D-075).
+# - Called by CI after the checks pass on a push to staging (→ staging) or main (→ prod).
+# - Scheduled at 22:00 and 02:00 Karachi: deploys a production release that was deferred.
+# - "Run workflow": staging from any branch, or prod from main (with force during shop hours).
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+    secrets:
+      DEPLOY_SSH_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Where to deploy. Staging accepts any branch; prod only main.
+        type: choice
+        options: [staging, prod]
+        default: staging
+      force:
+        description: 'Prod only: deploy during shop hours (emergency)'
+        type: boolean
+        default: false
+  schedule:
+    - cron: '0 17 * * *' # 22:00 Karachi
+    - cron: '0 21 * * *' # 02:00 Karachi
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment || 'prod' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # One deploy per environment at a time, and a running deploy is never cancelled.
+    concurrency:
+      group: deploy-${{ inputs.environment || 'prod' }}
+      cancel-in-progress: false
+    env:
+      ENVIRONMENT: ${{ inputs.environment || 'prod' }}
+      FORCE: ${{ inputs.force == true }}
+      SERVER: 204.168.217.64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check what may deploy
+        id: gate
+        run: |
+          if [[ $ENVIRONMENT == prod && $GITHUB_REF != refs/heads/main ]]; then
+            echo "::error::Production deploys only from main."
+            exit 1
+          fi
+          echo "tag=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+          hour=$(TZ=Asia/Karachi date +%-H)
+          if [[ $ENVIRONMENT == prod && $FORCE != true ]] && (( hour >= 10 && hour < 20 )); then
+            echo "::notice::Deferred: production deploys only outside 10:00-20:00 Karachi (now $(TZ=Asia/Karachi date +%H:%M)). The next scheduled run (22:00) deploys it, or run this workflow with force for an emergency."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up SSH
+        if: steps.gate.outputs.go == 'true'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          # The server's host key is pinned in git, so the connection can't be redirected.
+          cp infra/server/known_hosts ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host erp
+            HostName $SERVER
+            User deploy
+            IdentityFile ~/.ssh/deploy
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            BatchMode yes
+          EOF
+
+      - name: Check the server
+        id: server
+        if: steps.gate.outputs.go == 'true'
+        env:
+          TAG: ${{ steps.gate.outputs.tag }}
+        run: |
+          status=$(ssh erp "status $ENVIRONMENT")
+          echo "$ENVIRONMENT: $status"
+          current=${status#current=}
+          current=${current%% *}
+          if [[ $current == "$TAG" ]]; then
+            echo "::notice::$ENVIRONMENT already runs $TAG; nothing to deploy."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "deploy=true" >> "$GITHUB_OUTPUT"
+          # Same tree as a release already on the server (e.g. tested on staging): reuse its images.
+          if ssh erp "has $TAG"; then echo "build=false"; else echo "build=true"; fi >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: steps.server.outputs.build == 'true'
+
+      - name: Build api
+        if: steps.server.outputs.build == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: api
+          tags: erp-api:${{ steps.gate.outputs.tag }}
+          build-args: ERP_VERSION=${{ steps.gate.outputs.tag }}
+          load: true
+          cache-from: type=gha,scope=erp
+
+      - name: Build worker
+        if: steps.server.outputs.build == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: worker
+          tags: erp-worker:${{ steps.gate.outputs.tag }}
+          build-args: ERP_VERSION=${{ steps.gate.outputs.tag }}
+          load: true
+          cache-from: type=gha,scope=erp
+
+      - name: Build web
+        if: steps.server.outputs.build == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: web
+          tags: erp-web:${{ steps.gate.outputs.tag }}
+          build-args: ERP_VERSION=${{ steps.gate.outputs.tag }}
+          load: true
+          cache-from: type=gha,scope=erp
+          # The web build runs the whole shared build stage, so its cache serves all three.
+          cache-to: type=gha,scope=erp,mode=max
+
+      - name: Send images to the server
+        if: steps.server.outputs.build == 'true'
+        env:
+          TAG: ${{ steps.gate.outputs.tag }}
+        run: docker save "erp-api:$TAG" "erp-worker:$TAG" "erp-web:$TAG" | gzip -1 | ssh erp load
+
+      - name: Deploy (migrate, start, health check, roll back on failure)
+        id: deploy
+        if: steps.server.outputs.deploy == 'true'
+        env:
+          TAG: ${{ steps.gate.outputs.tag }}
+        run: tar -C infra/app -czf - . | ssh erp "deploy $ENVIRONMENT $TAG"
+
+      - name: Check from the internet
+        if: steps.deploy.outcome == 'success'
+        env:
+          TAG: ${{ steps.gate.outputs.tag }}
+        run: |
+          if [[ $ENVIRONMENT == prod ]]; then hosts="pos app"; else hosts="staging-pos staging-app"; fi
+          for host in $hosts; do
+            url="https://$host.zorbixtechnologies.com"
+            ok=false
+            for _ in $(seq 1 10); do
+              version=$(curl -fsS "$url/api/health" | jq -r .version) || version=
+              if [[ $version == "$TAG" ]] && curl -fsS -o /dev/null "$url/"; then ok=true; break; fi
+              sleep 3
+            done
+            if [[ $ok != true ]]; then
+              echo "::error::$url does not serve $TAG (health version: ${version:-none})"
+              exit 1
+            fi
+            echo "$url serves $TAG"
+          done
+          echo "Deployed \`$TAG\` to **$ENVIRONMENT**." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Roll back after a failed internet check
+        if: failure() && steps.deploy.outcome == 'success'
+        run: ssh erp "rollback $ENVIRONMENT"

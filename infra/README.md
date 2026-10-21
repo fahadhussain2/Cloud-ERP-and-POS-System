@@ -6,17 +6,49 @@ Production runs on one Hetzner CX33 (`erp-prod-1`, `204.168.217.64`, Helsinki, U
 |---|---|
 | `server/` | `bootstrap.sh` sets up the OS (users, SSH, firewall, fail2ban, upgrades, swap, Docker). `apply.sh` runs it over SSH. |
 | `server/keys/<user>/*.pub` | **Public** SSH keys per server user. The list is complete: a key deleted here is removed from the server on the next run. |
-| `edge/` | The shared Caddy (TLS, headers, static apps, `/api`) for production and staging. `apply.sh` deploys it. |
+| `edge/` | The shared Caddy (TLS, headers) for production and staging. It routes each site to its environment's `web` and `api` containers. `apply.sh` deploys it. |
+| `app/` | One release of the apps (`api`, `worker`, `web`) for one environment: `compose.yaml` plus non-secret settings per environment. Deployed by `erp-deploy`. |
+| `server/files/bin/erp-deploy` | The only program the GitHub deploy key may run on the server (D-075). |
 
 ## Access
 
 | User | Who | Can |
 |---|---|---|
 | `admin` | The owner and Claude Code (each with its own key) | sudo without a password (there are no passwords) |
-| `deploy` | GitHub Actions (key added in W0-04) | Docker only, no sudo |
+| `deploy` | GitHub Actions | Only `erp-deploy` (`has`, `load`, `status`, `deploy`, `rollback`): no shell, no other command |
 | `root` | Nobody | SSH login is off |
 
 Log in with `ssh admin@204.168.217.64`. Claude uses `-i ~/.ssh/zorbix_erp_admin`.
+
+## Deploys (D-063, D-075)
+
+| What | How |
+|---|---|
+| **Staging** | Merge into `staging`. CI checks, then deploys automatically. |
+| **Try a pull request on staging** | Add the label **`deploy:staging`** to the PR. Each new push to it redeploys. The next merge into `staging` puts staging back. |
+| **Production** | Merge `staging` → `main` (the release). It deploys right away outside 10:00–20:00 Karachi; otherwise it is deferred to the scheduled run at **22:00** (and 02:00). |
+| **Production emergency** | Actions → **Deploy** → Run workflow → `prod`, tick **force**. Works only from `main`. |
+| **Roll back** | Revert the merge on the branch, which deploys the previous code. A failed deploy rolls itself back automatically. |
+
+Each deploy, on the server:
+1. Load images (skipped when the tree was already built, e.g. tested on staging).
+2. Run migrations. If they fail, it stops; the old version keeps running.
+3. Start the new version and check that `/api/health` returns its version, both apps load, and the worker stays up.
+4. If unhealthy, start the previous release again and fail the run.
+
+Then CI checks the public HTTPS addresses as well, and rolls back if they fail.
+
+**Migrations must work with the previous release too** (`REVIEW.md`): a rollback switches the code, not the database.
+
+**What runs where:**
+```bash
+ssh admin@204.168.217.64 cat /srv/erp/prod/releases.log
+```
+```bash
+ssh admin@204.168.217.64 sudo docker ps
+```
+
+**Secrets for an environment** go in `/srv/erp/<env>/app.env` on the server (mode 600, owner `deploy`). Never in git.
 
 ## Common tasks
 

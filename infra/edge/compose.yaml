@@ -16,7 +16,6 @@ services:
     volumes:
       # A folder, not a single file: a replaced file would stay hidden behind the old mount.
       - ./caddy:/etc/caddy:ro
-      - ./placeholder:/srv/placeholder:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:

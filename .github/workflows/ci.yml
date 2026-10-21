@@ -1,10 +1,13 @@
 # Checks every pull request and every push to staging/main (W0-02, D-063).
+# After the checks pass on a push, deploys: staging → staging, main → prod (W0-04, D-075).
 # Actions are pinned to commit SHAs; Dependabot keeps them current.
 name: CI
 
 on:
   pull_request:
     branches: [staging, main]
+    # `labeled`: adding the deploy:staging label deploys the pull request to staging.
+    types: [opened, synchronize, reopened, labeled]
     paths-ignore: ['docs/**', '**/*.md']
   push:
     branches: [staging, main]
@@ -15,7 +18,9 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push replaces an older pull-request run. A run that may deploy (a push, or a pull request
+  # labelled deploy:staging) always finishes, so a deploy is never cut off halfway.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'deploy:staging') }}
 
 jobs:
   check:
@@ -35,10 +40,15 @@ jobs:
       - run: pnpm check
       # Server and edge config (W0-03). shellcheck and Docker come with the runner.
       - name: Check server scripts
-        run: shellcheck -x infra/server/*.sh infra/edge/*.sh
-      - name: Check edge config
+        run: shellcheck -x infra/server/*.sh infra/server/files/bin/erp-deploy infra/edge/*.sh
+      - name: Check edge and app config
         run: |
           docker compose -f infra/edge/compose.yaml config -q
+          for env in prod staging; do
+            IMAGE_TAG=check docker compose --env-file "infra/app/$env.env" -f infra/app/compose.yaml config -q
+          done
+          docker run --rm -v "$PWD/infra/app/web:/etc/caddy:ro" caddy:2.11.7-alpine \
+            caddy validate --config /etc/caddy/Caddyfile
           docker run --rm -v "$PWD/infra/edge/caddy:/etc/caddy:ro" caddy:2.11.7-alpine \
             caddy validate --config /etc/caddy/Caddyfile
 
@@ -73,3 +83,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:integration
+
+  deploy:
+    name: Deploy
+    needs: [check, integration]
+    if: >-
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.labels.*.name, 'deploy:staging')
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+    secrets:
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}

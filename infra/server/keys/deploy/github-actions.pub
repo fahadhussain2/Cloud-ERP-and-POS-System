@@ -1,0 +1,1 @@
+restrict,command="/usr/local/bin/erp-deploy" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO/j/F7RuP6KQrNlV2z9q9u/YiIAJi4uHQZvs1zw/syu github-actions@zorbix-erp
