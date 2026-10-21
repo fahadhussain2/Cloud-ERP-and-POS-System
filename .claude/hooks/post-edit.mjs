@@ -13,18 +13,19 @@ const file = (input.tool_response && input.tool_response.filePath) || ti.file_pa
 if (!file || !existsSync(file) || /[\\/](node_modules|dist|build|sql_dump)[\\/]/.test(file)) process.exit(0);
 
 const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-const bin = (name) => {
-  const p = join(root, 'node_modules', '.bin', process.platform === 'win32' ? `${name}.cmd` : name);
+// Call each tool's JS entry with Node directly: no shell, so paths with spaces work on Windows.
+const bin = (rel) => {
+  const p = join(root, 'node_modules', rel);
   return existsSync(p) ? p : null;
 };
 const ext = extname(file).toLowerCase();
-const run = (cmd, args) => spawnSync(cmd, args, { cwd: root, encoding: 'utf8', shell: process.platform === 'win32', timeout: 30000 });
+const run = (script, args) => spawnSync(process.execPath, [script, ...args], { cwd: root, encoding: 'utf8', timeout: 30000 });
 
-const prettier = bin('prettier');
+const prettier = bin('prettier/bin/prettier.cjs');
 if (prettier && ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.json', '.css', '.md', '.yml', '.yaml', '.html'].includes(ext)) {
   run(prettier, ['--write', '--log-level', 'warn', file]);
 }
-const eslint = bin('eslint');
+const eslint = bin('eslint/bin/eslint.js');
 if (eslint && ['.ts', '.tsx', '.js', '.mjs', '.cjs'].includes(ext)) {
   const r = run(eslint, ['--fix', '--no-warn-ignored', file]);
   if (r.status && r.status !== 0) {

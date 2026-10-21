@@ -29,7 +29,7 @@ A TypeScript monorepo where every check runs with one command from the root, so 
 1. Branches: create `staging` from `main` and push it. This task is built on `w0-01-monorepo-skeleton`, which branches off `staging`.
 2. Root files:
    - `package.json` with scripts `lint`, `format`, `typecheck`, `test`, `build`, `check` (runs all of them)
-   - `pnpm-workspace.yaml`, `.nvmrc`, `.npmrc`
+   - `pnpm-workspace.yaml`, `.nvmrc`
    - `tsconfig.base.json`, `eslint.config.js`, `.prettierrc`, `.prettierignore`, `vitest.config.ts`
    - `.editorconfig`, `.gitattributes`
 3. Skeletons, each with `package.json`, `tsconfig.json`, `src/index.ts` and one smoke test:
@@ -44,7 +44,7 @@ A TypeScript monorepo where every check runs with one command from the root, so 
      - no I/O imports (`node:*`, `fs`, `http`, fetch)
      - no `Date.now()`, `new Date()` without arguments, `Math.random()`, `parseFloat`, or `toFixed`
      - no imports from other internal packages except `contracts`
-   - `packages/posting` may not be imported by `apps/pos`.
+   - `packages/posting` and `packages/db` may not be imported by `apps/pos` or `apps/backoffice`.
    - `no-floating-promises` and `consistent-type-imports` everywhere.
 5. Coverage: a **100% threshold** on `packages/domain`. It holds now and stays enforced from the first rule onwards.
 6. `.env.example` files for `apps/api` and `apps/worker` with placeholders only. `.gitignore` adds `node_modules`, `dist`, `coverage`, `.env*` except `.env.example`, and `*.tsbuildinfo`.
@@ -62,12 +62,12 @@ A TypeScript monorepo where every check runs with one command from the root, so 
 
 ## Tests that prove it
 
-- [ ] On a fresh clone, `pnpm install && pnpm check` exits 0. The output is shown in the PR.
-- [ ] Each package's smoke test runs: `GET /api/health` returns 200 `{status:"ok"}` through Fastify `inject`, and the POS placeholder renders its i18n key.
-- [ ] Boundary rules fail as expected on bad samples, for example `Date.now()` or an `fs` import in `packages/domain`. The ESLint output is shown in the PR.
-- [ ] Editing a `.ts` file triggers the post-edit hook (Prettier fixes the formatting).
-- [ ] `pnpm build` produces `apps/api/dist`, `apps/pos/dist` and `apps/backoffice/dist`.
-- [ ] `git status` is clean after the checks run, so no generated files are left untracked.
+- [x] On a fresh clone, `pnpm install && pnpm check` exits 0. The output is shown in the PR.
+- [x] Each package's smoke test runs: `GET /api/health` returns 200 `{status:"ok"}` through Fastify `inject`, and the POS placeholder renders its i18n key.
+- [x] Boundary rules fail as expected on bad samples, for example `Date.now()` or an `fs` import in `packages/domain`. The ESLint output is shown in the PR.
+- [x] Editing a `.ts` file triggers the post-edit hook (Prettier fixes the formatting).
+- [x] `pnpm build` produces `apps/api/dist`, `apps/pos/dist` and `apps/backoffice/dist`.
+- [x] `git status` is clean after the checks run, so no generated files are left untracked.
 
 ## Risks
 
@@ -80,4 +80,17 @@ A TypeScript monorepo where every check runs with one command from the root, so 
 
 ## Owner actions
 
-- Install Node.js 24 LTS on the development PC.
+- Install Node.js 24 LTS on the development PC. *Done.*
+
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| **TypeScript 6.0**, not 7.0 | typescript-eslint supports TypeScript only up to 6.0. Move to 7 when it does. |
+| No `.npmrc`. pnpm 11 settings live in `pnpm-workspace.yaml`: a version **catalog** (one version of each tool for every package) and `allowBuilds: esbuild` | pnpm 11 moved its settings out of `.npmrc` and blocks install scripts unless they are allowed. |
+| pnpm's **minimum release age** is kept. No exclusions; the catalog uses ranges that resolve to versions at least a day old. | Protects against a freshly published compromised package. |
+| The POS and back office also may not import **`@erp/db`** (not only `@erp/posting`) | The database package is server-only as well. |
+| `pnpm typecheck` also checks the root config files | `vitest.config.ts` would otherwise go unchecked. |
+| Prettier config is `.prettierrc.json` | Same as `.prettierrc`, with an explicit format. |
+| **The post-edit hook now runs Prettier and ESLint through Node directly, not through the shell** | Through the shell, the hook failed on the space in "Zorbix Products". Found while testing it here. |
+| On this PC, nvm's Node 22 comes before Node 24 on the PATH | Run `nvm install 24` then `nvm use 24` (or remove nvm) so terminals use Node 24. |
