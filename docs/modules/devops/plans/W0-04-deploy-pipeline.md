@@ -93,3 +93,14 @@ A merge to `staging` deploys to staging automatically. A merge `staging` → `ma
 
 1. Store the deploy key in GitHub. I generate it; you run one command (`gh secret set DEPLOY_SSH_KEY < …`), so the private key never appears on screen. Then I delete the local copy.
 2. Merge the first release PR, `staging` → `main`.
+
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| **Try a pull request on staging with the label `deploy:staging`**, instead of "Run workflow" with a branch | GitHub runs "Run workflow" only for workflows that are already on `main`, which happens only after the first release. The label works now, and a labelled PR's CI run is never cancelled mid-deploy. "Run workflow" stays for production `force` and works after the first release. |
+| `erp-deploy load` **reads the archive's image names before loading** | A crafted archive could otherwise overwrite another image (e.g. Caddy's) before the name check. |
+| The `web` image **drops the file capability on the Caddy binary** | With `no-new-privileges` and no capabilities, Linux refuses to start a binary that carries one (`operation not permitted`). Found in the trial run on the server. Ports 8080/8081 don't need it. |
+| App packages use `pnpm deploy --legacy`; internal packages are dev dependencies of the apps | pnpm 11 deploys without `--legacy` only with injected workspace packages. Internal packages are bundled into `dist`, so production installs only external dependencies (e.g. the API: Fastify, 13 MB). |
+| A CI push run (which may deploy) is never cancelled by a newer push | Otherwise a deploy could be cut off halfway. Pull-request runs without the label are still replaced by newer pushes. |
+| The pinned host key of the server is in `infra/server/known_hosts` | CI connects with `StrictHostKeyChecking yes`, so it can't be redirected to another machine. |

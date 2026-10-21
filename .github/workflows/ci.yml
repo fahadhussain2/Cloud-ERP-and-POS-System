@@ -16,8 +16,10 @@ on:
 permissions:
   contents: read
 
+# Adding any other label starts a run too; it gets its own group and skips every job, so it can
+# never cancel a real run.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'deploy:staging' && format('-label-{0}', github.event.label.name) || '' }}
   # A newer push replaces an older pull-request run. A run that may deploy (a push, or a pull request
   # labelled deploy:staging) always finishes, so a deploy is never cut off halfway.
   cancel-in-progress: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'deploy:staging') }}
@@ -25,6 +27,7 @@ concurrency:
 jobs:
   check:
     name: Format, lint, typecheck, test, build
+    if: github.event.action != 'labeled' || github.event.label.name == 'deploy:staging'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -54,6 +57,7 @@ jobs:
 
   integration:
     name: Integration tests (PostgreSQL 17)
+    if: github.event.action != 'labeled' || github.event.label.name == 'deploy:staging'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -87,9 +91,12 @@ jobs:
   deploy:
     name: Deploy
     needs: [check, integration]
+    # A push to staging/main; adding the deploy:staging label; or a new push to a labelled pull request.
+    # Not on `opened`: a PR opened with the label also sends `labeled`, which deploys it once.
     if: >-
       github.event_name == 'push' ||
-      contains(github.event.pull_request.labels.*.name, 'deploy:staging')
+      (github.event.action == 'labeled' && github.event.label.name == 'deploy:staging') ||
+      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'deploy:staging'))
     uses: ./.github/workflows/deploy.yml
     with:
       environment: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
