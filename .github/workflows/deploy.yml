@@ -140,7 +140,8 @@ jobs:
           load: true
           cache-from: type=gha,scope=erp
           # The web build runs the whole shared build stage, so its cache serves all three.
-          cache-to: type=gha,scope=erp,mode=max
+          # A failed cache upload must never fail a deploy; it only makes the next build slower.
+          cache-to: type=gha,scope=erp,mode=max,ignore-error=true
 
       - name: Send images to the server
         if: steps.server.outputs.build == 'true'
