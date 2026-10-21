@@ -1,0 +1,6 @@
+// Security upgrades only (the Ubuntu default origins). Docker packages are upgraded by hand.
+// The server clock is UTC: 23:30 UTC = 04:30 Asia/Karachi, after the 04:00 business-date cutoff (W0-03).
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "23:30";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";

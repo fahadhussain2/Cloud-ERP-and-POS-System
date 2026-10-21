@@ -1,0 +1,7 @@
+# Docker Engine from Docker's own repository, verified with its signing key (W0-03).
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: noble
+Components: stable
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/docker.asc
