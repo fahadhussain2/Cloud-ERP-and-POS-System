@@ -11,8 +11,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit && pnpm -r --parallel typecheck",
-    "test": "vitest run --coverage",
-    "test:watch": "vitest",
+    "test": "vitest run --coverage --exclude \"**/*.int.test.ts\"",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:watch": "vitest --exclude \"**/*.int.test.ts\"",
     "build": "pnpm -r build",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },

@@ -46,6 +46,7 @@ Node 24 LTS + pnpm 11 (D-071). Run from the repo root:
 | `pnpm check` | **All checks:** format check, lint, typecheck, tests with coverage, build. Must pass before "done". |
 | `pnpm lint` · `pnpm typecheck` · `pnpm test` · `pnpm build` | The single steps; `pnpm format` fixes formatting |
 | `pnpm test:watch` | Vitest in watch mode |
+| `pnpm test:integration` | Integration tests (`*.int.test.ts`) against PostgreSQL 17+ at `DATABASE_URL`. They fail without it, and CI always runs them. |
 | `pnpm --filter @erp/<app> dev` | Run one app (`api`, `worker`, `pos`, `backoffice`) |
 
 Packages are named `@erp/<folder>` and used as TypeScript source; only apps are built. `pnpm e2e` arrives with the first UI flow.

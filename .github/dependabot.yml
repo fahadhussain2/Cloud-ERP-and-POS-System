@@ -1,0 +1,9 @@
+# Keeps the SHA-pinned GitHub Actions up to date (W0-02). npm updates stay manual for now.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: staging
+    schedule:
+      interval: monthly
+    labels: ['module:devops']
