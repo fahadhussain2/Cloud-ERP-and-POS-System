@@ -2,9 +2,9 @@
 
 Multi-tenant cloud ERP with an offline-first POS for retail SMBs. The first tenant is **Delux Autos** (Karachi auto parts store, ~20k SKUs, 8–9 counters, one cash desk, PKR). Later it will be sold as SaaS in Pakistan and the UAE/Middle East. Go-live target: **1 Jan 2027**.
 
-## Current phase: Wave 0 (foundations)
+## Current phase: requirements approved, build on hold
 
-The owner approved the documents in `docs/` on 2026-10-21 (D-060). Implementation may proceed in build-wave order (PRD §8): Wave 0 → Wave 1 → Wave 2. Keep the docs current: any change of decision is recorded as a new entry in `docs/06-DECISION-LOG.md` before or with the code that implements it.
+The owner approved the PRD and all documents in `docs/` (D-060, confirmed in D-068). **Do not start building (no application code, no scaffolding) until the owner explicitly says to start Wave 0.** Until then: answer questions, refine the docs and prototypes, and record every change of decision as a new entry in `docs/06-DECISION-LOG.md`. Once started, build in wave order (PRD §8): Wave 0 → Wave 1 → Wave 2.
 
 ## Source of truth
 

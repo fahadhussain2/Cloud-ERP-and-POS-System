@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft for owner review. No implementation until approved. |
+| **Status** | **Approved** by the owner on 2026-10-21 (D-060, D-068). Build starts on the owner's go-ahead. |
 | **Owner** | Fahad Hussain |
 | **First tenant** | Delux Autos, Karachi (auto parts retail, PKR) |
 | **Target** | Build Oct–Nov 2026 · Shadow pilot Dec 2026 · Go-live **Fri 1 Jan 2027** |

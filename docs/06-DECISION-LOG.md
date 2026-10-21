@@ -420,3 +420,8 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Light suits bright shop floors.
 - **Status:** Accepted
 
+### D-068 PRD approved; build start on hold (2026-10-21)
+- **Decision:** the owner approves the PRD and all documents in `docs/`, including D-061 to D-067. **Building does not start yet.** Wave 0 begins only when the owner explicitly says so. This supersedes "Wave 0 starts" in D-060.
+- **Schedule note:** every day of delay comes out of build time before the 1 Jan 2027 go-live. The release plan and go/no-go date (18 Dec) are unchanged for now.
+- **Status:** Accepted
+
