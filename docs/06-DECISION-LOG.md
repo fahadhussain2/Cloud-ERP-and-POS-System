@@ -425,3 +425,12 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Schedule note:** every day of delay comes out of build time before the 1 Jan 2027 go-live. The release plan and go/no-go date (18 Dec) are unchanged for now.
 - **Status:** Accepted
 
+### D-069 Delivery process: AI-native SDLC playbook, module folders (2026-10-21)
+- **Decision:**
+  - Delivery follows the AI-native SDLC playbook, scaled for a solo developer ([07-DELIVERY-PROCESS.md](07-DELIVERY-PROCESS.md)).
+  - **The loop:** the PRD is the MVP intent; feature specs only where needed; **one accepted `plan.md` per task before any code**; tests first for core logic; "done" only after the checks have run and been shown; Claude reviews against `REVIEW.md`, and the owner approves merges.
+  - **Guardrails:** hooks (block `sql_dump/`, format/lint, no secrets, no test edits during bug fixes), skills, verifier/researcher subagents, and evals grown from real scenarios and incidents.
+  - **Work is organized in module folders** (`docs/modules/<module>/` with README, optional intent/spec, `plans/`), not per task and not per file type.
+- **Why:** everything about a module lives in one place, which gives Claude better context. Every change traces to requirement IDs. The plan gate and human merge approval keep a solo developer in control of AI-written code.
+- **Status:** Accepted. Setup steps (07 §9) are prepared before Wave 0 code. Building is still on hold (D-068).
+

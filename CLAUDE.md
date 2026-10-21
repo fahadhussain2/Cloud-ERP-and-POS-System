@@ -16,6 +16,7 @@ The owner approved the PRD and all documents in `docs/` (D-060, confirmed in D-0
 | [docs/04-ACCOUNTING-POSTING-RULES.md](docs/04-ACCOUNTING-POSTING-RULES.md) | Exactly what every document posts to the GL, stock and party ledgers |
 | [docs/05-LEGACY-MIGRATION.md](docs/05-LEGACY-MIGRATION.md) | Legacy → new mapping, opening balances, reconciliation |
 | [docs/06-DECISION-LOG.md](docs/06-DECISION-LOG.md) | Why things are the way they are. Check here before proposing an alternative. |
+| [docs/07-DELIVERY-PROCESS.md](docs/07-DELIVERY-PROCESS.md) | How work is done: module folders, plan → tests → build → verify → review loop, guardrails, evals |
 
 Reference requirement and decision IDs (e.g. `POS-12`, `D-017`) in code comments only where the reason isn't obvious, and in commit messages.
 
