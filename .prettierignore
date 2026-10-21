@@ -1,0 +1,13 @@
+# Approved docs and prose are formatted by hand.
+docs/
+**/*.md
+
+# Claude Code tooling, tested separately.
+.claude/
+
+# Legacy data (CLAUDE.md rule 11).
+sql_dump/
+
+pnpm-lock.yaml
+**/dist/
+**/coverage/

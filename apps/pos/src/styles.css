@@ -1,0 +1,10 @@
+/* Logical properties only, so the layout works right-to-left (CLAUDE.md rule 10). */
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+}
+
+.placeholder {
+  padding-block: 2rem;
+  padding-inline: 1.5rem;
+}

@@ -38,7 +38,17 @@ Building started (D-070). Work task by task from the Wave 0 issues; **no code be
 
 ## Commands
 
-Added in Wave 0, once the monorepo exists: `pnpm lint` · `pnpm typecheck` · `pnpm test` · `pnpm build` · `pnpm e2e`.
+Node 24 LTS + pnpm 11 (D-071). Run from the repo root:
+
+| Command | What it does |
+|---|---|
+| `pnpm install` | Install everything (one lockfile for the workspace) |
+| `pnpm check` | **All checks:** format check, lint, typecheck, tests with coverage, build. Must pass before "done". |
+| `pnpm lint` · `pnpm typecheck` · `pnpm test` · `pnpm build` | The single steps; `pnpm format` fixes formatting |
+| `pnpm test:watch` | Vitest in watch mode |
+| `pnpm --filter @erp/<app> dev` | Run one app (`api`, `worker`, `pos`, `backoffice`) |
+
+Packages are named `@erp/<folder>` and used as TypeScript source; only apps are built. `pnpm e2e` arrives with the first UI flow.
 
 ## Known mistakes to avoid
 
