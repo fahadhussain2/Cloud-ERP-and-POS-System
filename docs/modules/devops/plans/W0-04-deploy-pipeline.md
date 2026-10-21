@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#5](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/5) |
 | **Module** | devops |
-| **Status** | Accepted (2026-10-22) |
+| **Status** | Built; staging verified. Waiting for: merge of #19, revert rehearsal, first production release |
 | **Refs** | Architecture §9, §9.1; D-063, D-065, D-073, D-075 |
 | **Depends on** | W0-02 (CI), W0-03 (server and edge) |
 | **Size** | about 2 days |
@@ -69,14 +69,14 @@ A merge to `staging` deploys to staging automatically. A merge `staging` → `ma
 
 ## Tests that prove it
 
-- [ ] **Unit tests:** `/api/health` returns `version`; the API and worker stop cleanly on `SIGTERM`.
+- [x] **Unit tests:** `/api/health` returns `version`; the API and worker stop cleanly on `SIGTERM`.
 - [ ] **Merge to `staging` deploys staging automatically.** `staging-pos` and `staging-app` show the real (placeholder) apps, and `/api/health` returns 200 with the new version.
-- [ ] **Bad health check → automatic rollback.** A throwaway branch whose `/api/health` returns 500 is deployed to staging on demand. The deploy fails, the previous version is serving again within a minute, and the run is red.
-- [ ] **Failing migration → nothing switches.** A throwaway branch whose `migrate` exits with an error: the deploy stops before starting the new version, the old version keeps serving, and the run is red.
+- [x] **Bad health check → automatic rollback.** A throwaway branch whose `/api/health` returns 500 is deployed to staging on demand. The deploy fails, the previous version is serving again within a minute, and the run is red.
+- [x] **Failing migration → nothing switches.** A throwaway branch whose `migrate` exits with an error: the deploy stops before starting the new version, the old version keeps serving, and the run is red.
 - [ ] **Rollback by reverting a merge on `staging`** redeploys the previous version.
-- [ ] **The deploy key can't do anything else:** `ssh deploy@… bash`, or any command other than the four, is refused.
+- [x] **The deploy key can't do anything else:** `ssh deploy@… bash`, or any command other than the four, is refused.
 - [ ] **Production after hours:** a release merged during shop hours is deferred, with a clear message in the run, and deployed by the next scheduled run (or by `force`). After a release, `pos` and `app` serve the apps, and production uses the **same image tag** that staging tested.
-- [ ] A deploy takes under 5 minutes; when the image already exists, under 1 minute.
+- [x] A deploy takes under 5 minutes; when the image already exists, under 1 minute.
 - [ ] The release log on the server shows every deploy and rollback.
 
 ## Risks
@@ -103,4 +103,18 @@ A merge to `staging` deploys to staging automatically. A merge `staging` → `ma
 | The `web` image **drops the file capability on the Caddy binary** | With `no-new-privileges` and no capabilities, Linux refuses to start a binary that carries one (`operation not permitted`). Found in the trial run on the server. Ports 8080/8081 don't need it. |
 | App packages use `pnpm deploy --legacy`; internal packages are dev dependencies of the apps | pnpm 11 deploys without `--legacy` only with injected workspace packages. Internal packages are bundled into `dist`, so production installs only external dependencies (e.g. the API: Fastify, 13 MB). |
 | A CI push run (which may deploy) is never cancelled by a newer push | Otherwise a deploy could be cut off halfway. Pull-request runs without the label are still replaced by newer pushes. |
+| Other label events skip every job in their own concurrency group; a PR deploys on `labeled` (deploy:staging) or on a push once labelled, never on `opened` | Creating a PR with labels sent one run per label. Two runs deployed the same broken release (it rolled back twice), and an unrelated label could have cancelled a real run. Found in rehearsal A. |
+| Build-cache upload errors are ignored (`ignore-error=true`) | A cache-export clash (`not_found`) failed a deploy after a good build. A missing cache only slows the next build. |
 | The pinned host key of the server is in `infra/server/known_hosts` | CI connects with `StrictHostKeyChecking yes`, so it can't be redirected to another machine. |
+
+## Results so far (2026-10-22)
+
+| Check | Result |
+|---|---|
+| Trial build and hardened run on the server | All three images healthy as `node` / `nobody`, read-only, no capabilities. `index.html` `no-cache`, assets `immutable`, deep routes fall back to the app. API and worker stop in under 1 s with exit 0. |
+| Deploy key | `status` works; `bash`, any other command, and an interactive login are refused; a path-like tag is rejected. |
+| **First staging deploy** (PR #19 labelled `deploy:staging`) | Green. `staging-pos` and `staging-app` serve the apps; `/api/health` returns the tree hash `31f67f94…`; the containers have the staging limits (API 512 MB / 0.5 CPU, worker 256 MB, web 128 MB). |
+| **Rehearsal A, unhealthy release** (PR #20, health 500) | `container erp-staging-api-1 is unhealthy` → `rolled back to 31f67f94…`; run red; staging kept serving the good version. |
+| **Rehearsal B, failing migration** (PR #21) | `migration-failed`: the new version never started, the old version kept serving, run red. The `opened` run skipped the deploy and the `labeled` run deployed once, which proves the trigger fix. |
+| Release log | Every deploy, rollback and stopped migration is recorded. `current` and `previous` are kept for rollback. |
+| Timing | First deploy with a cold cache: 2 min 52 s. With the cache: 1 min 57 s. |
