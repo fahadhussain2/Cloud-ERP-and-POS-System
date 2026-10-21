@@ -2,9 +2,9 @@
 
 Multi-tenant cloud ERP with an offline-first POS for retail SMBs. First tenant: **Delux Autos** (Karachi auto parts store, PKR). Go-live **1 Jan 2027**.
 
-## Phase: requirements approved, build on hold
+## Phase: Wave 0 (foundations)
 
-**Do not write application code or scaffold until the owner explicitly says to start Wave 0** (D-068). Until then: refine docs and prototypes; record every change of decision in `docs/06-DECISION-LOG.md`.
+Building started (D-070). Work task by task from the Wave 0 issues; **no code before the task's plan is accepted**. Record every change of decision in `docs/06-DECISION-LOG.md`.
 
 ## Read first
 

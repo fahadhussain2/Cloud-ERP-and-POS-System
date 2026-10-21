@@ -434,3 +434,18 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** everything about a module lives in one place, which gives Claude better context. Every change traces to requirement IDs. The plan gate and human merge approval keep a solo developer in control of AI-written code.
 - **Status:** Accepted. Setup steps (07 §9) are prepared before Wave 0 code. Building is still on hold (D-068).
 
+
+### D-070 Build starts: Wave 0 (2026-10-21)
+- **Decision:** the owner gives the go-ahead to start building. Wave 0 starts now, task by task (issues #2–#14). Each task still needs its accepted plan before any code (D-069). This ends the hold in D-068.
+- **Status:** Accepted
+
+### D-071 Monorepo tooling (2026-10-21)
+- **Decision:**
+  - Node.js 24 LTS and pnpm 11 workspaces, both pinned.
+  - No Turborepo for now.
+  - Internal packages are used as TypeScript source; only the apps are built.
+  - ESM throughout and strict TypeScript.
+  - ESLint (flat config) + Prettier; Vitest with a 100% coverage threshold on `packages/domain`.
+  - Lint rules enforce the boundaries: no I/O, clock or float parsing in `packages/domain`, and no `packages/posting` in the POS.
+- **Why:** the smallest setup that gives one-command checks for a solo developer, and some non-negotiable rules are enforced by the linter instead of by memory.
+- **Status:** Accepted (with the W0-01 plan)
