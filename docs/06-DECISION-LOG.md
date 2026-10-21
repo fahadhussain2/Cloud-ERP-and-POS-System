@@ -449,3 +449,11 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Lint rules enforce the boundaries: no I/O, clock or float parsing in `packages/domain`, and no `packages/posting` in the POS.
 - **Why:** the smallest setup that gives one-command checks for a solo developer, and some non-negotiable rules are enforced by the linter instead of by memory.
 - **Status:** Accepted (with the W0-01 plan)
+
+### D-072 PostgreSQL driver: node-postgres (`pg`) (2026-10-21)
+- **Decision:** the API, worker and tools connect to PostgreSQL with `pg` (node-postgres), through Drizzle's node-postgres driver.
+- **Why:**
+  - It is the most mature Node driver and supports transactions with `SET LOCAL` for RLS.
+  - pg-boss (the planned job queue) uses it too, so there is one driver to learn, configure and patch.
+- **Alternative:** postgres.js is faster in benchmarks, but it would be a second driver next to pg-boss, and speed isn't a constraint at about 140 bills a day.
+- **Status:** Accepted (with the W0-02 plan)
