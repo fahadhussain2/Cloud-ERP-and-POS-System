@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "drizzle-orm": "catalog:",
     "pg": "catalog:"
   },
   "devDependencies": {
