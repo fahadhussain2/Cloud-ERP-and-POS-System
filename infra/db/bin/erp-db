@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# Production database operations on the server (W0-05, D-076, D-077). Installed by infra/db/apply.sh.
+#
+#   erp-db backup            daily (03:00 Karachi): full backup on the 1st of the month, differential otherwise;
+#                            then saves `pgbackrest info` for the status file
+#   erp-db canary            every minute: add a row to ops.backup_canary
+#   erp-db status            every 15 minutes: write /srv/erp/prod/backup-status.json. It reads PostgreSQL and the
+#                            info saved by the last backup, so it makes no requests to the storage (D-077).
+#   erp-db secrets           interactive, for the owner: enter the B2 key; generates the backup passphrase
+#   erp-db restore-drill [--time '<YYYY-MM-DD HH:MM:SS+00>']
+#                            restore into a throwaway container, check it, report RPO/RTO, delete it
+set -euo pipefail
+
+DB=erp-prod-db
+IMAGE=erp-postgres:17.9
+SECRETS=/srv/erp/prod/db-secrets
+STATUS=/srv/erp/prod/backup-status.json
+INFO=/srv/erp/prod/backup-info.json
+PG_UID=999
+
+die() {
+  echo "erp-db: $*" >&2
+  exit 1
+}
+say() { echo "erp-db: $*"; }
+[[ $EUID -eq 0 ]] || die "run as root (sudo)"
+
+pgbr() { docker exec -u postgres "$DB" pgbackrest --stanza=erp "$@"; }
+psql_db() { docker exec -u postgres "$DB" psql -X -v ON_ERROR_STOP=1 -At -d erp "$@"; }
+
+case ${1:-} in
+  backup)
+    if [[ $(TZ=Asia/Karachi date +%d) == 01 ]]; then type=full; else type=diff; fi
+    say "$type backup"
+    pgbr --type="$type" backup
+    tmp=$(mktemp)
+    pgbr --output=json info >"$tmp"
+    install -m 640 -o root -g deploy "$tmp" "$INFO"
+    rm -f "$tmp"
+    ;;
+
+  canary)
+    psql_db -c "INSERT INTO ops.backup_canary DEFAULT VALUES" \
+      -c "DELETE FROM ops.backup_canary WHERE at < now() - interval '400 days'" >/dev/null
+    ;;
+
+  status)
+    archiver=$(psql_db -F ' ' -c "SELECT coalesce(extract(epoch FROM last_archived_time)::bigint, 0),
+      coalesce(extract(epoch FROM last_failed_time)::bigint, 0), archived_count, failed_count FROM pg_stat_archiver")
+    tmp=$(mktemp)
+    ARCHIVER=$archiver INFO_FILE=$INFO python3 - >"$tmp" <<'PY'
+import json, os, time
+last_archived, last_failed, archived, failed = (int(x) for x in os.environ["ARCHIVER"].split())
+try:
+    with open(os.environ["INFO_FILE"]) as f:
+        stanza = json.load(f)[0]
+except (OSError, ValueError, IndexError):
+    stanza = {"status": {"message": "no info saved yet"}, "backup": []}
+backups = stanza.get("backup", [])
+print(json.dumps({
+    "generated_at": int(time.time()),
+    "stanza_status": stanza["status"]["message"],
+    "last_archived_at": last_archived,
+    "last_failed_at": last_failed,
+    "archived_count": archived,
+    "failed_count": failed,
+    "last_backup_at": max((b["timestamp"]["stop"] for b in backups), default=0),
+    "last_backup_type": backups[-1]["type"] if backups else "",
+    "backups": len(backups),
+}))
+PY
+    install -m 640 -o root -g deploy "$tmp" "$STATUS"
+    rm -f "$tmp"
+    ;;
+
+  secrets)
+    [[ -t 0 ]] || die "run this interactively: ssh -t admin@<server> sudo erp-db secrets"
+    install -d -m 700 -o "$PG_UID" -g "$PG_UID" "$SECRETS"
+    conf=$SECRETS/pgbackrest.conf
+    pass=''
+    if [[ -f $conf ]]; then
+      pass=$(sed -n 's/^repo1-cipher-pass=//p' "$conf")
+      echo "Backup secrets already exist. Only the B2 key is replaced; the backup passphrase is kept."
+    fi
+    read -rp "B2 keyID: " key_id
+    read -rsp "B2 applicationKey (hidden): " key
+    echo
+    [[ -n $key_id && -n $key ]] || die "both values are required"
+    new_pass=0
+    if [[ -z $pass ]]; then
+      pass=$(openssl rand -base64 48 | tr -d '\n')
+      new_pass=1
+    fi
+    tmp=$(mktemp)
+    printf '[global]\nrepo1-s3-key=%s\nrepo1-s3-key-secret=%s\nrepo1-cipher-pass=%s\n' "$key_id" "$key" "$pass" >"$tmp"
+    install -m 600 -o "$PG_UID" -g "$PG_UID" "$tmp" "$conf"
+    rm -f "$tmp"
+    echo "Saved the B2 key."
+    if ((new_pass)); then
+      cat <<EOF
+
+=====================================================================================
+ BACKUP PASSPHRASE: shown once. Save it NOW in your password manager AND on paper.
+ Without it, the backups can never be decrypted.
+
+   $pass
+
+=====================================================================================
+EOF
+    fi
+    ;;
+
+  restore-drill)
+    target=''
+    if [[ ${2:-} == --time ]]; then
+      target=${3:?"--time needs a value like '2026-10-22 10:15:00+00'"}
+    fi
+    id=$(date +%s)
+    name=erp-drill-$id
+    vol=erp-drill-pgdata-$id
+    trap 'docker rm -f "$name" >/dev/null 2>&1 || true; docker volume rm "$vol" >/dev/null 2>&1 || true' EXIT
+    run=(docker run --rm -u postgres -e PGBACKREST_CONFIG_INCLUDE_PATH=/run/erp-secrets
+      -v "$SECRETS:/run/erp-secrets:ro" -v "$vol:/var/lib/postgresql/data")
+    # A restore is network-bound (one request per file to the storage): use many parallel downloads.
+    # --no-delta: the target is empty, so there is nothing to compare against.
+    restore=(pgbackrest --stanza=erp --repo=1 --process-max=16 --no-delta)
+    start=$(date +%s)
+    docker volume create "$vol" >/dev/null
+    docker run --rm -u root -v "$vol:/var/lib/postgresql/data" "$IMAGE" \
+      sh -c 'chown postgres:postgres /var/lib/postgresql/data && chmod 700 /var/lib/postgresql/data'
+    if [[ -n $target ]]; then
+      say "restoring to $target"
+      "${run[@]}" "$IMAGE" "${restore[@]}" --type=time "--target=$target" --target-action=promote restore
+    else
+      say "restoring the latest backup and all archived WAL"
+      "${run[@]}" "$IMAGE" "${restore[@]}" restore
+    fi
+    restored=$(date +%s)
+    # archive_mode=off: a drill must never write WAL into the production backup repository.
+    docker run -d --name "$name" -e PGBACKREST_CONFIG_INCLUDE_PATH=/run/erp-secrets \
+      -v "$SECRETS:/run/erp-secrets:ro" -v "$vol:/var/lib/postgresql/data" "$IMAGE" \
+      postgres -c config_file=/etc/postgresql/postgresql.conf -c archive_mode=off -c shared_buffers=256MB >/dev/null
+    for _ in $(seq 1 120); do
+      [[ $(docker exec -u postgres "$name" psql -X -At -d erp -c 'SELECT NOT pg_is_in_recovery()' 2>/dev/null) == t ]] && break
+      sleep 2
+    done
+    [[ $(docker exec -u postgres "$name" psql -X -At -d erp -c 'SELECT NOT pg_is_in_recovery()') == t ]] ||
+      die "restored database did not finish recovery"
+    ready=$(date +%s)
+    say "checking every table and index (pg_amcheck)"
+    docker exec -u postgres "$name" pg_amcheck --all --install-missing --heapallindexed
+    canary=$(docker exec -u postgres "$name" psql -X -At -F ' ' -d erp -c \
+      "SELECT count(*), coalesce(extract(epoch FROM max(at))::bigint, 0) FROM ops.backup_canary")
+    read -r rows newest <<<"$canary"
+    after=0
+    if [[ -n $target ]]; then
+      after=$(docker exec -u postgres "$name" psql -X -At -d erp -c \
+        "SELECT count(*) FROM ops.backup_canary WHERE at > '$target'::timestamptz")
+    fi
+    cat <<EOF
+
+Restore drill $(date -u +%Y-%m-%dT%H:%M:%SZ)
+  target:             ${target:-latest}
+  restore (download): $((restored - start)) s
+  recovery + start:   $((ready - restored)) s
+  total (RTO):        $((ready - start)) s
+  pg_amcheck:         clean
+  canary rows:        $rows, newest $(date -u -d "@$newest" +%Y-%m-%dT%H:%M:%SZ)
+EOF
+    if [[ -n $target ]]; then
+      echo "  rows after target:  $after (must be 0)"
+      [[ $after == 0 ]] || die "point-in-time restore contains rows after the target"
+    else
+      # The restore replays all WAL archived until recovery ends, so the honest measure is: if the server had
+      # died when the restored database came up, how old would the newest surviving change be?
+      echo "  data loss (RPO):    newest restored change $((ready - newest)) s before the restored database came up"
+    fi
+    ;;
+
+  *)
+    die "usage: erp-db backup | canary | status | secrets | restore-drill [--time '<ts>']"
+    ;;
+esac

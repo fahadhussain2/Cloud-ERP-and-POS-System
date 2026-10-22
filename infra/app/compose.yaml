@@ -24,6 +24,7 @@ services:
       edge:
         aliases:
           - erp-${ERP_ENV}-api
+      db: {}
     deploy:
       resources:
         limits:
@@ -33,6 +34,9 @@ services:
   worker:
     <<: *hardening
     image: erp-worker:${IMAGE_TAG:?}
+    networks:
+      - default
+      - db
     deploy:
       resources:
         limits:
@@ -55,4 +59,8 @@ services:
 networks:
   edge:
     name: erp-edge
+    external: true
+  # The environment's database network (infra/db, W0-05): internal, no internet.
+  db:
+    name: erp-${ERP_ENV}-db
     external: true

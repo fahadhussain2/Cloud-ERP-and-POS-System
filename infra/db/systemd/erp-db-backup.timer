@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily backup: full on the 1st of the month, differential otherwise (erp-db, W0-05)
+
+[Timer]
+OnCalendar=*-*-* 03:00 Asia/Karachi
+Persistent=true
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
