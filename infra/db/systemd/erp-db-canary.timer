@@ -1,0 +1,10 @@
+[Unit]
+Description=Backup canary row (erp-db, W0-05)
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=false
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

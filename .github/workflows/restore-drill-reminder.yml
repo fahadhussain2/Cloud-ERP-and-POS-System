@@ -1,0 +1,36 @@
+# Opens a GitHub issue each month to run the restore drill (W0-05, D-029, D-076).
+name: Restore drill reminder
+
+on:
+  schedule:
+    - cron: '0 6 2 * *' # the 2nd of each month, 11:00 Karachi (after the monthly full backup on the 1st)
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Open the drill issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          month=$(TZ=Asia/Karachi date +%Y-%m)
+          gh issue create --repo "$GITHUB_REPOSITORY" --label module:devops \
+            --title "Monthly restore drill ($month)" \
+            --body "$(cat <<'BODY'
+          Monthly restore drill (D-029, D-076). See `infra/README.md` → Backups.
+
+          - [ ] Run the drill on the server (latest backup):
+            `ssh admin@204.168.217.64 sudo erp-db restore-drill`
+          - [ ] Run a point-in-time drill to a moment from last week:
+            `ssh admin@204.168.217.64 "sudo erp-db restore-drill --time '<YYYY-MM-DD HH:MM:SS+00>'"`
+          - [ ] Both report `pg_amcheck: clean`; the latest drill's data loss is under 5 minutes
+          - [ ] Add the results to `docs/modules/devops/restore-drills.md`
+
+          A drill uses about 1,500 requests of B2's free daily 2,500 (D-077): run at most one drill a day.
+          BODY
+          )"

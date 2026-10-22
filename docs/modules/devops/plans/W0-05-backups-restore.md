@@ -4,8 +4,8 @@
 |---|---|
 | **Issue** | [#6](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/6) |
 | **Module** | devops |
-| **Status** | Accepted (2026-10-22) |
-| **Refs** | PRD §7 (durability); architecture §9, §12; D-029, D-062, D-074, D-075, D-076 |
+| **Status** | Built; waiting for the B2 daily cap to reset (00:00 UTC) to finish the checks and drills |
+| **Refs** | PRD §7 (durability); architecture §9, §12; D-029, D-062, D-074, D-075, D-076, **D-077** |
 | **Depends on** | W0-03 (server), W0-04 (deploys) |
 | **Size** | about 1.5 days |
 
@@ -107,3 +107,28 @@ PostgreSQL runs on the server, and **no committed data can be lost**. Every chan
 ## Owner answers (2026-10-22)
 
 - **Storage: Backblaze B2.** The account was created in **US East**, not EU Central, and the owner chose to keep it. Backups are encrypted before upload, the database is small, and nothing requires EU storage today. Done: bucket `zorbix-erp-backups-prod` (private, default encryption on, 30-day lifecycle for prior versions) and an application key limited to that bucket.
+
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| **Sized for B2's free tier (D-077):**<br>• WAL every **5 min** (was 1)<br>• **one repo** with a monthly full on the 1st + nightly differentials, 12 monthly fulls kept, WAL from the previous month's full (30+ days point-in-time)<br>• status without B2 requests<br>• at most one drill a day | The owner doesn't want a card on the B2 account, so the free daily caps (2,500 downloads) are hard limits. The first day's test restores used them up, and B2 then also refused the reads that archiving needs. Normal use is now about 500 requests a day. |
+| `ca-certificates` added to the database image | pgBackRest couldn't verify B2's TLS certificate (`unable to get local issuer certificate`): the PostgreSQL image doesn't include the CA bundle. |
+| pgBackRest **bundling** + block incremental, `process-max=4` | A full backup of the empty database took **278 s** (one request per file, 1,267 files, Helsinki → US East). With bundling it takes **25 s**. |
+| Restores use `--process-max=16 --no-delta` | A restore is network-bound; delta mode has nothing to compare against in an empty folder. |
+| The canary runs **every minute** (planned: 5 minutes) | A row every minute keeps WAL flowing for the 5-minute archive interval, and makes the measured data loss accurate to a minute. It doesn't touch B2. |
+| **Data loss is measured against the moment the restored database came up**, not the drill start | A "latest" restore also replays WAL archived during the drill, so the first measure came out negative. The fixed measure answers: if the server had died then, how old is the newest surviving change? |
+| The backup check is a Python script (`infra/db/check_backup_status.py`) | It runs the same on a PC, the server and CI, with no `jq` needed. |
+| `server-apply.sh` installs the timers *before* the B2 check | A failed check (e.g. a B2 cap) still leaves the server with the right schedule. |
+| A leftover `pgbackrest/repo2/` folder (3.5 MB) from the first setup is still in the bucket | It can't be cleaned up through pgBackRest without B2 requests while capped. **Owner:** delete the folder `pgbackrest/repo2` in the B2 web interface (Browse Files); that's free. |
+
+## Results so far (2026-10-22)
+
+| Check | Result |
+|---|---|
+| Staging database | PostgreSQL 17.9, archive off, data checksums on, canary table, 512 MB limit, only on the internal network `erp-staging-db`, no host port. |
+| Production database + archiving | `pgbackrest check` passed; WAL segments archived encrypted and compressed. 5432 is not on the host. |
+| First full backups | 29 MB → 3.5 MB (encrypted, zstd). 278 s before bundling, 25 s after. |
+| **Restore drill 1 (latest)** | Restored, recovered, `pg_amcheck` clean, container and volume deleted. Total 107–109 s. Data loss 78 s (measure fixed during the drill). |
+| Backup check | Red on the real status while B2 is capped: WAL 50 min old, failures since the last success, no backup info under the new setup. **The check catches a real outage.** |
+| **Not yet done** (needs the cap to reset, and one drill per day) | Archiving catches up · a differential backup under the new setup · checking an encrypted file · the point-in-time drill (day 1) and the latest drill again (day 2) · the nightly check green · apps deployed with the database network. |

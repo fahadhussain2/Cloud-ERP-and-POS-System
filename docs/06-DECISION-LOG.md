@@ -518,3 +518,20 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Production data never lands in the less protected staging.
   - Deletes by an attacker can be undone for 30 days.
 - **Status:** Accepted (with the W0-05 plan)
+
+### D-077 Backups sized for Backblaze B2's free tier, no card (2026-10-22)
+- **Decision:** the owner doesn't want a payment card on the B2 account, so B2 enforces its free daily limits as hard caps (2,500 downloads, 2,500 listings, 10 GB storage). The backup setup in D-076 is changed to fit inside them:
+  - WAL is archived every **5 minutes** instead of every minute. Still RPO ≤ 5 min, as the PRD requires.
+  - **One repository** instead of two:
+    - a full backup on the 1st of each month and a differential every night
+    - 12 monthly fulls kept
+    - WAL kept from the previous month's full, so restore to any moment in the last 30+ days
+  - Small files are bundled, so a backup or restore makes far fewer requests.
+  - The 15-minute status reads PostgreSQL and the info saved by the nightly backup, so it makes no B2 requests.
+  - **At most one restore drill a day** (about 1,500 requests).
+- **Why:**
+  - On the first day, test restores used up the free 2,500 downloads, and B2 then also refused the reads that archiving needs.
+  - Normal use is now about 500 requests a day.
+- **Risk accepted:** little margin. A drill on a very busy day could pause archiving until 00:00 UTC (05:00 Karachi). Nothing is lost while the server is healthy, and the backup check alerts.
+- **Revisit before go-live:** add a card with caps (cost about $0.05 a month) when real shop data arrives, or when data nears 10 GB.
+- **Status:** Accepted (changes D-076)

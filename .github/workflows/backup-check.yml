@@ -1,0 +1,45 @@
+# Nightly backup freshness check (W0-05, D-076, D-077). A red run sends GitHub's failure email.
+# W0-06 adds the same check as a Grafana alert to Slack within minutes.
+name: Backup check
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # 08:00 Karachi, after the 03:00 backup
+  workflow_dispatch:
+    inputs:
+      max_wal_minutes:
+        description: Fail if the last archived WAL is older than this (minutes)
+        default: '15'
+      max_backup_hours:
+        description: Fail if the last backup is older than this (hours)
+        default: '26'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check production backups
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          cp infra/server/known_hosts ~/.ssh/known_hosts
+      - name: Check
+        env:
+          MAX_WAL: ${{ inputs.max_wal_minutes || '15' }}
+          MAX_BACKUP: ${{ inputs.max_backup_hours || '26' }}
+        run: |
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            deploy@204.168.217.64 "backup-status prod" > status.json
+          python3 infra/db/check_backup_status.py status.json \
+            --max-wal-minutes "$MAX_WAL" --max-backup-hours "$MAX_BACKUP" | tee -a "$GITHUB_STEP_SUMMARY"

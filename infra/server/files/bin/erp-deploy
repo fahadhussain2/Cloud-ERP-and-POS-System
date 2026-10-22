@@ -6,6 +6,7 @@
 #   status <env>              current=<tag> previous=<tag>
 #   deploy <env> <tag>        stdin: tar.gz of infra/app. Migrate, start, check; roll back on failure.
 #   rollback <env>            switch back to the previous release
+#   backup-status prod        print the database backup status (read-only, for the nightly check; W0-05)
 #
 # <env> is prod or staging; <tag> is a 40-character git tree hash.
 set -euo pipefail
@@ -171,7 +172,12 @@ case $cmd in
     say "rolled back $env to $previous"
     ;;
 
+  backup-status)
+    [[ ${argv[1]:-} == prod ]] || die "backups run only for prod"
+    cat "$ROOT/prod/backup-status.json" || die "no backup status yet"
+    ;;
+
   *)
-    die "allowed commands: has, load, status, deploy, rollback"
+    die "allowed commands: has, load, status, deploy, rollback, backup-status"
     ;;
 esac

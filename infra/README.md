@@ -9,6 +9,7 @@ Production runs on one Hetzner CX33 (`erp-prod-1`, `204.168.217.64`, Helsinki, U
 | `edge/` | The shared Caddy (TLS, headers) for production and staging. It routes each site to its environment's `web` and `api` containers. `apply.sh` deploys it. |
 | `app/` | One release of the apps (`api`, `worker`, `web`) for one environment: `compose.yaml` plus non-secret settings per environment. Deployed by `erp-deploy`. |
 | `server/files/bin/erp-deploy` | The only program the GitHub deploy key may run on the server (D-075). |
+| `db/` | PostgreSQL + pgBackRest per environment: image, config, `apply.sh`, `erp-db` (backups, canary, status, secrets, restore drills), systemd timers (D-076). |
 
 ## Access
 
@@ -49,6 +50,57 @@ ssh admin@204.168.217.64 sudo docker ps
 ```
 
 **Secrets for an environment** go in `/srv/erp/<env>/app.env` on the server (mode 600, owner `deploy`). Never in git.
+
+## Database and backups (D-076, D-077)
+
+Each environment has its own PostgreSQL 17.9 container (`erp-prod-db`, `erp-staging-db`), set up by `infra/db/apply.sh`. App deploys never touch it.
+- **No public port.** Apps reach the database on the internal network `erp-<env>-db`.
+- **Admins** use:
+  ```bash
+  ssh admin@204.168.217.64 sudo docker exec -it -u postgres erp-prod-db psql -d erp
+  ```
+
+**Production backups** (pgBackRest → Backblaze B2 `zorbix-erp-backups-prod`, encrypted; staging has none):
+
+| What | When |
+|---|---|
+| WAL (every committed change) | Off-site within 5 minutes |
+| Full backup | 1st of each month, 03:00 Karachi; 12 kept |
+| Differential backup | Every other night, 03:00 Karachi |
+| Restore possible to | Any moment in the last 30+ days, or the start of any of the last 12 months |
+| Canary row (`ops.backup_canary`) | Every minute: keeps WAL flowing and measures data loss in drills |
+| Status file `/srv/erp/prod/backup-status.json` | Every 15 minutes; checked nightly by CI (`Backup check` workflow) |
+
+B2 is on the free tier with hard daily caps (D-077):
+- **Run at most one restore drill a day.**
+- If B2 refuses with "cap exceeded", archiving pauses until 00:00 UTC (05:00 Karachi) and then catches up by itself. WAL waits safely on the server meanwhile.
+
+**Secrets** live in `/srv/erp/prod/db-secrets/`: the B2 key, the backup passphrase, and the database superuser password. Never in git.
+- To change the B2 key (the passphrase is kept):
+  ```bash
+  ssh -t admin@204.168.217.64 sudo erp-db secrets
+  ```
+- The **backup passphrase** is kept offline by the owner. Without it, no backup can be decrypted.
+
+**Restore drill** (monthly; a GitHub issue reminds you on the 2nd):
+```bash
+ssh admin@204.168.217.64 sudo erp-db restore-drill
+```
+```bash
+ssh admin@204.168.217.64 "sudo erp-db restore-drill --time '2026-10-22 10:15:00+00'"
+```
+Each drill restores into a throwaway container, runs `pg_amcheck`, reports the restore time and data loss, then deletes everything. Log the result in `docs/modules/devops/restore-drills.md`.
+
+**Real disaster (the server is lost):**
+1. Rebuild the server (see "Rebuild from scratch").
+2. Restore the secrets: run `erp-db secrets` with the B2 key, and put the saved passphrase into `/srv/erp/prod/db-secrets/pgbackrest.conf` as `repo1-cipher-pass=…`.
+3. Restore: `pgbackrest --stanza=erp --repo=1 --process-max=16 restore` into an empty `erp-prod-pgdata` volume, then start with `infra/db/apply.sh … prod`.
+4. Deploy the apps.
+
+**Check backups by hand:**
+```bash
+ssh admin@204.168.217.64 "sudo erp-db status && sudo cat /srv/erp/prod/backup-status.json"
+```
 
 ## Common tasks
 
