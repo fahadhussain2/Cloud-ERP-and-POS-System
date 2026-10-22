@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#10](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/10) |
 | **Module** | platform |
-| **Status** | Built; PR to staging with the `deploy:staging` check |
+| **Status** | Done on staging (PR [#30](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/pull/30)); waiting for the owner's merge |
 | **Refs** | PLT-04, PLT-05, PLT-08; PRD §4 (users and roles); architecture §6.3, §6.4; D-026, D-051, D-078, D-081 |
 | **Depends on** | W0-07 (tenancy and RLS), W0-08 (domain package) |
 | **Size** | about 2 days |
@@ -128,3 +128,4 @@ None. W0-11 creates your owner account; until then, staging uses a test tenant.
 | API (integration, 13 tests) | Secure cookie; identical failures; **PIN refused as the password**; 5-try lockout with the audit trail; idle and absolute expiry; logout; cookie moved to another tenant refused; garbage cookies; other-origin POST refused; `requirePermission` (Salesman 403, Manager 204). |
 | Mutation checks | Lockout effectively off: the lockout test fails. Origin check off: the other-site test fails. |
 | Totals | `pnpm check` green with 180 unit tests; **46 integration tests** pass. |
+| **Staging, over HTTPS** (test shop `w0-test`, made by hand; test password in a git-ignored local file) | Migration `0003` applied by the deploy; Argon2 loads in the Linux image. Owner login → cookie `Max-Age=43200; Path=/api; HttpOnly; Secure; SameSite=Strict`, 38 permissions. `can/pos.void`: Owner 204, Salesman 403. Wrong password 401; other origin 403; logout 204, then `me` 401. The audit trail shows `login.success`, `login.failed` and `logout` with the **real client IP**, and no row contains a password hash. |
