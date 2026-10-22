@@ -27,7 +27,7 @@ Log in with `ssh admin@204.168.217.64`. Claude uses `-i ~/.ssh/zorbix_erp_admin`
 |---|---|
 | **Staging** | Merge into `staging`. CI checks, then deploys automatically. |
 | **Try a pull request on staging** | Add the label **`deploy:staging`** to the PR. Each new push to it redeploys. The next merge into `staging` puts staging back. |
-| **Production** | Merge `staging` → `main` (the release). It deploys right away outside 10:00–20:00 Karachi; otherwise it is deferred to the scheduled run at **22:00** (and 02:00). |
+| **Production** | Merge `staging` → `main` (the release). It deploys right away outside 10:00–20:00 Karachi; otherwise it is deferred to the next **hourly scheduled run (:17 past each hour, 20:17 to 03:17 Karachi)**. |
 | **Production emergency** | Actions → **Deploy** → Run workflow → `prod`, tick **force**. Works only from `main`. |
 | **Roll back** | Revert the merge on the branch, which deploys the previous code. A failed deploy rolls itself back automatically. |
 

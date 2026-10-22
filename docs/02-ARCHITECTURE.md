@@ -312,7 +312,7 @@ docker compose:
 | **Production** | Hetzner CX33, Helsinki | `main` branch | **Merging `staging` → `main` is the release.** It deploys automatically, but only **outside shop hours (10:00–20:00 Asia/Karachi)**. A merge during hours waits until after closing. Emergency override via a manual "Run workflow". |
 
 - **Work flow:** feature work → `staging` (test on staging) → pull request `staging` → `main` → merge = release.
-- **Docs-only changes** (`docs/**`, `*.md`) never trigger a deploy. They may be committed straight to `main` and are then merged into `staging` to keep the branches aligned.
+- **Docs-only changes** (`docs/**`, `*.md`) never trigger a deploy. Like code, they go to `staging` by pull request and reach `main` with the next release, so `main` always has exactly the tree staging tested (D-080).
 - **Each deploy:** pull images → run database migrations (if a migration fails, the old version keeps running) → start → health check. If the health check fails, the previous image is restored automatically and an alert is sent.
 - **Rollback:** revert the merge on `main`, which redeploys the previous version.
 - **Limit of the free GitHub plan:** branch protection is not enforced on private repositories, so "only merge `main` through a pull request" is a discipline rule, not a technical lock.

@@ -573,3 +573,12 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - The POS and the API get identical results (rule 2).
   - Type errors catch amount/quantity mix-ups at compile time.
 - **Status:** Accepted (with the W0-08 plan)
+
+### D-080 Hourly off-the-hour deploy schedule; docs go through staging (2026-10-23)
+- **Decision:**
+  - **Deferred production deploys:** GitHub's scheduled runs are best-effort, and the 22:00 run of the first release never happened. The schedule in D-075 changes from 22:00 and 02:00 to **every hour at :17 from 20:17 to 03:17 Karachi**. Each run exits in seconds when nothing is waiting.
+  - **All changes, docs included, go through `staging`.** `main` moves only by release merges (`staging` → `main`). This replaces "docs-only changes may go straight to `main`" (CLAUDE.md, D-063).
+- **Why:**
+  - Eight off-peak chances a night instead of two peak ones, for about 4 Actions minutes a night.
+  - Docs committed straight to `main` gave it a different file tree from staging, so production rebuilt its images instead of reusing the ones staging tested (D-075).
+- **Status:** Accepted (owner, 2026-10-23)

@@ -1,6 +1,7 @@
 # Deploys a release to staging or production (W0-04, D-063, D-075).
 # - Called by CI after the checks pass on a push to staging (→ staging) or main (→ prod).
-# - Scheduled at 22:00 and 02:00 Karachi: deploys a production release that was deferred.
+# - Scheduled every hour at :17 from 20:17 to 03:17 Karachi: deploys a production release that was deferred.
+#   GitHub's schedules are best-effort (a top-of-the-hour run was skipped once), so: off the hour, many chances.
 # - "Run workflow": staging from any branch, or prod from main (with force during shop hours).
 name: Deploy
 
@@ -25,8 +26,7 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: '0 17 * * *' # 22:00 Karachi
-    - cron: '0 21 * * *' # 02:00 Karachi
+    - cron: '17 15-22 * * *' # 20:17 to 03:17 Karachi; each run exits in seconds when nothing is waiting
 
 permissions:
   contents: read
@@ -59,7 +59,7 @@ jobs:
           echo "tag=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
           hour=$(TZ=Asia/Karachi date +%-H)
           if [[ $ENVIRONMENT == prod && $FORCE != true ]] && (( hour >= 10 && hour < 20 )); then
-            echo "::notice::Deferred: production deploys only outside 10:00-20:00 Karachi (now $(TZ=Asia/Karachi date +%H:%M)). The next scheduled run (22:00) deploys it, or run this workflow with force for an emergency."
+            echo "::notice::Deferred: production deploys only outside 10:00-20:00 Karachi (now $(TZ=Asia/Karachi date +%H:%M)). A scheduled run after 20:00 deploys it, or run this workflow with force for an emergency."
             echo "go=false" >> "$GITHUB_OUTPUT"
           else
             echo "go=true" >> "$GITHUB_OUTPUT"

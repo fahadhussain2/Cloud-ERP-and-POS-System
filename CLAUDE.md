@@ -32,7 +32,7 @@ Building started (D-070). Work task by task from the Wave 0 issues; **no code be
 
 - **Done = checks run and output shown** (lint, typecheck, test, build; e2e for UI flows). Never claim done without it.
 - **Bug fix = failing test first**, committed, then lock it: `node .claude/hooks/bugfix-lock.mjs lock <test>`. Fix the code, then unlock.
-- **Branches:** code → `staging` (auto-deploys to staging); release = merge `staging` → `main` (production, after 20:00 Karachi). Docs-only changes may go straight to `main`.
+- **Branches:** everything (code and docs) → `staging` via a pull request (auto-deploys to staging); release = merge `staging` → `main` (production, after 20:00 Karachi). `main` moves only by releases (D-080).
 - **Reviews** follow [REVIEW.md](REVIEW.md). The owner approves merges.
 - **Skills:** `posting-rules`, `checkout-rules`, `sync-protocol`, `legacy-migration`. **Agents:** `verifier` (runs checks, reports), `researcher` (read-only).
 

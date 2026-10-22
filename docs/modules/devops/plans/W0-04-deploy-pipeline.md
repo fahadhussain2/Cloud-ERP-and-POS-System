@@ -118,3 +118,10 @@ A merge to `staging` deploys to staging automatically. A merge `staging` → `ma
 | **Rehearsal B, failing migration** (PR #21) | `migration-failed`: the new version never started, the old version kept serving, run red. The `opened` run skipped the deploy and the `labeled` run deployed once, which proves the trigger fix. |
 | Release log | Every deploy, rollback and stopped migration is recorded. `current` and `previous` are kept for rollback. |
 | Timing | First deploy with a cold cache: 2 min 52 s. With the cache: 1 min 57 s. |
+
+## After the first release (2026-10-22)
+
+| Finding | Change |
+|---|---|
+| The first release was merged at 13:41 Karachi and correctly **deferred**. But GitHub **never ran the 22:00 scheduled run**: there were no scheduled runs at all, two hours later. Scheduled runs are best-effort, and top-of-the-hour slots are the busiest. | The deploy was started by hand at 00:39 Karachi (outside hours, no force). The schedule is now **every hour at :17 from 20:17 to 03:17 Karachi** (D-080): off the hour, with eight chances a night, at about 4 Actions minutes a night. |
+| Production rebuilt its images instead of reusing staging's, because docs commits made straight to `main` after the release gave `main` a different file tree from staging. | All docs now go through `staging`, so `main` moves only by release merges (D-080). |
