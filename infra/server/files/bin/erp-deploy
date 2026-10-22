@@ -133,7 +133,9 @@ case $cmd in
     [[ -f $dir/compose.yaml && -f $dir/$env.env ]] || die "bundle must contain compose.yaml and $env.env"
 
     say "migrating ($env, $tag)"
-    if ! compose "$env" "$tag" run --rm --no-deps api node dist/migrate.js; then
+    # The owner role's URL is given only to this one-off container, never to the running apps (D-078).
+    [[ -f $ROOT/$env/migrate.env ]] || die "missing $ROOT/$env/migrate.env (run infra/db/apply.sh for $env)"
+    if ! compose "$env" "$tag" run --rm --no-deps --env-from-file "$ROOT/$env/migrate.env" api node dist/migrate.js; then
       record "$env" deploy "$tag" migration-failed
       die "migration failed; ${current:-nothing} keeps running"
     fi

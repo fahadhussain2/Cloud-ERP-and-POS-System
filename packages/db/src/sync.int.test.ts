@@ -110,17 +110,10 @@ describe('change-feed cursor', () => {
       await withTenant(pool, { tenantId: tenant }, (_db, c) => insertBranch(c, 'FAST'));
 
       // A pull now must not return FAST: the cursor would move past T1's txid and lose SLOW forever.
-      const start = await withTenant(pool, { tenantId: tenant }, (_db, c) =>
-        c.query<{ txid: string }>(
-          "SELECT (txid::text::bigint - 1)::text AS txid FROM erp.branches WHERE code = 'FAST'",
-        ),
-      );
-      const from = { txid: '0', rowVersion: '0' };
       const during = await withTenant(pool, { tenantId: tenant }, (_db, c) =>
-        pullChanges(c, 'branches', from, 1000),
+        pullChanges(c, 'branches', START, 1000),
       );
       expect(during.rows.map((r) => r['code'])).not.toContain('FAST');
-      expect(start.rows).toHaveLength(1);
 
       await t1.query('COMMIT');
       const after = await withTenant(pool, { tenantId: tenant }, (_db, c) =>

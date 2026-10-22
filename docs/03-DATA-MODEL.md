@@ -22,6 +22,7 @@
 | Sync columns | Downloadable (synced) tables have `row_version bigint`, `txid xid8` (set by trigger) and `deleted_at` (soft delete). |
 | Immutability | Rows in document and ledger tables are never updated after posting, except for workflow status fields (e.g. `handover_status`, `status: voided`). Every status change is also written to the audit log. |
 | Legacy | Migrated rows keep `legacy jsonb` with the original IDs and values for traceability. |
+| Schema and helpers | All tables are in schema `erp`, created by SQL migrations in `packages/db/migrations/` (D-078):<br>• **tenant tables:** `SELECT erp.enable_tenant_rls('erp.<t>')` (forced RLS on `tenant_id = erp.current_tenant_id()`)<br>• **synced tables:** also `erp.enable_sync` (`txid` / `row_version` by trigger, `DELETE` refused)<br>• **audit columns:** `erp.enable_audit`<br>• **default ID:** `erp.uuid_v7()`<br>• **status columns:** `text` + `CHECK`, not enums |
 
 Data in this document is grouped by area. Fields marked † are derived and maintained by the posting engine.
 

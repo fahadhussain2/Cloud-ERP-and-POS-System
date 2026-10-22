@@ -27,6 +27,8 @@ FROM node-runtime AS api
 COPY --from=build --chown=root:root /out/api/package.json ./
 COPY --from=build --chown=root:root /out/api/node_modules ./node_modules
 COPY --from=build --chown=root:root /out/api/dist ./dist
+# SQL migrations, found next to dist/ by the bundled migrate step (D-078).
+COPY --from=build --chown=root:root /repo/packages/db/migrations ./migrations
 ENV HOST=0.0.0.0 PORT=3000
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \

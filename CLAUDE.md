@@ -47,10 +47,19 @@ Node 24 LTS + pnpm 11 (D-071). Run from the repo root:
 | `pnpm lint` · `pnpm typecheck` · `pnpm test` · `pnpm build` | The single steps; `pnpm format` fixes formatting |
 | `pnpm test:watch` | Vitest in watch mode |
 | `pnpm test:integration` | Integration tests (`*.int.test.ts`) against PostgreSQL 17+ at `DATABASE_URL`. They fail without it, and CI always runs them. |
+| `pnpm db:up` · `pnpm db:down` | Local PostgreSQL 17.9 on `127.0.0.1:54329` (Docker). Then: `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:54329/postgres pnpm test:integration` |
 | `pnpm --filter @erp/<app> dev` | Run one app (`api`, `worker`, `pos`, `backoffice`) |
 
 Packages are named `@erp/<folder>` and used as TypeScript source; only apps are built. `pnpm e2e` arrives with the first UI flow.
 
+**Database (D-078):**
+- Tables live in schema `erp` and are created only by SQL files in `packages/db/migrations/` (immutable once applied).
+- Every new table calls `erp.enable_tenant_rls`, and synced tables also call `erp.enable_sync` and `erp.enable_audit`.
+- Mirror each table in `packages/db/src/schema.ts`; a test fails if the two differ.
+- App code queries only inside `withTenant(...)`.
+
 ## Known mistakes to avoid
 
 *(Add a line whenever the same mistake happens twice.)*
+
+- After `pnpm deploy` (e.g. testing a production bundle), run `CI=true pnpm install` before other pnpm commands; otherwise pnpm wants to rebuild `node_modules` and aborts without a TTY.

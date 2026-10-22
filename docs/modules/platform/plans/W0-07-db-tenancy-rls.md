@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#8](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/8) |
 | **Module** | platform (with sync) |
-| **Status** | Accepted (2026-10-22) |
+| **Status** | Built; PR to staging with the `deploy:staging` check |
 | **Refs** | PLT-01, PLT-02, PLT-10; architecture §5.3, §6.2; data model §1–§2; CLAUDE.md rules 1, 5, 7, 8; D-028, D-036, D-075, D-078 |
 | **Depends on** | W0-01, W0-02 (CI with PostgreSQL), W0-05 (databases on the server) |
 | **Size** | about 2 days |
@@ -113,3 +113,12 @@ The multi-tenant base every module builds on:
 ## Owner actions
 
 - None, except starting Docker Desktop on the PC when running integration tests locally.
+
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| **Migrations are hand-written SQL only**, applied by a small runner in `packages/db` (`erp_meta.migrations`, an advisory lock, checksums). `drizzle-kit` isn't used. **Drift is caught by an integration test** that compares every table, column, type and `NOT NULL` in the Drizzle schema with the real database. | `drizzle-kit generate` puts `CREATE SCHEMA` and the tables in its first migration, but the tables need the helper functions (`erp.uuid_v7()`, the RLS and sync helpers) to exist first, which would mean hand-editing its output. The test against the real database is a stronger drift check than "generate finds nothing". |
+| **Applied migrations are immutable:** the runner refuses to run if one was edited (tested) | A changed history would make servers differ. Fixes go in a new migration. |
+| The API image ships `packages/db/migrations` next to `dist/`; `pg` is a runtime dependency of the API | The bundled `migrate` step finds the SQL files the same way in tests and in production. |
+| **Mutation check:** removing the cursor's `txid < pg_snapshot_xmin` guard, or RLS on `locations`, each makes exactly the right test fail | Proves the tests guard what they claim to. |
