@@ -1,0 +1,22 @@
+# Local development database (W0-07): PostgreSQL 17.9 on 127.0.0.1:54329, for migrations and integration tests.
+#   pnpm db:up
+#   DATABASE_URL=postgres://postgres:postgres@127.0.0.1:54329/postgres pnpm test:integration
+# Local only: the password is not a secret and the port is bound to this PC.
+name: erp-dev
+services:
+  db:
+    image: postgres:17.9-bookworm
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: --data-checksums
+    ports:
+      - '127.0.0.1:54329:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'postgres']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  pgdata:

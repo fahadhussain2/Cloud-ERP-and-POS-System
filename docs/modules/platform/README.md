@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Not started (build on hold, D-068) |
+| **Status** | In progress: W0-07 (tenancy, RLS, sync columns) |
 | **Requirements** | 13 (PLT-01…PLT-13) |
 | **Feature spec needed** | Yes: device enrollment + PIN security |
 

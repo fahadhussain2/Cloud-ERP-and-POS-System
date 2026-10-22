@@ -10,9 +10,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "fastify": "catalog:"
+    "fastify": "catalog:",
+    "pg": "catalog:"
   },
   "devDependencies": {
+    "@erp/db": "workspace:*",
     "@erp/observability": "workspace:*",
     "tsup": "catalog:",
     "tsx": "catalog:",

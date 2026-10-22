@@ -535,3 +535,21 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Risk accepted:** little margin. A drill on a very busy day could pause archiving until 00:00 UTC (05:00 Karachi). Nothing is lost while the server is healthy, and the backup check alerts.
 - **Revisit before go-live:** add a card with caps (cost about $0.05 a month) when real shop data arrives, or when data nears 10 GB.
 - **Status:** Accepted (changes D-076)
+
+### D-078 Database foundations: Drizzle + SQL migrations, three roles, fail-closed RLS (2026-10-22)
+- **Decision:**
+  - **Drizzle ORM 0.45** (stable) on `node-postgres`. Tables are defined in TypeScript, and `drizzle-kit` writes SQL migrations that are committed and reviewed. RLS, triggers, grants and functions are hand-written SQL migrations.
+  - Everything lives in the schema **`erp`**.
+  - **Roles:**
+    - `erp_owner` owns the schema and runs migrations
+    - `erp_app` (API, worker) has no `BYPASSRLS` and owns nothing
+    - `postgres` only creates the roles
+  - **Only the deploy's migrate step holds the owner's credentials.**
+  - **Tenant context is set per transaction** (`withTenant` → `set_config(…, true)`).
+  - **Every tenant table:** `FORCE` RLS with `tenant_id = erp.current_tenant_id()`, which is NULL without a context, so the table **fails closed**.
+  - **Standard helpers** (`enable_tenant_rls`, `enable_sync`, `enable_audit`) add the policy, the sync trigger (`txid` = `pg_current_xact_id()`, `row_version` from one global sequence, `DELETE` refused) and the audit columns.
+  - `erp.uuid_v7()` is the default ID.
+  - Status columns are `text` + `CHECK`, not enums.
+  - **A CI test fails the build** for a table without forced RLS.
+- **Why:** isolation is enforced by PostgreSQL itself, mistakes give empty results rather than leaks, the cursor can't skip rows, and the running app can't weaken any of it.
+- **Status:** Accepted (with the W0-07 plan)

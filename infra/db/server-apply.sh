@@ -33,6 +33,39 @@ echo "== database"
 docker compose -p "erp-$env-db" --env-file "$src/$env.env" -f "$src/compose.yaml" up -d --wait
 docker exec -u postgres "erp-$env-db" psql -X -At -d erp -c "SELECT version()"
 
+echo "== roles (D-078)"
+# erp_owner owns the schema and runs migrations; erp_app is what the apps use (no BYPASSRLS, owns nothing).
+for role in erp_owner erp_app; do
+  file=$secrets/$role-password
+  if [[ ! -f $file ]]; then
+    openssl rand -hex 24 | tr -d '\n' >"$file"
+    chown 999:999 "$file"
+    chmod 600 "$file"
+  fi
+done
+owner_pw=$(cat "$secrets/erp_owner-password")
+app_pw=$(cat "$secrets/erp_app-password")
+docker exec -i -u postgres "erp-$env-db" psql -X -q -v ON_ERROR_STOP=1 -d erp \
+  -v owner_pw="$owner_pw" -v app_pw="$app_pw" <<'SQL' >/dev/null
+SELECT format('CREATE ROLE erp_owner LOGIN') WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'erp_owner') \gexec
+SELECT format('CREATE ROLE erp_app LOGIN NOBYPASSRLS') WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'erp_app') \gexec
+ALTER ROLE erp_owner PASSWORD :'owner_pw';
+ALTER ROLE erp_app PASSWORD :'app_pw' NOBYPASSRLS;
+REVOKE CONNECT ON DATABASE erp FROM PUBLIC;
+GRANT CONNECT, CREATE ON DATABASE erp TO erp_owner;
+GRANT CONNECT ON DATABASE erp TO erp_app;
+SQL
+# Read by docker compose as the deploy user: app.env for the running apps, migrate.env only for the migrate step.
+umask 077
+printf 'DATABASE_URL=postgres://erp_app:%s@erp-%s-db:5432/erp\n' "$app_pw" "$env" >"/srv/erp/$env/app.env.new"
+printf 'MIGRATION_DATABASE_URL=postgres://erp_owner:%s@erp-%s-db:5432/erp\n' "$owner_pw" "$env" >"/srv/erp/$env/migrate.env.new"
+for f in app.env migrate.env; do
+  chown deploy:deploy "/srv/erp/$env/$f.new"
+  mv "/srv/erp/$env/$f.new" "/srv/erp/$env/$f"
+done
+umask 022
+echo "roles ready; wrote /srv/erp/$env/app.env and migrate.env"
+
 if [[ $env == prod ]]; then
   echo "== backups"
   # The separate monthly backup (repo2) was dropped to fit B2's free limits (D-077).
