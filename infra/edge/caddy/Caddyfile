@@ -1,10 +1,13 @@
-# Edge proxy: TLS, security headers, static apps and /api (W0-03, architecture §9.0).
-# Until W0-04 deploys the apps, each site serves a placeholder and /api answers 503.
+# Edge proxy: TLS, security headers, and routing to each environment's containers (W0-03, W0-04).
+#   /api/*        → erp-<env>-api:3000
+#   everything else → erp-<env>-web:8080 (POS) or :8081 (back office)
+# An environment that isn't deployed answers 503.
 {
 	acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
 }
 
-(common) {
+# app <env> <web port>
+(app) {
 	encode zstd gzip
 	header {
 		# No includeSubDomains: the marketing site on the apex is managed elsewhere.
@@ -16,13 +19,11 @@
 	}
 	# The API is served on each app's own origin (D-065).
 	handle /api/* {
-		reverse_proxy {args[0]}:3000
+		reverse_proxy erp-{args[0]}-api:3000
 	}
 	handle {
-		root * /srv/placeholder
-		file_server
+		reverse_proxy erp-{args[0]}-web:{args[1]}
 	}
-	# The API container is not deployed yet: answer 503 instead of 502.
 	handle_errors 502 {
 		respond "Service unavailable" 503
 	}
@@ -33,19 +34,19 @@
 }
 
 pos.zorbixtechnologies.com {
-	import common erp-prod-api
+	import app prod 8080
 }
 
 app.zorbixtechnologies.com {
-	import common erp-prod-api
+	import app prod 8081
 }
 
 staging-pos.zorbixtechnologies.com {
-	import common erp-staging-api
+	import app staging 8080
 	import staging
 }
 
 staging-app.zorbixtechnologies.com {
-	import common erp-staging-api
+	import app staging 8081
 	import staging
 }

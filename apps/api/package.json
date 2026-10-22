@@ -13,6 +13,7 @@
     "fastify": "catalog:"
   },
   "devDependencies": {
+    "@erp/observability": "workspace:*",
     "tsup": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:"

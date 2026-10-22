@@ -187,10 +187,16 @@ ensure_user admin sudo adm systemd-journal
 ensure_keys admin
 put_file "$FILES/sudoers/90-erp-admin" /etc/sudoers.d/90-erp-admin 440
 visudo -cqf /etc/sudoers.d/90-erp-admin || die "invalid sudoers file"
-# deploy runs Docker for GitHub Actions (W0-04): Docker access only, no sudo.
+# deploy runs Docker for GitHub Actions: Docker access only, no sudo. Its key may run only
+# erp-deploy (forced command in keys/deploy/*.pub, D-075).
 ensure_user deploy docker
 ensure_keys deploy
+put_file "$FILES/bin/erp-deploy" /usr/local/bin/erp-deploy 755
 install -d -m 755 /srv/erp /srv/erp/edge
+for env in prod staging; do
+  [[ -d /srv/erp/$env ]] || changed "/srv/erp/$env"
+  install -d -m 750 -o deploy -g deploy "/srv/erp/$env"
+done
 
 step "Firewall (ufw)"
 before=$(ufw status verbose)
