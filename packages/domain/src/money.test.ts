@@ -46,7 +46,7 @@ describe('money properties', () => {
         fc.integer({ min: -1_000_000, max: 1_000_000 }),
         fc.integer({ min: 0, max: 10_000_000 }),
         (q, p) => {
-          expect(mulQty(qty(-q), money(p))).toBe(-mulQty(qty(q), money(p)) || 0);
+          expect(mulQty(qty(-q), money(p))).toBe(-(mulQty(qty(q), money(p)) as number) || 0);
         },
       ),
     );

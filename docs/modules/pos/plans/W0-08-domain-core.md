@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#9](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/9) |
 | **Module** | pos (the `packages/domain` base for every checkout rule) |
-| **Status** | Accepted (2026-10-22) |
+| **Status** | Built; PR to staging |
 | **Refs** | POS-15, PRD §7 (integrity); architecture §4.4, §12; posting rules §1.7; CLAUDE.md rules 1–2; D-036, D-056, D-079; skill `checkout-rules` |
 | **Depends on** | W0-01 |
 | **Size** | about 1 day |
@@ -58,11 +58,11 @@ The small, exact building blocks every checkout and posting rule will use, so no
 
 ## Tests that prove it
 
-- [ ] Golden cases pass for every function (about 80 cases).
-- [ ] Property tests: allocations always sum to the total and never differ from the exact share by 1 paisa or more; `round(−x) = −round(x)`; parse ∘ format round-trips for valid input.
-- [ ] Coverage of `packages/domain` is 100% lines, branches, functions and statements (enforced).
-- [ ] Unsafe or non-integer input raises `DomainError` with the right code, never a wrong number.
-- [ ] `pnpm check` green; the lint boundaries still hold.
+- [x] Golden cases pass for every function (about 80 cases).
+- [x] Property tests: allocations always sum to the total and never differ from the exact share by 1 paisa or more; `round(−x) = −round(x)`; parse ∘ format round-trips for valid input.
+- [x] Coverage of `packages/domain` is 100% lines, branches, functions and statements (enforced).
+- [x] Unsafe or non-integer input raises `DomainError` with the right code, never a wrong number.
+- [x] `pnpm check` green; the lint boundaries still hold.
 
 ## Risks
 
@@ -75,3 +75,21 @@ The small, exact building blocks every checkout and posting rule will use, so no
 ## Owner actions
 
 None.
+
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| `money()` accepts a number or the database's bigint **text**, not a JS `bigint` | The database driver returns `bigint` columns as text; a `bigint` input would be an unused path. |
+| Two extra golden cases: a quantity beyond the safe range, and an invalid instant for the business date | The 100% branch-coverage target found two input checks that no case reached. |
+| `packages/*/src/testing/**` (the golden runner) is excluded from coverage | It is test infrastructure, not domain logic. |
+
+## Results (2026-10-23)
+
+| Check | Result |
+|---|---|
+| Tests first | 109 golden cases and 8 property tests committed failing (`977f471`); 2 cases added while building. |
+| Domain tests | **119 pass**: 111 golden cases in 8 files, plus 8 `fast-check` properties (each runs 100 random inputs). |
+| Coverage of `packages/domain` | **100%** lines, branches, functions and statements, in every file (enforced by the CI threshold). |
+| Mutation checks | Halves rounding toward zero: 10 cases fail. Ties ignoring the weight: "equal remainders: the larger weight wins" fails. |
+| `pnpm check` | Green: format, lint (including the domain purity rules), typecheck, 134 unit tests, build. |

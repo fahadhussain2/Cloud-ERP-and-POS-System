@@ -29,7 +29,7 @@ describe('allocation properties', () => {
       fc.property(total, weights, (t, w) => {
         const sumW = w.reduce((s, x) => s + BigInt(x), 0n);
         allocate(money(t), w).forEach((part, i) => {
-          const diff = BigInt(part) * sumW - BigInt(t) * BigInt(w[i]);
+          const diff = BigInt(part) * sumW - BigInt(t) * BigInt(w[i] ?? 0);
           expect(diff < 0n ? -diff : diff).toBeLessThan(sumW);
           if (w[i] === 0) expect(part).toBe(0);
         });
@@ -40,7 +40,7 @@ describe('allocation properties', () => {
   it('splits a refund as the exact mirror of the sale', () => {
     fc.assert(
       fc.property(total, weights, (t, w) => {
-        expect(allocate(money(-t), w)).toStrictEqual(allocate(money(t), w).map((x) => -x || 0));
+        expect(allocate(money(-t), w)).toStrictEqual(allocate(money(t), w).map((x) => -(x as number) || 0));
       }),
     );
   });

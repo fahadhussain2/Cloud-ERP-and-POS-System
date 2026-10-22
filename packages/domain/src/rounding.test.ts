@@ -18,10 +18,10 @@ describe('cash rounding properties', () => {
         fc.constantFrom(1, 50, 100, 500, 1000),
         (a, inc) => {
           const r = roundCash(money(a), money(inc));
-          expect(r.rounded % inc).toBe(0);
+          expect(Math.abs(r.rounded) % inc).toBe(0);
           expect(r.rounded - a).toBe(r.adjustment);
           expect(Math.abs(r.adjustment) * 2).toBeLessThanOrEqual(inc);
-          expect(roundCash(money(-a), money(inc)).rounded).toBe(-r.rounded || 0);
+          expect(roundCash(money(-a), money(inc)).rounded).toBe(-(r.rounded as number) || 0);
         },
       ),
     );
