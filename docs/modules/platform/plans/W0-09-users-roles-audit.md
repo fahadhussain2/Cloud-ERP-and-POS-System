@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#10](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/10) |
 | **Module** | platform |
-| **Status** | Accepted (2026-10-23) |
+| **Status** | Built; PR to staging with the `deploy:staging` check |
 | **Refs** | PLT-04, PLT-05, PLT-08; PRD §4 (users and roles); architecture §6.3, §6.4; D-026, D-051, D-078, D-081 |
 | **Depends on** | W0-07 (tenancy and RLS), W0-08 (domain package) |
 | **Size** | about 2 days |
@@ -64,25 +64,25 @@ People log in to the back office with their own account; what they may do comes 
 ## Tests written first
 
 **Permissions (domain, golden):**
-- [ ] **Permission matrix:** every template × every catalog permission gives the expected yes/no; Owner gets everything, including a permission added later.
-- [ ] Limits: two roles combine to the most permissive; a branch-scoped role counts only in its branch.
-- [ ] Salesman can process returns by default (D-051) and can't void; Accountant can't sell.
+- [x] **Permission matrix:** every template × every catalog permission gives the expected yes/no; Owner gets everything, including a permission added later.
+- [x] Limits: two roles combine to the most permissive; a branch-scoped role counts only in its branch.
+- [x] Salesman can process returns by default (D-051) and can't void; Accountant can't sell.
 
 **Database (integration):**
-- [ ] The existing RLS check covers the new tables automatically; `tenant_directory` is the only allow-listed exception, and it exposes only `code` and `tenant_id`.
-- [ ] Usernames are unique per tenant, case-insensitive; the same username in two tenants is fine.
-- [ ] The audit trigger writes before/after for an update, with the user and request ID, and **without** `password_hash` / `pin_verifier`.
-- [ ] `audit_log` refuses `UPDATE` and `DELETE`, for the app role and the owner role alike.
+- [x] The existing RLS check covers the new tables automatically; `tenant_directory` is the only allow-listed exception, and it exposes only `code` and `tenant_id`.
+- [x] Usernames are unique per tenant, case-insensitive; the same username in two tenants is fine.
+- [x] The audit trigger writes before/after for an update, with the user and request ID, and **without** `password_hash` / `pin_verifier`.
+- [x] `audit_log` refuses `UPDATE` and `DELETE`, for the app role and the owner role alike.
 
 **API (integration, real database):**
-- [ ] Login with the right password sets the cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api`); `/api/auth/me` returns the user and their effective permissions.
-- [ ] A wrong password, an unknown user, and a wrong shop code all give the same answer, and take about the same time.
-- [ ] Five wrong passwords lock the account for 15 minutes, even with the right password; each attempt is in the audit log.
-- [ ] **The user's PIN doesn't work as a password.**
-- [ ] A session expires after 12 h and after 2 h idle (clock injected); logout revokes it.
-- [ ] A cookie with another tenant's id and a real token from this tenant is rejected.
-- [ ] A state-changing request from another origin is rejected.
-- [ ] A route with `requirePermission('pos.void')` refuses a Salesman and allows a Manager.
+- [x] Login with the right password sets the cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api`); `/api/auth/me` returns the user and their effective permissions.
+- [x] A wrong password, an unknown user, and a wrong shop code all give the same answer, and take about the same time.
+- [x] Five wrong passwords lock the account for 15 minutes, even with the right password; each attempt is in the audit log.
+- [x] **The user's PIN doesn't work as a password.**
+- [x] A session expires after 12 h and after 2 h idle (clock injected); logout revokes it.
+- [x] A cookie with another tenant's id and a real token from this tenant is rejected.
+- [x] A state-changing request from another origin is rejected.
+- [x] A route with `requirePermission('pos.void')` refuses a Salesman and allows a Manager.
 
 ## Order
 
@@ -105,3 +105,26 @@ People log in to the back office with their own account; what they may do comes 
 ## Owner actions
 
 None. W0-11 creates your owner account; until then, staging uses a test tenant.
+
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| Login bookkeeping (failed count, lock, last login) is in its own table, `user_login_state` | On `users`, every login would write an audit row and bump the sync version that counters download. |
+| **Yes/no abilities are permissions, not limits.** Limits are only `maxDiscountBp` and `voidWindow`. | "Can void", "can see cost", "can sell on credit" in the data model's example limits were permissions under another name. One concept each keeps the role editor simple. |
+| An extra route, `GET /api/auth/can/:permission` (204 / 403) | Screens can ask "may I?" without knowing the role setup; it also tests `requirePermission`. |
+| Bug found by the tests: with no trigger arguments, PostgreSQL passes `TG_ARGV` as **NULL**, so the audit row lost its tenant | Fixed with `coalesce(TG_ARGV, '{}')`, before any commit. |
+| The role matrix is a reviewed snapshot file (`golden/role-matrix.snap.json`) | Changing a template changes that file, so the change shows up in review. |
+
+**Default to confirm with the owner:** Salesman (and Cashier) can **sell on credit** (`pos.credit.sell`). Each customer's credit limit still applies, and over-limit needs a manager PIN. Remove it from the template if counters should never sell on credit without a manager.
+
+## Results (2026-10-23)
+
+| Check | Result |
+|---|---|
+| Tests first | Committed failing (`05dbb81`). |
+| Domain | Permission golden cases (28), limits (8), template checks and the role matrix. `packages/domain` coverage stays at **100%**. |
+| Database (integration) | Usernames, the directory, audit before/after without secrets, soft delete as `delete`, append-only for app and owner (and `TRUNCATE`), tenant isolation. The RLS check covers the 7 new tables automatically. |
+| API (integration, 13 tests) | Secure cookie; identical failures; **PIN refused as the password**; 5-try lockout with the audit trail; idle and absolute expiry; logout; cookie moved to another tenant refused; garbage cookies; other-origin POST refused; `requirePermission` (Salesman 403, Manager 204). |
+| Mutation checks | Lockout effectively off: the lockout test fails. Origin check off: the other-site test fails. |
+| Totals | `pnpm check` green with 180 unit tests; **46 integration tests** pass. |
