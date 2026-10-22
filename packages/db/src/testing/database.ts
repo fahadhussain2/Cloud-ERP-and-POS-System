@@ -77,8 +77,11 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   return db;
 }
 
-/** Creates a tenant as the owner role (FORCE RLS applies to it too, so it sets the context). */
-export async function createTenant(ownerUrl: string, name: string): Promise<string> {
+/**
+ * Creates a tenant as the owner role (FORCE RLS applies to it too, so it sets the context), and registers its
+ * shop code in the login directory when one is given.
+ */
+export async function createTenant(ownerUrl: string, name: string, code?: string): Promise<string> {
   const c = new pg.Client({ connectionString: ownerUrl });
   await c.connect();
   try {
@@ -92,6 +95,7 @@ export async function createTenant(ownerUrl: string, name: string): Promise<stri
        VALUES ($1, $2, 'PKR', 2, 'Asia/Karachi', 'en-PK', 1, '20:00')`,
       [id, name],
     );
+    if (code) await c.query('INSERT INTO erp.tenant_directory (code, tenant_id) VALUES ($1, $2)', [code, id]);
     await c.query('COMMIT');
     return id;
   } finally {

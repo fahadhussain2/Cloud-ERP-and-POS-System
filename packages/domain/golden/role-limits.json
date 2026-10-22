@@ -1,0 +1,72 @@
+{
+  "description": "Role limits combine to the most permissive; a branch-scoped role counts only in its branch (PLT-05, D-081)",
+  "cases": [
+    {
+      "name": "Salesman: discount down to the floor (no extra % cap), no voids",
+      "input": { "grants": [{ "template": "salesman", "branchId": null }], "branchId": "b1" },
+      "expected": { "maxDiscountBp": 10000, "voidWindow": "none" }
+    },
+    {
+      "name": "Manager voids on the same business day",
+      "input": { "grants": [{ "template": "manager", "branchId": null }], "branchId": "b1" },
+      "expected": { "maxDiscountBp": 10000, "voidWindow": "same_day" }
+    },
+    {
+      "name": "Accountant has no selling limits",
+      "input": { "grants": [{ "template": "accountant", "branchId": null }], "branchId": "b1" },
+      "expected": { "maxDiscountBp": 0, "voidWindow": "none" }
+    },
+    {
+      "name": "Two roles: the most permissive wins",
+      "input": {
+        "grants": [
+          { "template": "accountant", "branchId": null },
+          { "template": "manager", "branchId": null }
+        ],
+        "branchId": "b1"
+      },
+      "expected": { "maxDiscountBp": 10000, "voidWindow": "same_day" }
+    },
+    {
+      "name": "A Manager role for another branch doesn't count here",
+      "input": {
+        "grants": [
+          { "template": "salesman", "branchId": null },
+          { "template": "manager", "branchId": "b2" }
+        ],
+        "branchId": "b1"
+      },
+      "expected": { "maxDiscountBp": 10000, "voidWindow": "none" }
+    },
+    {
+      "name": "A Manager role for this branch counts",
+      "input": {
+        "grants": [
+          { "template": "salesman", "branchId": null },
+          { "template": "manager", "branchId": "b1" }
+        ],
+        "branchId": "b1"
+      },
+      "expected": { "maxDiscountBp": 10000, "voidWindow": "same_day" }
+    },
+    {
+      "name": "No roles: no limits at all",
+      "input": { "grants": [], "branchId": "b1" },
+      "expected": { "maxDiscountBp": 0, "voidWindow": "none" }
+    },
+    {
+      "name": "Custom role with a 5% cap and voids before handover only",
+      "input": {
+        "grants": [
+          {
+            "permissions": ["pos.sale.create", "pos.void"],
+            "limits": { "maxDiscountBp": 500, "voidWindow": "same_day_before_handover" },
+            "branchId": null
+          }
+        ],
+        "branchId": "b1"
+      },
+      "expected": { "maxDiscountBp": 500, "voidWindow": "same_day_before_handover" }
+    }
+  ]
+}
