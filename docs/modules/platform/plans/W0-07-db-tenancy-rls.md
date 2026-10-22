@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#8](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/8) |
 | **Module** | platform (with sync) |
-| **Status** | Built; PR to staging with the `deploy:staging` check |
+| **Status** | Done on staging (PR [#27](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/pull/27)); waiting for the owner's merge |
 | **Refs** | PLT-01, PLT-02, PLT-10; architecture §5.3, §6.2; data model §1–§2; CLAUDE.md rules 1, 5, 7, 8; D-028, D-036, D-075, D-078 |
 | **Depends on** | W0-01, W0-02 (CI with PostgreSQL), W0-05 (databases on the server) |
 | **Size** | about 2 days |
@@ -67,29 +67,29 @@ The multi-tenant base every module builds on:
 ## Tests written first (they must fail before the code exists)
 
 **RLS (rule 5, PLT-10):**
-- [ ] **Every table has RLS:** every table in `erp` has RLS **enabled and forced**, at least one policy, and a `NOT NULL tenant_id` (or is on a short allow-list, e.g. `tenants` itself, policy on `id`). **A new table without them fails CI.**
-- [ ] **The app role is safe:** `erp_app` is not a superuser, has no `BYPASSRLS`, owns no table, and can't `ALTER` or `DROP` anything.
-- [ ] **Tenants are isolated:** in tenant A's context, tenant B's rows are invisible to `SELECT`, and `UPDATE` / `DELETE` touch 0 rows.
+- [x] **Every table has RLS:** every table in `erp` has RLS **enabled and forced**, at least one policy, and a `NOT NULL tenant_id` (or is on a short allow-list, e.g. `tenants` itself, policy on `id`). **A new table without them fails CI.**
+- [x] **The app role is safe:** `erp_app` is not a superuser, has no `BYPASSRLS`, owns no table, and can't `ALTER` or `DROP` anything.
+- [x] **Tenants are isolated:** in tenant A's context, tenant B's rows are invisible to `SELECT`, and `UPDATE` / `DELETE` touch 0 rows.
   - `INSERT` with B's `tenant_id` fails.
   - `UPDATE … SET tenant_id = B` fails.
-- [ ] **Fail closed:** with no context, every table returns 0 rows and inserts fail. A malformed context raises an error.
-- [ ] **No context leak:** after a `withTenant` transaction ends, the same pooled connection has no tenant set.
+- [x] **Fail closed:** with no context, every table returns 0 rows and inserts fail. A malformed context raises an error.
+- [x] **No context leak:** after a `withTenant` transaction ends, the same pooled connection has no tenant set.
 
 **Sync columns and cursor (rule 8, architecture §5.3):**
-- [ ] An insert sets `txid` and `row_version`, and an update moves both forward.
-- [ ] `DELETE` on a syncable table is refused; a soft delete moves the cursor.
-- [ ] **No skipped rows under concurrency:**
+- [x] An insert sets `txid` and `row_version`, and an update moves both forward.
+- [x] `DELETE` on a syncable table is refused; a soft delete moves the cursor.
+- [x] **No skipped rows under concurrency:**
   1. Transaction T1 writes a row and stays open.
   2. Transaction T2 writes and commits.
   3. A pull at that moment returns **neither** row past the safe point.
   4. After T1 commits, the next pull returns **both**.
-- [ ] Pulls return rows in `(txid, row_version)` order, and resuming from a cursor returns each row exactly once.
+- [x] Pulls return rows in `(txid, row_version)` order, and resuming from a cursor returns each row exactly once.
 
 **Audit, IDs, migrations:**
-- [ ] `created_by` / `updated_by` come from `app.user_id`; `updated_at` changes on update.
-- [ ] `erp.uuid_v7()` returns version-7 UUIDs that sort by creation time.
-- [ ] **Migrations:** running them again is a no-op; `drizzle-kit generate` finds no un-generated changes (schema and SQL can't drift).
-- [ ] **Deploy:** staging's deploy runs the real migrations as `erp_owner`, and the running API holds only `erp_app` (checked on the server: `migrate.env` isn't in the API container's environment).
+- [x] `created_by` / `updated_by` come from `app.user_id`; `updated_at` changes on update.
+- [x] `erp.uuid_v7()` returns version-7 UUIDs that sort by creation time.
+- [x] **Migrations:** running them again is a no-op; `drizzle-kit generate` finds no un-generated changes (schema and SQL can't drift).
+- [x] **Deploy:** staging's deploy runs the real migrations as `erp_owner`, and the running API holds only `erp_app` (checked on the server: `migrate.env` isn't in the API container's environment).
 
 ## Order
 
@@ -122,3 +122,16 @@ The multi-tenant base every module builds on:
 | **Applied migrations are immutable:** the runner refuses to run if one was edited (tested) | A changed history would make servers differ. Fixes go in a new migration. |
 | The API image ships `packages/db/migrations` next to `dist/`; `pg` is a runtime dependency of the API | The bundled `migrate` step finds the SQL files the same way in tests and in production. |
 | **Mutation check:** removing the cursor's `txid < pg_snapshot_xmin` guard, or RLS on `locations`, each makes exactly the right test fail | Proves the tests guard what they claim to. |
+
+## Results (2026-10-22)
+
+| Check | Result |
+|---|---|
+| Tests first | Committed failing (`4605a51`): the modules didn't exist. |
+| Integration tests | **25/25 pass**, locally (dev database) and in CI (PostgreSQL 17 service). |
+| Mutation checks | Without the `pg_snapshot_xmin` guard, the concurrency test fails. Without RLS on `locations`, the RLS check reports "RLS not enabled / not forced / no policy". |
+| `pnpm check` | Green: format, lint, typecheck, 16 unit tests, build. |
+| Bundled `migrate` (production copy) | Applies both migrations, then "up to date"; without `MIGRATION_DATABASE_URL` it exits 1. |
+| **Staging deploy** (PR #27, `deploy:staging`) | The migrations ran inside the deploy as `erp_owner`; all three tables have RLS enabled and forced and are owned by `erp_owner`. |
+| Least privilege on staging | The API container's environment has only `DATABASE_URL`. It connects as `erp_app`, and without a tenant context sees **0** tenants. |
+| Server roles | `erp_owner` and `erp_app` are created on staging and prod: not superusers, no `BYPASSRLS`. `app.env` and `migrate.env` are mode 600, owner `deploy`. Prod's are ready for its first real migration at the next release. |
