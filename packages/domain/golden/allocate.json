@@ -1,0 +1,60 @@
+{
+  "description": "Split a total over weights by largest remainder: the parts always sum exactly to the total. Ties go to the larger weight, then the earlier line (posting rules §1.7, D-079).",
+  "cases": [
+    {
+      "name": "Rs 10 discount over three equal lines",
+      "input": { "total": 1000, "weights": [1000, 1000, 1000] },
+      "expected": [334, 333, 333]
+    },
+    {
+      "name": "100 over three equal weights",
+      "input": { "total": 100, "weights": [1, 1, 1] },
+      "expected": [34, 33, 33]
+    },
+    {
+      "name": "splits exactly when it can",
+      "input": { "total": 1000, "weights": [500, 300, 200] },
+      "expected": [500, 300, 200]
+    },
+    {
+      "name": "one leftover paisa goes to the largest remainder",
+      "input": { "total": 1001, "weights": [500, 300, 200] },
+      "expected": [501, 300, 200]
+    },
+    {
+      "name": "the largest remainder wins over position",
+      "input": { "total": 10, "weights": [3, 3, 1] },
+      "expected": [4, 4, 2]
+    },
+    {
+      "name": "equal remainders: the larger weight wins",
+      "input": { "total": 3, "weights": [1, 2, 3] },
+      "expected": [0, 1, 2]
+    },
+    {
+      "name": "a negative total (refund) mirrors the positive split",
+      "input": { "total": -1001, "weights": [500, 300, 200] },
+      "expected": [-501, -300, -200]
+    },
+    { "name": "zero total", "input": { "total": 0, "weights": [5, 3] }, "expected": [0, 0] },
+    {
+      "name": "a single line takes everything",
+      "input": { "total": 999, "weights": [5] },
+      "expected": [999]
+    },
+    {
+      "name": "a zero-weight line gets nothing",
+      "input": { "total": 101, "weights": [0, 1, 1] },
+      "expected": [0, 51, 50]
+    },
+    {
+      "name": "the largest safe total",
+      "input": { "total": 9007199254740991, "weights": [1, 1] },
+      "expected": [4503599627370496, 4503599627370495]
+    },
+    { "name": "no lines", "input": { "total": 100, "weights": [] }, "error": "bad_weights" },
+    { "name": "all weights zero", "input": { "total": 100, "weights": [0, 0] }, "error": "bad_weights" },
+    { "name": "a negative weight", "input": { "total": 100, "weights": [2, -1] }, "error": "bad_weights" },
+    { "name": "a fractional weight", "input": { "total": 100, "weights": [1.5, 1] }, "error": "bad_weights" }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Exact parsing of typed quantities into thousandths (1.5 m = 1500), without floats (D-079)",
+  "cases": [
+    { "name": "whole pieces", "input": { "text": "2" }, "expected": 2000 },
+    { "name": "one and a half", "input": { "text": "1.5" }, "expected": 1500 },
+    { "name": "a quarter", "input": { "text": "0.25" }, "expected": 250 },
+    { "name": "the smallest step", "input": { "text": "0.001" }, "expected": 1 },
+    { "name": "a returned quantity", "input": { "text": "-1" }, "expected": -1000 },
+    { "name": "thousands separator", "input": { "text": "1,000" }, "expected": 1000000 },
+    { "name": "too many decimals", "input": { "text": "1.0005" }, "error": "too_many_decimals" },
+    { "name": "letters", "input": { "text": "two" }, "error": "invalid_number" }
+  ]
+}

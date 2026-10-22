@@ -6,7 +6,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['apps/*/src/**', 'packages/*/src/**', 'tools/*/src/**'],
-      exclude: ['**/*.test.{ts,tsx}', '**/main.{ts,tsx}'],
+      exclude: ['**/*.test.{ts,tsx}', '**/main.{ts,tsx}', '**/testing/**'],
       reporter: ['text-summary', 'html'],
       thresholds: {
         // Checkout rules must be fully covered (architecture §12, D-071).
