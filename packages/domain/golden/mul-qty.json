@@ -1,0 +1,109 @@
+{
+  "description": "Line amount = quantity (thousandths) x unit price (paisa) / 1000, rounded half away from zero (D-079)",
+  "cases": [
+    {
+      "name": "2 pieces at Rs 450",
+      "input": {
+        "qty": 2000,
+        "unitPrice": 45000
+      },
+      "expected": 90000
+    },
+    {
+      "name": "1.5 m at Rs 200 per m",
+      "input": {
+        "qty": 1500,
+        "unitPrice": 20000
+      },
+      "expected": 30000
+    },
+    {
+      "name": "1.5 m at Rs 333 per m (exact paisa)",
+      "input": {
+        "qty": 1500,
+        "unitPrice": 33300
+      },
+      "expected": 49950
+    },
+    {
+      "name": "0.333 kg at Rs 100 per kg",
+      "input": {
+        "qty": 333,
+        "unitPrice": 10000
+      },
+      "expected": 3330
+    },
+    {
+      "name": "exactly half a paisa rounds up",
+      "input": {
+        "qty": 1500,
+        "unitPrice": 1
+      },
+      "expected": 2
+    },
+    {
+      "name": "just under half a paisa rounds down",
+      "input": {
+        "qty": 1,
+        "unitPrice": 499
+      },
+      "expected": 0
+    },
+    {
+      "name": "exactly half, minimum quantity",
+      "input": {
+        "qty": 1,
+        "unitPrice": 500
+      },
+      "expected": 1
+    },
+    {
+      "name": "a returned line rounds the same way, negative",
+      "input": {
+        "qty": -1500,
+        "unitPrice": 1
+      },
+      "expected": -2
+    },
+    {
+      "name": "zero quantity",
+      "input": {
+        "qty": 0,
+        "unitPrice": 45000
+      },
+      "expected": 0
+    },
+    {
+      "name": "1 million units at Rs 90 million: the product passes 2^53 and is computed exactly",
+      "input": {
+        "qty": 1000000000,
+        "unitPrice": 9000000000
+      },
+      "expected": 9000000000000000
+    },
+    {
+      "name": "a result beyond the safe range",
+      "input": {
+        "qty": 2000000000,
+        "unitPrice": 9000000000
+      },
+      "error": "out_of_range"
+    },
+    {
+      "name": "a fractional quantity is refused",
+      "input": {
+        "qty": 1.5,
+        "unitPrice": 100
+      },
+      "error": "not_integer"
+    },
+    {
+      "name": "a quantity beyond the safe range is refused",
+      "input": {
+        "qty": 9007199254740992,
+        "unitPrice": 1
+      },
+      "error": "out_of_range"
+    }
+  ]
+}

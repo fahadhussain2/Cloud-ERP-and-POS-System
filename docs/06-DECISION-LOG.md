@@ -553,3 +553,23 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - **A CI test fails the build** for a table without forced RLS.
 - **Why:** isolation is enforced by PostgreSQL itself, mistakes give empty results rather than leaks, the cursor can't skip rows, and the running app can't weaken any of it.
 - **Status:** Accepted (with the W0-07 plan)
+
+### D-079 Domain core: branded integer Money and Qty, one rounding rule, largest-remainder allocation (2026-10-22)
+- **Decision:**
+  - **Types:**
+    - `Money` is a branded safe integer in minor units.
+    - `Qty` is a branded integer in thousandths.
+    - Products are computed in `bigint` and range-checked.
+  - **One rounding rule: half away from zero**, everywhere.
+  - **Allocation:** by largest remainder, so the parts always sum exactly to the total. Ties go to the larger weight, then the earlier line.
+  - **Cash rounding** to the tenant's increment returns the adjustment for the rounding account.
+  - **Parsing:** decimal text is parsed exactly; too many decimals is an error.
+  - **Business date** = the tenant-local date, minus one day before the cutoff hour. The time is always passed in.
+  - **Errors** are `DomainError` with a stable code.
+  - **Tests:** golden JSON cases per rule, plus `fast-check` property tests.
+- **Why:**
+  - Exact money (rule 1).
+  - Returns mirror sales.
+  - The POS and the API get identical results (rule 2).
+  - Type errors catch amount/quantity mix-ups at compile time.
+- **Status:** Accepted (with the W0-08 plan)

@@ -1,0 +1,67 @@
+{
+  "description": "Exact parsing of typed amounts into minor units, without floats. Too many decimals is an error, never a silent round (D-079).",
+  "cases": [
+    { "name": "rupees and paisa", "input": { "text": "1250.50", "minorUnits": 2 }, "expected": 125050 },
+    {
+      "name": "with thousands separators",
+      "input": { "text": "1,250.50", "minorUnits": 2 },
+      "expected": 125050
+    },
+    { "name": "whole rupees", "input": { "text": "1250", "minorUnits": 2 }, "expected": 125000 },
+    { "name": "one decimal", "input": { "text": "1250.5", "minorUnits": 2 }, "expected": 125050 },
+    { "name": "paisa only", "input": { "text": "0.05", "minorUnits": 2 }, "expected": 5 },
+    { "name": "a leading dot", "input": { "text": ".5", "minorUnits": 2 }, "expected": 50 },
+    { "name": "negative", "input": { "text": "-12.30", "minorUnits": 2 }, "expected": -1230 },
+    { "name": "surrounding spaces", "input": { "text": " 99 ", "minorUnits": 2 }, "expected": 9900 },
+    { "name": "millions", "input": { "text": "1,234,567.89", "minorUnits": 2 }, "expected": 123456789 },
+    { "name": "minus zero is zero", "input": { "text": "-0", "minorUnits": 2 }, "expected": 0 },
+    {
+      "name": "no minor units (a currency without cents)",
+      "input": { "text": "1250", "minorUnits": 0 },
+      "expected": 1250
+    },
+    {
+      "name": "three minor units (e.g. Kuwaiti dinar)",
+      "input": { "text": "1.250", "minorUnits": 3 },
+      "expected": 1250
+    },
+    {
+      "name": "the largest safe amount",
+      "input": { "text": "90071992547409.91", "minorUnits": 2 },
+      "expected": 9007199254740991
+    },
+    {
+      "name": "too many decimals",
+      "input": { "text": "1250.505", "minorUnits": 2 },
+      "error": "too_many_decimals"
+    },
+    {
+      "name": "decimals where the currency has none",
+      "input": { "text": "1250.5", "minorUnits": 0 },
+      "error": "too_many_decimals"
+    },
+    { "name": "wrong grouping", "input": { "text": "12,50", "minorUnits": 2 }, "error": "invalid_number" },
+    {
+      "name": "wrong grouping (4 digits)",
+      "input": { "text": "1,2345", "minorUnits": 2 },
+      "error": "invalid_number"
+    },
+    { "name": "a trailing dot", "input": { "text": "1250.", "minorUnits": 2 }, "error": "invalid_number" },
+    { "name": "letters", "input": { "text": "abc", "minorUnits": 2 }, "error": "invalid_number" },
+    { "name": "empty", "input": { "text": "", "minorUnits": 2 }, "error": "invalid_number" },
+    { "name": "two dots", "input": { "text": "1.2.3", "minorUnits": 2 }, "error": "invalid_number" },
+    { "name": "a plus sign", "input": { "text": "+5", "minorUnits": 2 }, "error": "invalid_number" },
+    { "name": "scientific notation", "input": { "text": "1e3", "minorUnits": 2 }, "error": "invalid_number" },
+    { "name": "two minus signs", "input": { "text": "--1", "minorUnits": 2 }, "error": "invalid_number" },
+    {
+      "name": "beyond the safe range",
+      "input": { "text": "90071992547409.92", "minorUnits": 2 },
+      "error": "out_of_range"
+    },
+    {
+      "name": "unsupported minor units",
+      "input": { "text": "1", "minorUnits": 4 },
+      "error": "invalid_minor_units"
+    }
+  ]
+}
