@@ -30,7 +30,7 @@ psql_db() { docker exec -u postgres "$DB" psql -X -v ON_ERROR_STOP=1 -At -d erp 
 
 case ${1:-} in
   backup)
-    if [[ $(TZ=Asia/Karachi date +%d) == 01 ]]; then type=full; else type=diff; fi
+    if [[ $(TZ=Asia/Karachi date +%d) == 01 ]]; then type='full'; else type='diff'; fi
     say "$type backup"
     pgbr --type="$type" backup
     tmp=$(mktemp)
