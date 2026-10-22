@@ -582,3 +582,29 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Eight off-peak chances a night instead of two peak ones, for about 4 Actions minutes a night.
   - Docs committed straight to `main` gave it a different file tree from staging, so production rebuilt its images instead of reusing the ones staging tested (D-075).
 - **Status:** Accepted (owner, 2026-10-23)
+
+### D-081 Back-office login, sessions, permissions and the audit log (2026-10-23)
+- **Decision:**
+  - **Login:** shop code + username + password. A cross-tenant `tenant_directory` maps the code to the tenant and holds nothing else.
+  - **Passwords:** Argon2id (`@node-rs/argon2`, OWASP parameters, stored with the hash). At least 10 characters, no composition rules.
+  - **Sessions** live in the database:
+    - the token travels in an HTTP-only, Secure, `SameSite=Strict` cookie on `/api`, as `<tenant id>.<token>`; only its SHA-256 is stored
+    - looked up under RLS
+    - 12 h absolute, 2 h idle
+  - **Defences:**
+    - 5 wrong passwords lock the account for 15 minutes, plus a per-IP login rate limit
+    - unknown users take as long as wrong passwords
+    - state-changing requests must come from our own origin
+    - **a PIN never logs in to the back office**
+  - **Permissions:** strings from one catalog, plus numeric limits per role, evaluated by `can()` / `effectiveLimits()` in `packages/domain`.
+  - **Roles:**
+    - templates (Owner, Manager, Cashier, Salesman, Purchaser, Accountant); Owner has `*`
+    - roles can be scoped to a branch
+    - several roles combine to the most permissive
+  - **The audit log is written by database triggers** (before/after, secrets stripped), plus API events for logins. It is append-only for every role.
+- **Why:**
+  - Shared addresses (D-065).
+  - A stolen database can't be used to log in.
+  - The POS and the API decide permissions identically (rule 2).
+  - Changes can't go unlogged, and history can't be rewritten (PLT-08).
+- **Status:** Accepted (with the W0-09 plan)

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-07 (tenancy, RLS, sync columns) |
+| **Status** | In progress: W0-07 done; W0-09 (users, roles, audit) |
 | **Requirements** | 13 (PLT-01…PLT-13) |
 | **Feature spec needed** | Yes: device enrollment + PIN security |
 
