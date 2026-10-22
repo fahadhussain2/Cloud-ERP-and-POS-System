@@ -499,3 +499,22 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - A leaked deploy key can't open a shell.
   - Rollback stays safe because old code works with the new schema.
 - **Status:** Accepted (with the W0-04 plan)
+
+### D-076 Backups with pgBackRest to Backblaze B2; drills in a throwaway container (2026-10-22)
+- **Decision:**
+  - PostgreSQL 17.9 runs per environment in its own compose project, never on a public port.
+  - **pgBackRest** handles backups:
+    - continuous WAL archiving every 60 s (RPO ≈ 1 min)
+    - weekly full and daily differential backups at 03:00 Karachi, kept for 30 days (point-in-time)
+    - a monthly full on the 1st, kept 12 months
+    - encrypted with AES-256 before upload
+  - **Off-site storage: Backblaze B2 US East** (owner's choice; the account region is fixed), with versioning and 30-day retention of deleted versions. Encryption before upload means the region doesn't affect privacy.
+  - The backup passphrase is generated on the server and kept offline by the owner.
+  - **Restore drills run in a throwaway container**, not in staging. This changes architecture §9.
+  - A canary table measures the real RPO in every drill.
+  - A nightly CI check fails on stale backups.
+- **Why:**
+  - Meets the PRD's durability (RPO ≤ 5 min, 30 days + 12 months).
+  - Production data never lands in the less protected staging.
+  - Deletes by an attacker can be undone for 30 days.
+- **Status:** Accepted (with the W0-05 plan)
