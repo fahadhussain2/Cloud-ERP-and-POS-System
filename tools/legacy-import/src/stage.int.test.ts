@@ -168,7 +168,7 @@ describe('staging a dump', () => {
 
   it('stops on a CNIC-shaped value in another column, naming only the column', async () => {
     const dir = await dumpDir('cnic', { 'dbo.Admin_Users.Table.sql': users(CNIC) });
-    const err = await stageDump({ url, label: 'cnic', dumpDir: dir }).catch((e: unknown) => e as Error);
+    const err = (await stageDump({ url, label: 'cnic', dumpDir: dir }).catch((e: unknown) => e)) as Error;
     expect(err).toMatchObject({ code: 'personal_data' });
     expect(err.message).toContain('Admin_Users.Phone2');
     expect(err.message).not.toContain(CNIC);
@@ -213,7 +213,7 @@ describe('staging a dump', () => {
     const dir = await dumpDir('mismatch', {
       'dbo.T.Table.sql': [
         "INSERT [dbo].[T] ([a]) VALUES (N'one",
-        "INSERT looks like a statement but is inside the string')",
+        "INSERT [dbo].[T] looks like data but is inside the string')",
       ],
     });
     await expect(stageDump({ url, label: 'fixture', dumpDir: dir })).rejects.toMatchObject({

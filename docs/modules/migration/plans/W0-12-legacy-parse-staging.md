@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#13](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/13) |
 | **Module** | migration |
-| **Status** | Accepted (2026-10-24) |
+| **Status** | Built, in review (2026-10-24) |
 | **Refs** | MIG-01; [importer spec](../spec.md); migration doc §1, §2; CLAUDE.md rules 1 and 11; D-084 |
 | **Depends on** | W0-01 |
 | **Size** | about 1.5 days |
@@ -46,29 +46,29 @@
 
 All with **synthetic dump files** written by the tests (UTF-16 LE, CRLF). No real data in git or CI.
 
-- [ ] **Parser (golden):**
+- [x] **Parser (golden):**
   - strings with `''`, line breaks and Urdu
   - `NULL`, negatives, decimals and `CAST(… AS Decimal(18, 2))` kept digit for digit
   - binary literals
   - several rows in one `INSERT`
   - `GO`, `SET IDENTITY_INSERT`, comments, skipped `CREATE TABLE`
   - an unknown statement stops with file and line
-- [ ] **DateTime (golden):**
+- [x] **DateTime (golden):**
   - `0x0000000000000000` → `1900-01-01 00:00:00.000`
   - negative days (before 1900)
   - ticks rounding: 1 → `.003`, 2 → `.007`, 299 → `.997`
   - a real-looking 2025 value
   - the `CAST(N'…' AS DateTime)` form
-- [ ] **Credentials:**
+- [x] **Credentials:**
   - a fixture `Admin_Users` with `UserPassword` and a `CNICNo` column → neither column exists in staging, the report lists both as dropped, and no value appears in any output
   - a CNIC-shaped value in an ordinary column stops the run, naming only the column
   - `Nickname` is kept
-- [ ] **Staging (integration, PostgreSQL):**
+- [x] **Staging (integration, PostgreSQL):**
   - a fixture dump stages with all three counts equal
   - staging the same label again gives the same result, not duplicates
   - two labels live side by side
   - a file whose line scan disagrees with the parser fails the run
-- [ ] **Coverage:** 100% on the parser and the date conversion, like `packages/domain`.
+- [x] **Coverage:** 100% on the parser and the date conversion, like `packages/domain`.
 
 ## Verify
 
@@ -100,3 +100,35 @@ All with **synthetic dump files** written by the tests (UTF-16 LE, CRLF). No rea
 
 1. **The 2026 dump:** not answered yet. W0-12 runs on the Dec 2025 copy; the 2026 dump is needed before W0-13's results are checked.
 2. **Staging on this PC only:** yes.
+
+## Changes during the build
+
+Found by the first run on the real Dec 2025 copy; each was added as a test before the fix.
+
+| Plan | Built | Why |
+|---|---|---|
+| Skip `GO`, `SET`, `USE`, comments, `CREATE`/`ALTER` | Also `IF` and `EXEC` batches (up to `GO`) and `PRINT` lines | The dump has a database script (`IF … sp_fulltext_database`, `EXEC …`) and SSMS writes `print 'Processed 100 total records'` between data batches. |
+| The line scan counts lines that start an `INSERT` | Lines that start with `INSERT [` (SSMS's data form, at column 0) | A stored procedure's code contains an `INSERT`; it's skipped as code, so it mustn't be counted as data. A mismatch either way still fails the run. |
+| Credential columns by whole words | `cnic`, `password`, `passwd`, `pwd` anywhere in the name; `pass`, `pin`, `nic` as words | `INV_BusinessPartner.BPCNIC` is one run of capitals. The CNIC value check stopped the run on it, as designed; now the name rule drops it. A side effect: `Admin_Users.ByPassWelcomeScreen` (a screen flag) is dropped too, which costs nothing. |
+| A streaming reader | Each file is read whole, then parsed row by row | The largest file fits in memory easily; rows are still inserted in batches. |
+| A separate `parse` step | Parsing runs inside `stage` | Nothing needs parsed rows without staging them. |
+
+## Results (2026-10-24)
+
+**Real run on the Dec 2025 copy** (`pnpm legacy:stage --label dec2025`, about 30 s): **79 files, 45 tables, 217,495 rows**, every file passing the three-way count.
+
+| Table | Rows | Migration doc §1 |
+|---|--:|--:|
+| `INV_Item` | 19,552 | 19,552 |
+| `INV_BusinessPartner` | 375 | 375 |
+| `INV_BusinessPartnerSelection` | 414 | 281 supplier + 131 customer roles, plus the cash partners |
+| `INV_Category` · `INV_Brand` · `INV_Make` · `INV_Manufacture` · `INV_Size` · `INV_Unit` | 267 · 330 · 23 · 214 · 74 · 5 | the same |
+| `GL_ChartofAccount` | 77 | 77 |
+| `INV_SaleHeader` / `INV_SaleDetail` | 22,644 / 35,152 | the same |
+| `INV_PurchaseHeader` / `INV_PurchaseDetail` | 1,280 / 10,736 | the same |
+| `GL_TransactionHeader` / `GL_TransactionDetail` | 24,976 / 53,799 | the same |
+| `Admin_Users` | 17 | 17 |
+
+- **Dropped, never stored:** `Admin_Users.UserPassword`, `INV_BusinessPartner.BPCNIC`, `Admin_Users.ByPassWelcomeScreen`.
+- The staged column names were checked once: no other password, PIN or CNIC column. Contact columns (phones, e-mails, addresses of parties) stay in local staging for W0-13, which masks them in reports.
+- `Admin_Company` has the name, NTN and sales-tax numbers but no address or phone; W0-13 looks for the rest of the bill header in the other `Admin_` tables.

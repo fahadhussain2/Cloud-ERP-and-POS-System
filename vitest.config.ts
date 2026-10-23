@@ -11,6 +11,13 @@ export default defineConfig({
       thresholds: {
         // Checkout rules must be fully covered (architecture §12, D-071).
         'packages/domain/src/**': { lines: 100, branches: 100, functions: 100, statements: 100 },
+        // The legacy parser decides what is stored and what is dropped (D-084).
+        'tools/legacy-import/src/{parse,datetime,columns}.ts': {
+          lines: 100,
+          branches: 100,
+          functions: 100,
+          statements: 100,
+        },
       },
     },
   },

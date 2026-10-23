@@ -80,9 +80,49 @@
       ]
     },
     {
+      "name": "a database script's IF and EXEC batches are skipped up to GO",
+      "input": "USE [master]\r\nGO\r\nCREATE DATABASE [DLX]\r\nGO\r\nIF (1 = FULLTEXTSERVICEPROPERTY('IsFullTextInstalled'))\r\nbegin\r\nEXEC [DLX].[dbo].[sp_fulltext_database] @action = 'enable'\r\nend\r\nGO\r\nEXEC sys.sp_db_vardecimal_storage_format N'DLX', N'ON'\r\nGO\r\nALTER DATABASE [DLX] SET  READ_WRITE \r\nGO\r\nINSERT [dbo].[T] ([a]) VALUES (1)\r\n",
+      "expected": [{ "table": "T", "columns": ["a"], "rows": [["1"]], "line": 14 }]
+    },
+    {
+      "name": "SSMS progress lines (print) between data batches are skipped",
+      "input": "INSERT [dbo].[T] ([a]) VALUES (1)\r\nprint 'Processed 100 total records'\r\nGO\r\nINSERT [dbo].[T] ([a]) VALUES (2)\r\n",
+      "expected": [
+        { "table": "T", "columns": ["a"], "rows": [["1"]], "line": 1 },
+        { "table": "T", "columns": ["a"], "rows": [["2"]], "line": 4 }
+      ]
+    },
+    {
       "name": "an empty script",
       "input": "\r\nGO\r\n",
       "expected": []
+    },
+    {
+      "name": "other CASTs: binary, NULL and a DateTime without milliseconds",
+      "input": "INSERT [dbo].[T] ([a], [b], [c]) VALUES (CAST(0x1234AB AS VarBinary(3)), CAST(NULL AS DateTime), CAST(N'2025-07-01 08:30:00' AS DateTime))",
+      "expected": [
+        {
+          "table": "T",
+          "columns": ["a", "b", "c"],
+          "rows": [["0x1234ab", null, "2025-07-01 08:30:00.000"]],
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "a last SET without a line break, and a comment left open at the end",
+      "input": "INSERT [dbo].[T] ([a]) VALUES (1)\r\nSET NOCOUNT ON",
+      "expected": [{ "table": "T", "columns": ["a"], "rows": [["1"]], "line": 1 }]
+    },
+    {
+      "name": "an unclosed comment ends the script",
+      "input": "INSERT [dbo].[T] ([a]) VALUES (1)\r\n/* trailing",
+      "expected": [{ "table": "T", "columns": ["a"], "rows": [["1"]], "line": 1 }]
+    },
+    {
+      "name": "a CREATE with no GO after it runs to the end",
+      "input": "INSERT [dbo].[T] ([a]) VALUES (1)\r\nCREATE TABLE [dbo].[T] ([a] int)\r\n",
+      "expected": [{ "table": "T", "columns": ["a"], "rows": [["1"]], "line": 1 }]
     },
     {
       "name": "an unknown statement stops the run",
@@ -107,6 +147,18 @@
     {
       "name": "a bad DateTime",
       "input": "INSERT [dbo].[T] ([a]) VALUES (CAST(0x0000 AS DateTime))\r\n",
+      "error": { "line": 1 }
+    },
+    { "name": "a missing bracket", "input": "INSERT [dbo].[T] [a] VALUES (1)\r\n", "error": { "line": 1 } },
+    { "name": "stray text", "input": "GO\r\n(1, 2)\r\n", "error": { "line": 2 } },
+    {
+      "name": "a binary value cast to a date",
+      "input": "INSERT [dbo].[T] ([a]) VALUES (CAST(0x0000 AS Date))\r\n",
+      "error": { "line": 1 }
+    },
+    {
+      "name": "a DateTime string that isn't one",
+      "input": "INSERT [dbo].[T] ([a]) VALUES (CAST(N'yesterday' AS DateTime))\r\n",
       "error": { "line": 1 }
     }
   ]

@@ -15,13 +15,24 @@ describe('credential columns', () => {
     'CNIC',
     'CNICNo',
     'NIC_No',
+    'BPCNIC',
+    'PartyCnicNo',
+    'USERPWD',
+    'ADMINPASSWORD',
     'Passwd',
   ])('%s is dropped', (name) => expect(isCredentialColumn(name)).toBe(true));
 
-  it.each(['Nickname', 'Pincushion', 'ItemName', 'Passage', 'Mechanic', 'Phone', 'CompanyID', 'Spinner'])(
-    '%s is kept',
-    (name) => expect(isCredentialColumn(name)).toBe(false),
-  );
+  it.each([
+    'Nickname',
+    'Pincushion',
+    'ItemName',
+    'Passage',
+    'Mechanic',
+    'Phone',
+    'CompanyID',
+    'Spinner',
+    'Technician',
+  ])('%s is kept', (name) => expect(isCredentialColumn(name)).toBe(false));
 });
 
 describe('CNIC-shaped values', () => {

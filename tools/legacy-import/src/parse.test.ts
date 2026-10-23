@@ -32,11 +32,19 @@ describe('parse errors', () => {
 });
 
 describe('the independent INSERT count', () => {
-  it('counts lines that start an INSERT, without parsing them', () => {
+  it('counts the lines SSMS writes for data, `INSERT [` at the start, without parsing them', () => {
     expect(
-      countInsertLines('INSERT [dbo].[T] ([a]) VALUES (1)\r\n  insert [dbo].[T] ([a]) VALUES (2)\r\nGO\r\n'),
+      countInsertLines('INSERT [dbo].[T] ([a]) VALUES (1)\r\nINSERT [dbo].[T] ([a]) VALUES (2)\r\nGO\r\n'),
     ).toBe(2);
     expect(countInsertLines('SET IDENTITY_INSERT [dbo].[T] ON\r\n-- INSERT in a comment\r\n')).toBe(0);
+  });
+
+  it('leaves out INSERTs in procedure code, which is indented or uses INTO', () => {
+    expect(
+      countInsertLines(
+        'CREATE PROCEDURE p AS\r\n  INSERT [dbo].[T] ([a]) VALUES (1)\r\nINSERT INTO #t SELECT 1\r\nGO\r\n',
+      ),
+    ).toBe(0);
   });
 });
 
@@ -55,6 +63,12 @@ describe('reading a dump file', () => {
     const { text, sha256 } = await readDumpFile(file);
     expect(text).toBe("N'کراچی'\r\n");
     expect(sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('also reads UTF-16 LE without a byte-order mark', async () => {
+    const file = join(dir, 'nobom.sql');
+    await writeFile(file, Buffer.from('GO\r\n', 'utf16le'));
+    expect((await readDumpFile(file)).text).toBe('GO\r\n');
   });
 
   it('refuses a file that is not UTF-16 LE', async () => {
