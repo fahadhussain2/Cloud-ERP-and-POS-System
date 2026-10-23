@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#11](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/11) |
 | **Module** | platform |
-| **Status** | Built; PR to staging with the `deploy:staging` check |
+| **Status** | Done on staging (PR [#32](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/pull/32)); waiting for the owner's merge |
 | **Refs** | PLT-03, PLT-04, PLT-07; architecture §4.3, §6.3; [platform spec](../spec.md); D-026, D-081, D-082 |
 | **Depends on** | W0-09 (users, roles, sessions, audit) |
 | **Size** | about 2.5 days |
@@ -133,3 +133,4 @@ None.
 | API (12 new integration tests) | Codes only with `admin.devices`, stored hashed, `K7Q2-M9XD` format. Enrollment `C01`, `C02`, `D01`; a reused, wrong or expired code and a **forged proof of key** all fail the same way; the per-shop limit; the audit trail names the manager. 15-minute tokens. Another device's key, a wrong signature, an expired nonce and a **reused nonce** are refused. Revocation stops the token at once. Session cookies and device tokens can't stand in for each other. PIN: needs the password, refuses `1234` and the short code, stores a PBKDF2 verifier, is audited, and **still can't log in**. |
 | Mutation checks | No proof-of-key check: the forged-proof test fails. Reusable nonce: the nonce test fails. |
 | Totals | `pnpm check` green with **217 unit tests**; **58 integration tests** pass. |
+| **Staging, over HTTPS** (a Node script acting as a counter, using the shared device crypto) | Owner login → enrollment code (format ok) → enroll on `staging-pos` → device **C01**. The same code again → `enrollment_failed`. Signed challenge → token → `devices/me` 200 with the right tenant, branch and code. Revoke 204 → the same token **401**, a new token **401**. Migration `0004` applied by the deploy. |
