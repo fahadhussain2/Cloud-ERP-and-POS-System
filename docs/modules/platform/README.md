@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-07 done; W0-09 (users, roles, audit) |
+| **Status** | In progress: W0-07, W0-09, W0-10 done; W0-11 (tenant setup) |
 | **Requirements** | 13 (PLT-01…PLT-13) |
 | **Feature spec needed** | Yes: device enrollment + PIN security |
 
