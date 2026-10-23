@@ -1,0 +1,48 @@
+# One PostgreSQL per environment (W0-05, D-076). Started by infra/db/apply.sh, never by app deploys.
+#   docker compose -p erp-<env>-db --env-file <env>.env -f compose.yaml up -d --wait
+# Networks: `default` lets the database reach the backup storage; `db` (internal, no internet) is shared
+# with that environment's api and worker. No port is published.
+services:
+  db:
+    image: erp-postgres:17.9
+    pull_policy: never
+    container_name: erp-${ERP_ENV:?}-db
+    restart: unless-stopped
+    shm_size: 256mb
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_DB: erp
+      POSTGRES_PASSWORD_FILE: /run/erp-secrets/postgres-password
+      POSTGRES_INITDB_ARGS: --data-checksums
+      PGBACKREST_CONFIG_INCLUDE_PATH: /run/erp-secrets
+    command: >-
+      postgres -c config_file=/etc/postgresql/postgresql.conf
+      -c shared_buffers=${PG_SHARED_BUFFERS:?}
+      -c effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:?}
+      -c work_mem=${PG_WORK_MEM:?}
+      -c maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:?}
+      -c archive_mode=${PG_ARCHIVE_MODE:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - /srv/erp/${ERP_ENV}/db-secrets:/run/erp-secrets:ro
+    networks:
+      - default
+      - db
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'postgres', '-d', 'erp']
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    deploy:
+      resources:
+        limits:
+          memory: ${PG_MEMORY:?}
+
+volumes:
+  pgdata:
+    name: erp-${ERP_ENV}-pgdata
+
+networks:
+  db:
+    name: erp-${ERP_ENV}-db
+    internal: true

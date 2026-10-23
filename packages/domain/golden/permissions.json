@@ -1,0 +1,145 @@
+{
+  "description": "Role templates (PRD §4, D-051, D-081): who may do what. The full matrix is in role-matrix.snap.json.",
+  "cases": [
+    {
+      "name": "Owner can do everything",
+      "input": { "roles": ["owner"], "permission": "admin.settings" },
+      "expected": true
+    },
+    {
+      "name": "Owner gets permissions added later (*)",
+      "input": { "roles": ["owner"], "permission": "acc.period.close" },
+      "expected": true
+    },
+    {
+      "name": "Manager can void",
+      "input": { "roles": ["manager"], "permission": "pos.void" },
+      "expected": true
+    },
+    {
+      "name": "Manager approves below-floor sales",
+      "input": { "roles": ["manager"], "permission": "pos.price.below_floor" },
+      "expected": true
+    },
+    {
+      "name": "Manager approves no-receipt returns",
+      "input": { "roles": ["manager"], "permission": "pos.return.no_receipt" },
+      "expected": true
+    },
+    {
+      "name": "Manager approves out-of-policy returns",
+      "input": { "roles": ["manager"], "permission": "pos.return.outside_policy" },
+      "expected": true
+    },
+    {
+      "name": "Manager can't post journals",
+      "input": { "roles": ["manager"], "permission": "acc.journal.post" },
+      "expected": false
+    },
+    {
+      "name": "Manager can't change settings",
+      "input": { "roles": ["manager"], "permission": "admin.settings" },
+      "expected": false
+    },
+    {
+      "name": "Salesman sells",
+      "input": { "roles": ["salesman"], "permission": "pos.sale.create" },
+      "expected": true
+    },
+    {
+      "name": "Salesman processes returns by default (D-051)",
+      "input": { "roles": ["salesman"], "permission": "pos.return.create" },
+      "expected": true
+    },
+    {
+      "name": "Salesman can't void",
+      "input": { "roles": ["salesman"], "permission": "pos.void" },
+      "expected": false
+    },
+    {
+      "name": "Salesman can't sell below the floor",
+      "input": { "roles": ["salesman"], "permission": "pos.price.below_floor" },
+      "expected": false
+    },
+    {
+      "name": "Salesman can't do no-receipt returns",
+      "input": { "roles": ["salesman"], "permission": "pos.return.no_receipt" },
+      "expected": false
+    },
+    {
+      "name": "Salesman can't see cost",
+      "input": { "roles": ["salesman"], "permission": "cost.view" },
+      "expected": false
+    },
+    {
+      "name": "Salesman can't approve overrides",
+      "input": { "roles": ["salesman"], "permission": "pos.override.approve" },
+      "expected": false
+    },
+    {
+      "name": "Cashier receives handovers",
+      "input": { "roles": ["cashier"], "permission": "cash.handover.receive" },
+      "expected": true
+    },
+    {
+      "name": "Cashier closes the drawer",
+      "input": { "roles": ["cashier"], "permission": "cash.session.close" },
+      "expected": true
+    },
+    {
+      "name": "Cashier can also sell",
+      "input": { "roles": ["cashier"], "permission": "pos.sale.create" },
+      "expected": true
+    },
+    {
+      "name": "Cashier can't approve their own variance",
+      "input": { "roles": ["cashier"], "permission": "cash.variance.approve" },
+      "expected": false
+    },
+    {
+      "name": "Purchaser receives goods",
+      "input": { "roles": ["purchaser"], "permission": "pur.receive" },
+      "expected": true
+    },
+    {
+      "name": "Purchaser sees cost",
+      "input": { "roles": ["purchaser"], "permission": "cost.view" },
+      "expected": true
+    },
+    {
+      "name": "Purchaser can't post journals",
+      "input": { "roles": ["purchaser"], "permission": "acc.journal.post" },
+      "expected": false
+    },
+    {
+      "name": "Purchaser proposes but can't approve repricing",
+      "input": { "roles": ["purchaser"], "permission": "pur.reprice.approve" },
+      "expected": false
+    },
+    {
+      "name": "Accountant posts journals",
+      "input": { "roles": ["accountant"], "permission": "acc.journal.post" },
+      "expected": true
+    },
+    {
+      "name": "Accountant closes periods",
+      "input": { "roles": ["accountant"], "permission": "acc.period.close" },
+      "expected": true
+    },
+    {
+      "name": "Accountant doesn't sell",
+      "input": { "roles": ["accountant"], "permission": "pos.sale.create" },
+      "expected": false
+    },
+    {
+      "name": "Two roles combine: Salesman + Purchaser sees cost",
+      "input": { "roles": ["salesman", "purchaser"], "permission": "cost.view" },
+      "expected": true
+    },
+    {
+      "name": "No roles, no permissions",
+      "input": { "roles": [], "permission": "pos.sale.create" },
+      "expected": false
+    }
+  ]
+}

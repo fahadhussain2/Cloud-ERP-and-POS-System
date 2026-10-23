@@ -1,0 +1,25 @@
+{
+  "description": "Amount x rate in basis points (1% = 100 bp) / 10000, rounded half away from zero (D-079)",
+  "cases": [
+    { "name": "10% of Rs 1,205", "input": { "amount": 120500, "bp": 1000 }, "expected": 12050 },
+    {
+      "name": "10% of Rs 1,205.05: half a paisa rounds up",
+      "input": { "amount": 120505, "bp": 1000 },
+      "expected": 12051
+    },
+    { "name": "5% of 99 paisa", "input": { "amount": 99, "bp": 500 }, "expected": 5 },
+    { "name": "12.5% of 1 paisa", "input": { "amount": 1, "bp": 1250 }, "expected": 0 },
+    { "name": "50% of 1 paisa", "input": { "amount": 1, "bp": 5000 }, "expected": 1 },
+    {
+      "name": "a refund rounds away from zero too",
+      "input": { "amount": -120505, "bp": 1000 },
+      "expected": -12051
+    },
+    { "name": "100%", "input": { "amount": 120505, "bp": 10000 }, "expected": 120505 },
+    {
+      "name": "a fractional basis point is refused",
+      "input": { "amount": 100, "bp": 12.5 },
+      "error": "invalid_basis_points"
+    }
+  ]
+}

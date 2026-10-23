@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Not started (build on hold, D-068) |
+| **Status** | In progress: W0-08 (domain core) |
 | **Requirements** | 17 (POS-01…POS-17) |
 | **Feature spec needed** | Yes: checkout screen and keyboard map; local DB and storage guardrails |
 
@@ -37,6 +37,22 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 ## Related
 
 PRD W1–W7, W15; architecture §4 (offline design), §8 (printing); D-001–D-013, D-047–D-053; prototype: Tijara POS
+
+## Domain core (`packages/domain`, W0-08, D-079)
+
+The exact building blocks every checkout rule uses. They are pure functions; golden cases are in `packages/domain/golden/`.
+
+| Function | What it does |
+|---|---|
+| `money(v)`, `add`, `sub`, `negate`, `sum` | `Money` = whole minor units (paisa). Accepts the database's bigint text. Refuses fractions and unsafe values. |
+| `qty(v)`, `parseQty(text)` | `Qty` = thousandths of a unit (1.5 m = 1500) |
+| `mulQty(qty, unitPrice)` | Line amount, rounded half away from zero |
+| `mulBp(amount, bp)` | Amount × rate in basis points (1% = 100 bp) |
+| `roundCash(amount, increment)` | Cash rounding to the tenant increment → `{ rounded, adjustment }` (POS-15) |
+| `allocate(total, weights)` | Largest-remainder split that always sums exactly (bill discounts, refunds) |
+| `parseMoney(text, minorUnits)` | Typed text → exact minor units; extra decimals are an error |
+| `businessDate(instantMs, timeZone, cutoffHour)` | Business date with the 04:00 cutoff (D-056); the time is always passed in |
+| `DomainError.code` | A stable error code for i18n messages and API exceptions |
 
 ## Work in this module
 

@@ -62,7 +62,7 @@ flowchart LR
 | Realtime nudge | Server-Sent Events | "Changes available" and live cash queue when online |
 | Reverse proxy | **Caddy** **(proposed)** | Automatic TLS, serves static apps |
 | Hosting | Hetzner CX33 (4 vCPU, 8 GB RAM, 80 GB), Helsinki (D-062) | Docker Compose, no provider-specific services |
-| Backups | WAL-G or pgBackRest to object storage at a **different provider** **(proposed)** | RPO ≤ 5 min |
+| Backups | **pgBackRest** to Backblaze B2 (a **different provider**), encrypted (D-076, D-077) | RPO ≤ 5 min |
 | Testing | Vitest (unit, golden cases), Postgres integration tests, Playwright (incl. offline e2e) | See §12 |
 
 ## 3. Repository layout (proposed)
@@ -278,8 +278,8 @@ docker compose:
 
 | Concern | Requirement |
 |---|---|
-| Backups | Continuous WAL archiving plus a daily base backup to S3-compatible storage at **another provider**. Retention 30 days plus monthly snapshots for 12 months. Backups encrypted. |
-| Restore drill | Monthly, into staging, timed, logged. **Before go-live: at least one full drill.** |
+| Backups | pgBackRest to Backblaze B2 (US East), encrypted with AES-256 before upload, sized for B2's free daily limits (D-076, D-077):<br>• WAL archived every 5 min (RPO ≤ 5 min)<br>• full backup on the 1st of each month, differential every night at 03:00 Karachi<br>• 12 monthly fulls kept; restore to any moment in the last 30+ days<br>The passphrase is kept offline by the owner. |
+| Restore drill | Monthly, into a **throwaway container** (never staging, which is less protected), timed and logged in `docs/modules/devops/restore-drills.md`. A canary table measures the real data loss. `erp-db restore-drill` on the server (D-076). **Before go-live: a full drill with real data.** |
 | Hardening | SSH keys only, no root login, no passwords; Hetzner Cloud Firewall + ufw (only 22, 80, 443); fail2ban; unattended security upgrades after hours; Postgres listening only on the Docker network. SSH is open to any IP, because the owner's IP is dynamic and GitHub Actions uses many IPs (D-073). Setup lives in `infra/` and is rebuildable from git. |
 | Secrets | Environment files outside git. Rotated on staff changes. |
 | Monitoring | See §11: Sentry, Grafana Cloud (logs, metrics, traces via OpenTelemetry + Alloy agent), uptime checks, Slack alerts with email backup for critical ones. |
@@ -312,7 +312,7 @@ docker compose:
 | **Production** | Hetzner CX33, Helsinki | `main` branch | **Merging `staging` → `main` is the release.** It deploys automatically, but only **outside shop hours (10:00–20:00 Asia/Karachi)**. A merge during hours waits until after closing. Emergency override via a manual "Run workflow". |
 
 - **Work flow:** feature work → `staging` (test on staging) → pull request `staging` → `main` → merge = release.
-- **Docs-only changes** (`docs/**`, `*.md`) never trigger a deploy. They may be committed straight to `main` and are then merged into `staging` to keep the branches aligned.
+- **Docs-only changes** (`docs/**`, `*.md`) never trigger a deploy. Like code, they go to `staging` by pull request and reach `main` with the next release, so `main` always has exactly the tree staging tested (D-080).
 - **Each deploy:** pull images → run database migrations (if a migration fails, the old version keeps running) → start → health check. If the health check fails, the previous image is restored automatically and an alert is sent.
 - **Rollback:** revert the merge on `main`, which redeploys the previous version.
 - **Limit of the free GitHub plan:** branch protection is not enforced on private repositories, so "only merge `main` through a pull request" is a discipline rule, not a technical lock.

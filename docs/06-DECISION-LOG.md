@@ -518,3 +518,93 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Production data never lands in the less protected staging.
   - Deletes by an attacker can be undone for 30 days.
 - **Status:** Accepted (with the W0-05 plan)
+
+### D-077 Backups sized for Backblaze B2's free tier, no card (2026-10-22)
+- **Decision:** the owner doesn't want a payment card on the B2 account, so B2 enforces its free daily limits as hard caps (2,500 downloads, 2,500 listings, 10 GB storage). The backup setup in D-076 is changed to fit inside them:
+  - WAL is archived every **5 minutes** instead of every minute. Still RPO ≤ 5 min, as the PRD requires.
+  - **One repository** instead of two:
+    - a full backup on the 1st of each month and a differential every night
+    - 12 monthly fulls kept
+    - WAL kept from the previous month's full, so restore to any moment in the last 30+ days
+  - Small files are bundled, so a backup or restore makes far fewer requests.
+  - The 15-minute status reads PostgreSQL and the info saved by the nightly backup, so it makes no B2 requests.
+  - **At most one restore drill a day** (about 1,500 requests).
+- **Why:**
+  - On the first day, test restores used up the free 2,500 downloads, and B2 then also refused the reads that archiving needs.
+  - Normal use is now about 500 requests a day.
+- **Risk accepted:** little margin. A drill on a very busy day could pause archiving until 00:00 UTC (05:00 Karachi). Nothing is lost while the server is healthy, and the backup check alerts.
+- **Revisit before go-live:** add a card with caps (cost about $0.05 a month) when real shop data arrives, or when data nears 10 GB.
+- **Status:** Accepted (changes D-076)
+
+### D-078 Database foundations: Drizzle + SQL migrations, three roles, fail-closed RLS (2026-10-22)
+- **Decision:**
+  - **Drizzle ORM 0.45** (stable) on `node-postgres`. Tables are defined in TypeScript, and `drizzle-kit` writes SQL migrations that are committed and reviewed. RLS, triggers, grants and functions are hand-written SQL migrations.
+  - Everything lives in the schema **`erp`**.
+  - **Roles:**
+    - `erp_owner` owns the schema and runs migrations
+    - `erp_app` (API, worker) has no `BYPASSRLS` and owns nothing
+    - `postgres` only creates the roles
+  - **Only the deploy's migrate step holds the owner's credentials.**
+  - **Tenant context is set per transaction** (`withTenant` → `set_config(…, true)`).
+  - **Every tenant table:** `FORCE` RLS with `tenant_id = erp.current_tenant_id()`, which is NULL without a context, so the table **fails closed**.
+  - **Standard helpers** (`enable_tenant_rls`, `enable_sync`, `enable_audit`) add the policy, the sync trigger (`txid` = `pg_current_xact_id()`, `row_version` from one global sequence, `DELETE` refused) and the audit columns.
+  - `erp.uuid_v7()` is the default ID.
+  - Status columns are `text` + `CHECK`, not enums.
+  - **A CI test fails the build** for a table without forced RLS.
+- **Why:** isolation is enforced by PostgreSQL itself, mistakes give empty results rather than leaks, the cursor can't skip rows, and the running app can't weaken any of it.
+- **Status:** Accepted (with the W0-07 plan)
+
+### D-079 Domain core: branded integer Money and Qty, one rounding rule, largest-remainder allocation (2026-10-22)
+- **Decision:**
+  - **Types:**
+    - `Money` is a branded safe integer in minor units.
+    - `Qty` is a branded integer in thousandths.
+    - Products are computed in `bigint` and range-checked.
+  - **One rounding rule: half away from zero**, everywhere.
+  - **Allocation:** by largest remainder, so the parts always sum exactly to the total. Ties go to the larger weight, then the earlier line.
+  - **Cash rounding** to the tenant's increment returns the adjustment for the rounding account.
+  - **Parsing:** decimal text is parsed exactly; too many decimals is an error.
+  - **Business date** = the tenant-local date, minus one day before the cutoff hour. The time is always passed in.
+  - **Errors** are `DomainError` with a stable code.
+  - **Tests:** golden JSON cases per rule, plus `fast-check` property tests.
+- **Why:**
+  - Exact money (rule 1).
+  - Returns mirror sales.
+  - The POS and the API get identical results (rule 2).
+  - Type errors catch amount/quantity mix-ups at compile time.
+- **Status:** Accepted (with the W0-08 plan)
+
+### D-080 Hourly off-the-hour deploy schedule; docs go through staging (2026-10-23)
+- **Decision:**
+  - **Deferred production deploys:** GitHub's scheduled runs are best-effort, and the 22:00 run of the first release never happened. The schedule in D-075 changes from 22:00 and 02:00 to **every hour at :17 from 20:17 to 03:17 Karachi**. Each run exits in seconds when nothing is waiting.
+  - **All changes, docs included, go through `staging`.** `main` moves only by release merges (`staging` → `main`). This replaces "docs-only changes may go straight to `main`" (CLAUDE.md, D-063).
+- **Why:**
+  - Eight off-peak chances a night instead of two peak ones, for about 4 Actions minutes a night.
+  - Docs committed straight to `main` gave it a different file tree from staging, so production rebuilt its images instead of reusing the ones staging tested (D-075).
+- **Status:** Accepted (owner, 2026-10-23)
+
+### D-081 Back-office login, sessions, permissions and the audit log (2026-10-23)
+- **Decision:**
+  - **Login:** shop code + username + password. A cross-tenant `tenant_directory` maps the code to the tenant and holds nothing else.
+  - **Passwords:** Argon2id (`@node-rs/argon2`, OWASP parameters, stored with the hash). At least 10 characters, no composition rules.
+  - **Sessions** live in the database:
+    - the token travels in an HTTP-only, Secure, `SameSite=Strict` cookie on `/api`, as `<tenant id>.<token>`; only its SHA-256 is stored
+    - looked up under RLS
+    - 12 h absolute, 2 h idle
+  - **Defences:**
+    - 5 wrong passwords lock the account for 15 minutes, plus a per-IP login rate limit
+    - unknown users take as long as wrong passwords
+    - state-changing requests must come from our own origin
+    - **a PIN never logs in to the back office**
+  - **Permissions:** strings from one catalog, plus numeric limits per role, evaluated by `can()` / `effectiveLimits()` in `packages/domain`.
+  - **Roles:**
+    - templates (Owner, Manager, Cashier, Salesman, Purchaser, Accountant); Owner has `*`
+    - roles can be scoped to a branch
+    - several roles combine to the most permissive
+  - **The audit log is written by database triggers** (before/after, secrets stripped), plus API events for logins. It is append-only for every role.
+- **Why:**
+  - Shared addresses (D-065).
+  - A stolen database can't be used to log in.
+  - The POS and the API decide permissions identically (rule 2).
+  - Changes can't go unlogged, and history can't be rewritten (PLT-08).
+- **Status:** Accepted (with the W0-09 plan)

@@ -6,6 +6,7 @@
 #   status <env>              current=<tag> previous=<tag>
 #   deploy <env> <tag>        stdin: tar.gz of infra/app. Migrate, start, check; roll back on failure.
 #   rollback <env>            switch back to the previous release
+#   backup-status prod        print the database backup status (read-only, for the nightly check; W0-05)
 #
 # <env> is prod or staging; <tag> is a 40-character git tree hash.
 set -euo pipefail
@@ -132,7 +133,9 @@ case $cmd in
     [[ -f $dir/compose.yaml && -f $dir/$env.env ]] || die "bundle must contain compose.yaml and $env.env"
 
     say "migrating ($env, $tag)"
-    if ! compose "$env" "$tag" run --rm --no-deps api node dist/migrate.js; then
+    # The owner role's URL is given only to this one-off container, never to the running apps (D-078).
+    [[ -f $ROOT/$env/migrate.env ]] || die "missing $ROOT/$env/migrate.env (run infra/db/apply.sh for $env)"
+    if ! compose "$env" "$tag" run --rm --no-deps --env-from-file "$ROOT/$env/migrate.env" api node dist/migrate.js; then
       record "$env" deploy "$tag" migration-failed
       die "migration failed; ${current:-nothing} keeps running"
     fi
@@ -171,7 +174,12 @@ case $cmd in
     say "rolled back $env to $previous"
     ;;
 
+  backup-status)
+    [[ ${argv[1]:-} == prod ]] || die "backups run only for prod"
+    cat "$ROOT/prod/backup-status.json" || die "no backup status yet"
+    ;;
+
   *)
-    die "allowed commands: has, load, status, deploy, rollback"
+    die "allowed commands: has, load, status, deploy, rollback, backup-status"
     ;;
 esac

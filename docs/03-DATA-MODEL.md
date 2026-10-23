@@ -22,6 +22,7 @@
 | Sync columns | Downloadable (synced) tables have `row_version bigint`, `txid xid8` (set by trigger) and `deleted_at` (soft delete). |
 | Immutability | Rows in document and ledger tables are never updated after posting, except for workflow status fields (e.g. `handover_status`, `status: voided`). Every status change is also written to the audit log. |
 | Legacy | Migrated rows keep `legacy jsonb` with the original IDs and values for traceability. |
+| Schema and helpers | All tables are in schema `erp`, created by SQL migrations in `packages/db/migrations/` (D-078):<br>• **tenant tables:** `SELECT erp.enable_tenant_rls('erp.<t>')` (forced RLS on `tenant_id = erp.current_tenant_id()`)<br>• **synced tables:** also `erp.enable_sync` (`txid` / `row_version` by trigger, `DELETE` refused)<br>• **audit columns:** `erp.enable_audit`<br>• **default ID:** `erp.uuid_v7()`<br>• **status columns:** `text` + `CHECK`, not enums |
 
 Data in this document is grouped by area. Fields marked † are derived and maintained by the posting engine.
 
@@ -45,17 +46,27 @@ Data in this document is grouped by area. Fields marked † are derived and main
 
 **device_series** (server mirror for gap detection): `device_id, family (S|H|R|M|Z), last_accepted_seq, missing_seqs int[]`
 
-**users:** `username, email, full_name, short_code (for quick PIN unlock), password_hash (Argon2id), pin_verifier (slow hash + salt), status`
-- Unique per tenant: `username`, `short_code`.
+**users:** `username, email, full_name, short_code (for quick PIN unlock), password_hash (Argon2id), pin_verifier (slow hash + salt), status (active|disabled), password_changed_at`
+- Unique per tenant: `username` and `email` (case-insensitive), `short_code`.
+- The audit log never stores `password_hash` or `pin_verifier`. Back-office login checks only `password_hash` (D-081).
 
-**roles:** `name, is_template, permissions text[], limits jsonb`
-- Example `limits`: `{ max_discount_bp: 500, can_sell_below_floor: false, can_sell_on_credit: true, void_window: "same_day_before_handover", can_return_without_receipt: false, can_view_cost: false, can_approve_overrides: false }`.
+**user_login_state:** `user_id, failed_logins, locked_until, last_login_at`. Kept apart from `users`, so logins don't create audit or sync noise. 5 failures → locked for 15 min.
+
+**sessions:** `user_id, token_hash (SHA-256), created_at, expires_at (12 h), last_seen_at (idle 2 h), revoked_at, ip, user_agent`. Back office only.
+
+**tenant_directory:** `code (e.g. delux) → tenant_id`. Used by the login, the one table readable across tenants, and it holds nothing else (D-081).
+
+**roles:** `name, template_key (owner|manager|cashier|salesman|purchaser|accountant, or null for a custom role), permissions text[], limits jsonb`
+- Permissions are catalog keys from `packages/domain` (`pos.void`, `pos.return.create`, `cost.view`, …); `*` = all (Owner).
+- `limits`: `{ maxDiscountBp, voidWindow: none|same_day_before_handover|same_day }`. Yes/no abilities are permissions, not limits (D-081).
 
 **user_roles:** `user_id, role_id, branch_id (nullable = all branches)`
 
 **reason_codes:** `kind (return|void|adjustment|override|variance|no_receipt), code, label, sort, is_active`
 
-**audit_log:** `at, user_id, device_id, action, entity, entity_id, before jsonb, after jsonb, ip`. Append-only.
+**audit_log:** `at, user_id, device_id, request_id, action, entity, entity_id, before jsonb, after jsonb, ip`. Append-only for every role, the owner included (no update, delete or truncate).
+- Master data: written by a trigger (`erp.enable_audit_log`) as `create` / `update` / `delete` (soft delete), with before/after and secret columns removed.
+- Logins: written by the API as `login.success`, `login.failed`, `login.locked`, `login.refused_locked`, `logout` (`entity = 'session'`).
 
 ---
 

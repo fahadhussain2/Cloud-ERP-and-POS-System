@@ -1,0 +1,55 @@
+{
+  "description": "Cash rounding to the tenant increment (Delux: 100 paisa = Rs 1), nearest, half away from zero. The adjustment is posted to the rounding account (POS-15, D-079).",
+  "cases": [
+    {
+      "name": "Rs 1,250.50 rounds up to Rs 1,251",
+      "input": { "amount": 125050, "increment": 100 },
+      "expected": { "rounded": 125100, "adjustment": 50 }
+    },
+    {
+      "name": "Rs 1,250.49 rounds down",
+      "input": { "amount": 125049, "increment": 100 },
+      "expected": { "rounded": 125000, "adjustment": -49 }
+    },
+    {
+      "name": "already whole",
+      "input": { "amount": 125000, "increment": 100 },
+      "expected": { "rounded": 125000, "adjustment": 0 }
+    },
+    {
+      "name": "a refund of Rs 1,250.50 rounds to Rs 1,251 back",
+      "input": { "amount": -125050, "increment": 100 },
+      "expected": { "rounded": -125100, "adjustment": -50 }
+    },
+    {
+      "name": "49 paisa rounds to nothing",
+      "input": { "amount": 49, "increment": 100 },
+      "expected": { "rounded": 0, "adjustment": -49 }
+    },
+    {
+      "name": "50 paisa rounds to Rs 1",
+      "input": { "amount": 50, "increment": 100 },
+      "expected": { "rounded": 100, "adjustment": 50 }
+    },
+    {
+      "name": "an increment of 1 paisa changes nothing",
+      "input": { "amount": 125049, "increment": 1 },
+      "expected": { "rounded": 125049, "adjustment": 0 }
+    },
+    {
+      "name": "Rs 5 increment, exactly halfway",
+      "input": { "amount": 124750, "increment": 500 },
+      "expected": { "rounded": 125000, "adjustment": 250 }
+    },
+    {
+      "name": "a zero increment is refused",
+      "input": { "amount": 100, "increment": 0 },
+      "error": "invalid_increment"
+    },
+    {
+      "name": "a negative increment is refused",
+      "input": { "amount": 100, "increment": -100 },
+      "error": "invalid_increment"
+    }
+  ]
+}

@@ -43,13 +43,15 @@ jobs:
       - run: pnpm check
       # Server and edge config (W0-03). shellcheck and Docker come with the runner.
       - name: Check server scripts
-        run: shellcheck -x infra/server/*.sh infra/server/files/bin/erp-deploy infra/edge/*.sh
+        run: shellcheck -x infra/server/*.sh infra/server/files/bin/erp-deploy infra/edge/*.sh infra/db/*.sh infra/db/bin/erp-db
       - name: Check edge and app config
         run: |
           docker compose -f infra/edge/compose.yaml config -q
           for env in prod staging; do
             IMAGE_TAG=check docker compose --env-file "infra/app/$env.env" -f infra/app/compose.yaml config -q
+            docker compose --env-file "infra/db/$env.env" -f infra/db/compose.yaml config -q
           done
+          python3 -m py_compile infra/db/check_backup_status.py
           docker run --rm -v "$PWD/infra/app/web:/etc/caddy:ro" caddy:2.11.7-alpine \
             caddy validate --config /etc/caddy/Caddyfile
           docker run --rm -v "$PWD/infra/edge/caddy:/etc/caddy:ro" caddy:2.11.7-alpine \

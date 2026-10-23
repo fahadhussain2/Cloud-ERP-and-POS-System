@@ -1,0 +1,140 @@
+{
+  "description": "Business date: the tenant-local date, minus one day before the cutoff hour (Delux: Asia/Karachi, 04:00). `at` is a UTC instant (architecture §4.4, D-056, D-079).",
+  "cases": [
+    {
+      "name": "an evening sale at 20:30",
+      "input": {
+        "at": "2026-10-22T15:30:00Z",
+        "timeZone": "Asia/Karachi",
+        "cutoffHour": 4
+      },
+      "expected": "2026-10-22"
+    },
+    {
+      "name": "a late sale at 01:00 counts to the previous day",
+      "input": {
+        "at": "2026-10-22T20:00:00Z",
+        "timeZone": "Asia/Karachi",
+        "cutoffHour": 4
+      },
+      "expected": "2026-10-22"
+    },
+    {
+      "name": "03:59:59 is still the previous day",
+      "input": {
+        "at": "2026-10-22T22:59:59Z",
+        "timeZone": "Asia/Karachi",
+        "cutoffHour": 4
+      },
+      "expected": "2026-10-22"
+    },
+    {
+      "name": "04:00 starts the new day",
+      "input": {
+        "at": "2026-10-22T23:00:00Z",
+        "timeZone": "Asia/Karachi",
+        "cutoffHour": 4
+      },
+      "expected": "2026-10-23"
+    },
+    {
+      "name": "across a month end",
+      "input": {
+        "at": "2026-10-31T21:00:00Z",
+        "timeZone": "Asia/Karachi",
+        "cutoffHour": 4
+      },
+      "expected": "2026-10-31"
+    },
+    {
+      "name": "New Year night before 04:00 belongs to 31 December",
+      "input": {
+        "at": "2026-12-31T22:00:00Z",
+        "timeZone": "Asia/Karachi",
+        "cutoffHour": 4
+      },
+      "expected": "2026-12-31"
+    },
+    {
+      "name": "New Year at 04:00",
+      "input": {
+        "at": "2026-12-31T23:00:00Z",
+        "timeZone": "Asia/Karachi",
+        "cutoffHour": 4
+      },
+      "expected": "2027-01-01"
+    },
+    {
+      "name": "into a leap day",
+      "input": {
+        "at": "2028-02-29T20:00:00Z",
+        "timeZone": "Asia/Karachi",
+        "cutoffHour": 4
+      },
+      "expected": "2028-02-29"
+    },
+    {
+      "name": "a midnight cutoff is the plain local date",
+      "input": {
+        "at": "2026-10-22T19:30:00Z",
+        "timeZone": "Asia/Karachi",
+        "cutoffHour": 0
+      },
+      "expected": "2026-10-23"
+    },
+    {
+      "name": "Dubai (UTC+4) at 03:00",
+      "input": {
+        "at": "2026-10-22T23:00:00Z",
+        "timeZone": "Asia/Dubai",
+        "cutoffHour": 4
+      },
+      "expected": "2026-10-22"
+    },
+    {
+      "name": "a daylight-saving zone on the change night",
+      "input": {
+        "at": "2026-03-29T02:30:00Z",
+        "timeZone": "Europe/London",
+        "cutoffHour": 4
+      },
+      "expected": "2026-03-28"
+    },
+    {
+      "name": "an invalid instant",
+      "input": {
+        "at": "not a date",
+        "timeZone": "Asia/Karachi",
+        "cutoffHour": 4
+      },
+      "error": "not_integer"
+    },
+    {
+      "name": "an unknown time zone",
+      "input": {
+        "at": "2026-10-22T15:30:00Z",
+        "timeZone": "Mars/Base",
+        "cutoffHour": 4
+      },
+      "error": "invalid_time_zone"
+    },
+    {
+      "name": "cutoff hour 24",
+      "input": {
+        "at": "2026-10-22T15:30:00Z",
+        "timeZone": "Asia/Karachi",
+        "cutoffHour": 24
+      },
+      "error": "invalid_cutoff"
+    },
+    {
+      "name": "a fractional cutoff hour",
+      "input": {
+        "at": "2026-10-22T15:30:00Z",
+        "timeZone": "Asia/Karachi",
+        "cutoffHour": 1.5
+      },
+      "error": "invalid_cutoff"
+    }
+  ]
+}

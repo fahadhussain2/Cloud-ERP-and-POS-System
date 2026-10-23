@@ -1,0 +1,45 @@
+{
+  "description": "Money: integer minor units (paisa); construction from numbers or database text, and exact arithmetic (D-079)",
+  "cases": [
+    { "name": "a whole paisa amount", "input": { "op": "money", "value": 125050 }, "expected": 125050 },
+    {
+      "name": "bigint text from the database",
+      "input": { "op": "money", "value": "125050" },
+      "expected": 125050
+    },
+    { "name": "negative text", "input": { "op": "money", "value": "-5" }, "expected": -5 },
+    {
+      "name": "the largest safe amount",
+      "input": { "op": "money", "value": 9007199254740991 },
+      "expected": 9007199254740991
+    },
+    {
+      "name": "a fraction of a paisa is refused",
+      "input": { "op": "money", "value": 1.5 },
+      "error": "not_integer"
+    },
+    { "name": "decimal text is refused", "input": { "op": "money", "value": "1.5" }, "error": "not_integer" },
+    { "name": "words are refused", "input": { "op": "money", "value": "abc" }, "error": "not_integer" },
+    {
+      "name": "beyond the safe range",
+      "input": { "op": "money", "value": 9007199254740992 },
+      "error": "out_of_range"
+    },
+    {
+      "name": "text beyond the safe range",
+      "input": { "op": "money", "value": "9007199254740992" },
+      "error": "out_of_range"
+    },
+    { "name": "add", "input": { "op": "add", "a": 100, "b": 250 }, "expected": 350 },
+    {
+      "name": "add past the safe range",
+      "input": { "op": "add", "a": 9007199254740991, "b": 1 },
+      "error": "out_of_range"
+    },
+    { "name": "subtract into negative", "input": { "op": "sub", "a": 100, "b": 250 }, "expected": -150 },
+    { "name": "negate", "input": { "op": "negate", "a": 5 }, "expected": -5 },
+    { "name": "negate zero stays zero (never -0)", "input": { "op": "negate", "a": 0 }, "expected": 0 },
+    { "name": "sum of nothing is zero", "input": { "op": "sum", "values": [] }, "expected": 0 },
+    { "name": "sum", "input": { "op": "sum", "values": [1, 2, 3] }, "expected": 6 }
+  ]
+}

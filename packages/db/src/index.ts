@@ -1,2 +1,5 @@
-// Drizzle schema, SQL migrations, RLS policies and seed templates (server only).
-export {};
+// Database access (server only): Drizzle schema, SQL migrations, tenant context and the change feed (D-078).
+export { MIGRATIONS_DIR, migrate, type MigrateOptions } from './migrate';
+export * as schema from './schema';
+export { pullChanges, START, SYNCED_TABLES, type Cursor, type SyncedTable } from './sync';
+export { withTenant, type Db, type TenantContext } from './tenant';
