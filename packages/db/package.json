@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@erp/contracts": "workspace:*",
+    "@erp/domain": "workspace:*",
     "drizzle-orm": "catalog:",
     "pg": "catalog:"
   },

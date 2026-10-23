@@ -1,5 +1,15 @@
 // Pure, deterministic checkout rules shared by the POS and the API (CLAUDE.md rule 2).
 // No I/O, no clock, no randomness: inputs in, results out. Every rule has golden test cases.
+export {
+  ACCOUNT_TYPES,
+  REQUIRED_SYSTEM_ROLES,
+  SYSTEM_ROLES,
+  validateChartOfAccounts,
+  type AccountType,
+  type ChartAccount,
+  type ChartProblem,
+  type SystemRole,
+} from './accounts';
 export { allocate } from './allocate';
 export { businessDate } from './business-date';
 export {

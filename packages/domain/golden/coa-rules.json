@@ -127,6 +127,44 @@
       "expected": [{ "problem": "duplicate_code", "account": "1000" }]
     },
     {
+      "name": "an unknown account type (templates and imports are data, not code)",
+      "input": {
+        "required": [],
+        "accounts": [
+          { "code": "7000", "type": "other", "parentCode": null, "isPostable": true, "systemRole": null }
+        ]
+      },
+      "expected": [{ "problem": "unknown_type", "account": "7000" }]
+    },
+    {
+      "name": "an unknown system role",
+      "input": {
+        "required": [],
+        "accounts": [
+          {
+            "code": "1110",
+            "type": "asset",
+            "parentCode": null,
+            "isPostable": true,
+            "systemRole": "PETTY_CASH"
+          }
+        ]
+      },
+      "expected": [{ "problem": "unknown_role", "account": "1110" }]
+    },
+    {
+      "name": "a code used three times is reported once",
+      "input": {
+        "required": [],
+        "accounts": [
+          { "code": "1110", "type": "asset", "parentCode": null, "isPostable": true, "systemRole": null },
+          { "code": "1110", "type": "asset", "parentCode": null, "isPostable": true, "systemRole": null },
+          { "code": "1110", "type": "asset", "parentCode": null, "isPostable": true, "systemRole": null }
+        ]
+      },
+      "expected": [{ "problem": "duplicate_code", "account": "1110" }]
+    },
+    {
       "name": "several problems are all reported, sorted",
       "input": {
         "required": ["SALES"],

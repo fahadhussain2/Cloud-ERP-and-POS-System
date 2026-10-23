@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-07, W0-09, W0-10 done; W0-11 (tenant setup) |
+| **Status** | In progress: W0-07, W0-09, W0-10 done; W0-11 (tenant setup) in review |
 | **Requirements** | 13 (PLT-01…PLT-13) |
 | **Feature spec needed** | Yes: device enrollment + PIN security |
 
@@ -29,6 +29,13 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 | PLT-11 | Internal tenant setup script (platform owner only, not customer-facing). | 2 |
 | PLT-12 | Support and diagnostics: "Trace a bill" timeline in the back office (owner / platform admin): device, user, print, sync attempts, server acceptance,… | 1 |
 | PLT-13 | Light and dark themes. | 2 |
+
+## Tenant setup (W0-11, D-083)
+
+- A shop is a reviewed JSON spec (`infra/db/tenants/<name>.json`, schema `TenantSpec` in `packages/contracts`), created by `setupTenant` (`packages/db`): **create-if-missing**, drift reported and never applied.
+- The chart of accounts is the retail template (`packages/db/templates/retail-coa.json`) plus the shop's banks and wallets, checked by `validateChartOfAccounts` (`packages/domain`) before anything is written.
+- On the server: `sudo erp-tenant setup <env> <name>` (the owner types the password) and `reset-password` for support; see [infra/README.md](../../../infra/README.md#tenants-d-083).
+- A generated password sets `must_change_password`: the API then answers `403 password_change_required` on every route except `GET /api/auth/me`, `POST /api/auth/logout` and `PUT /api/users/me/password`.
 
 ## Related
 

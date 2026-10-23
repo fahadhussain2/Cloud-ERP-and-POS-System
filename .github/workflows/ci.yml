@@ -43,7 +43,7 @@ jobs:
       - run: pnpm check
       # Server and edge config (W0-03). shellcheck and Docker come with the runner.
       - name: Check server scripts
-        run: shellcheck -x infra/server/*.sh infra/server/files/bin/erp-deploy infra/edge/*.sh infra/db/*.sh infra/db/bin/erp-db
+        run: shellcheck -x infra/server/*.sh infra/server/files/bin/erp-deploy infra/edge/*.sh infra/db/*.sh infra/db/bin/erp-db infra/db/bin/erp-tenant
       - name: Check edge and app config
         run: |
           docker compose -f infra/edge/compose.yaml config -q

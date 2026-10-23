@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#12](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/12) |
 | **Module** | platform (with accounting) |
-| **Status** | Accepted (2026-10-23) |
+| **Status** | Built, in review (2026-10-23) |
 | **Refs** | PLT-01, PLT-02, PLT-11, ACC-01, ACC-08, ACC-09, POS-16; posting rules §2; migration §5; D-055, D-056, D-061, D-081, D-083 |
 | **Depends on** | W0-07, W0-09, W0-10 |
 | **Size** | about 2 days |
@@ -73,22 +73,22 @@
 
 ## Tests written first
 
-- [ ] **CoA rules (golden):** the retail template passes. Each of these fails with a clear code:
+- [x] **CoA rules (golden):** the retail template passes. Each of these fails with a clear code:
   - a missing system role
   - a duplicate system role
   - a child of another type
   - a postable parent
   - an unknown parent code
   - a duplicate account code
-- [ ] **Setup (integration):**
+- [x] **Setup (integration):**
   - Creates the tenant, the directory entry, the branch, the 3 locations, the full chart with **every system role exactly once**, the banks, the payment methods (cash unmapped, non-cash mapped), the tiers (one default), `ZERO`, the 6 roles, the owner with the Owner role, and the default print profile.
   - **A second run reports "no changes"** and creates no duplicates.
   - A changed spec value is reported as drift and **not** applied.
   - The owner can log in with the chosen password.
-- [ ] **Password change:**
+- [x] **Password change:**
   - A must-change user gets `403 password_change_required` on other routes, but can call `me`, `logout` and the change endpoint.
   - The change needs the current password, applies the W0-09 rules, clears the flag, and ends the user's other sessions.
-- [ ] RLS covers every new table (the existing check), and the Drizzle mirror matches (the drift check).
+- [x] RLS covers every new table (the existing check), and the Drizzle mirror matches (the drift check).
 
 ## Order
 
@@ -114,3 +114,15 @@
 2. **Raast and bank transfers:** decided later in the system. Both start without an account; the setup report and the go-live checklist flag them.
 3. **Owner username:** `fahad`.
 4. **Shop code:** `delux`.
+
+## Changes during the build
+
+| Plan | Built | Why |
+|---|---|---|
+| Specs in `infra/tenants/` | `infra/db/tenants/`, copied to `/srv/erp/tenants/` by `infra/db/apply.sh` | They are installed with `erp-tenant`, which lives with the database tools. |
+| A `setup-tenant` entry | `apps/api/src/tenant-admin.ts` with two actions, `setup` and `reset-password` | The support reset from the risks table needs the same container and role. Input is JSON on stdin, so the password is never in a command line or the environment. |
+| `infra/tenants/apply.sh` from the PC for test tenants, with a password from a git-ignored file | `sudo erp-tenant setup <env> <name> --generated`: a generated password, shown once, with must-change-password | One path for every shop; no password file to keep. |
+| — | `sudo erp-tenant reset-password <env> <shop> <user>` | The risks table's "admin reset path": a generated temporary password (must change), lifts a lockout, ends the user's sessions, writes `password.reset` to the audit log. |
+| `payment_methods.gl_account_id` (data model) | `payment_methods.bank_account_id` | A method posts to its bank account's GL account (ACC-08); one mapping instead of two that could disagree. Data model §5 updated. |
+| CoA rules for the listed problems | Also `unknown_type` and `unknown_role`; a code used three times is reported once | Templates and imports are data, so a typo is reported, not trusted. Golden cases added first. |
+| Roles named after the template key | Named `Owner`, `Manager`, … with `template_key` | Readable in the back office; the key still identifies the template. |

@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import deluxSpec from '../../../../infra/db/tenants/delux.json';
 import { createTestDatabase, type TestDatabase } from '../testing/database';
-import { setupTenant, type SetupReport } from './tenant';
+import { resetUserPassword, setupTenant, type SetupReport } from './tenant';
 
 // The tenant setup command (PLT-11, ACC-01, ACC-08, POS-16, D-083), run on the real Delux spec.
 
@@ -180,5 +180,44 @@ describe('running it again', () => {
     expect(await q('SELECT closing_time FROM erp.tenants WHERE id = :tenant')).toEqual([
       { closing_time: '20:00:00' },
     ]);
+  });
+});
+
+describe('the support password reset', () => {
+  it('sets a temporary password that must be changed, unlocks the user and ends their sessions', async () => {
+    await admin.query(
+      `INSERT INTO erp.user_login_state (user_id, tenant_id, failed_logins, locked_until)
+       SELECT id, tenant_id, 0, now() + interval '15 minutes' FROM erp.users WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    await admin.query(
+      `INSERT INTO erp.sessions (tenant_id, user_id, token_hash, created_at, expires_at, last_seen_at)
+       SELECT tenant_id, id, '\x01', now(), now() + interval '1 hour', now() FROM erp.users WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    await resetUserPassword(db.ownerUrl, 'delux', 'FAHAD', { passwordHash: 'temporary-hash' });
+    expect(
+      await q('SELECT password_hash, must_change_password FROM erp.users WHERE tenant_id = :tenant'),
+    ).toEqual([{ password_hash: 'temporary-hash', must_change_password: true }]);
+    expect(await q('SELECT locked_until FROM erp.user_login_state WHERE tenant_id = :tenant')).toEqual([
+      { locked_until: null },
+    ]);
+    expect(
+      await q('SELECT count(*)::int AS n FROM erp.sessions WHERE tenant_id = :tenant AND revoked_at IS NULL'),
+    ).toEqual([{ n: 0 }]);
+    expect(
+      await q(
+        "SELECT count(*)::int AS n FROM erp.audit_log WHERE tenant_id = :tenant AND action = 'password.reset'",
+      ),
+    ).toEqual([{ n: 1 }]);
+  });
+
+  it('refuses an unknown shop or user', async () => {
+    await expect(resetUserPassword(db.ownerUrl, 'nope', 'fahad', { passwordHash: 'x' })).rejects.toThrow(
+      'no shop nope',
+    );
+    await expect(resetUserPassword(db.ownerUrl, 'delux', 'nobody', { passwordHash: 'x' })).rejects.toThrow(
+      'no user nobody in delux',
+    );
   });
 });

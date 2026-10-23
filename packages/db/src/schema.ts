@@ -4,6 +4,7 @@ import {
   char,
   customType,
   date,
+  integer,
   jsonb,
   pgSchema,
   smallint,
@@ -98,6 +99,7 @@ export const users = erp.table('users', {
   pinVerifier: text('pin_verifier'),
   status: text('status', { enum: ['active', 'disabled'] }).notNull(),
   passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
+  mustChangePassword: boolean('must_change_password').notNull(),
   ...syncColumns,
   ...auditColumns,
 });
@@ -174,6 +176,8 @@ export const devices = erp.table('devices', {
   enrolledByUserId: uuid('enrolled_by_user_id'),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   revokedByUserId: uuid('revoked_by_user_id'),
+  /** Null = the tenant's default print profile (D-055). */
+  printProfileId: uuid('print_profile_id'),
   ...syncColumns,
   ...auditColumns,
 });
@@ -208,4 +212,93 @@ export const deviceTokens = erp.table('device_tokens', {
   tokenHash: bytea('token_hash').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+});
+
+/** Chart of accounts (ACC-01): the posting engine finds accounts by system role. */
+export const accounts = erp.table('accounts', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  type: text('type', { enum: ['asset', 'liability', 'equity', 'income', 'expense'] }).notNull(),
+  parentId: uuid('parent_id'),
+  isPostable: boolean('is_postable').notNull(),
+  systemRole: text('system_role'),
+  isActive: boolean('is_active').notNull(),
+  legacyCode: text('legacy_code'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const bankAccounts = erp.table('bank_accounts', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  kind: text('kind', { enum: ['bank', 'wallet', 'card_clearing'] }).notNull(),
+  glAccountId: uuid('gl_account_id').notNull(),
+  isActive: boolean('is_active').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const paymentMethods = erp.table('payment_methods', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  code: text('code', {
+    enum: ['cash', 'bank_transfer', 'raast', 'jazzcash', 'easypaisa', 'card', 'on_account'],
+  }).notNull(),
+  name: text('name').notNull(),
+  isCash: boolean('is_cash').notNull(),
+  requiresReference: boolean('requires_reference').notNull(),
+  bankAccountId: uuid('bank_account_id'),
+  isActive: boolean('is_active').notNull(),
+  sort: smallint('sort').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const priceTiers = erp.table('price_tiers', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  sort: smallint('sort').notNull(),
+  isDefault: boolean('is_default').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const taxCodes = erp.table('tax_codes', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  rateBp: integer('rate_bp').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const printProfiles = erp.table('print_profiles', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  name: text('name').notNull(),
+  paperFormat: text('paper_format', { enum: ['a4', 'a5', 'thermal_80', 'thermal_58'] }).notNull(),
+  codeType: text('code_type', { enum: ['barcode', 'signed_qr'] }).notNull(),
+  copies: smallint('copies').notNull(),
+  templateOptions: jsonb('template_options').notNull(),
+  isTenantDefault: boolean('is_tenant_default').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const expenseCategories = erp.table('expense_categories', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  glAccountId: uuid('gl_account_id').notNull(),
+  isActive: boolean('is_active').notNull(),
+  ...syncColumns,
+  ...auditColumns,
 });
