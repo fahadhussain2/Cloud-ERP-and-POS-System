@@ -15,6 +15,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:up": "docker compose -f infra/dev/compose.yaml up -d --wait",
     "db:down": "docker compose -f infra/dev/compose.yaml down",
+    "legacy:stage": "pnpm --filter @erp/legacy-import start stage",
     "test:watch": "vitest --exclude \"**/*.int.test.ts\"",
     "build": "pnpm -r build",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"

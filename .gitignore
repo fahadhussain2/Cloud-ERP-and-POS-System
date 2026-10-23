@@ -1,5 +1,7 @@
 # Legacy database dump: contains customer personal data and legacy credentials. Never commit.
 sql_dump/
+# Importer reports and output (counts only, but kept local with the dump; D-084)
+tools/legacy-import/out/
 
 # Claude Code local state
 .claude/settings.local.json
