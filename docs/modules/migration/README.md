@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Not started (build on hold, D-068) |
+| **Status** | In progress: W0-12 (parse and stage) |
 | **Requirements** | 4 (MIG-01…MIG-04) |
 | **Feature spec needed** | Yes: importer design (parser, staging, transform, load) |
 
