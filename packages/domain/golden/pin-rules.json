@@ -1,0 +1,26 @@
+{
+  "description": "Staff PIN rules: 4-6 digits, not trivial, not the user's short code (PLT-04, spec §4, D-082)",
+  "cases": [
+    { "name": "a 4-digit PIN", "input": { "pin": "4821", "shortCode": "07" }, "expected": null },
+    { "name": "a 6-digit PIN", "input": { "pin": "482193", "shortCode": null }, "expected": null },
+    { "name": "letters", "input": { "pin": "48a1", "shortCode": null }, "expected": "not_digits" },
+    { "name": "a space", "input": { "pin": "48 21", "shortCode": null }, "expected": "not_digits" },
+    { "name": "too short", "input": { "pin": "482", "shortCode": null }, "expected": "too_short" },
+    { "name": "too long", "input": { "pin": "4821935", "shortCode": null }, "expected": "too_long" },
+    { "name": "all the same digit", "input": { "pin": "1111", "shortCode": null }, "expected": "all_same" },
+    { "name": "all zeros", "input": { "pin": "000000", "shortCode": null }, "expected": "all_same" },
+    { "name": "counting up", "input": { "pin": "1234", "shortCode": null }, "expected": "sequence" },
+    {
+      "name": "counting up from zero",
+      "input": { "pin": "012345", "shortCode": null },
+      "expected": "sequence"
+    },
+    { "name": "counting down", "input": { "pin": "9876", "shortCode": null }, "expected": "sequence" },
+    { "name": "almost a sequence is fine", "input": { "pin": "1235", "shortCode": null }, "expected": null },
+    {
+      "name": "the user's own short code",
+      "input": { "pin": "4821", "shortCode": "4821" },
+      "expected": "is_short_code"
+    }
+  ]
+}

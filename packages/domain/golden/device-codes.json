@@ -1,0 +1,33 @@
+{
+  "description": "Device codes per kind (C counters, D cash desks, M mobile), never reused, so bill numbers stay unique (architecture §4.4, D-082)",
+  "cases": [
+    { "name": "the first counter", "input": { "kind": "counter", "existing": [] }, "expected": "C01" },
+    {
+      "name": "the next counter",
+      "input": { "kind": "counter", "existing": ["C01", "D01"] },
+      "expected": "C02"
+    },
+    {
+      "name": "never reuses a number, even after revocation",
+      "input": { "kind": "counter", "existing": ["C01", "C02"] },
+      "expected": "C03"
+    },
+    {
+      "name": "after a gap, still the next number",
+      "input": { "kind": "counter", "existing": ["C01", "C04"] },
+      "expected": "C05"
+    },
+    {
+      "name": "the first cash desk",
+      "input": { "kind": "cash_desk", "existing": ["C01", "C02"] },
+      "expected": "D01"
+    },
+    { "name": "the first mobile device", "input": { "kind": "mobile", "existing": [] }, "expected": "M01" },
+    { "name": "past 99", "input": { "kind": "counter", "existing": ["C99"] }, "expected": "C100" },
+    {
+      "name": "ignores codes in another format",
+      "input": { "kind": "counter", "existing": ["X9", "C1"] },
+      "expected": "C01"
+    }
+  ]
+}
