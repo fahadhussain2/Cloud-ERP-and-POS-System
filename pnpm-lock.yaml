@@ -288,6 +288,12 @@ importers:
 
   packages/db:
     dependencies:
+      '@erp/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@erp/domain':
+        specifier: workspace:*
+        version: link:../domain
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)

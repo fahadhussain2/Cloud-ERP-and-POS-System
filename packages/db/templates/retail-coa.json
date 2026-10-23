@@ -1,0 +1,285 @@
+{
+  "description": "Retail chart-of-accounts template (posting rules §2, D-083). Banks, wallets and card clearing are added per tenant under 1100. Expense heads 6100-6400 are headers: tenants and the legacy importer add their own accounts below them.",
+  "accounts": [
+    {
+      "code": "1000",
+      "name": "Assets",
+      "type": "asset",
+      "parentCode": null,
+      "isPostable": false,
+      "systemRole": null
+    },
+    {
+      "code": "1100",
+      "name": "Cash and bank",
+      "type": "asset",
+      "parentCode": "1000",
+      "isPostable": false,
+      "systemRole": null
+    },
+    {
+      "code": "1110",
+      "name": "Cash drawer (cash desk)",
+      "type": "asset",
+      "parentCode": "1100",
+      "isPostable": true,
+      "systemRole": "CASH_DRAWER"
+    },
+    {
+      "code": "1120",
+      "name": "Cash in transit, counters (awaiting handover / payout)",
+      "type": "asset",
+      "parentCode": "1100",
+      "isPostable": true,
+      "systemRole": "CASH_IN_TRANSIT"
+    },
+    {
+      "code": "1130",
+      "name": "Cash in safe",
+      "type": "asset",
+      "parentCode": "1100",
+      "isPostable": true,
+      "systemRole": null
+    },
+    {
+      "code": "1200",
+      "name": "Accounts receivable (customers)",
+      "type": "asset",
+      "parentCode": "1000",
+      "isPostable": true,
+      "systemRole": "AR_CONTROL"
+    },
+    {
+      "code": "1300",
+      "name": "Inventory",
+      "type": "asset",
+      "parentCode": "1000",
+      "isPostable": true,
+      "systemRole": "INVENTORY"
+    },
+    {
+      "code": "1400",
+      "name": "Input tax recoverable (future)",
+      "type": "asset",
+      "parentCode": "1000",
+      "isPostable": true,
+      "systemRole": "TAX_RECOVERABLE"
+    },
+    {
+      "code": "2000",
+      "name": "Liabilities",
+      "type": "liability",
+      "parentCode": null,
+      "isPostable": false,
+      "systemRole": null
+    },
+    {
+      "code": "2100",
+      "name": "Accounts payable (suppliers)",
+      "type": "liability",
+      "parentCode": "2000",
+      "isPostable": true,
+      "systemRole": "AP_CONTROL"
+    },
+    {
+      "code": "2300",
+      "name": "Output tax payable (future)",
+      "type": "liability",
+      "parentCode": "2000",
+      "isPostable": true,
+      "systemRole": "TAX_PAYABLE"
+    },
+    {
+      "code": "3000",
+      "name": "Equity",
+      "type": "equity",
+      "parentCode": null,
+      "isPostable": false,
+      "systemRole": null
+    },
+    {
+      "code": "3100",
+      "name": "Owners' / partners' capital",
+      "type": "equity",
+      "parentCode": "3000",
+      "isPostable": true,
+      "systemRole": null
+    },
+    {
+      "code": "3110",
+      "name": "Partners' drawings",
+      "type": "equity",
+      "parentCode": "3000",
+      "isPostable": true,
+      "systemRole": null
+    },
+    {
+      "code": "3200",
+      "name": "Retained earnings",
+      "type": "equity",
+      "parentCode": "3000",
+      "isPostable": true,
+      "systemRole": "RETAINED_EARNINGS"
+    },
+    {
+      "code": "3300",
+      "name": "Opening balance equity",
+      "type": "equity",
+      "parentCode": "3000",
+      "isPostable": true,
+      "systemRole": "OPENING_BALANCE_EQUITY"
+    },
+    {
+      "code": "4000",
+      "name": "Income",
+      "type": "income",
+      "parentCode": null,
+      "isPostable": false,
+      "systemRole": null
+    },
+    {
+      "code": "4100",
+      "name": "Sales",
+      "type": "income",
+      "parentCode": "4000",
+      "isPostable": true,
+      "systemRole": "SALES"
+    },
+    {
+      "code": "4110",
+      "name": "Sales returns (contra)",
+      "type": "income",
+      "parentCode": "4000",
+      "isPostable": true,
+      "systemRole": "SALES_RETURNS"
+    },
+    {
+      "code": "4120",
+      "name": "Sales discounts (contra)",
+      "type": "income",
+      "parentCode": "4000",
+      "isPostable": true,
+      "systemRole": "SALES_DISCOUNT"
+    },
+    {
+      "code": "4210",
+      "name": "Cash rounding",
+      "type": "income",
+      "parentCode": "4000",
+      "isPostable": true,
+      "systemRole": "ROUNDING"
+    },
+    {
+      "code": "5000",
+      "name": "Cost of sales",
+      "type": "expense",
+      "parentCode": null,
+      "isPostable": false,
+      "systemRole": null
+    },
+    {
+      "code": "5100",
+      "name": "Cost of goods sold",
+      "type": "expense",
+      "parentCode": "5000",
+      "isPostable": true,
+      "systemRole": "COGS"
+    },
+    {
+      "code": "5200",
+      "name": "Inventory adjustments / shrinkage",
+      "type": "expense",
+      "parentCode": "5000",
+      "isPostable": true,
+      "systemRole": "INVENTORY_ADJUSTMENT"
+    },
+    {
+      "code": "5300",
+      "name": "Purchase price variance",
+      "type": "expense",
+      "parentCode": "5000",
+      "isPostable": true,
+      "systemRole": "PURCHASE_PRICE_VARIANCE"
+    },
+    {
+      "code": "6000",
+      "name": "Operating expenses",
+      "type": "expense",
+      "parentCode": null,
+      "isPostable": false,
+      "systemRole": null
+    },
+    {
+      "code": "6100",
+      "name": "Salaries",
+      "type": "expense",
+      "parentCode": "6000",
+      "isPostable": false,
+      "systemRole": null
+    },
+    {
+      "code": "6110",
+      "name": "Salaries: general",
+      "type": "expense",
+      "parentCode": "6100",
+      "isPostable": true,
+      "systemRole": null
+    },
+    {
+      "code": "6200",
+      "name": "Utilities",
+      "type": "expense",
+      "parentCode": "6000",
+      "isPostable": false,
+      "systemRole": null
+    },
+    {
+      "code": "6210",
+      "name": "Utilities: general",
+      "type": "expense",
+      "parentCode": "6200",
+      "isPostable": true,
+      "systemRole": null
+    },
+    {
+      "code": "6300",
+      "name": "General expenses",
+      "type": "expense",
+      "parentCode": "6000",
+      "isPostable": false,
+      "systemRole": null
+    },
+    {
+      "code": "6310",
+      "name": "General expenses: other",
+      "type": "expense",
+      "parentCode": "6300",
+      "isPostable": true,
+      "systemRole": null
+    },
+    {
+      "code": "6400",
+      "name": "Miscellaneous expenses",
+      "type": "expense",
+      "parentCode": "6000",
+      "isPostable": false,
+      "systemRole": null
+    },
+    {
+      "code": "6410",
+      "name": "Miscellaneous expenses: other",
+      "type": "expense",
+      "parentCode": "6400",
+      "isPostable": true,
+      "systemRole": null
+    },
+    {
+      "code": "6500",
+      "name": "Cash short / over",
+      "type": "expense",
+      "parentCode": "6000",
+      "isPostable": true,
+      "systemRole": "CASH_SHORT_OVER"
+    }
+  ]
+}

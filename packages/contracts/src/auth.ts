@@ -18,5 +18,13 @@ export const MeResponse = z.object({
     maxDiscountBp: z.number().int(),
     voidWindow: z.enum(['none', 'same_day_before_handover', 'same_day']),
   }),
+  /** When true, the API allows only me, logout and the password change until it is changed (D-083). */
+  mustChangePassword: z.boolean(),
 });
 export type MeResponse = z.infer<typeof MeResponse>;
+
+export const ChangePasswordRequest = z.object({
+  currentPassword: z.string().min(1).max(256),
+  newPassword: z.string().min(1).max(256),
+});
+export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequest>;

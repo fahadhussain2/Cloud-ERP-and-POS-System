@@ -16,6 +16,10 @@ docker run --rm erp-postgres:17.9 pgbackrest version
 
 echo "== tools"
 install -m 755 "$src/bin/erp-db" /usr/local/sbin/erp-db
+install -m 755 "$src/bin/erp-tenant" /usr/local/sbin/erp-tenant
+# Tenant specs (W0-11, D-083): reviewed data, no secrets. `erp-tenant setup` reads them from here.
+install -d -m 755 /srv/erp/tenants
+install -m 644 "$src"/tenants/*.json /srv/erp/tenants/
 secrets=/srv/erp/$env/db-secrets
 install -d -m 700 -o 999 -g 999 "$secrets"
 if [[ ! -f $secrets/postgres-password ]]; then

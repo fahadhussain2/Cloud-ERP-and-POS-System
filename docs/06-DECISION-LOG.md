@@ -608,3 +608,39 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - The POS and the API decide permissions identically (rule 2).
   - Changes can't go unlogged, and history can't be rewritten (PLT-08).
 - **Status:** Accepted (with the W0-09 plan)
+
+### D-082 Device enrollment, key-based device tokens, PBKDF2 staff PIN (2026-10-23)
+- **Decision** (details in `docs/modules/platform/spec.md`):
+  - **Enrollment:** a one-time code (8 Crockford base32 characters, 15 minutes, single use, hashed, rate-limited) created with `admin.devices`. The device generates a non-extractable ECDSA P-256 key and proves it holds it when enrolling.
+  - **Device codes** (`C01…`, `D01…`, `M01…`) are numbered per kind and never reused.
+  - **The key is the only long-lived device credential.** 15-minute access tokens are issued for a signature over a single-use, 60-second server nonce. There are no refresh tokens. Revoking a device ends its tokens at once.
+  - **Signatures:** ECDSA P-256 / SHA-256 in IEEE P1363 form, over canonical JSON from one shared function.
+  - **Staff PIN:**
+    - 4–6 digits; trivial PINs refused
+    - stored as PBKDF2-HMAC-SHA256 with 600,000 iterations, so the browser can check it offline with WebCrypto
+    - 5 wrong tries lock the user on that device until a manager unlocks it
+    - the rules live in `packages/domain`
+    - a PIN never logs in to the back office
+- **Why:**
+  - Nothing reusable to steal on a counter except a key that can't be extracted.
+  - Offline unlock and overrides work without the server.
+  - The honest limit of short PINs is accepted and documented: they give accountability, not strong authentication.
+- **Status:** Accepted (with the W0-10 plan and spec)
+
+### D-083 Tenant setup from a reviewed spec; create-if-missing; owner sets their own password (2026-10-23)
+- **Decision:**
+  - A tenant is described by a JSON spec in git (no secrets) and created by one idempotent command (PLT-11):
+    - settings, branch, locations
+    - the retail chart-of-accounts template plus the tenant's banks and wallets
+    - payment methods, price tiers, tax code, expense categories, print profile
+    - the six role templates and the owner account
+  - **Re-running changes nothing.** It creates only what's missing, never overwrites, and reports differences as drift.
+  - **Chart of accounts:** `packages/domain` checks that every system role is mapped exactly once, children share their parent's type, and parents aren't postable.
+  - **Payment methods:** cash isn't mapped to an account (the posting engine routes it by role). Non-cash methods map to a bank, wallet or card-clearing account; an unmapped one is reported as needing attention. For Delux, **Raast and bank transfer start unmapped** until the owner picks the bank.
+  - **Owner password:** the owner types it at a hidden prompt on the server. Generated passwords (test tenants only) force a password change, which the API enforces.
+  - **Delux:** shop code `delux`, owner `fahad`. The bill header is filled in later (by the legacy importer if the dump has it, otherwise in the back office).
+- **Why:**
+  - Repeatable shops for testing, demos and new customers.
+  - A live shop's settings never change as a side effect.
+  - Nobody else sees the owner's password.
+- **Status:** Accepted (with the W0-11 plan)

@@ -37,16 +37,22 @@ Data in this document is grouped by area. Fields marked † are derived and main
 **locations:** `branch_id, code, name, kind (shop|storage|damaged), is_sellable`
 - Delux: `SHOP` (sellable), `GODOWN` (storage), `DAMAGED` (not sellable).
 
-**devices:** `branch_id, code (e.g. C03, D01), name, kind (counter|cash_desk|mobile), public_key (ECDSA P-256), print_profile_id (nullable → tenant default), status (active|revoked), enrolled_at, revoked_at, last_seen_at, app_version, health jsonb`
+**devices:** `branch_id, code (C01… counters, D01… cash desks, M01… mobile; never reused), name, kind (counter|cash_desk|mobile), public_key (ECDSA P-256, SPKI), status (active|revoked), enrolled_at, enrolled_by_user_id, revoked_at, revoked_by_user_id, print_profile_id (null = the tenant default)` (D-082, D-055)
+- Still to come: `last_seen_at`, `app_version`, `health` in a separate device-health table (PLT-09), so routine check-ins don't create audit or sync noise.
 
 **print_profiles:** `name, paper_format (a4|a5|thermal_80|thermal_58), code_type (barcode|signed_qr), copies (1|2), template_options jsonb (header lines, policy text, font size), is_tenant_default`
 - Delux: one profile `A5 landscape dot matrix` (`paper_format = a5`), `barcode` (Code 39), 1 copy, the default for every device.
+- At most one `is_tenant_default` per tenant.
 
-**device_enrollment_codes:** `branch_id, code_hash, expires_at, used_at, created_by_user_id`
+**device_enrollment_codes:** `branch_id, kind, name, code_hash (SHA-256), created_by_user_id, expires_at (15 min), used_at, used_by_device_id`
+
+**device_challenges:** `device_id, nonce_hash, expires_at (60 s), used_at`. A single-use nonce a device signs to get a token.
+
+**device_tokens:** `device_id, token_hash, expires_at (15 min)`. Deleted when the device is revoked. See the [platform spec](modules/platform/spec.md).
 
 **device_series** (server mirror for gap detection): `device_id, family (S|H|R|M|Z), last_accepted_seq, missing_seqs int[]`
 
-**users:** `username, email, full_name, short_code (for quick PIN unlock), password_hash (Argon2id), pin_verifier (slow hash + salt), status (active|disabled), password_changed_at`
+**users:** `username, email, full_name, short_code (for quick PIN unlock), password_hash (Argon2id), pin_verifier (slow hash + salt), status (active|disabled), password_changed_at, must_change_password` (a generated password must be changed before anything else, D-083)
 - Unique per tenant: `username` and `email` (case-insensitive), `short_code`.
 - The audit log never stores `password_hash` or `pin_verifier`. Back-office login checks only `password_hash` (D-081).
 
@@ -112,7 +118,7 @@ Walk-in customers are **not** parties. Sales without `customer_party_id` are wal
 
 **item_compatibility:** `item_id, make_id, model (text, e.g. CIVIC, MEHRAN), year_from, year_to, note`. A light vehicle tag (D-014).
 
-**price_tiers:** `code (RETAIL|MECHANIC|WHOLESALE…), name, sort, is_default`
+**price_tiers:** `code (RETAIL|MECHANIC|WHOLESALE…), name, sort, is_default` (exactly one default)
 
 **item_prices:** `item_id, tier_id, price`. PK `(tenant_id, item_id, tier_id)`.
 
@@ -167,7 +173,9 @@ This keeps the one-screen exchange (D-006) to one document, one number, one rece
 
 **sales_payments:** `document_id, method_id, amount (negative for refunds), cash_received (cash; optional, entered by the salesman; null = exact amount), change_due (cash; printed on the bill), reference`
 
-**payment_methods:** `code (cash|bank_transfer|raast|jazzcash|easypaisa|card|on_account), name, gl_account_id, requires_reference, is_cash, is_active`
+**payment_methods:** `code (cash|bank_transfer|raast|jazzcash|easypaisa|card|on_account), name, bank_account_id, requires_reference, is_cash, is_active, sort` (ACC-08, D-083)
+- Cash and on-account have no bank account: the posting engine routes them by role (`CASH_IN_TRANSIT` / `CASH_DRAWER`, `AR_CONTROL`). Every other method posts to its bank account's GL account and needs a reference.
+- A non-cash method without a bank account can't be posted yet; the tenant setup reports it ("needs attention"). Delux: Raast and bank transfer, until the owner picks the bank.
 
 **overrides:** `document_id, line_id (nullable), kind (below_list|below_floor|credit_limit|offline_cap|no_receipt_return|return_permission|return_outside_policy|void|reprint), requested_by_user_id, approved_by_user_id, reason_code, note, values jsonb, at_device`
 
@@ -191,9 +199,10 @@ Held bills are **device-local only** and never sent to the server.
 
 **cash_movements** (non-party cash): `session_id, device_id, number, kind (expense|bank_deposit|float_in|float_out|other), amount, expense_category_id, bank_account_id, note, reference, user_id`
 
-**expense_categories:** `name, gl_account_id`
+**expense_categories:** `code, name, gl_account_id (a postable expense account), is_active`
 
-**bank_accounts:** `name, kind (bank|wallet|card_clearing), gl_account_id`
+**bank_accounts:** `code, name, kind (bank|wallet|card_clearing), gl_account_id (its own asset account under 1100 Cash and bank), is_active`
+- Delux: Soneri (1150), HBL (1160), JazzCash (1170), Easypaisa (1171), card settlement clearing (1180).
 
 **day_reconciliations**†: `branch_id, business_date, status (provisional|final), summary jsonb (missing handovers, variances, exceptions), computed_at`
 
@@ -239,6 +248,8 @@ Held bills are **device-local only** and never sent to the server.
 **accounts:** `code, name, type (asset|liability|equity|income|expense), parent_id, is_postable, system_role (nullable, unique per tenant), is_active, legacy_code`
 
 System roles: `CASH_DRAWER, CASH_IN_TRANSIT, AR_CONTROL, AP_CONTROL, INVENTORY, COGS, SALES, SALES_RETURNS, SALES_DISCOUNT, ROUNDING, CASH_SHORT_OVER, INVENTORY_ADJUSTMENT, PURCHASE_PRICE_VARIANCE, OPENING_BALANCE_EQUITY, RETAINED_EARNINGS, TAX_PAYABLE, TAX_RECOVERABLE` (the tax roles are unused in the MVP). Bank, wallet and card accounts are mapped through `bank_accounts` and `payment_methods`.
+- A new tenant's chart comes from the retail template (`packages/db/templates/retail-coa.json`, posting rules §2) plus one account per bank account (D-083).
+- `validateChartOfAccounts` (`packages/domain`) checks it before anything is written: every required role exactly once, on a postable account; children share their parent's type; parents aren't postable; codes unique. Only postable accounts carry a role (a CHECK in the database too).
 
 **fiscal_years / periods:** `start_date, end_date, status (open|closed)`. Generated from `tenants.fiscal_year_start_month`. `tenants.lock_date` blocks postings on or before that date.
 

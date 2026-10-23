@@ -1,4 +1,4 @@
-import { LoginRequest, type MeResponse } from '@erp/contracts';
+import { ChangePasswordRequest, LoginRequest, type MeResponse } from '@erp/contracts';
 import { withTenant } from '@erp/db';
 import {
   can,
@@ -14,7 +14,7 @@ import rateLimit from '@fastify/rate-limit';
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
 import type pg from 'pg';
 
-import { hashPassword, needsRehash, verifyPassword } from './password';
+import { hashPassword, needsRehash, passwordProblem, verifyPassword } from './password';
 import {
   hashToken,
   LOCK_AFTER_FAILURES,
@@ -41,6 +41,8 @@ export interface AuthContext {
   username: string;
   fullName: string;
   grants: RoleGrant[];
+  /** A generated password must be changed before anything else (D-083). */
+  mustChangePassword: boolean;
 }
 
 declare module 'fastify' {
@@ -76,6 +78,7 @@ const me = (a: Omit<AuthContext, 'sessionId'>): MeResponse => ({
   user: { id: a.userId, username: a.username, fullName: a.fullName },
   permissions: expandPermissions(a.grants, null),
   limits: effectiveLimits(a.grants, null),
+  mustChangePassword: a.mustChangePassword,
 });
 
 /** Registers the auth routes on `scope` and returns `requireAuth` for other routes in it. */
@@ -94,7 +97,8 @@ export async function registerAuth(
     if (hostOf(origin) !== req.headers.host) await reply.code(403).send({ error: 'bad_origin' });
   });
 
-  const requireAuth: preHandlerAsyncHookHandler = async (req, reply) => {
+  // A valid session, whether or not the password must be changed: only me, logout and the change itself use it.
+  const requireSession: preHandlerAsyncHookHandler = async (req, reply) => {
     const parsed = parseSessionCookie(req.cookies[SESSION_COOKIE]);
     if (!parsed) return reply.code(401).send({ error: 'unauthenticated' });
     const t = now();
@@ -105,8 +109,9 @@ export async function registerAuth(
         last_seen_at: Date;
         username: string;
         full_name: string;
+        must_change_password: boolean;
       }>(
-        `SELECT s.id, s.user_id, s.last_seen_at, u.username, u.full_name
+        `SELECT s.id, s.user_id, s.last_seen_at, u.username, u.full_name, u.must_change_password
          FROM erp.sessions s JOIN erp.users u ON u.tenant_id = s.tenant_id AND u.id = s.user_id
          WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > $2 AND s.last_seen_at > $3
            AND u.status = 'active' AND u.deleted_at IS NULL`,
@@ -124,9 +129,17 @@ export async function registerAuth(
         username: s.username,
         fullName: s.full_name,
         grants: await loadGrants(c, s.user_id),
+        mustChangePassword: s.must_change_password,
       };
     });
     if (!req.auth) return reply.code(401).send({ error: 'unauthenticated' });
+  };
+
+  // Every other route: a valid session and no pending password change.
+  const requireAuth: preHandlerAsyncHookHandler = async (req, reply) => {
+    await requireSession.call(scope, req, reply);
+    if (reply.sent) return;
+    if (req.auth!.mustChangePassword) return reply.code(403).send({ error: 'password_change_required' });
   };
 
   scope.post(
@@ -161,11 +174,13 @@ export async function registerAuth(
           username: string;
           full_name: string;
           password_hash: string | null;
+          must_change_password: boolean;
           status: string;
           failed_logins: number | null;
           locked_until: Date | null;
         }>(
-          `SELECT u.id, u.username, u.full_name, u.password_hash, u.status, s.failed_logins, s.locked_until
+          `SELECT u.id, u.username, u.full_name, u.password_hash, u.must_change_password, u.status,
+           s.failed_logins, s.locked_until
          FROM erp.users u LEFT JOIN erp.user_login_state s ON s.user_id = u.id
          WHERE lower(u.username) = lower($1) AND u.deleted_at IS NULL
          FOR UPDATE OF u`,
@@ -231,6 +246,7 @@ export async function registerAuth(
             username: user.username,
             fullName: user.full_name,
             grants: await loadGrants(c, user.id),
+            mustChangePassword: user.must_change_password,
           }),
         };
       });
@@ -247,7 +263,7 @@ export async function registerAuth(
     },
   );
 
-  scope.post('/auth/logout', { preHandler: requireAuth }, async (req, reply) => {
+  scope.post('/auth/logout', { preHandler: requireSession }, async (req, reply) => {
     const a = req.auth!;
     await withTenant(pool, { tenantId: a.tenantId, userId: a.userId, requestId: req.id }, async (_db, c) => {
       await c.query('UPDATE erp.sessions SET revoked_at = $1 WHERE id = $2', [now(), a.sessionId]);
@@ -261,7 +277,53 @@ export async function registerAuth(
     return reply.code(204).send();
   });
 
-  scope.get('/auth/me', { preHandler: requireAuth }, (req) => me(req.auth!));
+  scope.get('/auth/me', { preHandler: requireSession }, (req) => me(req.auth!));
+
+  // Change your own password (D-083): needs the current one; ends your other sessions.
+  scope.put(
+    '/users/me/password',
+    { preHandler: requireSession, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (req, reply) => {
+      const body = ChangePasswordRequest.safeParse(req.body);
+      if (!body.success) return reply.code(400).send({ error: 'invalid_request' });
+      const { currentPassword, newPassword } = body.data;
+      const a = req.auth!;
+      const t = now();
+      const outcome = await withTenant(
+        pool,
+        { tenantId: a.tenantId, userId: a.userId, requestId: req.id },
+        async (_db, c) => {
+          const { rows } = await c.query<{ password_hash: string | null }>(
+            'SELECT password_hash FROM erp.users WHERE id = $1 FOR UPDATE',
+            [a.userId],
+          );
+          if (!(await verifyPassword(rows[0]?.password_hash ?? null, currentPassword)))
+            return 'wrong' as const;
+          const problem = passwordProblem(newPassword, a.username);
+          if (problem) return { problem };
+          await c.query(
+            `UPDATE erp.users SET password_hash = $1, must_change_password = false, password_changed_at = $2
+             WHERE id = $3`,
+            [await hashPassword(newPassword), t, a.userId],
+          );
+          await c.query(
+            'UPDATE erp.sessions SET revoked_at = $1 WHERE user_id = $2 AND id <> $3 AND revoked_at IS NULL',
+            [t, a.userId, a.sessionId],
+          );
+          await c.query(
+            `INSERT INTO erp.audit_log (tenant_id, user_id, request_id, action, entity, entity_id, ip)
+             VALUES ($1, $2, $3, 'password.changed', 'user', $2, $4)`,
+            [a.tenantId, a.userId, req.id, req.ip],
+          );
+          return 'changed' as const;
+        },
+      );
+      if (outcome === 'wrong') return reply.code(401).send({ error: 'wrong_password' });
+      if (outcome !== 'changed')
+        return reply.code(400).send({ error: 'weak_password', problem: outcome.problem });
+      return reply.code(204).send();
+    },
+  );
 
   // "May I?" for screens: 204 if the user has the permission (all branches), 403 if not.
   scope.get<{ Params: { permission: string } }>(
