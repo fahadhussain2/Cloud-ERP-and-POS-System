@@ -626,3 +626,21 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Offline unlock and overrides work without the server.
   - The honest limit of short PINs is accepted and documented: they give accountability, not strong authentication.
 - **Status:** Accepted (with the W0-10 plan and spec)
+
+### D-083 Tenant setup from a reviewed spec; create-if-missing; owner sets their own password (2026-10-23)
+- **Decision:**
+  - A tenant is described by a JSON spec in git (no secrets) and created by one idempotent command (PLT-11):
+    - settings, branch, locations
+    - the retail chart-of-accounts template plus the tenant's banks and wallets
+    - payment methods, price tiers, tax code, expense categories, print profile
+    - the six role templates and the owner account
+  - **Re-running changes nothing.** It creates only what's missing, never overwrites, and reports differences as drift.
+  - **Chart of accounts:** `packages/domain` checks that every system role is mapped exactly once, children share their parent's type, and parents aren't postable.
+  - **Payment methods:** cash isn't mapped to an account (the posting engine routes it by role). Non-cash methods map to a bank, wallet or card-clearing account; an unmapped one is reported as needing attention. For Delux, **Raast and bank transfer start unmapped** until the owner picks the bank.
+  - **Owner password:** the owner types it at a hidden prompt on the server. Generated passwords (test tenants only) force a password change, which the API enforces.
+  - **Delux:** shop code `delux`, owner `fahad`. The bill header is filled in later (by the legacy importer if the dump has it, otherwise in the back office).
+- **Why:**
+  - Repeatable shops for testing, demos and new customers.
+  - A live shop's settings never change as a side effect.
+  - Nobody else sees the owner's password.
+- **Status:** Accepted (with the W0-11 plan)

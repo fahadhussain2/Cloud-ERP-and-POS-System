@@ -1,0 +1,183 @@
+{
+  "description": "Chart-of-accounts rules (ACC-01, posting rules §2, D-083): every required system role exactly once, on a postable account; children share their parent's type; parents aren't postable; codes unique. `required` lists the roles this case requires.",
+  "cases": [
+    {
+      "name": "a small valid chart",
+      "input": {
+        "required": ["CASH_DRAWER", "SALES"],
+        "accounts": [
+          { "code": "1000", "type": "asset", "parentCode": null, "isPostable": false, "systemRole": null },
+          {
+            "code": "1110",
+            "type": "asset",
+            "parentCode": "1000",
+            "isPostable": true,
+            "systemRole": "CASH_DRAWER"
+          },
+          { "code": "4000", "type": "income", "parentCode": null, "isPostable": false, "systemRole": null },
+          {
+            "code": "4100",
+            "type": "income",
+            "parentCode": "4000",
+            "isPostable": true,
+            "systemRole": "SALES"
+          }
+        ]
+      },
+      "expected": []
+    },
+    {
+      "name": "a missing system role",
+      "input": {
+        "required": ["CASH_DRAWER", "SALES"],
+        "accounts": [
+          { "code": "1000", "type": "asset", "parentCode": null, "isPostable": false, "systemRole": null },
+          {
+            "code": "1110",
+            "type": "asset",
+            "parentCode": "1000",
+            "isPostable": true,
+            "systemRole": "CASH_DRAWER"
+          }
+        ]
+      },
+      "expected": [{ "problem": "missing_role", "role": "SALES" }]
+    },
+    {
+      "name": "a system role on two accounts",
+      "input": {
+        "required": ["CASH_DRAWER"],
+        "accounts": [
+          { "code": "1000", "type": "asset", "parentCode": null, "isPostable": false, "systemRole": null },
+          {
+            "code": "1110",
+            "type": "asset",
+            "parentCode": "1000",
+            "isPostable": true,
+            "systemRole": "CASH_DRAWER"
+          },
+          {
+            "code": "1130",
+            "type": "asset",
+            "parentCode": "1000",
+            "isPostable": true,
+            "systemRole": "CASH_DRAWER"
+          }
+        ]
+      },
+      "expected": [{ "problem": "duplicate_role", "role": "CASH_DRAWER", "accounts": ["1110", "1130"] }]
+    },
+    {
+      "name": "a system role on a header account",
+      "input": {
+        "required": ["CASH_DRAWER"],
+        "accounts": [
+          {
+            "code": "1000",
+            "type": "asset",
+            "parentCode": null,
+            "isPostable": false,
+            "systemRole": "CASH_DRAWER"
+          }
+        ]
+      },
+      "expected": [{ "problem": "role_on_header", "account": "1000" }]
+    },
+    {
+      "name": "a child of another type",
+      "input": {
+        "required": [],
+        "accounts": [
+          { "code": "1000", "type": "asset", "parentCode": null, "isPostable": false, "systemRole": null },
+          { "code": "1110", "type": "expense", "parentCode": "1000", "isPostable": true, "systemRole": null }
+        ]
+      },
+      "expected": [{ "problem": "type_mismatch", "account": "1110" }]
+    },
+    {
+      "name": "a postable parent",
+      "input": {
+        "required": [],
+        "accounts": [
+          { "code": "6100", "type": "expense", "parentCode": null, "isPostable": true, "systemRole": null },
+          { "code": "6110", "type": "expense", "parentCode": "6100", "isPostable": true, "systemRole": null }
+        ]
+      },
+      "expected": [{ "problem": "postable_parent", "account": "6100" }]
+    },
+    {
+      "name": "an unknown parent",
+      "input": {
+        "required": [],
+        "accounts": [
+          { "code": "1110", "type": "asset", "parentCode": "1000", "isPostable": true, "systemRole": null }
+        ]
+      },
+      "expected": [{ "problem": "unknown_parent", "account": "1110" }]
+    },
+    {
+      "name": "a duplicate account code",
+      "input": {
+        "required": [],
+        "accounts": [
+          { "code": "1000", "type": "asset", "parentCode": null, "isPostable": false, "systemRole": null },
+          { "code": "1000", "type": "asset", "parentCode": null, "isPostable": false, "systemRole": null }
+        ]
+      },
+      "expected": [{ "problem": "duplicate_code", "account": "1000" }]
+    },
+    {
+      "name": "an unknown account type (templates and imports are data, not code)",
+      "input": {
+        "required": [],
+        "accounts": [
+          { "code": "7000", "type": "other", "parentCode": null, "isPostable": true, "systemRole": null }
+        ]
+      },
+      "expected": [{ "problem": "unknown_type", "account": "7000" }]
+    },
+    {
+      "name": "an unknown system role",
+      "input": {
+        "required": [],
+        "accounts": [
+          {
+            "code": "1110",
+            "type": "asset",
+            "parentCode": null,
+            "isPostable": true,
+            "systemRole": "PETTY_CASH"
+          }
+        ]
+      },
+      "expected": [{ "problem": "unknown_role", "account": "1110" }]
+    },
+    {
+      "name": "a code used three times is reported once",
+      "input": {
+        "required": [],
+        "accounts": [
+          { "code": "1110", "type": "asset", "parentCode": null, "isPostable": true, "systemRole": null },
+          { "code": "1110", "type": "asset", "parentCode": null, "isPostable": true, "systemRole": null },
+          { "code": "1110", "type": "asset", "parentCode": null, "isPostable": true, "systemRole": null }
+        ]
+      },
+      "expected": [{ "problem": "duplicate_code", "account": "1110" }]
+    },
+    {
+      "name": "several problems are all reported, sorted",
+      "input": {
+        "required": ["SALES"],
+        "accounts": [
+          { "code": "6100", "type": "expense", "parentCode": null, "isPostable": true, "systemRole": null },
+          { "code": "6110", "type": "income", "parentCode": "6100", "isPostable": true, "systemRole": null }
+        ]
+      },
+      "expected": [
+        { "problem": "missing_role", "role": "SALES" },
+        { "problem": "postable_parent", "account": "6100" },
+        { "problem": "type_mismatch", "account": "6110" }
+      ]
+    }
+  ]
+}

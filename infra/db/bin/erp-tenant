@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Creates or completes a tenant from its spec, or resets a password (W0-11, PLT-11, D-083).
+# Installed by infra/db/apply.sh, with the specs from infra/db/tenants in /srv/erp/tenants.
+#
+#   sudo erp-tenant setup <env> <name>                   the owner types their password at a hidden prompt
+#                                                        (run it with ssh -t); nobody else sees it
+#   sudo erp-tenant setup <env> <name> --generated       test tenants: a generated password, shown once, that
+#                                                        must be changed at the first login
+#   sudo erp-tenant reset-password <env> <shop> <user>   support: a generated temporary password (must be changed),
+#                                                        also lifts a lockout and ends the user's sessions
+#   sudo erp-tenant list                                 the specs on this server
+#
+# <env> is prod or staging. Re-running setup is safe: it creates only what's missing and reports any value that
+# differs from the spec without changing it. It runs the API image of the environment's current release in a
+# one-off container on the database network, with the owner role's URL (migrate.env), like the migrate step.
+set -euo pipefail
+
+ROOT=/srv/erp
+SPECS=$ROOT/tenants
+
+die() {
+  echo "erp-tenant: $*" >&2
+  exit 1
+}
+[[ $EUID -eq 0 ]] || die "run with sudo"
+
+check_env() { [[ ${1:-} == prod || ${1:-} == staging ]] || die "environment must be prod or staging"; }
+
+# The input goes to the container as JSON on stdin, so the password is never in a command line or environment.
+make_input() { # setup <spec file> prompt|generated  |  reset-password <shop> <user>
+  python3 - "$@" <<'PY'
+import getpass, json, secrets, sys
+
+def generated(user):
+    pw = secrets.token_urlsafe(15)
+    print(f"temporary password for {user}: {pw}\n  (shown once; it must be changed at the first login)", file=sys.stderr)
+    return pw
+
+if sys.argv[1] == "setup":
+    with open(sys.argv[2], encoding="utf-8") as f:
+        spec = json.load(f)
+    user = spec["owner"]["username"]
+    if sys.argv[3] == "generated":
+        pw, must_change = generated(user), True
+    else:
+        try:
+            open("/dev/tty").close()
+        except OSError:
+            sys.exit("erp-tenant: the password prompt needs a terminal: ssh -t ... sudo erp-tenant ...")
+        pw = getpass.getpass(f"Choose the password for {user} (at least 10 characters): ")
+        if getpass.getpass("Type it again: ") != pw:
+            sys.exit("erp-tenant: the two passwords differ; nothing was changed")
+        must_change = False
+    json.dump({"action": "setup", "spec": spec, "ownerPassword": pw, "mustChangePassword": must_change}, sys.stdout)
+else:
+    shop, user = sys.argv[2], sys.argv[3]
+    json.dump({"action": "reset-password", "tenantCode": shop, "username": user, "password": generated(user)}, sys.stdout)
+PY
+}
+
+run_admin() { # env; stdin: the JSON input
+  local env=$1 tag
+  tag=$(cat "$ROOT/$env/current" 2>/dev/null) || die "nothing is deployed to $env yet"
+  [[ -f $ROOT/$env/migrate.env ]] || die "missing $ROOT/$env/migrate.env (run infra/db/apply.sh for $env)"
+  docker run --rm -i --network "erp-$env-db" --env-file "$ROOT/$env/migrate.env" \
+    --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges --memory 512m \
+    "erp-api:$tag" node dist/tenant-admin.js
+}
+
+cmd=${1:-}
+case $cmd in
+  setup)
+    check_env "${2:-}"
+    name=${3:-}
+    [[ $name =~ ^[a-z0-9][a-z0-9-]{0,31}$ ]] || die "usage: erp-tenant setup <env> <name> [--generated]"
+    spec=$SPECS/$name.json
+    [[ -f $spec ]] || die "no spec $spec (see: erp-tenant list)"
+    mode=prompt
+    case ${4:-} in
+      '') ;;
+      --generated) mode=generated ;;
+      *) die "unknown option ${4}" ;;
+    esac
+    make_input setup "$spec" "$mode" | run_admin "$2" || die "setup failed; nothing was changed"
+    ;;
+  reset-password)
+    check_env "${2:-}"
+    [[ ${3:-} =~ ^[a-z0-9][a-z0-9-]{1,31}$ && ${4:-} =~ ^[A-Za-z0-9._-]{1,64}$ ]] ||
+      die "usage: erp-tenant reset-password <env> <shop> <user>"
+    make_input reset-password "$3" "$4" | run_admin "$2" || die "reset failed; the password above was not set"
+    ;;
+  list)
+    find "$SPECS" -maxdepth 1 -name '*.json' -printf '%f\n' 2>/dev/null | sed 's/\.json$//' | sort
+    ;;
+  *)
+    sed -n '4,12p' "$0" >&2
+    exit 2
+    ;;
+esac

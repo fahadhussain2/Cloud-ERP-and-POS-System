@@ -9,7 +9,7 @@ Production runs on one Hetzner CX33 (`erp-prod-1`, `204.168.217.64`, Helsinki, U
 | `edge/` | The shared Caddy (TLS, headers) for production and staging. It routes each site to its environment's `web` and `api` containers. `apply.sh` deploys it. |
 | `app/` | One release of the apps (`api`, `worker`, `web`) for one environment: `compose.yaml` plus non-secret settings per environment. Deployed by `erp-deploy`. |
 | `server/files/bin/erp-deploy` | The only program the GitHub deploy key may run on the server (D-075). |
-| `db/` | PostgreSQL + pgBackRest per environment: image, config, `apply.sh`, `erp-db` (backups, canary, status, secrets, restore drills), systemd timers (D-076). |
+| `db/` | PostgreSQL + pgBackRest per environment: image, config, `apply.sh`, `erp-db` (backups, canary, status, secrets, restore drills), systemd timers (D-076). `erp-tenant` and the tenant specs in `db/tenants/` (D-083). |
 
 ## Access
 
@@ -101,6 +101,28 @@ Each drill restores into a throwaway container, runs `pg_amcheck`, reports the r
 ```bash
 ssh admin@204.168.217.64 "sudo erp-db status && sudo cat /srv/erp/prod/backup-status.json"
 ```
+
+## Tenants (D-083)
+
+A shop is described by a reviewed spec in `db/tenants/<name>.json` (settings, branch, locations, banks, payment methods, tiers, print profile, the owner's username; no secrets). `infra/db/apply.sh` copies the specs to `/srv/erp/tenants/` and installs `erp-tenant`. It runs the API image of the environment's current release, so deploy first.
+
+**Create a shop (or complete it).** The owner chooses the password at a hidden prompt; nobody else sees it:
+```bash
+ssh -t admin@204.168.217.64 sudo erp-tenant setup prod delux
+```
+It prints what it created, any **drift** (spec values that differ from the database; never applied) and what **needs attention** (e.g. a payment method without a bank account). A second run prints `no changes`. To change a live shop, use the back office (or a migration), not the spec.
+
+**A test shop** with a generated password, shown once, that must be changed at the first login:
+```bash
+ssh admin@204.168.217.64 sudo erp-tenant setup staging demo --generated
+```
+
+**Forgotten password** (support): sets a generated temporary password that must be changed, lifts a lockout and ends the user's sessions. Give the password to the user in person or by phone:
+```bash
+ssh admin@204.168.217.64 sudo erp-tenant reset-password prod delux fahad
+```
+
+**A new shop:** copy `db/tenants/demo.json`, change it, open a PR, then run `infra/db/apply.sh` for each environment and `erp-tenant setup` (staging first).
 
 ## Common tasks
 
