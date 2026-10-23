@@ -16,6 +16,8 @@ import { hashPassword } from './auth/password';
 
 // Device enrollment, key-based device tokens, revocation and staff PIN (PLT-03, PLT-04, spec, D-082).
 
+type DeviceKeys = Awaited<ReturnType<typeof generateDeviceKey>>;
+
 const SHOP = 'device-shop';
 const HOST = 'app.example.test';
 const ORIGIN = `https://${HOST}`;
@@ -81,7 +83,7 @@ async function newCode(cookie: string, kind = 'counter', branchId = branch) {
   return res.json<{ code: string; expiresAt: string }>().code;
 }
 
-async function enroll(code: string, keys?: CryptoKeyPair, shop = SHOP) {
+async function enroll(code: string, keys?: DeviceKeys, shop = SHOP) {
   const k = keys ?? (await generateDeviceKey());
   const publicKey = await exportPublicKey(k.publicKey);
   const signature = await signCanonical(k.privateKey, { tenantCode: shop, code, publicKey });
@@ -89,7 +91,7 @@ async function enroll(code: string, keys?: CryptoKeyPair, shop = SHOP) {
   return { res, keys: k };
 }
 
-async function deviceToken(deviceId: string, keys: CryptoKeyPair, tenantId = tenant) {
+async function deviceToken(deviceId: string, keys: DeviceKeys, tenantId = tenant) {
   const ch = await post('/api/devices/challenge', { tenantId, deviceId });
   if (ch.statusCode !== 200) return { status: ch.statusCode, token: null };
   const { nonce } = ch.json<{ nonce: string }>();

@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#11](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/11) |
 | **Module** | platform |
-| **Status** | Accepted with [the spec](../spec.md) (2026-10-23) |
+| **Status** | Built; PR to staging with the `deploy:staging` check |
 | **Refs** | PLT-03, PLT-04, PLT-07; architecture §4.3, §6.3; [platform spec](../spec.md); D-026, D-081, D-082 |
 | **Depends on** | W0-09 (users, roles, sessions, audit) |
 | **Size** | about 2.5 days |
@@ -72,22 +72,22 @@ The server side of trusted counters, ready for the POS app in Wave 1:
 ## Tests written first
 
 **Domain (golden):**
-- [ ] PIN rules: 4–6 digits only; `1111`, `1234`, `9876` and the user's short code are refused; `4821` is accepted.
-- [ ] Lockout: the 5th wrong PIN locks; a right PIN before that resets the count; a locked user stays locked even with the right PIN until a manager unlock.
-- [ ] Device codes: the next number per kind, **never reused** (after `C01` and a revoked `C02` comes `C03`, so old bill numbers stay unique); a cash desk is `D01`.
+- [x] PIN rules: 4–6 digits only; `1111`, `1234`, `9876` and the user's short code are refused; `4821` is accepted.
+- [x] Lockout: the 5th wrong PIN locks; a right PIN before that resets the count; a locked user stays locked even with the right PIN until a manager unlock.
+- [x] Device codes: the next number per kind, **never reused** (after `C01` and a revoked `C02` comes `C03`, so old bill numbers stay unique); a cash desk is `D01`.
 
 **Cross-check between browser and server crypto (unit, Node's WebCrypto):**
-- [ ] A signature made by the POS library verifies in the API helper; a single changed byte fails.
-- [ ] A PIN verifier made by the API verifies in the POS library, and the reverse.
-- [ ] `canonicalJson` gives the same bytes for the same object, whatever the key order.
+- [x] A signature made by the POS library verifies in the API helper; a single changed byte fails.
+- [x] A PIN verifier made by the API verifies in the POS library, and the reverse.
+- [x] `canonicalJson` gives the same bytes for the same object, whatever the key order.
 
 **API (integration, real database):**
-- [ ] Enrollment code: created only with `admin.devices`; shown once; expires after 15 minutes; works once; a wrong or reused code gives the same error; rate limit.
-- [ ] Enroll: a bad proof-of-possession signature is refused; a device gets `C01`, then `C02`; the audit log shows who created the code and which device used it.
-- [ ] Token: a correct challenge signature gives a 15-minute token that works on `GET /api/devices/me`; a wrong signature, an expired nonce, a reused nonce, or **another device's key** is refused.
-- [ ] Revoke: the token stops working at once, and a new challenge or token is refused.
-- [ ] Device tokens can't be used as back-office sessions, and the reverse.
-- [ ] Set PIN: needs the current password; refuses `1234`; the stored verifier is PBKDF2 (never the plain PIN); **the back-office login still refuses the PIN** (from W0-09).
+- [x] Enrollment code: created only with `admin.devices`; shown once; expires after 15 minutes; works once; a wrong or reused code gives the same error; rate limit.
+- [x] Enroll: a bad proof-of-possession signature is refused; a device gets `C01`, then `C02`; the audit log shows who created the code and which device used it.
+- [x] Token: a correct challenge signature gives a 15-minute token that works on `GET /api/devices/me`; a wrong signature, an expired nonce, a reused nonce, or **another device's key** is refused.
+- [x] Revoke: the token stops working at once, and a new challenge or token is refused.
+- [x] Device tokens can't be used as back-office sessions, and the reverse.
+- [x] Set PIN: needs the current password; refuses `1234`; the stored verifier is PBKDF2 (never the plain PIN); **the back-office login still refuses the PIN** (from W0-09).
 
 ## Order
 
@@ -111,3 +111,25 @@ The server side of trusted counters, ready for the POS app in Wave 1:
 ## Owner actions
 
 None.
+
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| **One WebCrypto implementation in `packages/contracts`** (`device-crypto.ts`), used by the POS and the API, instead of a POS library plus an API helper checked against each other | Browsers and Node 24 both have WebCrypto. With one implementation, a signature or PIN-verifier format mismatch between the two sides can't happen at all. The "cross-check" tests become direct tests of the shared code. |
+| The API and contracts TypeScript configs include the `DOM` library | For the WebCrypto, `TextEncoder` and `atob`/`btoa` types; Node 24 provides these at runtime. |
+| `devices` has no `last_seen_at`, `app_version` or `health` yet | Updating them on every check-in would write audit rows and sync versions all day. They go in a separate device-health table with PLT-09. |
+| The token request signs the canonical JSON of `{ tenantId, deviceId, nonce }` (spec §2 updated) | One signing format (canonical JSON) for everything, instead of a second ad-hoc string format. |
+| The per-shop enrollment limit (10 failures in 15 minutes → 429) counts `device.enroll_failed` audit rows | The audit trail is already there, so no extra table is needed. The per-IP limit is the route rate limit. |
+| Setting a PIN writes an explicit `pin.changed` audit row | The audit trigger strips `pin_verifier`, so a PIN-only change would otherwise leave no trace. |
+
+## Results (2026-10-23)
+
+| Check | Result |
+|---|---|
+| Tests first | Committed failing (`3d741cc`). |
+| Domain | 27 new golden cases (PIN rules, lockout, device codes); `packages/domain` stays at **100%** coverage. |
+| Shared crypto (11 tests) | Canonical JSON key order and invalid values; P1363 64-byte signatures; tampered value / wrong key / broken key are refused; the **private key can't be exported**; PIN verifiers are PBKDF2 at 600,000 iterations, salted, never contain the PIN, and garbage is refused. |
+| API (12 new integration tests) | Codes only with `admin.devices`, stored hashed, `K7Q2-M9XD` format. Enrollment `C01`, `C02`, `D01`; a reused, wrong or expired code and a **forged proof of key** all fail the same way; the per-shop limit; the audit trail names the manager. 15-minute tokens. Another device's key, a wrong signature, an expired nonce and a **reused nonce** are refused. Revocation stops the token at once. Session cookies and device tokens can't stand in for each other. PIN: needs the password, refuses `1234` and the short code, stores a PBKDF2 verifier, is audited, and **still can't log in**. |
+| Mutation checks | No proof-of-key check: the forged-proof test fails. Reusable nonce: the nonce test fails. |
+| Totals | `pnpm check` green with **217 unit tests**; **58 integration tests** pass. |

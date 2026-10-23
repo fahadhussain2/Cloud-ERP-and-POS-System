@@ -26,7 +26,7 @@ This spec defines how a counter becomes a trusted shop device, how it talks to t
 There are **no long-lived device secrets** besides the non-extractable key. A device gets a short access token by proving it holds its key:
 
 1. `POST /api/devices/challenge` → a random **nonce**, valid for 60 seconds, usable once.
-2. The device signs `tenantId | deviceId | nonce` and calls `POST /api/devices/token`.
+2. The device signs the canonical JSON of `{ tenantId, deviceId, nonce }` (§3) and calls `POST /api/devices/token`.
 3. The server verifies the signature with the stored public key and checks that the device is **active**. It then issues an **access token valid for 15 minutes**. Only the token's SHA-256 is stored.
 4. Requests carry `Authorization: Device <tenantId>.<token>`. The server sets the tenant context from it and looks the token up **under RLS**, the same pattern as back-office sessions (D-081).
 

@@ -37,12 +37,17 @@ Data in this document is grouped by area. Fields marked † are derived and main
 **locations:** `branch_id, code, name, kind (shop|storage|damaged), is_sellable`
 - Delux: `SHOP` (sellable), `GODOWN` (storage), `DAMAGED` (not sellable).
 
-**devices:** `branch_id, code (e.g. C03, D01), name, kind (counter|cash_desk|mobile), public_key (ECDSA P-256), print_profile_id (nullable → tenant default), status (active|revoked), enrolled_at, revoked_at, last_seen_at, app_version, health jsonb`
+**devices:** `branch_id, code (C01… counters, D01… cash desks, M01… mobile; never reused), name, kind (counter|cash_desk|mobile), public_key (ECDSA P-256, SPKI), status (active|revoked), enrolled_at, enrolled_by_user_id, revoked_at, revoked_by_user_id` (D-082)
+- Still to come: `print_profile_id` with print profiles (W0-11), and `last_seen_at`, `app_version`, `health` in a separate device-health table (PLT-09), so routine check-ins don't create audit or sync noise.
 
 **print_profiles:** `name, paper_format (a4|a5|thermal_80|thermal_58), code_type (barcode|signed_qr), copies (1|2), template_options jsonb (header lines, policy text, font size), is_tenant_default`
 - Delux: one profile `A5 landscape dot matrix` (`paper_format = a5`), `barcode` (Code 39), 1 copy, the default for every device.
 
-**device_enrollment_codes:** `branch_id, code_hash, expires_at, used_at, created_by_user_id`
+**device_enrollment_codes:** `branch_id, kind, name, code_hash (SHA-256), created_by_user_id, expires_at (15 min), used_at, used_by_device_id`
+
+**device_challenges:** `device_id, nonce_hash, expires_at (60 s), used_at`. A single-use nonce a device signs to get a token.
+
+**device_tokens:** `device_id, token_hash, expires_at (15 min)`. Deleted when the device is revoked. See the [platform spec](modules/platform/spec.md).
 
 **device_series** (server mirror for gap detection): `device_id, family (S|H|R|M|Z), last_accepted_seq, missing_seqs int[]`
 

@@ -159,3 +159,53 @@ export const auditLog = erp.table('audit_log', {
   after: jsonb('after'),
   ip: text('ip'),
 });
+
+/** Enrolled devices (D-082). The public key verifies device tokens and document signatures. */
+export const devices = erp.table('devices', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  code: text('code').notNull(),
+  name: text('name'),
+  kind: text('kind', { enum: ['counter', 'cash_desk', 'mobile'] }).notNull(),
+  publicKey: bytea('public_key').notNull(),
+  status: text('status', { enum: ['active', 'revoked'] }).notNull(),
+  enrolledAt: timestamp('enrolled_at', { withTimezone: true }).notNull(),
+  enrolledByUserId: uuid('enrolled_by_user_id'),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  revokedByUserId: uuid('revoked_by_user_id'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const deviceEnrollmentCodes = erp.table('device_enrollment_codes', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  kind: text('kind', { enum: ['counter', 'cash_desk', 'mobile'] }).notNull(),
+  name: text('name'),
+  codeHash: bytea('code_hash').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  createdByUserId: uuid('created_by_user_id').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  usedByDeviceId: uuid('used_by_device_id'),
+});
+
+export const deviceChallenges = erp.table('device_challenges', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  nonceHash: bytea('nonce_hash').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+});
+
+export const deviceTokens = erp.table('device_tokens', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  tokenHash: bytea('token_hash').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+});
