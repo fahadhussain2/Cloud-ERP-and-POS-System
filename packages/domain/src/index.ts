@@ -2,6 +2,17 @@
 // No I/O, no clock, no randomness: inputs in, results out. Every rule has golden test cases.
 export { allocate } from './allocate';
 export { businessDate } from './business-date';
+export {
+  nextDeviceCode,
+  nextPinState,
+  PIN_MAX_FAILURES,
+  pinProblem,
+  type DeviceKind,
+  type PinEvent,
+  type PinProblem,
+  type PinResult,
+  type PinState,
+} from './device';
 export { DomainError, type DomainErrorCode } from './errors';
 export { add, money, mulBp, mulQty, negate, parseMoney, sub, sum, type Money } from './money';
 export {

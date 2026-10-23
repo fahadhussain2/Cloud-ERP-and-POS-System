@@ -1,0 +1,41 @@
+{
+  "description": "PIN attempts on one device: 5 wrong tries lock the user there until a manager unlocks (architecture §4.3, spec §4, D-082)",
+  "cases": [
+    {
+      "name": "a right PIN unlocks",
+      "input": { "state": { "failures": 0, "locked": false }, "events": ["correct"] },
+      "expected": { "state": { "failures": 0, "locked": false }, "results": ["ok"] }
+    },
+    {
+      "name": "a wrong PIN counts",
+      "input": { "state": { "failures": 0, "locked": false }, "events": ["wrong"] },
+      "expected": { "state": { "failures": 1, "locked": false }, "results": ["wrong"] }
+    },
+    {
+      "name": "a right PIN resets the count",
+      "input": { "state": { "failures": 3, "locked": false }, "events": ["correct"] },
+      "expected": { "state": { "failures": 0, "locked": false }, "results": ["ok"] }
+    },
+    {
+      "name": "the 5th wrong PIN locks",
+      "input": {
+        "state": { "failures": 0, "locked": false },
+        "events": ["wrong", "wrong", "wrong", "wrong", "wrong"]
+      },
+      "expected": {
+        "state": { "failures": 5, "locked": true },
+        "results": ["wrong", "wrong", "wrong", "wrong", "locked"]
+      }
+    },
+    {
+      "name": "locked stays locked, even with the right PIN",
+      "input": { "state": { "failures": 5, "locked": true }, "events": ["correct", "wrong"] },
+      "expected": { "state": { "failures": 5, "locked": true }, "results": ["locked", "locked"] }
+    },
+    {
+      "name": "a manager unlock clears it, then the PIN works",
+      "input": { "state": { "failures": 5, "locked": true }, "events": ["manager_unlock", "correct"] },
+      "expected": { "state": { "failures": 0, "locked": false }, "results": ["unlocked", "ok"] }
+    }
+  ]
+}
