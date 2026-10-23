@@ -608,3 +608,21 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - The POS and the API decide permissions identically (rule 2).
   - Changes can't go unlogged, and history can't be rewritten (PLT-08).
 - **Status:** Accepted (with the W0-09 plan)
+
+### D-082 Device enrollment, key-based device tokens, PBKDF2 staff PIN (2026-10-23)
+- **Decision** (details in `docs/modules/platform/spec.md`):
+  - **Enrollment:** a one-time code (8 Crockford base32 characters, 15 minutes, single use, hashed, rate-limited) created with `admin.devices`. The device generates a non-extractable ECDSA P-256 key and proves it holds it when enrolling.
+  - **Device codes** (`C01…`, `D01…`, `M01…`) are numbered per kind and never reused.
+  - **The key is the only long-lived device credential.** 15-minute access tokens are issued for a signature over a single-use, 60-second server nonce. There are no refresh tokens. Revoking a device ends its tokens at once.
+  - **Signatures:** ECDSA P-256 / SHA-256 in IEEE P1363 form, over canonical JSON from one shared function.
+  - **Staff PIN:**
+    - 4–6 digits; trivial PINs refused
+    - stored as PBKDF2-HMAC-SHA256 with 600,000 iterations, so the browser can check it offline with WebCrypto
+    - 5 wrong tries lock the user on that device until a manager unlocks it
+    - the rules live in `packages/domain`
+    - a PIN never logs in to the back office
+- **Why:**
+  - Nothing reusable to steal on a counter except a key that can't be extracted.
+  - Offline unlock and overrides work without the server.
+  - The honest limit of short PINs is accepted and documented: they give accountability, not strong authentication.
+- **Status:** Accepted (with the W0-10 plan and spec)
