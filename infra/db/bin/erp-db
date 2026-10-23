@@ -155,11 +155,16 @@ EOF
     fi
     restored=$(date +%s)
     # archive_mode=off: a drill must never write WAL into the production backup repository.
+    # Async archive-get prefetches WAL in parallel: replaying a day of WAL one file at a time from the
+    # storage takes minutes (found in the first point-in-time drill).
     docker run -d --name "$name" -e PGBACKREST_CONFIG_INCLUDE_PATH=/run/erp-secrets \
+      -e PGBACKREST_ARCHIVE_ASYNC=y -e PGBACKREST_PROCESS_MAX=8 \
       -v "$SECRETS:/run/erp-secrets:ro" -v "$vol:/var/lib/postgresql/data" "$IMAGE" \
       postgres -c config_file=/etc/postgresql/postgresql.conf -c archive_mode=off -c shared_buffers=256MB >/dev/null
-    for _ in $(seq 1 120); do
+    # Up to 15 minutes, with progress every 30 seconds.
+    for i in $(seq 1 450); do
       [[ $(docker exec -u postgres "$name" psql -X -At -d erp -c 'SELECT NOT pg_is_in_recovery()' 2>/dev/null) == t ]] && break
+      if ((i % 15 == 0)); then say "recovering: $(docker logs "$name" 2>&1 | grep -c 'restored log file') WAL files replayed"; fi
       sleep 2
     done
     [[ $(docker exec -u postgres "$name" psql -X -At -d erp -c 'SELECT NOT pg_is_in_recovery()') == t ]] ||
