@@ -6,3 +6,4 @@ One entry per drill (D-029, D-076). Run with `sudo erp-db restore-drill [--time 
 |---|---|---|---|---|---|---|---|---|
 | 2026-10-22 12:35 | latest | full `20261022-123310F` | 102 s | 7 s | 109 s | clean | not measured | First drill. Synthetic data only (canary). The RPO measure was wrong (compared with the drill start) and was fixed. |
 | 2026-10-22 12:38 | latest | full `20261022-123310F` | 98 s | 9 s | 107 s | clean | 78 s | Restore time went to B2 retries: the free daily download cap was being hit (D-077). |
+| 2026-10-24 08:02 | **point in time** `2026-10-24 07:00:00+00` | full `20261022-123310F` + diff `20261023-220001D` + WAL | 109 s | 126 s | 235 s | clean | n/a: 2,558 canary rows, newest 06:59:01, **0 after the target** | First point-in-time drill, with the fixed script (parallel WAL prefetch). It also proves a differential backup under the free-tier setup restores. |
