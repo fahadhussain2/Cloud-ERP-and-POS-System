@@ -106,3 +106,4 @@ jobs:
       environment: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
     secrets:
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
