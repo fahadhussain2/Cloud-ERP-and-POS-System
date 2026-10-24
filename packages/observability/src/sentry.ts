@@ -29,8 +29,11 @@ export function initSentry(opts: {
     release: opts.version,
     initialScope: { tags: { app: opts.app } },
     sendDefaultPii: false,
+    // Errors only. Our own OpenTelemetry setup traces requests (tracing.ts), so Sentry must not instrument
+    // anything: with tracesSampleRate set at all (even 0) it adds its own Fastify integration, which clashes with
+    // @fastify/otel and crashed the API at startup (2026-10-24); its module hooks would also run twice.
     skipOpenTelemetrySetup: true,
-    tracesSampleRate: 0,
+    registerEsmLoaderHooks: false,
     // scrubEvent only removes fields, so the event keeps Sentry's type.
     beforeSend: (event) => scrubEvent(event as unknown as EventLike) as unknown as typeof event,
   });
