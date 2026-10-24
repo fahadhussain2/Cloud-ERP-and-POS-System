@@ -34,6 +34,18 @@ pnpm legacy:stage --label dec2025
 - The report is `tools/legacy-import/out/<label>/staging-report.md`: counts per table, the dropped credential columns and every staged column name. No values.
 - A run stops, and stages nothing, if a statement is unknown, the counts disagree, or a value looks like a CNIC in a column that isn't dropped. Reviewed exceptions go in `tools/legacy-import/columns.json` (column names only).
 
+### Loading the masters (W0-13)
+
+```bash
+pnpm dev:db
+pnpm legacy:import --label dec2025
+```
+
+- `pnpm dev:db` creates the local `erp_dev` database with the migrations and the Delux tenant (from `infra/db/tenants/delux.json`). Safe to run again.
+- `pnpm legacy:import` loads units, categories, brands, origins, vehicle makes, parties, items (identifiers, vehicle tags, tier prices) and the legacy expense accounts into it, as the app role under RLS. A second run prints `unchanged` everywhere. `--dry-run` (or the `transform` step) compares and reports without writing.
+- The owner's decisions live in `tools/legacy-import/mapping/delux.json` (codes and catalog words only). Edit it after the review and run the import again.
+- Reports: `tools/legacy-import/out/<label>/reports/index.html` (with CSVs for Excel). Party reports have names and masked phones; `summary.json` has counts only.
+
 ## Related
 
 docs/05-LEGACY-MIGRATION.md (all); D-030, D-034, D-052, D-055

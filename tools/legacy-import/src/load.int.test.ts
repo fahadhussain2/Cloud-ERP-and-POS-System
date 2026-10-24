@@ -645,7 +645,9 @@ describe('the first import', () => {
        FROM erp.accounts a LEFT JOIN erp.accounts p ON p.id = a.parent_id WHERE a.tenant_id = :tenant ORDER BY a.code`,
     );
     const byLegacy = Object.fromEntries(
-      accounts.filter((a) => a.legacy_code).map((a) => [a.legacy_code, [a.code, a.name]]),
+      accounts
+        .filter((a) => a.legacy_code)
+        .map((a): [string, string[]] => [a.legacy_code!, [a.code, a.name]]),
     );
     expect(byLegacy).toEqual({
       '10-01-0001': ['1110', 'Cash drawer (cash desk)'],
@@ -783,6 +785,7 @@ describe('the reports', () => {
           'catalog/brand-countries.csv',
           'catalog/partno-not-oem.csv',
           'parties/credit-customers.csv',
+          'company.md',
           'parties/no-phone.csv',
           'accounts/mapping.csv',
         ]),

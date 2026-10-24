@@ -32,11 +32,13 @@ function withUser(url: string, user: { name: string; password: string } | null, 
 /**
  * Creates a fresh database with the two roles and all migrations applied (W0-07, D-078).
  * Needs DATABASE_URL to point at a PostgreSQL 17+ superuser (CI provides one; locally: pnpm db:up).
+ * With a `name`, an existing database of that name is kept and brought up to date (the local `erp_dev`).
  */
-export async function createTestDatabase(): Promise<TestDatabase> {
+export async function createTestDatabase(opts: { name?: string } = {}): Promise<TestDatabase> {
   const base = process.env['DATABASE_URL'];
   if (!base) throw new Error('DATABASE_URL is not set');
-  const name = `erp_test_${randomBytes(6).toString('hex')}`;
+  const name = opts.name ?? `erp_test_${randomBytes(6).toString('hex')}`;
+  if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error(`not a database name: ${name}`);
 
   const admin = new pg.Client({ connectionString: base });
   await admin.connect();
@@ -51,7 +53,8 @@ export async function createTestDatabase(): Promise<TestDatabase> {
           CREATE ROLE ${APP.name} LOGIN PASSWORD '${APP.password}' NOBYPASSRLS;
         END IF;
       END $$`);
-    await admin.query(`CREATE DATABASE ${name}`);
+    const exists = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name]);
+    if (exists.rowCount === 0) await admin.query(`CREATE DATABASE ${name}`);
     await admin.query(`GRANT CONNECT, CREATE ON DATABASE ${name} TO ${OWNER.name}`);
     await admin.query(`GRANT CONNECT ON DATABASE ${name} TO ${APP.name}`);
   } finally {

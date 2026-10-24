@@ -98,6 +98,7 @@ describe('the Drizzle schema matches the database', () => {
   const normalize = (t: string) =>
     t
       .replace(/^char\((\d+)\)$/, 'character($1)')
+      .replace(/^numeric\((\d+), (\d+)\)$/, 'numeric($1,$2)')
       .replace(/^time$/, 'time without time zone')
       .replace(/^timestamp$/, 'timestamp without time zone');
 

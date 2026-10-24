@@ -16,6 +16,7 @@
     "@erp/contracts": "workspace:*",
     "@erp/db": "workspace:*",
     "@erp/domain": "workspace:*",
-    "pg": "catalog:"
+    "pg": "catalog:",
+    "zod": "catalog:"
   }
 }
