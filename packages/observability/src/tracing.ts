@@ -8,6 +8,9 @@ import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 
+/** service.namespace (incubating in semantic-conventions): Grafana Cloud makes the job label `<namespace>/<name>`. */
+const ATTR_SERVICE_NAMESPACE = 'service.namespace';
+
 // OpenTelemetry for the API (architecture §11.1, D-086): request metrics and traces (HTTP, Fastify routes, pg
 // queries) to Alloy at OTEL_EXPORTER_OTLP_ENDPOINT, which forwards them to Grafana Cloud. Started from the app's
 // instrument.js (node --import), before Fastify and pg load. Without the endpoint (tests, local runs) it's off.
@@ -18,6 +21,8 @@ export function startTracing(opts: { service: string; env: string; version: stri
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: opts.service,
       [ATTR_SERVICE_VERSION]: opts.version,
+      // So metrics are told apart by environment: job="prod/erp-api", job="staging/erp-api".
+      [ATTR_SERVICE_NAMESPACE]: opts.env,
       'deployment.environment.name': opts.env,
     }),
     traceExporter: new OTLPTraceExporter(),
