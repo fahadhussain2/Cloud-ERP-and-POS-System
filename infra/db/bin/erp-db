@@ -72,37 +72,18 @@ print(json.dumps(status))
 # The same numbers for Grafana (node exporter textfile, W0-06): the dashboard and the backup alert use them.
 prom = os.environ["PROM_FILE"]
 if os.path.isdir(os.path.dirname(prom)):
+    metrics = [
+        ("erp_backup_status_timestamp_seconds", "When erp-db status last ran.", status["generated_at"]),
+        ("erp_backup_last_timestamp_seconds", "When the newest base backup finished.", status["last_backup_at"]),
+        ("erp_wal_last_archived_timestamp_seconds", "When WAL was last archived off-site.", last_archived),
+        ("erp_wal_last_failed_timestamp_seconds", "When WAL archiving last failed.", last_failed),
+        ("erp_backup_stanza_ok", "1 when pgBackRest reports the stanza as ok.", int(status["stanza_status"] == "ok")),
+    ]
     with open(prom + ".tmp", "w") as f:
-        f.write("# HELP erp_backup_status_timestamp_seconds When erp-db status last ran.
-")
-        f.write("# TYPE erp_backup_status_timestamp_seconds gauge
-")
-        f.write(f"erp_backup_status_timestamp_seconds {status['generated_at']}
-")
-        f.write("# HELP erp_backup_last_timestamp_seconds When the newest base backup finished.
-")
-        f.write("# TYPE erp_backup_last_timestamp_seconds gauge
-")
-        f.write(f"erp_backup_last_timestamp_seconds {status['last_backup_at']}
-")
-        f.write("# HELP erp_wal_last_archived_timestamp_seconds When WAL was last archived off-site.
-")
-        f.write("# TYPE erp_wal_last_archived_timestamp_seconds gauge
-")
-        f.write(f"erp_wal_last_archived_timestamp_seconds {last_archived}
-")
-        f.write("# HELP erp_wal_last_failed_timestamp_seconds When WAL archiving last failed.
-")
-        f.write("# TYPE erp_wal_last_failed_timestamp_seconds gauge
-")
-        f.write(f"erp_wal_last_failed_timestamp_seconds {last_failed}
-")
-        f.write("# HELP erp_backup_stanza_ok 1 when pgBackRest reports the stanza as ok.
-")
-        f.write("# TYPE erp_backup_stanza_ok gauge
-")
-        f.write(f"erp_backup_stanza_ok {1 if status['stanza_status'] == 'ok' else 0}
-")
+        for name, help_text, value in metrics:
+            f.write(f"# HELP {name} {help_text}" + chr(10))
+            f.write(f"# TYPE {name} gauge" + chr(10))
+            f.write(f"{name} {value}" + chr(10))
     os.chmod(prom + ".tmp", 0o644)
     os.replace(prom + ".tmp", prom)
 PY
