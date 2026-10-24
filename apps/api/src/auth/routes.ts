@@ -9,6 +9,7 @@ import {
   type RoleGrant,
   type RoleLimits,
 } from '@erp/domain';
+import { setContext } from '@erp/observability';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
@@ -133,6 +134,7 @@ export async function registerAuth(
       };
     });
     if (!req.auth) return reply.code(401).send({ error: 'unauthenticated' });
+    setContext({ tenantId: req.auth.tenantId, userId: req.auth.userId });
   };
 
   // Every other route: a valid session and no pending password change.
@@ -156,6 +158,7 @@ export async function registerAuth(
         [tenantCode],
       );
       const tenantId = dir.rows[0]?.tenant_id;
+      if (tenantId) setContext({ tenantId });
       if (!tenantId) {
         await verifyPassword(null, password);
         return failed();

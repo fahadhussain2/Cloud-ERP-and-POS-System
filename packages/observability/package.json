@@ -13,6 +13,7 @@
     "typescript": "catalog:"
   },
   "dependencies": {
+    "@sentry/node": "catalog:",
     "pino": "catalog:"
   }
 }
