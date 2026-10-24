@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-12 (parse and stage) |
+| **Status** | In progress: W0-12 done; W0-13 (catalog, parties, chart of accounts, cleanup reports) |
 | **Requirements** | 4 (MIG-01…MIG-04) |
 | **Feature spec needed** | Yes: importer design (parser, staging, transform, load) |
 
