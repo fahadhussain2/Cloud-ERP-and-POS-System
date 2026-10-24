@@ -14,6 +14,9 @@ on:
     secrets:
       DEPLOY_SSH_KEY:
         required: true
+      # Uploads the browser source maps to Sentry (W0-06); without it the build simply skips the upload.
+      SENTRY_AUTH_TOKEN:
+        required: false
   workflow_dispatch:
     inputs:
       environment:
