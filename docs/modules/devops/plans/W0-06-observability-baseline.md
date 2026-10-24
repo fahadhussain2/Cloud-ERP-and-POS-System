@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#7](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/7) |
 | **Module** | devops |
-| **Status** | Accepted (2026-10-24) |
+| **Status** | Built, verifying on staging (2026-10-24) |
 | **Refs** | Architecture §11; D-064 (amended by D-086), D-087; CLAUDE.md rule 11 |
 | **Depends on** | W0-03 (server), W0-04 (deploys), W0-05 (backup status) |
 | **Size** | about 3 days |
@@ -44,11 +44,11 @@
 
 ## Tests written first
 
-- [ ] **Redaction:** a log line with `password`, `pin`, `pinVerifier`, `token`, `authorization` and `cookie` (top level, nested, inside `req.headers`) shows `[redacted]` for each, never the value.
-- [ ] **Correlation:** a line logged inside `withContext({ requestId, tenantId })` carries both; after `setContext({ userId })` it carries the user too; outside any context it carries neither.
-- [ ] **API:** every response has `x-request-id`; a valid incoming one is kept, an invalid one is replaced; a 500 body is `{ error: 'internal', reference: <the request ID> }` with no stack or message; the log line for it has the request ID, the tenant and the error.
-- [ ] **Sentry scrubbing:** `beforeSend` removes cookies, authorization headers and request bodies.
-- [ ] `alloy fmt` accepts the Alloy config in CI.
+- [x] **Redaction:** a log line with `password`, `pin`, `pinVerifier`, `token`, `authorization` and `cookie` (top level, nested, inside `req.headers`) shows `[redacted]` for each, never the value.
+- [x] **Correlation:** a line logged inside `withContext({ requestId, tenantId })` carries both; after `setContext({ userId })` it carries the user too; outside any context it carries neither.
+- [x] **API:** every response has `x-request-id`; a valid incoming one is kept, an invalid one is replaced; a 500 body is `{ error: 'internal', reference: <the request ID> }` with no stack or message; the log line for it has the request ID, the tenant and the error.
+- [x] **Sentry scrubbing:** `beforeSend` removes cookies, authorization headers and request bodies.
+- [x] `alloy fmt` accepts the Alloy config in CI.
 
 ## Verify (on staging, then production)
 
@@ -94,3 +94,15 @@
 2. **EU regions** for Sentry and Grafana: yes.
 3. **Critical-alert email copy:** the owner's GitHub email.
 4. **Slack** for the alerts (free workspace), and **no paid services** at all (D-087).
+
+## Changes during the build
+
+| Plan | Built | Why |
+|---|---|---|
+| Alloy as its image's own user | **Root with every capability dropped**, all host mounts read-only, state in its own volume | The image's user can't read Docker's root-owned log files or write its state; root without capabilities can read root-owned files but change nothing. |
+| Worker tracing | Logs and Sentry only for now | The worker has no jobs yet; tracing comes with its first job. |
+| Container names from Docker | From compose log labels on each line; restarts detected from the apps' "started" log lines | Without the Docker socket Alloy can't ask Docker; per-container CPU and memory wait for a socket-free option. |
+| — | The worker image now ships its `node_modules` | Found by a local image build: the worker had no dependencies before, and would have crashed with pino and Sentry. |
+| — | `service.namespace` = env on OpenTelemetry data | Grafana Cloud turns it into the metrics' `job` label (`prod/erp-api`), so prod and staging are told apart. |
+| — | `protobufjs` install script denied, `@sentry/cli`'s allowed | pnpm requires a decision; protobufjs's script only checks versions, Sentry's CLI downloads the binary that uploads source maps. |
+| Synthetic checks and Grafana resources "applied with a script" | Dashboard, alert rules and notification policy by `grafana/apply.py`; the three uptime checks are created in the Grafana UI | The uptime-check API needs a separate token; three checks are quicker by hand and are described in the infra README. |
