@@ -43,10 +43,12 @@ jobs:
       - run: pnpm check
       # Server and edge config (W0-03). shellcheck and Docker come with the runner.
       - name: Check server scripts
-        run: shellcheck -x infra/server/*.sh infra/server/files/bin/erp-deploy infra/edge/*.sh infra/db/*.sh infra/db/bin/erp-db infra/db/bin/erp-tenant
+        run: shellcheck -x infra/server/*.sh infra/server/files/bin/erp-deploy infra/edge/*.sh infra/db/*.sh infra/db/bin/erp-db infra/db/bin/erp-tenant infra/observability/*.sh infra/observability/bin/erp-obs
       - name: Check edge and app config
         run: |
           docker compose -f infra/edge/compose.yaml config -q
+          docker compose -f infra/observability/compose.yaml config -q
+          docker run --rm -v "$PWD/infra/observability:/cfg:ro" grafana/alloy:v1.20.1 fmt /cfg/config.alloy >/dev/null
           for env in prod staging; do
             IMAGE_TAG=check docker compose --env-file "infra/app/$env.env" -f infra/app/compose.yaml config -q
             docker compose --env-file "infra/db/$env.env" -f infra/db/compose.yaml config -q
@@ -104,3 +106,4 @@ jobs:
       environment: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
     secrets:
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}

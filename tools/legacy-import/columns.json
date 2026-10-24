@@ -1,0 +1,5 @@
+{
+  "$comment": "Reviewed column exceptions for staging (D-084), as Table.Column names, never values. drop: also never stored. allow: kept although a value looks like a CNIC (e.g. a 13-digit barcode).",
+  "drop": [],
+  "allow": []
+}

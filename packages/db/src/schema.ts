@@ -6,6 +6,7 @@ import {
   date,
   integer,
   jsonb,
+  numeric,
   pgSchema,
   smallint,
   text,
@@ -299,6 +300,165 @@ export const expenseCategories = erp.table('expense_categories', {
   name: text('name').notNull(),
   glAccountId: uuid('gl_account_id').notNull(),
   isActive: boolean('is_active').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+/** Catalog (data model §4, D-014); `legacy` keeps imported rows' original keys (D-085). */
+export const units = erp.table('units', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  allowsFraction: boolean('allows_fraction').notNull(),
+  legacy: jsonb('legacy'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const categories = erp.table('categories', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  parentId: uuid('parent_id'),
+  pricingRule: jsonb('pricing_rule').notNull(),
+  returnPolicy: jsonb('return_policy').notNull(),
+  legacy: jsonb('legacy'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const brands = erp.table('brands', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  name: text('name').notNull(),
+  legacy: jsonb('legacy'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const origins = erp.table('origins', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  name: text('name').notNull(),
+  legacy: jsonb('legacy'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const vehicleMakes = erp.table('vehicle_makes', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  name: text('name').notNull(),
+  legacy: jsonb('legacy'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const parties = erp.table('parties', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  contactPerson: text('contact_person'),
+  phones: text('phones').array().notNull(),
+  email: text('email'),
+  address: text('address'),
+  city: text('city'),
+  country: text('country'),
+  taxId: text('tax_id'),
+  labelAbbr: text('label_abbr'),
+  notes: text('notes'),
+  status: text('status', { enum: ['active', 'inactive'] }).notNull(),
+  legacy: jsonb('legacy'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const customerAccounts = erp.table('customer_accounts', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  partyId: uuid('party_id').notNull(),
+  priceTierId: uuid('price_tier_id').notNull(),
+  creditAllowed: boolean('credit_allowed').notNull(),
+  /** Minor units; null = no limit (D-085). */
+  creditLimit: bigint('credit_limit', { mode: 'number' }),
+  offlineDailyCap: bigint('offline_daily_cap', { mode: 'number' }).notNull(),
+  paymentTermsDays: smallint('payment_terms_days'),
+  legacy: jsonb('legacy'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const supplierAccounts = erp.table('supplier_accounts', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  partyId: uuid('party_id').notNull(),
+  paymentTermsDays: smallint('payment_terms_days'),
+  defaultLeadDays: smallint('default_lead_days'),
+  legacy: jsonb('legacy'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const items = erp.table('items', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  categoryId: uuid('category_id').notNull(),
+  brandId: uuid('brand_id'),
+  originId: uuid('origin_id'),
+  unitId: uuid('unit_id').notNull(),
+  variant: text('variant'),
+  spec: text('spec'),
+  binLocation: text('bin_location'),
+  defaultSupplierId: uuid('default_supplier_id'),
+  minQty: numeric('min_qty', { precision: 14, scale: 3 }),
+  maxQty: numeric('max_qty', { precision: 14, scale: 3 }),
+  excludeFromReorder: boolean('exclude_from_reorder').notNull(),
+  floorPrice: bigint('floor_price', { mode: 'number' }),
+  taxCodeId: uuid('tax_code_id'),
+  status: text('status', { enum: ['active', 'dormant', 'discontinued'] }).notNull(),
+  legacy: jsonb('legacy'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const itemIdentifiers = erp.table('item_identifiers', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  kind: text('kind', { enum: ['barcode', 'oem', 'alternate', 'supplier_ref'] }).notNull(),
+  value: text('value').notNull(),
+  normalizedValue: text('normalized_value').notNull(),
+  isPrimary: boolean('is_primary').notNull(),
+  legacy: jsonb('legacy'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const itemCompatibility = erp.table('item_compatibility', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  makeId: uuid('make_id'),
+  model: text('model'),
+  yearFrom: smallint('year_from'),
+  yearTo: smallint('year_to'),
+  note: text('note'),
+  legacy: jsonb('legacy'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const itemPrices = erp.table('item_prices', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  tierId: uuid('tier_id').notNull(),
+  price: bigint('price', { mode: 'number' }).notNull(),
   ...syncColumns,
   ...auditColumns,
 });

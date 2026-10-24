@@ -13,7 +13,13 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 RUN pnpm fetch
 COPY . .
 RUN pnpm install --offline --frozen-lockfile
-RUN pnpm --filter @erp/api --filter @erp/worker --filter @erp/pos --filter @erp/backoffice build
+# The browser apps get the release and Sentry's erp-web DSN at build time (W0-06, D-086). With a Sentry token
+# (a BuildKit secret, never stored in the image), their source maps are uploaded to Sentry and deleted.
+ARG ERP_VERSION=dev
+ARG SENTRY_DSN_WEB=
+ARG SENTRY_ORG=
+ENV VITE_ERP_VERSION=$ERP_VERSION VITE_SENTRY_DSN=$SENTRY_DSN_WEB
+RUN --mount=type=secret,id=sentry_auth_token,required=false     SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" SENTRY_ORG="$SENTRY_ORG"     pnpm --filter @erp/api --filter @erp/worker --filter @erp/pos --filter @erp/backoffice build
 # Production copies: dist + external dependencies only. Internal packages are bundled into dist (D-071).
 RUN pnpm --filter @erp/api deploy --prod --legacy /out/api \
  && pnpm --filter @erp/worker deploy --prod --legacy /out/worker
@@ -36,10 +42,12 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
 ARG ERP_VERSION=dev
 ENV ERP_VERSION=$ERP_VERSION
 LABEL org.opencontainers.image.version=$ERP_VERSION
-CMD ["node", "dist/main.js"]
+# instrument.js starts OpenTelemetry before the app loads (W0-06, D-086).
+CMD ["node", "--import", "./dist/instrument.js", "dist/main.js"]
 
 FROM node-runtime AS worker
 COPY --from=build --chown=root:root /out/worker/package.json ./
+COPY --from=build --chown=root:root /out/worker/node_modules ./node_modules
 COPY --from=build --chown=root:root /out/worker/dist ./dist
 ARG ERP_VERSION=dev
 ENV ERP_VERSION=$ERP_VERSION

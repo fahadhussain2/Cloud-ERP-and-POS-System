@@ -11,10 +11,23 @@
   },
   "dependencies": {
     "@fastify/cookie": "catalog:",
+    "@fastify/otel": "catalog:",
     "@fastify/rate-limit": "catalog:",
     "@node-rs/argon2": "catalog:",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/exporter-metrics-otlp-http": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
+    "@opentelemetry/instrumentation": "catalog:",
+    "@opentelemetry/instrumentation-http": "catalog:",
+    "@opentelemetry/instrumentation-pg": "catalog:",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-metrics": "catalog:",
+    "@opentelemetry/sdk-node": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:",
+    "@sentry/node": "catalog:",
     "fastify": "catalog:",
     "pg": "catalog:",
+    "pino": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

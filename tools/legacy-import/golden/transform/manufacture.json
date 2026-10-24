@@ -1,0 +1,86 @@
+{
+  "description": "Manufacture (migration doc §3.2): a vehicle make on the allow-list (spelling fixed), a make with a model, a generic value (no make), or else a product spec such as H4 or 6PK.",
+  "cases": [
+    {
+      "name": "a make on the list",
+      "input": "TOYOTA",
+      "expected": {
+        "make": "Toyota",
+        "model": null,
+        "spec": null
+      }
+    },
+    {
+      "name": "a misspelt make",
+      "input": "HYNDAI",
+      "expected": {
+        "make": "Hyundai",
+        "model": null,
+        "spec": null
+      }
+    },
+    {
+      "name": "a make of two words",
+      "input": "volks  wagon",
+      "expected": {
+        "make": "Volkswagen",
+        "model": null,
+        "spec": null
+      }
+    },
+    {
+      "name": "a model that implies its make",
+      "input": "HIACE",
+      "expected": {
+        "make": "Toyota",
+        "model": "Hiace",
+        "spec": null
+      }
+    },
+    {
+      "name": "generic: no make",
+      "input": "UNIVERSAL",
+      "expected": {
+        "make": null,
+        "model": null,
+        "spec": null
+      }
+    },
+    {
+      "name": "a bulb type is a spec",
+      "input": "H4",
+      "expected": {
+        "make": null,
+        "model": null,
+        "spec": "H4"
+      }
+    },
+    {
+      "name": "a belt size is a spec",
+      "input": " 6PK ",
+      "expected": {
+        "make": null,
+        "model": null,
+        "spec": "6PK"
+      }
+    },
+    {
+      "name": "empty-like",
+      "input": "None",
+      "expected": {
+        "make": null,
+        "model": null,
+        "spec": null
+      }
+    },
+    {
+      "name": "missing",
+      "input": null,
+      "expected": {
+        "make": null,
+        "model": null,
+        "spec": null
+      }
+    }
+  ]
+}

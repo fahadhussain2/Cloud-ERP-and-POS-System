@@ -1,0 +1,20 @@
+{
+  "description": "Identifier search key (data model §4): upper case, without spaces, dashes, slashes and dots.",
+  "cases": [
+    {
+      "name": "an OEM number",
+      "input": "17910-so4 e84",
+      "expected": "17910SO4E84"
+    },
+    {
+      "name": "slashes and dots",
+      "input": "A/B.C-1",
+      "expected": "ABC1"
+    },
+    {
+      "name": "an item code",
+      "input": "ABEA001",
+      "expected": "ABEA001"
+    }
+  ]
+}

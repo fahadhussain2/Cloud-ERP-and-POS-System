@@ -8,7 +8,22 @@ catalog:
   '@eslint/js': ^10.0.1
   '@fastify/cookie': ^11.1.3
   '@fastify/rate-limit': ^11.2.1
+  '@fastify/otel': 0.21.2
+  '@opentelemetry/api': 1.9.1
+  '@opentelemetry/context-async-hooks': 2.12.0
+  '@opentelemetry/exporter-metrics-otlp-http': 0.223.0
+  '@opentelemetry/exporter-trace-otlp-http': 0.223.0
+  '@opentelemetry/instrumentation': 0.223.0
+  '@opentelemetry/instrumentation-http': 0.223.0
+  '@opentelemetry/instrumentation-pg': 0.75.0
+  '@opentelemetry/resources': 2.12.0
+  '@opentelemetry/sdk-metrics': 2.12.0
+  '@opentelemetry/sdk-node': 0.223.0
+  '@opentelemetry/semantic-conventions': 1.43.0
   '@node-rs/argon2': ^2.2.2
+  '@sentry/node': 10.76.2
+  '@sentry/react': 10.76.2
+  '@sentry/vite-plugin': 5.4.1
   '@testing-library/react': ^16.3.3
   '@types/node': ^24.19.2
   '@types/pg': ^8.23.1
@@ -26,6 +41,7 @@ catalog:
   i18next: ^26.5.0
   jsdom: ^30.1.3
   pg: ^8.23.1
+  pino: ^10.4.0
   prettier: ^3.9.10
   react: ^19.3.1
   react-dom: ^19.3.1
@@ -41,3 +57,7 @@ catalog:
 # esbuild (used by tsup and tsx) needs its install script to fetch its binary.
 allowBuilds:
   esbuild: true
+  # @sentry/cli (browser source-map upload, W0-06) downloads its binary in its install script.
+  '@sentry/cli': true
+  # protobufjs (OpenTelemetry exporters): its install script only checks versions; not needed.
+  protobufjs: false

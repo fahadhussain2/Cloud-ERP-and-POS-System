@@ -14,6 +14,9 @@ on:
     secrets:
       DEPLOY_SSH_KEY:
         required: true
+      # Uploads the browser source maps to Sentry (W0-06); without it the build simply skips the upload.
+      SENTRY_AUTH_TOKEN:
+        required: false
   workflow_dispatch:
     inputs:
       environment:
@@ -114,7 +117,13 @@ jobs:
           context: .
           target: api
           tags: erp-api:${{ steps.gate.outputs.tag }}
-          build-args: ERP_VERSION=${{ steps.gate.outputs.tag }}
+          # The same arguments and secret for all three: they share one build stage and its cache.
+          build-args: |
+            ERP_VERSION=${{ steps.gate.outputs.tag }}
+            SENTRY_DSN_WEB=${{ vars.SENTRY_DSN_WEB }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           load: true
           cache-from: type=gha,scope=erp
 
@@ -125,7 +134,13 @@ jobs:
           context: .
           target: worker
           tags: erp-worker:${{ steps.gate.outputs.tag }}
-          build-args: ERP_VERSION=${{ steps.gate.outputs.tag }}
+          # The same arguments and secret for all three: they share one build stage and its cache.
+          build-args: |
+            ERP_VERSION=${{ steps.gate.outputs.tag }}
+            SENTRY_DSN_WEB=${{ vars.SENTRY_DSN_WEB }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           load: true
           cache-from: type=gha,scope=erp
 
@@ -136,7 +151,13 @@ jobs:
           context: .
           target: web
           tags: erp-web:${{ steps.gate.outputs.tag }}
-          build-args: ERP_VERSION=${{ steps.gate.outputs.tag }}
+          # The same arguments and secret for all three: they share one build stage and its cache.
+          build-args: |
+            ERP_VERSION=${{ steps.gate.outputs.tag }}
+            SENTRY_DSN_WEB=${{ vars.SENTRY_DSN_WEB }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           load: true
           cache-from: type=gha,scope=erp
           # The web build runs the whole shared build stage, so its cache serves all three.

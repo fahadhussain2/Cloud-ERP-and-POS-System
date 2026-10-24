@@ -9,6 +9,10 @@
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@sentry/node": "catalog:",
+    "pino": "catalog:"
+  },
   "devDependencies": {
     "@erp/observability": "workspace:*",
     "tsup": "catalog:",

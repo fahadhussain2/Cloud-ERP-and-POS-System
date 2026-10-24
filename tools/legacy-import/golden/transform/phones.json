@@ -1,0 +1,20 @@
+{
+  "description": "Party phones (migration doc §3.4): trimmed, empty ones dropped, duplicates (same digits) removed, order kept.",
+  "cases": [
+    {
+      "name": "four fields, two the same number",
+      "input": ["0300-1234567", " 03001234567", "", null, "021-34567890"],
+      "expected": ["0300-1234567", "021-34567890"]
+    },
+    {
+      "name": "nothing",
+      "input": [null, "  "],
+      "expected": []
+    },
+    {
+      "name": "no digits is not a phone",
+      "input": ["N/A"],
+      "expected": []
+    }
+  ]
+}

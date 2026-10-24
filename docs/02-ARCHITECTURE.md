@@ -282,7 +282,7 @@ docker compose:
 | Restore drill | Monthly, into a **throwaway container** (never staging, which is less protected), timed and logged in `docs/modules/devops/restore-drills.md`. A canary table measures the real data loss. `erp-db restore-drill` on the server (D-076). **Before go-live: a full drill with real data.** |
 | Hardening | SSH keys only, no root login, no passwords; Hetzner Cloud Firewall + ufw (only 22, 80, 443); fail2ban; unattended security upgrades after hours; Postgres listening only on the Docker network. SSH is open to any IP, because the owner's IP is dynamic and GitHub Actions uses many IPs (D-073). Setup lives in `infra/` and is rebuildable from git. |
 | Secrets | Environment files outside git. Rotated on staff changes. |
-| Monitoring | See §11: Sentry, Grafana Cloud (logs, metrics, traces via OpenTelemetry + Alloy agent), uptime checks, Slack alerts with email backup for critical ones. |
+| Monitoring | See §11: Sentry, Grafana Cloud (logs, metrics, traces via OpenTelemetry + Alloy agent, uptime checks), Slack alerts from Grafana with email backup for critical ones (D-086). |
 | Deploy | GitHub Actions + Docker Compose over SSH. No deploy platform (Coolify, Kamal…) on the server (D-063). See §9.1. |
 | Portability | No Hetzner-specific APIs. Moving to a UAE region or managed Postgres = restore a backup plus a DNS change. |
 
@@ -324,7 +324,7 @@ docker compose:
 - **Locale and currency:** currency minor units come from the tenant. Formatting uses the tenant locale. The UI is RTL-ready.
 - **AI agents later:** documents and ledgers are clean, append-only, and exposed through a typed OpenAPI. Agents (reorder, pricing, catalog cleanup, anomaly detection) read through the API and write **proposals** (e.g. a draft PO or price suggestion) that a human approves. They never write ledgers directly.
 
-## 11. Logging, monitoring and observability (D-064)
+## 11. Logging, monitoring and observability (D-064, D-086)
 
 Goal: when something goes wrong, we can answer **what happened, to which bill, on which device, for which tenant, and why**, from one place, without SSH-ing into the server.
 
@@ -332,14 +332,14 @@ Goal: when something goes wrong, we can answer **what happened, to which bill, o
 
 | Signal | Tool | Runs where | Cost |
 |---|---|---|---|
-| **Errors** (API, worker, POS, back office) | **Sentry**: stack traces, release/version, breadcrumbs, source maps | Hosted | Free plan to start |
+| **Errors** (API, worker, POS, back office) | **Sentry** (EU): stack traces, release/version, breadcrumbs, source maps; projects `erp-server` and `erp-web`; its own alerts by email | Hosted | Free plan |
 | **Logs** | Structured JSON logs (pino) → **Grafana Loki** | Hosted (Grafana Cloud free tier; limits and retention, about 14 days, checked at setup) | Free |
 | **Metrics** | OpenTelemetry / Prometheus metrics → **Grafana Cloud** (Mimir) | Hosted | Free |
 | **Traces** | **OpenTelemetry** traces for API requests, sync pushes, postings and DB queries → Grafana Tempo | Hosted | Free |
-| **Collector** | **Grafana Alloy** agent: Docker logs, server metrics, PostgreSQL metrics (exporter + `pg_stat_statements`), OTLP from the apps | On the CX33 (~150–250 MB RAM) | Free |
-| **Uptime** | UptimeRobot or Better Stack: `/health`, POS and back-office URLs, SSL expiry | Hosted | Free |
+| **Collector** | **Grafana Alloy** agent: Docker log files (no Docker socket), server metrics, backup age, PostgreSQL metrics (exporter + `pg_stat_statements`), OTLP from the apps | On the CX33 (about 80 MB; limit 300 MB) | Free |
+| **Uptime** | **Grafana Synthetic Monitoring**: `/api/health` of app, POS and staging every 5 minutes, with certificate expiry (D-086; UptimeRobot's free plan is non-commercial only) | Hosted | Free (about 50k of 100k checks a month) |
 | **Dashboards and alert rules** | Grafana Cloud | Hosted | Free |
-| **Alert delivery** | **Slack**: `#erp-critical` (phone notifications on) and `#erp-alerts`, plus **email** backup for critical alerts | Hosted | Free |
+| **Alert delivery** | **Slack** from Grafana alerting: `#erp-critical` (phone notifications on) and `#erp-alerts`, plus **email** backup for critical alerts | Hosted | Free |
 
 - **Why hosted instead of self-hosted Grafana/Prometheus:** a full self-hosted stack would use about 1–1.5 GB of the 8 GB production server, and it would go down with the server it's watching.
 - **Vendor-neutral:** instrumentation is **OpenTelemetry**, so we can switch to self-hosted or another vendor later without code changes.

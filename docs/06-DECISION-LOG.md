@@ -644,3 +644,54 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - A live shop's settings never change as a side effect.
   - Nobody else sees the owner's password.
 - **Status:** Accepted (with the W0-11 plan)
+
+### D-084 Legacy staging: local only, generic parser, credentials dropped while parsing (2026-10-24)
+- **Decision:**
+  - The importer stages the legacy dumps in a **separate local database** (`erp_legacy` on the owner's PC), one schema per dump copy (`legacy_<label>`). Never on the server or in the app database; rebuilt on every staging run.
+  - A **generic parser** stages every table in the dump with its own columns. Values are kept as the source wrote them (text), with only the encoding undone; no floating point.
+  - **Credential columns are dropped while parsing** (by name), and a CNIC-shaped value in any other column stops the run, naming only the column. Reviewed exceptions go in a committed column list (names only).
+  - **Counts must agree** three ways (rows staged, rows parsed, a separate line scan), or the run fails.
+  - Reports hold counts and column names only and stay out of git. Claude runs the importer and reads its reports, never the staged rows.
+- **Why:**
+  - The dump holds customer and staff personal data and legacy passwords (CLAUDE.md rule 11).
+  - Separate copies allow comparing the Dec 2025 and 2026 dumps.
+  - A count proof that doesn't depend on the parser.
+- **Status:** Accepted (with the W0-12 plan)
+
+### D-085 Legacy masters: tested mapping rules, a reviewed mapping file, idempotent load; no credit limit by default (2026-10-24)
+- **Decision:**
+  - Migration `0006` adds the catalog and party tables (data model §3, §4) with forced RLS, sync and audit.
+  - Every legacy mapping rule (migration doc §3) is a pure, golden-tested function in `tools/legacy-import`.
+  - The owner's decisions are kept in a reviewed mapping file in git (codes and catalog words only, never personal data) and re-applied on every run. Nothing is auto-deleted or auto-merged.
+  - The load upserts by legacy key with `legacy jsonb` on every row, one transaction per entity group, as the app role inside `withTenant`. A re-run never duplicates; rows missing from a newer dump are reported, not deleted.
+  - Until the rehearsals, the load target is a local dev database only.
+  - Mechanic = Retail −5%, Wholesale = Retail −10%, rounded to Rs 1 (PRD Q1); floors follow the category rule cost + 5% (PRD Q2).
+  - **Customers' `credit_limit` empty = no limit.** Migrated credit customers start without a limit; the review report lists them so the owner sets limits before go-live. The offline daily cap still applies.
+  - Cleanup reports mask phone numbers; Claude reads only the summary and catalog reports.
+- **Why:**
+  - The legacy data needs many judgement calls; tested rules and a reviewed decision file make them visible and repeatable through the final run.
+  - Credit customers keep buying on credit from day one.
+  - Party contacts stay on the owner's PC until the real migration.
+- **Status:** Accepted (with the W0-13 plan)
+
+### D-086 Observability on free plans: Grafana sends the Slack alerts and runs the uptime checks (2026-10-24)
+- **Decision:** (amends D-064)
+  - **Uptime checks: Grafana Cloud Synthetic Monitoring** instead of UptimeRobot / Better Stack: HTTPS checks of the app, POS and staging health with certificate expiry, every 5 minutes (about 50k of the free 100k checks a month).
+  - **Slack alerts come from Grafana alerting** (free), to `#erp-critical` (with an email copy) and `#erp-alerts`. Sentry's free plan alerts by email only; its Slack integration needs a paid plan.
+  - **Sentry:** two projects (`erp-server`, `erp-web`) tagged by app, env, release and request ID. **EU regions** for Sentry and Grafana Cloud, next to the server in Helsinki.
+  - Grafana Alloy reads Docker's log files and gets **no Docker socket**.
+  - Secrets (Grafana token, Sentry DSNs) are typed by the owner at a hidden prompt on the server.
+- **Why:**
+  - UptimeRobot's free plan is non-commercial only and has no SSL monitoring.
+  - Everything stays on free plans with no card (D-087).
+  - The Docker socket would give the agent root on the server.
+- **Status:** Accepted (with the W0-06 plan)
+
+### D-087 No paid services (2026-10-24)
+- **Decision:** the owner will not pay for any service. Every tool stays on a free plan, with no card on file.
+  - **Backblaze B2 stays on the free tier for good:** the "add a card before go-live" note in D-077 is dropped. Restore drills stay at one a day. If backups near the free 10 GB, retention is reduced (fewer monthly fulls) rather than paying.
+  - New tools are proposed only with their free-plan limits stated.
+- **Why:** the owner's instruction.
+- **Risk accepted:** an emergency restore on a day the B2 download cap is already used up waits until 05:00 Karachi, unless a recent backup has been copied off B2 beforehand.
+- **Status:** Accepted (changes D-077)
+

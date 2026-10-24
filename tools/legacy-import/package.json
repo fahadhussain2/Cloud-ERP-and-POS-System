@@ -8,7 +8,15 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/pg": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:"
+  },
+  "dependencies": {
+    "@erp/contracts": "workspace:*",
+    "@erp/db": "workspace:*",
+    "@erp/domain": "workspace:*",
+    "pg": "catalog:",
+    "zod": "catalog:"
   }
 }

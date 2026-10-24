@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/main.ts', 'src/migrate.ts', 'src/tenant-admin.ts'],
+  entry: ['src/main.ts', 'src/instrument.ts', 'src/migrate.ts', 'src/tenant-admin.ts'],
   format: 'esm',
   target: 'node24',
   platform: 'node',

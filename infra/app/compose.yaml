@@ -12,8 +12,22 @@ x-hardening: &hardening
   security_opt:
     - no-new-privileges:true
   pull_policy: never
+  environment:
+    ERP_ENV: ${ERP_ENV}
+    # Traces and request metrics go to Alloy on the erp-otel network (infra/observability, D-086).
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+  # Alloy reads Docker's log files; these labels name the service on every line (D-086).
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: '3'
+      labels: com.docker.compose.project,com.docker.compose.service
   env_file:
     - path: /srv/erp/${ERP_ENV:?}/app.env
+      required: false
+    # SENTRY_DSN (sudo erp-obs secrets)
+    - path: /srv/erp/observability/app.env
       required: false
 
 services:
@@ -25,6 +39,7 @@ services:
         aliases:
           - erp-${ERP_ENV}-api
       db: {}
+      otel: {}
     deploy:
       resources:
         limits:
@@ -37,6 +52,7 @@ services:
     networks:
       - default
       - db
+      - otel
     deploy:
       resources:
         limits:
@@ -63,4 +79,8 @@ networks:
   # The environment's database network (infra/db, W0-05): internal, no internet.
   db:
     name: erp-${ERP_ENV}-db
+    external: true
+  # To Alloy (infra/observability): created by infra/observability/apply.sh, internal.
+  otel:
+    name: erp-otel
     external: true

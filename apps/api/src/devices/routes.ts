@@ -1,3 +1,4 @@
+import { setContext } from '@erp/observability';
 import { randomBytes, randomInt } from 'node:crypto';
 
 import {
@@ -91,6 +92,11 @@ export function registerDevices(scope: FastifyInstance, { pool, now, requireAuth
         : null;
     });
     if (!req.device) return reply.code(401).send({ error: 'unauthenticated' });
+    setContext({
+      tenantId: req.device.tenantId,
+      deviceId: req.device.deviceId,
+      branchId: req.device.branchId,
+    });
   };
 
   scope.post(
@@ -159,6 +165,7 @@ export function registerDevices(scope: FastifyInstance, { pool, now, requireAuth
         [tenantCode],
       );
       const tenantId = dir.rows[0]?.tenant_id;
+      if (tenantId) setContext({ tenantId });
       if (!tenantId) return failed();
       const t = now();
       const ctx = { tenantId, userId: null, requestId: req.id };
