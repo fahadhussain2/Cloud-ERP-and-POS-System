@@ -1,0 +1,25 @@
+{
+  "description": "Text clean-up: trimmed, runs of spaces collapsed, empty becomes nothing.",
+  "cases": [
+    {
+      "name": "trimmed and collapsed",
+      "input": "  OIL   FILTER\t ",
+      "expected": "OIL FILTER"
+    },
+    {
+      "name": "case kept",
+      "input": "Brake Pad",
+      "expected": "Brake Pad"
+    },
+    {
+      "name": "empty",
+      "input": "   ",
+      "expected": null
+    },
+    {
+      "name": "missing",
+      "input": null,
+      "expected": null
+    }
+  ]
+}

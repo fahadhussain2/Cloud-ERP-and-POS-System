@@ -1,0 +1,50 @@
+{
+  "description": "PartNo (migration doc §3.3): a part number has at least 5 characters, digits, and a dash or at least 4 digits; anything else (colours, short codes) is not.",
+  "cases": [
+    {
+      "name": "an OEM number with dashes",
+      "input": "17910-SO4-E84",
+      "expected": true
+    },
+    {
+      "name": "mostly digits",
+      "input": "90915YZZE1",
+      "expected": true
+    },
+    {
+      "name": "five characters with a dash",
+      "input": "A-123",
+      "expected": true
+    },
+    {
+      "name": "a colour",
+      "input": "WHITE",
+      "expected": false
+    },
+    {
+      "name": "a short code",
+      "input": "FC6",
+      "expected": false
+    },
+    {
+      "name": "letters and few digits",
+      "input": "LK20",
+      "expected": false
+    },
+    {
+      "name": "long but only 3 digits, no dash",
+      "input": "ABC123XYZ",
+      "expected": false
+    },
+    {
+      "name": "trimmed first",
+      "input": "  1791-0  ",
+      "expected": true
+    },
+    {
+      "name": "empty",
+      "input": "",
+      "expected": false
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "description": "Mechanic and Wholesale prices from Retail (PRD Q1): Retail less 5% and 10%, rounded to Rs 1, half away from zero.",
+  "cases": [
+    {
+      "name": "Rs 1,250 less 5%",
+      "input": {
+        "retail": 125000,
+        "bp": 9500
+      },
+      "expected": 118800
+    },
+    {
+      "name": "Rs 1,250 less 10%",
+      "input": {
+        "retail": 125000,
+        "bp": 9000
+      },
+      "expected": 112500
+    },
+    {
+      "name": "Rs 10 less 5% is Rs 9.50, rounded up to Rs 10",
+      "input": {
+        "retail": 1000,
+        "bp": 9500
+      },
+      "expected": 1000
+    },
+    {
+      "name": "Rs 11 less 10% is Rs 9.90, rounded to Rs 10",
+      "input": {
+        "retail": 1100,
+        "bp": 9000
+      },
+      "expected": 1000
+    },
+    {
+      "name": "zero stays zero",
+      "input": {
+        "retail": 0,
+        "bp": 9500
+      },
+      "expected": 0
+    }
+  ]
+}

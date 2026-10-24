@@ -337,6 +337,15 @@ importers:
 
   tools/legacy-import:
     dependencies:
+      '@erp/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@erp/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@erp/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       pg:
         specifier: 'catalog:'
         version: 8.23.1

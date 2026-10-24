@@ -1,0 +1,79 @@
+{
+  "description": "Legacy amounts to minor units, exactly (CLAUDE.md rule 1): decimals beyond the paisa must be zeros, otherwise the amount is rounded half away from zero and flagged.",
+  "cases": [
+    {
+      "name": "rupees and paisa",
+      "input": "1250.00",
+      "expected": {
+        "minor": 125000,
+        "rounded": false
+      }
+    },
+    {
+      "name": "whole rupees",
+      "input": "450",
+      "expected": {
+        "minor": 45000,
+        "rounded": false
+      }
+    },
+    {
+      "name": "one decimal",
+      "input": "0.5",
+      "expected": {
+        "minor": 50,
+        "rounded": false
+      }
+    },
+    {
+      "name": "money with four decimals, all zeros",
+      "input": "99.9900",
+      "expected": {
+        "minor": 9999,
+        "rounded": false
+      }
+    },
+    {
+      "name": "extra decimals are rounded and flagged",
+      "input": "10.125",
+      "expected": {
+        "minor": 1013,
+        "rounded": true
+      }
+    },
+    {
+      "name": "negatives round away from zero",
+      "input": "-10.125",
+      "expected": {
+        "minor": -1013,
+        "rounded": true
+      }
+    },
+    {
+      "name": "rounding down",
+      "input": "10.1249",
+      "expected": {
+        "minor": 1012,
+        "rounded": true
+      }
+    },
+    {
+      "name": "minus zero is zero",
+      "input": "-0",
+      "expected": {
+        "minor": 0,
+        "rounded": false
+      }
+    },
+    {
+      "name": "a comma",
+      "input": "12,50",
+      "error": "bad_amount"
+    },
+    {
+      "name": "E notation",
+      "input": "1.5E-3",
+      "error": "bad_amount"
+    }
+  ]
+}

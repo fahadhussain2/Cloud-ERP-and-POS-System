@@ -1,0 +1,35 @@
+{
+  "description": "Origins (migration doc §3.2): legacy makes are countries; spelling fixed from the mapping, otherwise title case.",
+  "cases": [
+    {
+      "name": "title case",
+      "input": "JAPAN",
+      "expected": "Japan"
+    },
+    {
+      "name": "title case, several words",
+      "input": "south  korea",
+      "expected": "South Korea"
+    },
+    {
+      "name": "a spelling fix",
+      "input": "INDONASIA",
+      "expected": "Indonesia"
+    },
+    {
+      "name": "a fix of several words",
+      "input": "Saudia Arabia",
+      "expected": "Saudi Arabia"
+    },
+    {
+      "name": "empty-like",
+      "input": "NONE",
+      "expected": null
+    },
+    {
+      "name": "missing",
+      "input": null,
+      "expected": null
+    }
+  ]
+}
