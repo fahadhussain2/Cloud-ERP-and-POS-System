@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./tracing": "./src/tracing.ts"
+    "./tracing": "./src/tracing.ts",
+    "./browser": "./src/browser.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -27,6 +28,7 @@
     "@opentelemetry/sdk-node": "catalog:",
     "@opentelemetry/semantic-conventions": "catalog:",
     "@sentry/node": "catalog:",
+    "@sentry/react": "catalog:",
     "pino": "catalog:"
   }
 }

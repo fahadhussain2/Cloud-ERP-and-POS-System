@@ -2,5 +2,6 @@
 export { currentContext, enterContext, setContext, withContext, type LogContext } from './context';
 export { createLogger, REDACT_PATHS, type LoggerOptions } from './logger';
 export { isRequestId, newRequestId } from './request-id';
-export { initSentry, scrubEvent, type ErrorReporter } from './sentry';
+export { initSentry, type ErrorReporter } from './sentry';
+export { scrubEvent } from './sentry-scrub';
 export { onShutdown, type ShutdownOptions } from './shutdown';

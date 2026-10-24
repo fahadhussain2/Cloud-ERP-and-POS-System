@@ -57,5 +57,7 @@ catalog:
 # esbuild (used by tsup and tsx) needs its install script to fetch its binary.
 allowBuilds:
   esbuild: true
+  # @sentry/cli (browser source-map upload, W0-06) downloads its binary in its install script.
+  '@sentry/cli': true
   # protobufjs (OpenTelemetry exporters): its install script only checks versions; not needed.
   protobufjs: false

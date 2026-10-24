@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { scrubEvent } from './sentry';
+import { scrubEvent } from './sentry-scrub';
 
 // Sentry events never carry cookies, authorization headers or request bodies (architecture §11.7, D-086).
 describe('scrubEvent', () => {
