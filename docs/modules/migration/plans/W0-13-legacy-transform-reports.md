@@ -159,3 +159,17 @@ Customers: Retail tier (you move mechanics to Mechanic in the review), credit al
 | Unknown references · abbreviation clashes | 0 · 0 | |
 
 **Checks:** `pnpm check` 406 tests (one earlier run had the API health test time out at 5 s while the machine was busy; the rerun passed); integration 93 tests.
+
+## Owner review (2026-10-24)
+
+The owner reviewed the first reports (issue #14's last criterion):
+
+1. **Brands that look like countries:** yes, they are origins. GERMANY, MALAYSIA, SGP (Singapore) and USA were added to `countryBrands`.
+2. **Vehicle makes:** yes. PRINCE, MG, PROTON, HAVAL and ISUZU were added to `vehicleMakes`.
+3. **Mechanics to the Mechanic tier:** later, before go-live.
+4. **Bill header:** placeholder lines for now; the real ones later.
+5. **Price 0, cost above price, duplicate names, PartNo values:** after go-live.
+
+Items 3–5 are on the [go-live checklist](../../../GO-LIVE-CHECKLIST.md).
+
+**Re-run with the decisions:** 5 vehicle makes created; 248 items updated (128 from brand to origin, the rest from spec to vehicle make); 29 vehicle tags created and 91 updated; everything else unchanged. Brands that are countries: 9 (none left that look like one); Manufacture values kept as spec: 181.

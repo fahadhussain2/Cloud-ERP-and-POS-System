@@ -7,10 +7,20 @@
     "CHINA": "China",
     "TAIWAN": "Taiwan",
     "THAILAND": "Thailand",
-    "JAPAN": "Japan"
+    "JAPAN": "Japan",
+    "GERMANY": "Germany",
+    "MALAYSIA": "Malaysia",
+    "SGP": "Singapore",
+    "USA": "USA"
   },
-  "brandNames": { "GENUINE": "Genuine (OEM)" },
-  "originNames": { "INDONASIA": "Indonesia", "HUNGRY": "Hungary", "SAUDIA ARABIA": "Saudi Arabia" },
+  "brandNames": {
+    "GENUINE": "Genuine (OEM)"
+  },
+  "originNames": {
+    "INDONASIA": "Indonesia",
+    "HUNGRY": "Hungary",
+    "SAUDIA ARABIA": "Saudi Arabia"
+  },
   "vehicleMakes": {
     "TOYOTA": "Toyota",
     "SUZUKI": "Suzuki",
@@ -31,9 +41,19 @@
     "SUBARU": "Subaru",
     "SUBARO": "Subaru",
     "VOLKSWAGEN": "Volkswagen",
-    "VOLKS WAGON": "Volkswagen"
+    "VOLKS WAGON": "Volkswagen",
+    "PRINCE": "Prince",
+    "MG": "MG",
+    "PROTON": "Proton",
+    "HAVAL": "Haval",
+    "ISUZU": "Isuzu"
   },
-  "manufactureModels": { "HIACE": { "make": "Toyota", "model": "Hiace" } },
+  "manufactureModels": {
+    "HIACE": {
+      "make": "Toyota",
+      "model": "Hiace"
+    }
+  },
   "genericManufactures": ["UNIVERSAL", "OTHER CARS", "LOCAL", "TRUCK", "NONE"],
   "fractionUnits": ["LITRE", "METER", "FOOT"],
   "cashPartners": ["0001", "0002"],
@@ -52,7 +72,14 @@
     },
     "retired": ["10-02-0001", "20-01-0001", "20-03-0001", "30-02-0001"],
     "notMigrated": ["-", "10-01-0002", "10-01-0003", "10-01-0004"],
-    "expenseParents": { "40-01": "6400", "40-02": "6300", "40-03": "6200", "40-04": "6100" },
-    "drawings": { "40-05": "3110" }
+    "expenseParents": {
+      "40-01": "6400",
+      "40-02": "6300",
+      "40-03": "6200",
+      "40-04": "6100"
+    },
+    "drawings": {
+      "40-05": "3110"
+    }
   }
 }
