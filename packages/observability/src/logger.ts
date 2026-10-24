@@ -1,3 +1,4 @@
+import { isSpanContextValid, trace } from '@opentelemetry/api';
 import pino, { type DestinationStream, type Logger } from 'pino';
 
 import { currentContext } from './context';
@@ -61,10 +62,12 @@ export function createLogger({ app, env, version, level = 'info', destination }:
       formatters: { level: (label) => ({ level: label }) },
       redact: { paths: REDACT_PATHS, censor: '[redacted]' },
       mixin() {
-        const ctx = currentContext();
-        if (!ctx) return {};
         const out: Record<string, string> = {};
-        for (const [from, to] of FIELDS) if (ctx[from] !== undefined) out[to] = ctx[from];
+        const ctx = currentContext();
+        if (ctx) for (const [from, to] of FIELDS) if (ctx[from] !== undefined) out[to] = ctx[from];
+        // The OpenTelemetry trace this line belongs to, so Grafana links the log line and the trace.
+        const span = trace.getActiveSpan()?.spanContext();
+        if (span && isSpanContextValid(span)) out['trace_id'] = span.traceId;
         return out;
       },
     },

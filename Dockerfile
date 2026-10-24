@@ -36,10 +36,12 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
 ARG ERP_VERSION=dev
 ENV ERP_VERSION=$ERP_VERSION
 LABEL org.opencontainers.image.version=$ERP_VERSION
-CMD ["node", "dist/main.js"]
+# instrument.js starts OpenTelemetry before the app loads (W0-06, D-086).
+CMD ["node", "--import", "./dist/instrument.js", "dist/main.js"]
 
 FROM node-runtime AS worker
 COPY --from=build --chown=root:root /out/worker/package.json ./
+COPY --from=build --chown=root:root /out/worker/node_modules ./node_modules
 COPY --from=build --chown=root:root /out/worker/dist ./dist
 ARG ERP_VERSION=dev
 ENV ERP_VERSION=$ERP_VERSION

@@ -1,5 +1,7 @@
 import { Writable } from 'node:stream';
 
+import { context, trace, TraceFlags } from '@opentelemetry/api';
+import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import { describe, expect, it } from 'vitest';
 
 import { setContext, withContext } from './context';
@@ -99,5 +101,22 @@ describe('every line', () => {
       ),
     );
     for (const l of lines) expect(l['request_id']).toBe(l['msg']);
+  });
+});
+
+describe('traces', () => {
+  it('a line logged inside a span carries its trace ID', () => {
+    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+    const { log, lines } = capture();
+    const span = trace.wrapSpanContext({
+      traceId: '0af7651916cd43dd8448eb211c80319c',
+      spanId: 'b7ad6b7169203331',
+      traceFlags: TraceFlags.SAMPLED,
+    });
+    context.with(trace.setSpan(context.active(), span), () => log.info('inside'));
+    log.info('outside');
+    expect(lines[0]).toMatchObject({ trace_id: '0af7651916cd43dd8448eb211c80319c' });
+    expect(lines[1]).not.toHaveProperty('trace_id');
+    context.disable();
   });
 });

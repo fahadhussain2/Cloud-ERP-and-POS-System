@@ -31,7 +31,7 @@ onShutdown(async () => {
 try {
   await app.listen({ port, host });
   // Which release is running, for reading logs and the deploy history.
-  app.log.info({ version, database: pool ? 'configured' : 'none' }, 'api started');
+  app.log.info({ database: pool ? 'configured' : 'none' }, 'api started');
 } catch (err) {
   app.log.error({ err }, 'api failed to start');
   sentry.capture(err);
