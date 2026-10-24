@@ -13,6 +13,10 @@
     "typescript": "catalog:"
   },
   "dependencies": {
-    "pg": "catalog:"
+    "@erp/contracts": "workspace:*",
+    "@erp/db": "workspace:*",
+    "@erp/domain": "workspace:*",
+    "pg": "catalog:",
+    "zod": "catalog:"
   }
 }

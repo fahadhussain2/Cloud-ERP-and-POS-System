@@ -14,13 +14,22 @@ describe('arguments', () => {
       step: 'stage',
       label: 'dec2025',
       dump: null,
+      tenant: 'delux',
       dryRun: false,
     });
     expect(parseArgs(['stage', '--label=oct2026', '--dump', 'copies/2026-10', '--dry-run'])).toEqual({
       step: 'stage',
       label: 'oct2026',
       dump: 'copies/2026-10',
+      tenant: 'delux',
       dryRun: true,
+    });
+  });
+
+  it('loads into the Delux shop unless another is named', () => {
+    expect(parseArgs(['load', '--label', 'dec2025', '--tenant', 'demo'])).toMatchObject({
+      step: 'load',
+      tenant: 'demo',
     });
   });
 

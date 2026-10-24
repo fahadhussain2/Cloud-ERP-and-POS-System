@@ -1,0 +1,62 @@
+{
+  "$comment": "A fixed mapping for the golden and load tests; the real one is mapping/delux.json.",
+  "emptyValues": ["NONE", "N/A", "-", "0"],
+  "countryBrands": {
+    "PAKISTANI": "Pakistan",
+    "CHINA": "China",
+    "TAIWAN": "Taiwan",
+    "JAPAN": "Japan"
+  },
+  "brandNames": {
+    "GENUINE": "Genuine (OEM)"
+  },
+  "originNames": {
+    "INDONASIA": "Indonesia",
+    "HUNGRY": "Hungary",
+    "SAUDIA ARABIA": "Saudi Arabia"
+  },
+  "vehicleMakes": {
+    "TOYOTA": "Toyota",
+    "SUZUKI": "Suzuki",
+    "HONDA": "Honda",
+    "HYNDAI": "Hyundai",
+    "CHEVERLET": "Chevrolet",
+    "VOLKS WAGON": "Volkswagen"
+  },
+  "manufactureModels": {
+    "HIACE": {
+      "make": "Toyota",
+      "model": "Hiace"
+    }
+  },
+  "genericManufactures": ["UNIVERSAL", "OTHER CARS", "LOCAL", "TRUCK"],
+  "fractionUnits": ["LITRE", "METER", "FOOT"],
+  "cashPartners": ["0001", "0002"],
+  "partyTiers": {
+    "0150": "MECHANIC"
+  },
+  "accounts": {
+    "template": {
+      "10-01-0001": "1110",
+      "10-03-0001": "1200",
+      "10-04-0001": "1150",
+      "10-04-0002": "1160",
+      "20-02-0001": "2100",
+      "30-01-0001": "4100",
+      "30-02-0002": "4120",
+      "50-01-0001": "3100",
+      "50-01-0002": "3110"
+    },
+    "retired": ["10-02-0001", "20-01-0001", "20-03-0001", "30-02-0001"],
+    "notMigrated": ["10-01-0002", "10-01-0003", "10-01-0004"],
+    "expenseParents": {
+      "40-01": "6400",
+      "40-02": "6300",
+      "40-03": "6200",
+      "40-04": "6100"
+    },
+    "drawings": {
+      "40-05": "3110"
+    }
+  }
+}

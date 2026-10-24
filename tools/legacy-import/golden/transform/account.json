@@ -1,0 +1,66 @@
+{
+  "description": "Legacy chart of accounts (migration doc §3.5): a template account, an expense account under its group, partner expenses into drawings, retired, not migrated, or unmapped.",
+  "cases": [
+    {
+      "name": "cash in hand",
+      "input": "10-01-0001",
+      "expected": {
+        "kind": "template",
+        "code": "1110"
+      }
+    },
+    {
+      "name": "HBL",
+      "input": "10-04-0002",
+      "expected": {
+        "kind": "template",
+        "code": "1160"
+      }
+    },
+    {
+      "name": "a utilities account",
+      "input": "40-03-0007",
+      "expected": {
+        "kind": "expense",
+        "parent": "6200"
+      }
+    },
+    {
+      "name": "a salary account",
+      "input": "40-04-0012",
+      "expected": {
+        "kind": "expense",
+        "parent": "6100"
+      }
+    },
+    {
+      "name": "a partner's expenses",
+      "input": "40-05-0002",
+      "expected": {
+        "kind": "drawings",
+        "code": "3110"
+      }
+    },
+    {
+      "name": "the old purchases account",
+      "input": "20-01-0001",
+      "expected": {
+        "kind": "retired"
+      }
+    },
+    {
+      "name": "cheque in hand",
+      "input": "10-01-0002",
+      "expected": {
+        "kind": "not_migrated"
+      }
+    },
+    {
+      "name": "something new",
+      "input": "60-01-0001",
+      "expected": {
+        "kind": "unmapped"
+      }
+    }
+  ]
+}

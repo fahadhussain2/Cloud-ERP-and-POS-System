@@ -80,11 +80,11 @@ Data in this document is grouped by area. Fields marked † are derived and main
 
 One **party** can be a customer, a supplier, or both. The legacy data has 39 such parties.
 
-**parties:** `code, name, contact_person, phones text[], email, address, city, country, tax_id (NTN/TRN), label_abbr (printed on labels, e.g. ADDI), notes, status, legacy jsonb`
+**parties:** `code, name, contact_person, phones text[], email, address, city, country, tax_id (NTN/TRN), label_abbr (printed on labels, e.g. ADDI), notes, status (active|inactive), legacy jsonb`
 
-**customer_accounts** (1:1 with party, optional): `party_id, price_tier_id, credit_allowed bool, credit_limit, offline_daily_cap, payment_terms_days`
+**customer_accounts** (1:1 with party, optional): `party_id, price_tier_id, credit_allowed bool, credit_limit (null = no limit, D-085), offline_daily_cap, payment_terms_days, legacy jsonb`
 
-**supplier_accounts** (1:1 with party, optional): `party_id, payment_terms_days, default_lead_days`
+**supplier_accounts** (1:1 with party, optional): `party_id, payment_terms_days, default_lead_days, legacy jsonb`
 
 **party_balances**†: `party_id, role (customer|supplier), balance, as_of` (synced to devices for customers)
 
@@ -97,15 +97,17 @@ Walk-in customers are **not** parties. Sales without `customer_party_id` are wal
 
 ## 4. Catalog and pricing
 
-**units:** `code (PCS, SET, LITRE, METER, FOOT), name, allows_fraction`
+Built in migration `0006` (W0-13). Every catalog table has `legacy jsonb`: the original keys and values of an imported row, and the marker the importer uses to recognise the identifiers and vehicle tags it derived (D-085).
+
+**units:** `code (PCS, SET, LITRE, METER, FOOT), name, allows_fraction` (LITRE, METER and FOOT for Delux)
 
 **categories:** `code (e.g. ABEA), name, parent_id, pricing_rule jsonb, return_policy jsonb`
 - `pricing_rule`: `{ tier_markups_bp: {RETAIL: 2500, MECHANIC: 2000, WHOLESALE: 1500}, floor_min_margin_bp: 500 }`
 - `return_policy`: `{ returnable: true, window_days: 30 }`
 
-**brands:** `name`
+**brands:** `name` (unique per tenant, ignoring case)
 
-**origins:** `name` (country of origin, e.g. JAPAN, CHINA, TAIWAN)
+**origins:** `name` (country of origin, e.g. Japan, China, Taiwan; unique ignoring case)
 
 **items:** `code (unique, scannable, e.g. ABEA001), name, category_id, brand_id, origin_id, unit_id, variant (position/size: R/H, L/H, FRONT, SET…), spec (non-vehicle spec, e.g. 6PK, H4, 6203), bin_location, default_supplier_id, min_qty, max_qty, exclude_from_reorder, floor_price (nullable → category rule), tax_code_id, status (active|dormant|discontinued), legacy jsonb`
 
@@ -116,11 +118,11 @@ Walk-in customers are **not** parties. Sales without `customer_party_id` are wal
 
 **vehicle_makes:** `name` (TOYOTA, SUZUKI, HONDA…)
 
-**item_compatibility:** `item_id, make_id, model (text, e.g. CIVIC, MEHRAN), year_from, year_to, note`. A light vehicle tag (D-014).
+**item_compatibility:** `item_id, make_id (nullable: a model or years without a make), model (text, e.g. CIVIC, MEHRAN), year_from, year_to (null = open-ended), note`. A light vehicle tag (D-014).
 
 **price_tiers:** `code (RETAIL|MECHANIC|WHOLESALE…), name, sort, is_default` (exactly one default)
 
-**item_prices:** `item_id, tier_id, price`. PK `(tenant_id, item_id, tier_id)`.
+**item_prices:** `item_id, tier_id, price`. Unique `(tenant_id, item_id, tier_id)`.
 
 **item_costs**†: `item_id, avg_cost, last_cost, last_supplier_id, last_receipt_at`
 

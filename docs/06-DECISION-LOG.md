@@ -658,3 +658,19 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - A count proof that doesn't depend on the parser.
 - **Status:** Accepted (with the W0-12 plan)
 
+### D-085 Legacy masters: tested mapping rules, a reviewed mapping file, idempotent load; no credit limit by default (2026-10-24)
+- **Decision:**
+  - Migration `0006` adds the catalog and party tables (data model §3, §4) with forced RLS, sync and audit.
+  - Every legacy mapping rule (migration doc §3) is a pure, golden-tested function in `tools/legacy-import`.
+  - The owner's decisions are kept in a reviewed mapping file in git (codes and catalog words only, never personal data) and re-applied on every run. Nothing is auto-deleted or auto-merged.
+  - The load upserts by legacy key with `legacy jsonb` on every row, one transaction per entity group, as the app role inside `withTenant`. A re-run never duplicates; rows missing from a newer dump are reported, not deleted.
+  - Until the rehearsals, the load target is a local dev database only.
+  - Mechanic = Retail −5%, Wholesale = Retail −10%, rounded to Rs 1 (PRD Q1); floors follow the category rule cost + 5% (PRD Q2).
+  - **Customers' `credit_limit` empty = no limit.** Migrated credit customers start without a limit; the review report lists them so the owner sets limits before go-live. The offline daily cap still applies.
+  - Cleanup reports mask phone numbers; Claude reads only the summary and catalog reports.
+- **Why:**
+  - The legacy data needs many judgement calls; tested rules and a reviewed decision file make them visible and repeatable through the final run.
+  - Credit customers keep buying on credit from day one.
+  - Party contacts stay on the owner's PC until the real migration.
+- **Status:** Accepted (with the W0-13 plan)
+

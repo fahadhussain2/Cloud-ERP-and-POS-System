@@ -9,7 +9,8 @@ export type DumpErrorCode =
   | 'count_mismatch'
   | 'columns_changed'
   | 'bad_label'
-  | 'no_files';
+  | 'no_files'
+  | 'bad_amount';
 
 export class DumpError extends Error {
   constructor(

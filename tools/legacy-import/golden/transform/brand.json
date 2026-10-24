@@ -1,0 +1,69 @@
+{
+  "description": "Brands (migration doc §3.2): a country entered as a brand becomes the origin; GENUINE becomes \"Genuine (OEM)\"; empty-like values are no brand.",
+  "cases": [
+    {
+      "name": "an ordinary brand, kept as written",
+      "input": "NGK",
+      "expected": {
+        "brand": "NGK",
+        "origin": null
+      }
+    },
+    {
+      "name": "spaces trimmed and collapsed",
+      "input": "  DENSO   JAPAN ",
+      "expected": {
+        "brand": "DENSO JAPAN",
+        "origin": null
+      }
+    },
+    {
+      "name": "a country is the origin, not a brand",
+      "input": "CHINA",
+      "expected": {
+        "brand": null,
+        "origin": "China"
+      }
+    },
+    {
+      "name": "matched without regard to case",
+      "input": "Pakistani",
+      "expected": {
+        "brand": null,
+        "origin": "Pakistan"
+      }
+    },
+    {
+      "name": "GENUINE",
+      "input": "GENUINE",
+      "expected": {
+        "brand": "Genuine (OEM)",
+        "origin": null
+      }
+    },
+    {
+      "name": "None",
+      "input": "None",
+      "expected": {
+        "brand": null,
+        "origin": null
+      }
+    },
+    {
+      "name": "empty",
+      "input": "  ",
+      "expected": {
+        "brand": null,
+        "origin": null
+      }
+    },
+    {
+      "name": "missing",
+      "input": null,
+      "expected": {
+        "brand": null,
+        "origin": null
+      }
+    }
+  ]
+}

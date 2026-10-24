@@ -1,0 +1,30 @@
+{
+  "description": "OEM numbers inside item names (migration doc §3.3): groups in brackets that contain a digit; the name itself is unchanged.",
+  "cases": [
+    {
+      "name": "one number",
+      "input": "OIL FILTER (17910-SO4-E84)",
+      "expected": ["17910-SO4-E84"]
+    },
+    {
+      "name": "two numbers, trimmed",
+      "input": "PAD ( 04465-0K240 ) (04465-0K290)",
+      "expected": ["04465-0K240", "04465-0K290"]
+    },
+    {
+      "name": "a word in brackets is not a number",
+      "input": "BULB (WHITE)",
+      "expected": []
+    },
+    {
+      "name": "the same number twice",
+      "input": "X (123) Y (123)",
+      "expected": ["123"]
+    },
+    {
+      "name": "no brackets",
+      "input": "AIR FILTER",
+      "expected": []
+    }
+  ]
+}

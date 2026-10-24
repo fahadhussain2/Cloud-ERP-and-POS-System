@@ -1,0 +1,92 @@
+{
+  "description": "Model (migration doc §3.3): a year range becomes years (ON = open-ended); any other text is a model name.",
+  "cases": [
+    {
+      "name": "a closed range",
+      "input": "2003-2008",
+      "expected": {
+        "yearFrom": 2003,
+        "yearTo": 2008,
+        "model": null
+      }
+    },
+    {
+      "name": "an open range",
+      "input": "2012-ON",
+      "expected": {
+        "yearFrom": 2012,
+        "yearTo": null,
+        "model": null
+      }
+    },
+    {
+      "name": "spaces around the dash, lower-case on",
+      "input": "2012 - on",
+      "expected": {
+        "yearFrom": 2012,
+        "yearTo": null,
+        "model": null
+      }
+    },
+    {
+      "name": "a model name",
+      "input": "MEHRAN",
+      "expected": {
+        "yearFrom": null,
+        "yearTo": null,
+        "model": "MEHRAN"
+      }
+    },
+    {
+      "name": "a model with an engine size",
+      "input": "SALOON 1.6",
+      "expected": {
+        "yearFrom": null,
+        "yearTo": null,
+        "model": "SALOON 1.6"
+      }
+    },
+    {
+      "name": "a backwards range is text",
+      "input": "2008-2003",
+      "expected": {
+        "yearFrom": null,
+        "yearTo": null,
+        "model": "2008-2003"
+      }
+    },
+    {
+      "name": "two-digit years are text",
+      "input": "03-08",
+      "expected": {
+        "yearFrom": null,
+        "yearTo": null,
+        "model": "03-08"
+      }
+    },
+    {
+      "name": "an impossible year is text",
+      "input": "1066-1070",
+      "expected": {
+        "yearFrom": null,
+        "yearTo": null,
+        "model": "1066-1070"
+      }
+    },
+    {
+      "name": "empty-like",
+      "input": "None",
+      "expected": null
+    },
+    {
+      "name": "empty",
+      "input": "",
+      "expected": null
+    },
+    {
+      "name": "missing",
+      "input": null,
+      "expected": null
+    }
+  ]
+}

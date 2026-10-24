@@ -18,6 +18,13 @@ export default defineConfig({
           functions: 100,
           statements: 100,
         },
+        // The legacy mapping rules decide what every item and party becomes (D-085).
+        'tools/legacy-import/src/transform/{rules,mapping}.ts': {
+          lines: 100,
+          branches: 100,
+          functions: 100,
+          statements: 100,
+        },
       },
     },
   },

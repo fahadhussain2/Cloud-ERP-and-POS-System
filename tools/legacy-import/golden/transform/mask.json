@@ -1,0 +1,30 @@
+{
+  "description": "Masked phones for reports (D-085): the last four digits kept, and the first four when the number has at least 11 digits.",
+  "cases": [
+    {
+      "name": "a mobile",
+      "input": "0300-1234567",
+      "expected": "0300-***4567"
+    },
+    {
+      "name": "a landline with the city code",
+      "input": "021-34567890",
+      "expected": "021-3***7890"
+    },
+    {
+      "name": "an international number",
+      "input": "+92 300 1234567",
+      "expected": "+92 30* ***4567"
+    },
+    {
+      "name": "a short number",
+      "input": "4567890",
+      "expected": "***7890"
+    },
+    {
+      "name": "four digits or fewer",
+      "input": "1234",
+      "expected": "****"
+    }
+  ]
+}
