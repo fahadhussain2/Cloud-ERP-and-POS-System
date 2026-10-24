@@ -39,7 +39,7 @@
 | Cash handover | **Required** |
 | Branch | `MAIN`, with Shop (sellable), Godown (storage), Damaged (not sellable) |
 | Banks and wallets | Soneri, HBL, JazzCash, Easypaisa, card settlement clearing (posting rules §2) |
-| Payment methods | cash · bank transfer · Raast · JazzCash · Easypaisa · card (reference required) · on account. JazzCash → JazzCash wallet, Easypaisa → Easypaisa wallet, card → card settlement clearing. **Bank transfer and Raast start unmapped** (the owner picks the bank later; the setup report lists them as "needs an account", and it's on the go-live checklist). |
+| Payment methods | cash · bank transfer · Raast · JazzCash · Easypaisa · card (reference required) · on account. JazzCash → JazzCash wallet, Easypaisa → Easypaisa wallet, card → card settlement clearing. **Bank transfer and Raast start unmapped** (the owner picks the bank later; the setup report lists them as "needs an account", and it's on the [go-live checklist](../../../GO-LIVE-CHECKLIST.md)). |
 | Price tiers | Retail (default), Mechanic, Wholesale |
 | Roles | the six templates (D-081), Salesman and Cashier with credit sales |
 | Print profile | A5 landscape dot matrix, Code 39 barcode, 1 copy, the default for every device (D-055) |
