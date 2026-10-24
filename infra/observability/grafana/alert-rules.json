@@ -1,0 +1,109 @@
+{
+  "$comment": "Grafana alert rules (architecture §11.6, D-086), applied by apply.py. severity critical goes to #erp-critical and email, warning to #erp-alerts. op is the threshold comparison: gt or lt.",
+  "rules": [
+    {
+      "uid": "erp-site-down",
+      "title": "Website or POS down",
+      "severity": "critical",
+      "datasource": "prom",
+      "expr": "min by (job) (avg_over_time(probe_success{job=~\"erp-app|erp-pos\"}[10m]))",
+      "op": "lt",
+      "threshold": 0.5,
+      "for": "0m",
+      "noData": "Alerting",
+      "summary": "{{ $labels.job }} failed most uptime checks in the last 10 minutes.",
+      "runbook": "docs/runbooks/site-down.md"
+    },
+    {
+      "uid": "erp-wal-archive-stale",
+      "title": "Backups: WAL not archived for 15 minutes",
+      "severity": "critical",
+      "datasource": "prom",
+      "expr": "time() - max(erp_wal_last_archived_timestamp_seconds)",
+      "op": "gt",
+      "threshold": 900,
+      "for": "5m",
+      "noData": "Alerting",
+      "summary": "Committed changes haven't reached off-site storage for over 15 minutes (RPO).",
+      "runbook": "docs/runbooks/backup-too-old.md"
+    },
+    {
+      "uid": "erp-base-backup-stale",
+      "title": "Backups: no base backup in 26 hours",
+      "severity": "critical",
+      "datasource": "prom",
+      "expr": "time() - max(erp_backup_last_timestamp_seconds)",
+      "op": "gt",
+      "threshold": 93600,
+      "for": "0m",
+      "noData": "Alerting",
+      "summary": "The nightly backup hasn't finished for over 26 hours.",
+      "runbook": "docs/runbooks/backup-too-old.md"
+    },
+    {
+      "uid": "erp-backup-status-stale",
+      "title": "Backups: status not updated for 45 minutes",
+      "severity": "critical",
+      "datasource": "prom",
+      "expr": "time() - max(erp_backup_status_timestamp_seconds)",
+      "op": "gt",
+      "threshold": 2700,
+      "for": "0m",
+      "noData": "Alerting",
+      "summary": "erp-db status (every 15 minutes) has stopped, so backup health is unknown.",
+      "runbook": "docs/runbooks/backup-too-old.md"
+    },
+    {
+      "uid": "erp-disk-full",
+      "title": "Disk over 85% full",
+      "severity": "critical",
+      "datasource": "prom",
+      "expr": "max(1 - node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})",
+      "op": "gt",
+      "threshold": 0.85,
+      "for": "10m",
+      "noData": "Alerting",
+      "summary": "The server's disk is {{ humanizePercentage $values.B.Value }} full.",
+      "runbook": "docs/runbooks/disk-full.md"
+    },
+    {
+      "uid": "erp-error-logged",
+      "title": "Error in the apps",
+      "severity": "warning",
+      "datasource": "logs",
+      "expr": "sum by (service, env, request_id) (count_over_time({level=~\"error|fatal\"} | json [5m]))",
+      "op": "gt",
+      "threshold": 0,
+      "for": "0m",
+      "noData": "OK",
+      "summary": "{{ $labels.service }} ({{ $labels.env }}) logged an error. Reference (request ID): {{ $labels.request_id }}",
+      "runbook": "docs/runbooks/app-error.md"
+    },
+    {
+      "uid": "erp-app-restarting",
+      "title": "An app keeps restarting",
+      "severity": "warning",
+      "datasource": "logs",
+      "expr": "sum by (service, env) (count_over_time({service=~\"api|worker\"} | json | msg=~\"(api|worker) started\" [15m]))",
+      "op": "gt",
+      "threshold": 2,
+      "for": "0m",
+      "noData": "OK",
+      "summary": "{{ $labels.service }} ({{ $labels.env }}) started {{ $values.B.Value }} times in 15 minutes.",
+      "runbook": "docs/runbooks/app-error.md"
+    },
+    {
+      "uid": "erp-certificate-expiring",
+      "title": "TLS certificate expires within 14 days",
+      "severity": "warning",
+      "datasource": "prom",
+      "expr": "min by (job) (probe_ssl_earliest_cert_expiry{job=~\"erp-.*\"} - time())",
+      "op": "lt",
+      "threshold": 1209600,
+      "for": "0m",
+      "noData": "OK",
+      "summary": "{{ $labels.job }}'s certificate expires in {{ humanizeDuration $values.B.Value }}. Caddy renews automatically; check the edge logs.",
+      "runbook": "docs/runbooks/site-down.md"
+    }
+  ]
+}

@@ -674,3 +674,24 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Party contacts stay on the owner's PC until the real migration.
 - **Status:** Accepted (with the W0-13 plan)
 
+### D-086 Observability on free plans: Grafana sends the Slack alerts and runs the uptime checks (2026-10-24)
+- **Decision:** (amends D-064)
+  - **Uptime checks: Grafana Cloud Synthetic Monitoring** instead of UptimeRobot / Better Stack: HTTPS checks of the app, POS and staging health with certificate expiry, every 5 minutes (about 50k of the free 100k checks a month).
+  - **Slack alerts come from Grafana alerting** (free), to `#erp-critical` (with an email copy) and `#erp-alerts`. Sentry's free plan alerts by email only; its Slack integration needs a paid plan.
+  - **Sentry:** two projects (`erp-server`, `erp-web`) tagged by app, env, release and request ID. **EU regions** for Sentry and Grafana Cloud, next to the server in Helsinki.
+  - Grafana Alloy reads Docker's log files and gets **no Docker socket**.
+  - Secrets (Grafana token, Sentry DSNs) are typed by the owner at a hidden prompt on the server.
+- **Why:**
+  - UptimeRobot's free plan is non-commercial only and has no SSL monitoring.
+  - Everything stays on free plans with no card (D-087).
+  - The Docker socket would give the agent root on the server.
+- **Status:** Accepted (with the W0-06 plan)
+
+### D-087 No paid services (2026-10-24)
+- **Decision:** the owner will not pay for any service. Every tool stays on a free plan, with no card on file.
+  - **Backblaze B2 stays on the free tier for good:** the "add a card before go-live" note in D-077 is dropped. Restore drills stay at one a day. If backups near the free 10 GB, retention is reduced (fewer monthly fulls) rather than paying.
+  - New tools are proposed only with their free-plan limits stated.
+- **Why:** the owner's instruction.
+- **Risk accepted:** an emergency restore on a day the B2 download cap is already used up waits until 05:00 Karachi, unless a recent backup has been copied off B2 beforehand.
+- **Status:** Accepted (changes D-077)
+

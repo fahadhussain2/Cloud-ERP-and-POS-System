@@ -102,6 +102,28 @@ Each drill restores into a throwaway container, runs `pg_amcheck`, reports the r
 ssh admin@204.168.217.64 "sudo erp-db status && sudo cat /srv/erp/prod/backup-status.json"
 ```
 
+## Observability (D-064, D-086)
+
+Errors go to **Sentry** (EU; projects `erp-server` and `erp-web`), logs, metrics and traces to **Grafana Cloud** (EU) through **Grafana Alloy** on the server (`observability/`), and alerts to Slack (`#erp-critical` with an email copy, `#erp-alerts`). All on free plans (D-087).
+
+**Set up or update Alloy** (creates the `erp-otel` network and the read-only `erp_monitor` database role):
+```bash
+infra/observability/apply.sh admin@204.168.217.64
+ssh -t admin@204.168.217.64 sudo erp-obs secrets    # once: Grafana Cloud details and the Sentry DSN (hidden)
+ssh admin@204.168.217.64 sudo erp-obs status
+```
+
+**Dashboard and alert rules** (`observability/dashboards/`, `observability/grafana/alert-rules.json`): edit the files, then apply them with a Grafana service-account token (typed at a hidden prompt):
+```bash
+python infra/observability/grafana/apply.py
+```
+
+**Finding things:** every error response has a `reference` (the request ID).
+- In Sentry, search the `request_id` tag.
+- In Grafana → Explore → the `-logs` data source: `{env="prod"} | json | request_id="<reference>"`. The line's `trace_id` opens the request's trace.
+- The *System* dashboard: Dashboards → ERP → System.
+- Each alert links to its runbook in `docs/runbooks/`.
+
 ## Tenants (D-083)
 
 A shop is described by a reviewed spec in `db/tenants/<name>.json` (settings, branch, locations, banks, payment methods, tiers, print profile, the owner's username; no secrets). `infra/db/apply.sh` copies the specs to `/srv/erp/tenants/` and installs `erp-tenant`. It runs the API image of the environment's current release, so deploy first.

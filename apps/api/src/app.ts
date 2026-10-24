@@ -1,4 +1,5 @@
-import Fastify, { type FastifyServerOptions } from 'fastify';
+import { enterContext, isRequestId, newRequestId } from '@erp/observability';
+import Fastify, { type FastifyError, type FastifyServerOptions } from 'fastify';
 import type pg from 'pg';
 
 import { registerAuth } from './auth/routes';
@@ -11,11 +12,53 @@ export interface AppOptions extends FastifyServerOptions {
   pool?: pg.Pool;
   /** Injected clock, so session and lockout times can be tested. */
   now?: () => Date;
+  /** Adds POST /api/_test/error, for checking error reporting end to end (staging only, W0-06). */
+  testErrors?: boolean;
+  /** Called with every unexpected error and its request ID (Sentry, D-086). */
+  reportError?: (err: unknown, requestId: string) => void;
 }
 
-export function buildApp({ version = 'dev', pool, now = () => new Date(), ...options }: AppOptions = {}) {
+export function buildApp({
+  version = 'dev',
+  pool,
+  now = () => new Date(),
+  testErrors = false,
+  reportError,
+  ...options
+}: AppOptions = {}) {
   // Behind Caddy (the only way in), so the client IP comes from X-Forwarded-For.
-  const app = Fastify({ trustProxy: true, ...options });
+  const app = Fastify({
+    trustProxy: true,
+    // Request IDs are UUIDv7; a caller's is kept only if it is a UUID (architecture §11.2).
+    genReqId: (req) => {
+      const given = req.headers['x-request-id'];
+      return isRequestId(given) ? given : newRequestId();
+    },
+    // The request ID comes from the context (one field, request_id), not Fastify's own reqId binding.
+    childLoggerFactory: (logger, _bindings, opts) => logger.child({}, opts),
+    ...options,
+  });
+
+  // Every log line and error of this request carries its ID; every response returns it (D-086).
+  app.addHook('onRequest', (req, reply, done) => {
+    enterContext({ requestId: req.id });
+    void reply.header('x-request-id', req.id);
+    done();
+  });
+
+  // Unexpected errors: logged and reported with the request ID; the caller gets only a reference.
+  app.setErrorHandler((err: FastifyError, req, reply) => {
+    if (err.statusCode !== undefined && err.statusCode < 500) return reply.send(err);
+    req.log.error({ err }, 'unexpected error');
+    reportError?.(err, req.id);
+    return reply.code(500).send({ error: 'internal', reference: req.id });
+  });
+
+  if (testErrors) {
+    app.post('/api/_test/error', () => {
+      throw new Error('test error (W0-06)');
+    });
+  }
 
   // Used by the deploy health check (D-063).
   app.get('/api/health', () => ({ status: 'ok', version }));
