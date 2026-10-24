@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Observability on the server (W0-06, D-086). Installed by infra/observability/apply.sh.
+#
+#   sudo erp-obs secrets    the owner types the Grafana Cloud details and the Sentry DSN (hidden where secret)
+#   sudo erp-obs status     is Alloy running, how much memory, its recent errors
+#   sudo erp-obs restart    restart Alloy (after changing secrets or the config)
+set -euo pipefail
+
+DIR=/srv/erp/observability
+COMPOSE=(docker compose -p erp-observability -f "$DIR/compose.yaml")
+
+die() {
+  echo "erp-obs: $*" >&2
+  exit 1
+}
+[[ $EUID -eq 0 ]] || die "run with sudo"
+
+case ${1:-} in
+  secrets)
+    [[ -t 0 ]] || die "run this interactively: ssh -t admin@<server> sudo erp-obs secrets"
+    echo "From Grafana Cloud: your stack -> Details (each of Prometheus, Loki and OpenTelemetry shows a URL and a user/instance ID)."
+    read -rp "Prometheus remote write URL (…/api/prom/push): " prom_url
+    read -rp "Prometheus user (a number): " prom_user
+    read -rp "Loki URL (…/loki/api/v1/push): " loki_url
+    read -rp "Loki user (a number): " loki_user
+    read -rp "OpenTelemetry endpoint (…/otlp): " otlp_url
+    read -rp "OpenTelemetry instance ID (a number): " otlp_user
+    read -rsp "Grafana access token with metrics, logs and traces write (hidden): " token
+    echo
+    echo "From Sentry: project erp-server -> Settings -> Client Keys (DSN)."
+    read -rsp "Sentry DSN for erp-server (hidden): " dsn
+    echo
+    for v in "$prom_url" "$loki_url" "$otlp_url"; do [[ $v == https://* ]] || die "URLs start with https://"; done
+    for v in "$prom_user" "$loki_user" "$otlp_user"; do [[ $v =~ ^[0-9]+$ ]] || die "users and instance IDs are numbers"; done
+    [[ -n $token ]] || die "the token is empty"
+    [[ -z $dsn || $dsn == https://*@*.sentry.io/* ]] || die "a Sentry DSN looks like https://<key>@<org>.ingest.de.sentry.io/<project>"
+    install -d -m 750 -o root -g deploy "$DIR"
+    umask 077
+    {
+      printf 'GRAFANA_PROM_URL=%s\nGRAFANA_PROM_USER=%s\n' "$prom_url" "$prom_user"
+      printf 'GRAFANA_LOKI_URL=%s\nGRAFANA_LOKI_USER=%s\n' "$loki_url" "$loki_user"
+      printf 'GRAFANA_OTLP_URL=%s\nGRAFANA_OTLP_USER=%s\n' "$otlp_url" "$otlp_user"
+      printf 'GRAFANA_TOKEN=%s\n' "$token"
+    } >"$DIR/grafana.env.new"
+    mv "$DIR/grafana.env.new" "$DIR/grafana.env"
+    # Read by the apps' compose file (as the deploy user), so it holds only what the apps need.
+    printf 'SENTRY_DSN=%s\n' "$dsn" >"$DIR/app.env.new"
+    chown root:deploy "$DIR/app.env.new"
+    chmod 640 "$DIR/app.env.new"
+    mv "$DIR/app.env.new" "$DIR/app.env"
+    umask 022
+    echo "Saved. Starting Alloy; the apps pick up the Sentry DSN at their next deploy."
+    "${COMPOSE[@]}" up -d
+    ;;
+  status)
+    "${COMPOSE[@]}" ps
+    docker stats --no-stream --format '{{.Name}}: {{.MemUsage}} memory, {{.CPUPerc}} CPU' erp-alloy || true
+    echo "--- recent warnings and errors"
+    docker logs --since 30m erp-alloy 2>&1 | grep -E 'level=(warn|error)' | tail -n 15 || true
+    ;;
+  restart)
+    "${COMPOSE[@]}" up -d --force-recreate
+    ;;
+  *)
+    sed -n '4,6p' "$0" >&2
+    exit 2
+    ;;
+esac

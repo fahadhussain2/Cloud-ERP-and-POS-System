@@ -1,0 +1,67 @@
+# Grafana Alloy on the server (W0-06, D-086). Installed and started by infra/observability/server-apply.sh:
+#   docker compose -p erp-observability -f /srv/erp/observability/compose.yaml up -d
+# It reads Docker's log files and the host's /proc and /sys read-only, and gets no Docker socket.
+
+services:
+  alloy:
+    image: grafana/alloy:v1.20.1
+    container_name: erp-alloy
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=127.0.0.1:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Both exist on the server before Alloy starts (server-apply.sh checks); optional here so CI can check the file.
+    env_file:
+      # Grafana Cloud endpoints and token (sudo erp-obs secrets)
+      - path: /srv/erp/observability/grafana.env
+        required: false
+      # Read-only PostgreSQL monitor role, written by server-apply.sh
+      - path: /srv/erp/observability/postgres.env
+        required: false
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      - /run/udev/data:/run/udev/data:ro
+      # backup.prom from erp-db status (W0-05)
+      - /srv/erp/metrics:/host/metrics:ro
+    networks:
+      # The apps send OpenTelemetry here (http://alloy:4318).
+      otel:
+        aliases:
+          - alloy
+      # PostgreSQL metrics (internal networks, no internet).
+      prod-db: {}
+      staging-db: {}
+      # Out to Grafana Cloud.
+      egress: {}
+    deploy:
+      resources:
+        limits:
+          memory: 300m
+          cpus: '0.5'
+
+volumes:
+  alloy-data:
+
+networks:
+  otel:
+    name: erp-otel
+    external: true
+  prod-db:
+    name: erp-prod-db
+    external: true
+  staging-db:
+    name: erp-staging-db
+    external: true
+  egress: {}

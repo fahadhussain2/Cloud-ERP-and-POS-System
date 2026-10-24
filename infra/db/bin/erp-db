@@ -48,7 +48,7 @@ case ${1:-} in
     archiver=$(psql_db -F ' ' -c "SELECT coalesce(extract(epoch FROM last_archived_time)::bigint, 0),
       coalesce(extract(epoch FROM last_failed_time)::bigint, 0), archived_count, failed_count FROM pg_stat_archiver")
     tmp=$(mktemp)
-    ARCHIVER=$archiver INFO_FILE=$INFO python3 - >"$tmp" <<'PY'
+    ARCHIVER=$archiver INFO_FILE=$INFO PROM_FILE=/srv/erp/metrics/backup.prom python3 - >"$tmp" <<'PY'
 import json, os, time
 last_archived, last_failed, archived, failed = (int(x) for x in os.environ["ARCHIVER"].split())
 try:
@@ -57,7 +57,7 @@ try:
 except (OSError, ValueError, IndexError):
     stanza = {"status": {"message": "no info saved yet"}, "backup": []}
 backups = stanza.get("backup", [])
-print(json.dumps({
+status = {
     "generated_at": int(time.time()),
     "stanza_status": stanza["status"]["message"],
     "last_archived_at": last_archived,
@@ -67,7 +67,44 @@ print(json.dumps({
     "last_backup_at": max((b["timestamp"]["stop"] for b in backups), default=0),
     "last_backup_type": backups[-1]["type"] if backups else "",
     "backups": len(backups),
-}))
+}
+print(json.dumps(status))
+# The same numbers for Grafana (node exporter textfile, W0-06): the dashboard and the backup alert use them.
+prom = os.environ["PROM_FILE"]
+if os.path.isdir(os.path.dirname(prom)):
+    with open(prom + ".tmp", "w") as f:
+        f.write("# HELP erp_backup_status_timestamp_seconds When erp-db status last ran.
+")
+        f.write("# TYPE erp_backup_status_timestamp_seconds gauge
+")
+        f.write(f"erp_backup_status_timestamp_seconds {status['generated_at']}
+")
+        f.write("# HELP erp_backup_last_timestamp_seconds When the newest base backup finished.
+")
+        f.write("# TYPE erp_backup_last_timestamp_seconds gauge
+")
+        f.write(f"erp_backup_last_timestamp_seconds {status['last_backup_at']}
+")
+        f.write("# HELP erp_wal_last_archived_timestamp_seconds When WAL was last archived off-site.
+")
+        f.write("# TYPE erp_wal_last_archived_timestamp_seconds gauge
+")
+        f.write(f"erp_wal_last_archived_timestamp_seconds {last_archived}
+")
+        f.write("# HELP erp_wal_last_failed_timestamp_seconds When WAL archiving last failed.
+")
+        f.write("# TYPE erp_wal_last_failed_timestamp_seconds gauge
+")
+        f.write(f"erp_wal_last_failed_timestamp_seconds {last_failed}
+")
+        f.write("# HELP erp_backup_stanza_ok 1 when pgBackRest reports the stanza as ok.
+")
+        f.write("# TYPE erp_backup_stanza_ok gauge
+")
+        f.write(f"erp_backup_stanza_ok {1 if status['stanza_status'] == 'ok' else 0}
+")
+    os.chmod(prom + ".tmp", 0o644)
+    os.replace(prom + ".tmp", prom)
 PY
     install -m 640 -o root -g deploy "$tmp" "$STATUS"
     rm -f "$tmp"

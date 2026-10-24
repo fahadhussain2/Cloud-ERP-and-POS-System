@@ -1,0 +1,179 @@
+// Grafana Alloy on erp-prod-1 (W0-06, D-086): container logs, server and PostgreSQL metrics, and OpenTelemetry
+// from the apps, sent to Grafana Cloud (EU). Secrets come from the environment (/srv/erp/observability, set by
+// `sudo erp-obs secrets`), never from this file.
+
+// ---- Logs: Docker's log files, read without the Docker socket ----
+
+local.file_match "containers" {
+  path_targets = [{"__path__" = "/var/lib/docker/containers/*/*-json.log"}]
+}
+
+loki.source.file "containers" {
+  targets    = local.file_match.containers.targets
+  forward_to = [loki.process.containers.receiver]
+}
+
+loki.process "containers" {
+  // Docker's wrapper: the line, the stream, the time, and the compose labels (infra/app/compose.yaml).
+  stage.json {
+    expressions = {
+      output  = "log",
+      stream  = "stream",
+      time    = "time",
+      project = "attrs.\"com.docker.compose.project\"",
+      service = "attrs.\"com.docker.compose.service\"",
+    }
+  }
+
+  stage.timestamp {
+    source = "time"
+    format = "RFC3339Nano"
+  }
+
+  stage.labels {
+    values = {
+      project = "",
+      service = "",
+      stream  = "",
+    }
+  }
+
+  stage.output {
+    source = "output"
+  }
+
+  // The apps log JSON (pino): level and env become labels. Request, tenant and user IDs stay in the line and are
+  // searched with `| json | request_id="…"`: as labels they would exceed the free tier's limits.
+  stage.json {
+    expressions = {
+      level = "level",
+      env   = "env",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level = "",
+      env   = "",
+    }
+  }
+
+  stage.drop {
+    longer_than         = "16KB"
+    drop_counter_reason = "line_too_long"
+  }
+
+  stage.static_labels {
+    values = {
+      host = "erp-prod-1",
+    }
+  }
+
+  forward_to = [loki.write.grafana.receiver]
+}
+
+loki.write "grafana" {
+  endpoint {
+    url = sys.env("GRAFANA_LOKI_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_LOKI_USER")
+      password = sys.env("GRAFANA_TOKEN")
+    }
+  }
+}
+
+// ---- Metrics: the server, the backup status file, PostgreSQL ----
+
+prometheus.exporter.unix "host" {
+  procfs_path        = "/host/proc"
+  sysfs_path         = "/host/sys"
+  rootfs_path        = "/host/root"
+  disable_collectors = ["btrfs", "infiniband", "ipvs", "nfs", "nfsd", "xfs", "zfs"]
+
+  // erp-db status writes backup.prom every 15 minutes (W0-05).
+  textfile {
+    directory = "/host/metrics"
+  }
+}
+
+prometheus.scrape "host" {
+  targets         = prometheus.exporter.unix.host.targets
+  scrape_interval = "60s"
+  forward_to      = [prometheus.remote_write.grafana.receiver]
+}
+
+prometheus.exporter.postgres "prod" {
+  data_source_names = [sys.env("PG_PROD_DSN")]
+}
+
+prometheus.exporter.postgres "staging" {
+  data_source_names = [sys.env("PG_STAGING_DSN")]
+}
+
+discovery.relabel "postgres_prod" {
+  targets = prometheus.exporter.postgres.prod.targets
+
+  rule {
+    target_label = "env"
+    replacement  = "prod"
+  }
+}
+
+discovery.relabel "postgres_staging" {
+  targets = prometheus.exporter.postgres.staging.targets
+
+  rule {
+    target_label = "env"
+    replacement  = "staging"
+  }
+}
+
+prometheus.scrape "postgres" {
+  targets         = array.concat(discovery.relabel.postgres_prod.output, discovery.relabel.postgres_staging.output)
+  scrape_interval = "60s"
+  forward_to      = [prometheus.remote_write.grafana.receiver]
+}
+
+prometheus.remote_write "grafana" {
+  endpoint {
+    url = sys.env("GRAFANA_PROM_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_PROM_USER")
+      password = sys.env("GRAFANA_TOKEN")
+    }
+  }
+}
+
+// ---- OpenTelemetry from the apps: request metrics and traces ----
+
+otelcol.receiver.otlp "apps" {
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    metrics = [otelcol.processor.batch.apps.input]
+    traces  = [otelcol.processor.batch.apps.input]
+  }
+}
+
+otelcol.processor.batch "apps" {
+  output {
+    metrics = [otelcol.exporter.otlphttp.grafana.input]
+    traces  = [otelcol.exporter.otlphttp.grafana.input]
+  }
+}
+
+otelcol.auth.basic "grafana" {
+  username = sys.env("GRAFANA_OTLP_USER")
+  password = sys.env("GRAFANA_TOKEN")
+}
+
+otelcol.exporter.otlphttp "grafana" {
+  client {
+    endpoint = sys.env("GRAFANA_OTLP_URL")
+    auth     = otelcol.auth.basic.grafana.handler
+  }
+}
