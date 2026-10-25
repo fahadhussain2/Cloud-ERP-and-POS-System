@@ -2,6 +2,7 @@ import { enterContext, isRequestId, newRequestId } from '@erp/observability';
 import Fastify, { type FastifyError, type FastifyServerOptions } from 'fastify';
 import type pg from 'pg';
 
+import { registerAdmin } from './admin/routes';
 import { registerAuth } from './auth/routes';
 import { registerDevices } from './devices/routes';
 import { registerSync } from './sync/routes';
@@ -71,6 +72,7 @@ export function buildApp({
         const requireAuth = await registerAuth(api, { pool, now });
         const requireDevice = registerDevices(api, { pool, now, requireAuth });
         registerSync(api, { pool, now, requireAuth, requireDevice });
+        registerAdmin(api, { pool, requireAuth });
       },
       { prefix: '/api' },
     );
