@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#6](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/6) |
 | **Module** | devops |
-| **Status** | Built; waiting for the B2 daily cap to reset (00:00 UTC) to finish the checks and drills |
+| **Status** | Done (2026-10-25) |
 | **Refs** | PRD §7 (durability); architecture §9, §12; D-029, D-062, D-074, D-075, D-076, **D-077** |
 | **Depends on** | W0-03 (server), W0-04 (deploys) |
 | **Size** | about 1.5 days |
@@ -68,21 +68,21 @@ PostgreSQL runs on the server, and **no committed data can be lost**. Every chan
 
 ## Tests that prove it
 
-- [ ] `pgbackrest check` passes: WAL archiving works end to end.
-- [ ] `pgbackrest info` shows the first full backup in both repos, and the archived WAL reaches the present.
-- [ ] A canary row reaches off-site storage within about 2 minutes (it shows up in the archived WAL range).
-- [ ] **Encrypted:** a file downloaded from the bucket is unreadable (it starts with `Salted__`, not PostgreSQL data).
-- [ ] **No public port:** the external scan still finds only 22, 80 and 443, and `ss -tlnp` shows no 5432 on the host.
-- [ ] **Restore drill, latest:**
+- [x] `pgbackrest check` passes: WAL archiving works end to end.
+- [x] `pgbackrest info` shows the first full backup in both repos, and the archived WAL reaches the present.
+- [x] A canary row reaches off-site storage within about 2 minutes (it shows up in the archived WAL range).
+- [x] **Encrypted:** a file downloaded from the bucket is unreadable (it starts with `Salted__`, not PostgreSQL data).
+- [x] **No public port:** the external scan still finds only 22, 80 and 443, and `ss -tlnp` shows no 5432 on the host.
+- [x] **Restore drill, latest:**
   - a throwaway container restores the latest backup and starts
   - `pg_amcheck` is clean
   - the newest canary row is ≤ 5 minutes before the drill started (**measured RPO**)
   - the total time is recorded (**measured RTO**)
-- [ ] **Point-in-time drill:** restored to a chosen moment, the canary has rows up to that moment and none after it.
-- [ ] Timers are active, and their next runs show 03:00 / 03:30 Karachi.
-- [ ] **The nightly freshness check is green**, and turns red when run with a zero-minute threshold (proves it can fail).
-- [ ] **Apps deploy fine** with the new database network attached.
-- [ ] No secret in git (the guard hook plus a search for the B2 key's ID prefix).
+- [x] **Point-in-time drill:** restored to a chosen moment, the canary has rows up to that moment and none after it.
+- [x] Timers are active, and their next runs show 03:00 / 03:30 Karachi.
+- [x] **The nightly freshness check is green**, and turns red when run with a zero-minute threshold (proves it can fail).
+- [x] **Apps deploy fine** with the new database network attached.
+- [x] No secret in git (the guard hook plus a search for the B2 key's ID prefix).
 
 ## Risks
 
@@ -132,3 +132,20 @@ PostgreSQL runs on the server, and **no committed data can be lost**. Every chan
 | **Restore drill 1 (latest)** | Restored, recovered, `pg_amcheck` clean, container and volume deleted. Total 107–109 s. Data loss 78 s (measure fixed during the drill). |
 | Backup check | Red on the real status while B2 is capped: WAL 50 min old, failures since the last success, no backup info under the new setup. **The check catches a real outage.** |
 | **Not yet done** (needs the cap to reset, and one drill per day) | Archiving catches up · a differential backup under the new setup · checking an encrypted file · the point-in-time drill (day 1) and the latest drill again (day 2) · the nightly check green · apps deployed with the database network. |
+
+## Results (2026-10-25)
+
+All checks done. The drills are logged in [restore-drills.md](../restore-drills.md).
+
+| Check | Result |
+|---|---|
+| Point-in-time drill (24 Oct, target 07:00 UTC) | Full + differential + WAL restored; canary rows up to 06:59:01 and **0 after the target**; `pg_amcheck` clean; 235 s. Needed the parallel WAL prefetch fix (in this PR). |
+| Latest drill (25 Oct) | Today's differential restored; `pg_amcheck` clean; **RTO 124 s, RPO 213 s** (target ≤ 5 min). |
+| Encryption | A raw file from the bucket starts with `Salted__` (aes-256-cbc), not PostgreSQL data. |
+| No public port | Only 22, 80 and 443 listen on the host; nothing on 5432. |
+| Timers | Canary every minute, status every 15 minutes, backup at 22:00 UTC (03:00 Karachi). |
+| Freshness check | The nightly GitHub check is green; it was red while B2 was capped, so it does catch an outage. |
+| Apps on the database network | Production migrated 0001–0006 and runs on it. |
+| Secrets | Not in git (searched); typed at a hidden prompt (`erp-db secrets`). |
+
+**Incident (24–25 Oct), my mistake:** a second drill on the same UTC day exceeded B2's free download cap. WAL archiving failed from about 21:15 to 00:00 UTC and the 22:00 UTC nightly backup aborted. Nothing was lost (WAL waits on the server); a backup was taken at 10:33 UTC on 25 Oct and the latest drill restored it. Since then drills run only on a UTC day without a drill, detached on the server. The W0-06 install of `erp-db` had also dropped the WAL-prefetch fix; this PR restores it, and the server now runs the repository's version.
