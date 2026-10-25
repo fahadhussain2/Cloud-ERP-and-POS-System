@@ -310,18 +310,32 @@ erDiagram
 
 ## 12. POS local database (SQLite in the browser)
 
-This mirrors a subset of the server tables. Downloaded tables keep their server columns plus `row_version`. Local-only tables:
+SQLite WASM in a dedicated worker, on OPFS (`opfs-sahpool`), changed only by numbered in-place migrations (`apps/pos/src/db/migrate.ts`, D-089). It mirrors a subset of the server tables: pulled tables keep only the columns their dataset lists (sync spec §3) plus `row_version` and `deleted_at`.
+
+**Built in W1-02 (local schema 1):**
 
 | Table | Purpose |
 |---|---|
-| `outbox` | `id, family, seq, payload json, signature, status (pending|sent|quarantined), attempts, last_error, created_at` |
-| `local_documents` | Full copy of this device's documents for 30 days (reprint, returns, re-push after a server restore) |
-| `held_bills` | Parked bills (expire at day close) |
+| `meta` | One row: local schema version, and this counter's device id, tenant, branch, code and kind |
+| `sync_state` | Key/value: `pull_cursor` (the opaque multi-dataset cursor), `last_pull_at` |
 | `local_series` | Next sequence per family. Incremented in the **same local transaction** that writes the document and outbox row. |
-| `sync_state` | Cursor per dataset, last push/pull, server clock offset |
-| `device_keys` | Reference to the non-extractable signing key (IndexedDB), device token |
+| `outbox` | `id, family, seq, payload json, signature, status (pending|sent|quarantined), attempts, last_error, created_at`; unique `(family, seq)`. While it has rows, a rebuild from the server is refused (rule 9). |
+| `local_documents` | Full copy of this device's documents for 30 days (reprint, returns, re-push after a server restore) |
+| `users`, `roles`, `user_roles` | Pulled for offline unlock: users carry `pin_verifier` and `pin_must_change`, never `password_hash` |
+| `tenant`, `branch` | Pulled settings as JSON (`data`): name, closing time, time zone… |
+| `pin_state` | Wrong PINs and the lock per person on this counter (survives reloads) |
+| `diagnostic_log` | The last 5,000 events (architecture §11.3) |
+
+The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` in IndexedDB (`erp-pos-keys`), and the device token is kept only in memory.
+
+**Planned (later tasks):**
+
+| Table | Purpose |
+|---|---|
+| `held_bills` | Parked bills (expire at day close) |
 | `local_cash_session` | Open session state (cash desk) |
 | `pending_overlays` | Derived: local unsynced effects on stock and customer balances, overlaid on the server snapshots |
+| Catalog tables | Items, prices, barcodes, stock snapshots (W1-03) |
 
 **Write order when a bill is finalized** (one SQLite transaction):
 1. allocate the sequence number

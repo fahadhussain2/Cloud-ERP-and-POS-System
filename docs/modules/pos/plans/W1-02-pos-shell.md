@@ -44,12 +44,25 @@
 
 ## Tests written first
 
-- [ ] **Local migrations:** a fresh database reaches the latest schema; an older one is upgraded in place with its rows kept; a failing migration rolls back and leaves the old schema.
-- [ ] **Outbox guard:** "rebuild from the server" is refused while the outbox has rows, allowed when empty.
-- [ ] **Pull (integration):** a device gets its tenant's users with `pin_verifier` and **without `password_hash`** (or any column not in the list); rows changed during a pull are not skipped (the existing cursor test, now through the endpoint); another tenant's device sees nothing; a revoked device gets `401`.
-- [ ] **Temporary PINs (integration):** only a user with the permission can set one; the counter can change it only with the right temporary PIN, and the new verifier reaches the next pull; offline, a temporary PIN can't sell.
-- [ ] **Unlock:** a right PIN unlocks; 5 wrong ones lock that user on this counter, and the lock survives a reload; a disabled user can't unlock; auto-lock after the idle time and at closing time.
-- [ ] **E2E:** the flows in scope item 5.
+- [x] **Local migrations:** a fresh database reaches the latest schema; an older one is upgraded in place with its rows kept; a failing migration rolls back and leaves the old schema.
+- [x] **Outbox guard:** "rebuild from the server" is refused while the outbox has rows, allowed when empty.
+- [x] **Pull (integration):** a device gets its tenant's users with `pin_verifier` and **without `password_hash`** (or any column not in the list); rows changed during a pull are not skipped (the existing cursor test, now through the endpoint); another tenant's device sees nothing; a revoked device gets `401`.
+- [x] **Temporary PINs (integration):** only a user with the permission can set one; the counter can change it only with the right temporary PIN, and the new verifier reaches the next pull; offline, a temporary PIN can't sell.
+- [x] **Unlock:** a right PIN unlocks; 5 wrong ones lock that user on this counter, and the lock survives a reload; a disabled user can't unlock; auto-lock after the idle time and at closing time.
+- [x] **E2E:** the flows in scope item 5.
+
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| Temporary PINs need **`admin.devices`**, not `admin.users` | The Manager template has `admin.devices` but not `admin.users`, and managers are the ones who give PINs (owner answer 2). Recorded in the platform README. |
+| The counter's screens talk to one `Counter` interface (`apps/pos/src/counter.ts`) | The screens are tested with a fake counter (jsdom); only `counter-browser.ts` touches the worker, IndexedDB and the network. |
+| **Bug found by the E2E, fixed test-first:** the counter sent its token as `Bearer`; the API reads `Device <tenantId>.<token>` (platform spec §2) | Every pull was refused. A locked failing test (`apps/pos/src/net/api.test.ts`), then the fix. |
+| The local and E2E proxies keep the browser's `Host` header (`changeOrigin: false`) | As Caddy does in production; otherwise the API's Origin check refuses back-office sign-in. |
+| In the E2E the counter reports permanent storage as granted (an init script), in a normal (persistent) browser profile | Chrome grants it to the installed app, which automation can't do, and never in an off-the-record profile. The refusal is covered by `storage/checks.test.ts`; Chrome's real grant is checked on staging (Verify 2). |
+| New dependencies, each older than 2 weeks: `vite-plugin-pwa` 2.0.0, `workbox-window` 7.4.1, `@playwright/test` 1.64.0 | The offline app shell and the E2E. `workbox-window` is a direct POS dependency because pnpm's strict layout needs it. |
+| `pnpm e2e` runs locally in the installed Edge (`E2E_CHANNEL=msedge`); CI installs Playwright's Chromium on its runner, and deploys wait for it | No browser download on the owner's PC; counters run Chrome or Edge (Q10). |
+| Auto-lock is unit-tested (`autoLockDue`) but not in the E2E | The E2E list in scope 5 doesn't include it; the 3-minute and closing-time rules are pure functions with their own tests. |
 
 ## Verify
 

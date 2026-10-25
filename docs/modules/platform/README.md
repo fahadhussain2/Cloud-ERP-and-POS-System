@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-07, W0-09, W0-10 done; W0-11 (tenant setup) in review |
+| **Status** | In progress: W0-07, W0-09, W0-10, W0-11 done; counter side of PLT-03/PLT-04 built with W1-02 (in review) |
 | **Requirements** | 13 (PLT-01…PLT-13) |
 | **Feature spec needed** | Yes: device enrollment + PIN security |
 
@@ -36,6 +36,13 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 - The chart of accounts is the retail template (`packages/db/templates/retail-coa.json`) plus the shop's banks and wallets, checked by `validateChartOfAccounts` (`packages/domain`) before anything is written.
 - On the server: `sudo erp-tenant setup <env> <name>` (the owner types the password) and `reset-password` for support; see [infra/README.md](../../../infra/README.md#tenants-d-083).
 - A generated password sets `must_change_password`: the API then answers `403 password_change_required` on every route except `GET /api/auth/me`, `POST /api/auth/logout` and `PUT /api/users/me/password`.
+
+## Counter PINs and back-office minimum (W1-02, D-089)
+
+- **Temporary PIN:** `PUT /api/users/:id/temporary-pin { pin }` needs **`admin.devices`** (the Manager template has it, not `admin.users`). It stores the verifier, sets `users.pin_must_change` (migration `0007`), resets `user_login_state.pin_failures` and audits `pin.temporary_set`.
+- **Own PIN at the counter:** `POST /api/sync/pin` (device token) checks the temporary PIN (wrong ones count towards the 5-try lock) and the PIN rules, clears the flag and audits `pin.changed` with the device.
+- **Lists for the back office:** `GET /api/branches`, `GET /api/staff` and `GET /api/devices` (`apps/api/src/admin/routes.ts`).
+- **Back office** (`apps/backoffice`): sign in, the forced password change, *Staff PINs* and *Counters* (one-time codes, revoke).
 
 ## Related
 

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W1-02 (POS shell); spec v1 accepted |
+| **Status** | In progress: W1-02 (POS shell) built, in review; spec v1 accepted |
 | **Requirements** | 17 (POS-01…POS-17) |
 | **Feature spec needed** | Yes: checkout screen and keyboard map; local DB and storage guardrails |
 
@@ -53,6 +53,23 @@ The exact building blocks every checkout rule uses. They are pure functions; gol
 | `parseMoney(text, minorUnits)` | Typed text → exact minor units; extra decimals are an error |
 | `businessDate(instantMs, timeZone, cutoffHour)` | Business date with the 04:00 cutoff (D-056); the time is always passed in |
 | `DomainError.code` | A stable error code for i18n messages and API exceptions |
+
+## Counter shell (W1-02, D-089)
+
+What every later counter task builds on ([spec](spec.md), [plan](plans/W1-02-pos-shell.md)):
+
+| Part | Where (`apps/pos/src`) |
+|---|---|
+| Local database: SQLite WASM in a worker on OPFS, numbered migrations, outbox guard | `db/worker.ts`, `db/migrate.ts`, `db/repo.ts`; the UI calls it through `db/client.ts` |
+| Storage checks that stop the counter (spec §3) | `storage/checks.ts`, `screens/StopScreen.tsx` |
+| Setup: the key pair in IndexedDB, enrollment, device token | `device/keys.ts`, `device/session.ts`, `screens/SetupScreen.tsx` |
+| Pull loop (startup, after unlock, every 60 s, when back online) | `sync/pull.ts` |
+| Unlock from the staff list, 5-try lock, auto-lock | `unlock/unlock.ts`, `screens/UnlockScreen.tsx`, `App.tsx` |
+| Choose your own PIN after a temporary one (online only) | `sync/pin.ts`, `screens/ChoosePinScreen.tsx` |
+| Status bar (POS-14) | `screens/StatusBar.tsx` |
+| Offline app shell; updates wait until no bill is open | `vite-plugin-pwa` in `vite.config.ts`, `pwa/update.ts` |
+
+The screens talk only to the `Counter` interface (`counter.ts`), so they are tested with a fake; `counter-browser.ts` is the real one. End-to-end flows: `e2e/counter.spec.ts` (`pnpm e2e`). Setting up a shop PC: [infra/counter-setup.md](../../../infra/counter-setup.md).
 
 ## Work in this module
 
