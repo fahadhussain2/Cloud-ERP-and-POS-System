@@ -1,20 +1,166 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nextProvider } from 'react-i18next';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { App } from './App';
+import type { Counter } from './counter';
+import type { DeviceInfo } from './db/repo';
 import { i18n } from './i18n';
 import en from './locales/en.json';
+import type { StaffUser } from './unlock/unlock';
 
-describe('App', () => {
-  it('renders its text from translation keys', () => {
-    render(
-      <I18nextProvider i18n={i18n}>
-        <App />
-      </I18nextProvider>,
-    );
+// The counter's screens over a fake counter (POS spec §3-§7). The PIN check is a plain comparison here; the real
+// one is PBKDF2 in the database worker.
 
-    expect(screen.getByRole('heading').textContent).toBe(en.app.title);
-    expect(screen.getByText(en.app.placeholder)).toBeDefined();
+const DEVICE: DeviceInfo = { deviceId: 'd', tenantId: 't', branchId: 'b', code: 'C01', kind: 'counter' };
+const staff = (over: Partial<StaffUser> = {}): StaffUser => ({
+  id: 'u1',
+  fullName: 'Asif Khan',
+  shortCode: '12',
+  pinVerifier: '4831',
+  pinMustChange: false,
+  status: 'active',
+  deletedAt: null,
+  ...over,
+});
+
+const fakeCounter = (over: Partial<Counter> = {}) => {
+  let device: DeviceInfo | null = DEVICE;
+  const pins = new Map<string, { failures: number; locked: boolean }>();
+  const calls: string[] = [];
+  const counter: Counter = {
+    checkStorage: () =>
+      Promise.resolve({ ok: true, health: { schemaVersion: 1, quickCheck: 'ok', outboxCount: 0 } }),
+    device: () => Promise.resolve(device),
+    enroll: (input) => {
+      calls.push(`enroll ${input.tenantCode} ${input.code}`);
+      device = DEVICE;
+      return Promise.resolve({ ok: true });
+    },
+    pull: () => {
+      calls.push('pull');
+      return Promise.resolve({ ok: true, rows: 0 });
+    },
+    staff: () => Promise.resolve([staff()]),
+    settings: () => Promise.resolve({ name: 'Delux Autos', closingTime: '22:00', timeZone: 'Asia/Karachi' }),
+    getPinState: (id) => Promise.resolve(pins.get(id) ?? { failures: 0, locked: false }),
+    setPinState: (id, s) => {
+      pins.set(id, s);
+      return Promise.resolve();
+    },
+    verifyPin: (verifier, pin) => Promise.resolve(verifier === pin),
+    changePin: (b) => {
+      calls.push(`changePin ${b.userId} ${b.currentPin} ${b.newPin}`);
+      return Promise.resolve('ok');
+    },
+    status: () => Promise.resolve({ outboxCount: 0, lastSyncAt: '2026-10-25T05:30:00.000Z' }),
+    log: () => Promise.resolve(),
+    ...over,
+  };
+  return { counter, calls, setDevice: (d: DeviceInfo | null) => (device = d) };
+};
+
+const show = (counter: Counter) =>
+  render(
+    <I18nextProvider i18n={i18n}>
+      <App counter={counter} />
+    </I18nextProvider>,
+  );
+
+const enterPin = (pin: string) => {
+  fireEvent.change(screen.getByLabelText(en.unlock.pin), { target: { value: pin } });
+  fireEvent.click(screen.getByRole('button', { name: en.unlock.submit }));
+};
+
+afterEach(cleanup);
+
+describe('counter screens', () => {
+  it('stop the counter, with what to do, when a storage check fails', async () => {
+    const { counter } = fakeCounter({
+      checkStorage: () => Promise.resolve({ ok: false, problem: 'not_persistent' }),
+    });
+    show(counter);
+    expect(await screen.findByText(en.stop.not_persistent)).toBeDefined();
+    expect(screen.queryByText(en.unlock.title)).toBeNull();
+  });
+
+  it('enroll a new counter with the shop code and a one-time code, then pull and show the staff', async () => {
+    const f = fakeCounter();
+    f.setDevice(null);
+    show(f.counter);
+    fireEvent.change(await screen.findByLabelText(en.setup.shopCode), { target: { value: 'delux' } });
+    fireEvent.change(screen.getByLabelText(en.setup.code), { target: { value: 'K7Q2-M9XD' } });
+    fireEvent.click(screen.getByRole('button', { name: en.setup.submit }));
+    expect(await screen.findByRole('button', { name: /Asif Khan/ })).toBeDefined();
+    expect(f.calls).toEqual(['enroll delux K7Q2-M9XD', 'pull']);
+  });
+
+  it('unlock with the right PIN; count down wrong ones and lock after the last', async () => {
+    const { counter } = fakeCounter();
+    show(counter);
+    fireEvent.click(await screen.findByRole('button', { name: /Asif Khan/ }));
+    enterPin('0000');
+    expect(await screen.findByText(i18n.t('unlock.wrong', { count: 4 }))).toBeDefined();
+    enterPin('4831');
+    expect(await screen.findByText(i18n.t('home.ready', { name: 'Asif Khan' }))).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: en.home.lock }));
+    fireEvent.click(await screen.findByRole('button', { name: /Asif Khan/ }));
+    for (let i = 0; i < 4; i++) {
+      enterPin('0000');
+      await screen.findByText(i18n.t('unlock.wrong', { count: 4 - i }));
+    }
+    enterPin('0000');
+    expect(await screen.findByText(en.unlock.locked)).toBeDefined();
+  });
+
+  it('typing the short code picks the person', async () => {
+    const { counter } = fakeCounter();
+    show(counter);
+    fireEvent.change(await screen.findByLabelText(en.unlock.shortCode), { target: { value: '12' } });
+    expect(await screen.findByLabelText(en.unlock.pin)).toBeDefined();
+  });
+
+  it('after a temporary PIN, make the person choose their own before selling', async () => {
+    const f = fakeCounter({
+      staff: () => Promise.resolve([staff({ pinVerifier: '4831', pinMustChange: true })]),
+    });
+    show(f.counter);
+    fireEvent.click(await screen.findByRole('button', { name: /Asif Khan/ }));
+    enterPin('4831');
+    fireEvent.change(await screen.findByLabelText(en.choosePin.newPin), { target: { value: '1234' } });
+    fireEvent.change(screen.getByLabelText(en.choosePin.repeat), { target: { value: '1234' } });
+    fireEvent.click(screen.getByRole('button', { name: en.choosePin.submit }));
+    expect(await screen.findByText(en.pinProblem.sequence)).toBeDefined();
+    fireEvent.change(screen.getByLabelText(en.choosePin.newPin), { target: { value: '7395' } });
+    fireEvent.change(screen.getByLabelText(en.choosePin.repeat), { target: { value: '7395' } });
+    fireEvent.click(screen.getByRole('button', { name: en.choosePin.submit }));
+    expect(await screen.findByText(i18n.t('home.ready', { name: 'Asif Khan' }))).toBeDefined();
+    expect(f.calls).toContain('changePin u1 4831 7395');
+  });
+
+  it('a temporary PIN cannot be changed, so cannot sell, while offline', async () => {
+    const f = fakeCounter({
+      staff: () => Promise.resolve([staff({ pinMustChange: true })]),
+      changePin: () => Promise.resolve('offline'),
+    });
+    show(f.counter);
+    fireEvent.click(await screen.findByRole('button', { name: /Asif Khan/ }));
+    enterPin('4831');
+    fireEvent.change(await screen.findByLabelText(en.choosePin.newPin), { target: { value: '7395' } });
+    fireEvent.change(screen.getByLabelText(en.choosePin.repeat), { target: { value: '7395' } });
+    fireEvent.click(screen.getByRole('button', { name: en.choosePin.submit }));
+    expect(await screen.findByText(en.choosePin.offline)).toBeDefined();
+    expect(screen.queryByText(i18n.t('home.ready', { name: 'Asif Khan' }))).toBeNull();
+  });
+
+  it('the status bar shows the counter, the bills waiting and when the counter went offline', async () => {
+    const { counter } = fakeCounter({
+      pull: () => Promise.resolve({ ok: false, reason: 'offline' }),
+      status: () => Promise.resolve({ outboxCount: 3, lastSyncAt: null }),
+    });
+    show(counter);
+    expect(await screen.findByText('C01')).toBeDefined();
+    expect(await screen.findByText(i18n.t('status.waiting', { count: 3 }))).toBeDefined();
+    await waitFor(() => expect(screen.getByText(/^Offline since/)).toBeDefined());
   });
 });

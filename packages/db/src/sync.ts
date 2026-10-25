@@ -36,3 +36,42 @@ export async function pullChanges(client: pg.ClientBase, table: SyncedTable, aft
   const cursor: Cursor = last ? { txid: last.txid_text, rowVersion: last.row_version_text } : after;
   return { rows, cursor };
 }
+
+export interface PullSource {
+  /** Table in the erp schema, e.g. `users`. */
+  table: string;
+  /** The only columns returned (sync spec §3): a column not listed never leaves the server. */
+  columns: readonly string[];
+  /** An extra filter with $n placeholders numbered from $4 (e.g. a branch filter). */
+  where?: string;
+  params?: readonly unknown[];
+}
+
+const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
+
+/**
+ * pullChanges for counters (sync spec §2, D-089): the same cursor rule, but only the listed columns. Run inside
+ * withTenant: RLS scopes it to the tenant.
+ */
+export async function pullColumns(client: pg.ClientBase, source: PullSource, after: Cursor, limit: number) {
+  for (const name of [source.table, ...source.columns]) {
+    if (!IDENTIFIER.test(name)) throw new Error(`not an identifier: ${name}`);
+  }
+  const { rows } = await client.query<Record<string, unknown> & { _txid: string; _rv: string }>(
+    `SELECT ${source.columns.map((c) => `"${c}"`).join(', ')}, txid::text AS _txid, row_version::text AS _rv
+     FROM erp.${source.table}
+     WHERE txid < pg_snapshot_xmin(pg_current_snapshot())
+       AND (txid, row_version) > ($1::xid8, $2::bigint)
+       ${source.where ? `AND (${source.where})` : ''}
+     ORDER BY txid, row_version
+     LIMIT $3`,
+    [after.txid, after.rowVersion, limit, ...(source.params ?? [])],
+  );
+  const last = rows.at(-1);
+  const cursor: Cursor = last ? { txid: last._txid, rowVersion: last._rv } : after;
+  for (const row of rows) {
+    delete (row as Partial<typeof row>)._txid;
+    delete (row as Partial<typeof row>)._rv;
+  }
+  return { rows: rows as Record<string, unknown>[], cursor };
+}

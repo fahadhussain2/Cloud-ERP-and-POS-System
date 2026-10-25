@@ -10,6 +10,7 @@ Production runs on one Hetzner CX33 (`erp-prod-1`, `204.168.217.64`, Helsinki, U
 | `app/` | One release of the apps (`api`, `worker`, `web`) for one environment: `compose.yaml` plus non-secret settings per environment. Deployed by `erp-deploy`. |
 | `server/files/bin/erp-deploy` | The only program the GitHub deploy key may run on the server (D-075). |
 | `db/` | PostgreSQL + pgBackRest per environment: image, config, `apply.sh`, `erp-db` (backups, canary, status, secrets, restore drills), systemd timers (D-076). `erp-tenant` and the tenant specs in `db/tenants/` (D-083). |
+| `counter-setup.md` | Setting up a counter PC in the shop: enroll, install the POS, keep the browser from deleting unsynced bills (D-089). |
 
 ## Access
 

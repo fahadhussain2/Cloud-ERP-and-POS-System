@@ -101,6 +101,8 @@ export const users = erp.table('users', {
   status: text('status', { enum: ['active', 'disabled'] }).notNull(),
   passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
   mustChangePassword: boolean('must_change_password').notNull(),
+  /** A temporary PIN set by a manager, to be replaced at a counter (D-089). */
+  pinMustChange: boolean('pin_must_change').notNull(),
   ...syncColumns,
   ...auditColumns,
 });
@@ -111,6 +113,7 @@ export const userLoginState = erp.table('user_login_state', {
   failedLogins: smallint('failed_logins').notNull(),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  pinFailures: smallint('pin_failures').notNull(),
 });
 
 export const roles = erp.table('roles', {

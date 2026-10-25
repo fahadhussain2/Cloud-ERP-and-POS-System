@@ -1,0 +1,101 @@
+import type { SqlDb } from './sql';
+
+// The counter's schema (POS spec §1–§2, data model §12, CLAUDE.md rule 9, D-089): numbered migrations, each in one
+// transaction, applied in place. Never drop and rebuild while the outbox has rows. Append new migrations; never
+// edit one that a counter may already have run.
+
+export interface Migration {
+  version: number;
+  statements: readonly string[];
+}
+
+export const MIGRATIONS: readonly Migration[] = [
+  {
+    version: 1,
+    statements: [
+      `CREATE TABLE meta (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        schema_version INTEGER NOT NULL,
+        device_id TEXT, tenant_id TEXT, branch_id TEXT, device_code TEXT, device_kind TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      )`,
+      'INSERT INTO meta (id, schema_version) VALUES (1, 0)',
+      // Pull cursor, last pull/push, server clock offset: small values by key (sync spec §4).
+      'CREATE TABLE sync_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+      'CREATE TABLE local_series (family TEXT PRIMARY KEY, next_seq INTEGER NOT NULL)',
+      `CREATE TABLE outbox (
+        id TEXT PRIMARY KEY,
+        family TEXT NOT NULL,
+        seq INTEGER NOT NULL,
+        payload TEXT NOT NULL,
+        signature TEXT,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'sent', 'quarantined')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT,
+        created_at TEXT NOT NULL,
+        UNIQUE (family, seq)
+      )`,
+      `CREATE TABLE local_documents (
+        id TEXT PRIMARY KEY, family TEXT NOT NULL, seq INTEGER NOT NULL, number TEXT NOT NULL,
+        kind TEXT NOT NULL, business_date TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL
+      )`,
+      // Pulled datasets (sync spec §3). Users get real columns (unlock reads them); the rest stay as JSON.
+      `CREATE TABLE users (
+        id TEXT PRIMARY KEY, username TEXT NOT NULL, full_name TEXT NOT NULL, short_code TEXT,
+        pin_verifier TEXT, pin_must_change INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE roles (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, template_key TEXT, permissions TEXT NOT NULL, limits TEXT NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE user_roles (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL, role_id TEXT NOT NULL, branch_id TEXT,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE TABLE tenant (id TEXT PRIMARY KEY, data TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT)',
+      'CREATE TABLE branch (id TEXT PRIMARY KEY, data TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT)',
+      // Wrong PINs per person on this counter (POS spec §5); survives reloads.
+      'CREATE TABLE pin_state (user_id TEXT PRIMARY KEY, failures INTEGER NOT NULL, locked INTEGER NOT NULL, updated_at TEXT NOT NULL)',
+      // The last ~5,000 events, for "Send diagnostics" (architecture §11.3).
+      'CREATE TABLE diagnostic_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, kind TEXT NOT NULL, detail TEXT NOT NULL)',
+    ],
+  },
+];
+
+export const LATEST_VERSION = MIGRATIONS.length;
+
+export class DbTooNewError extends Error {
+  constructor(
+    readonly found: number,
+    readonly known: number,
+  ) {
+    super(`the local database is version ${found}; this app knows up to ${known}`);
+    this.name = 'DbTooNewError';
+  }
+}
+
+/** The schema version, 0 for a database that has never been migrated. */
+export function currentVersion(db: SqlDb): number {
+  const hasMeta = db.selectValue("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'meta'");
+  return hasMeta ? Number(db.selectValue('SELECT schema_version FROM meta WHERE id = 1')) : 0;
+}
+
+/** Brings the database to the latest version, one transaction per migration. Returns the new version. */
+export function migrate(db: SqlDb, migrations: readonly Migration[] = MIGRATIONS): number {
+  const latest = migrations.at(-1)?.version ?? 0;
+  const found = currentVersion(db);
+  if (found > latest) throw new DbTooNewError(found, latest);
+  for (const m of migrations) {
+    if (m.version <= found) continue;
+    db.transaction(() => {
+      for (const statement of m.statements) db.exec(statement);
+      db.exec('UPDATE meta SET schema_version = ? WHERE id = 1', [m.version]);
+    });
+  }
+  return Math.max(found, latest);
+}
+
+/** A rebuild from the server is allowed only with an empty outbox (rule 9): unsynced bills are never dropped. */
+export const rebuildAllowed = (db: SqlDb): boolean =>
+  Number(db.selectValue('SELECT count(*) FROM outbox')) === 0;

@@ -12,3 +12,5 @@ sql_dump
 **/.env.*
 !**/.env.example
 *.md
+e2e/test-results
+e2e/playwright-report

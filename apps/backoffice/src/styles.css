@@ -1,10 +1,89 @@
-/* Logical properties only, so the layout works right-to-left (CLAUDE.md rule 10). */
+/* Logical properties only, so the layout works right-to-left (CLAUDE.md rule 10). Colour tokens only; themes come
+   with PLT-13. */
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #5c5c5c;
+  --accent: #0b5cad;
+  --danger: #b3261e;
+  --line: #d9dde1;
+  --nav-bg: #f1f3f5;
+  color-scheme: light;
+}
+
 body {
   margin: 0;
   font-family: system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
 }
 
-.placeholder {
+nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-block: 0.5rem;
+  padding-inline: 1.5rem;
+  background: var(--nav-bg);
+}
+
+nav [aria-current='true'] {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+nav .user {
+  margin-inline-start: auto;
+  color: var(--muted);
+}
+
+.screen {
   padding-block: 2rem;
   padding-inline: 1.5rem;
+  max-inline-size: 60rem;
+}
+
+.screen label {
+  display: block;
+  margin-block-end: 1rem;
+}
+
+.screen input,
+.screen select {
+  display: block;
+  margin-block-start: 0.25rem;
+  font-size: 1rem;
+  padding-block: 0.4rem;
+  padding-inline: 0.6rem;
+}
+
+.inline-form {
+  margin-block-end: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+table {
+  border-collapse: collapse;
+  inline-size: 100%;
+}
+
+th,
+td {
+  text-align: start;
+  padding-block: 0.5rem;
+  padding-inline: 0.75rem;
+  border-block-end: 1px solid var(--line);
+}
+
+[role='alert'],
+.danger {
+  color: var(--danger);
+}
+
+.code strong {
+  font-family: ui-monospace, monospace;
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
 }

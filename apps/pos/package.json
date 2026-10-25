@@ -10,11 +10,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@erp/contracts": "workspace:*",
+    "@erp/domain": "workspace:*",
     "@erp/observability": "workspace:*",
+    "@sqlite.org/sqlite-wasm": "catalog:",
     "i18next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "react-i18next": "catalog:"
+    "react-i18next": "catalog:",
+    "workbox-window": "catalog:"
   },
   "devDependencies": {
     "@sentry/vite-plugin": "catalog:",
@@ -24,6 +28,7 @@
     "@vitejs/plugin-react": "catalog:",
     "jsdom": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vite-plugin-pwa": "catalog:"
   }
 }

@@ -1,6 +1,75 @@
 {
   "app": {
     "title": "POS",
-    "placeholder": "Counter app: coming in Wave 1."
+    "checking": "Checking this counter…"
+  },
+  "stop": {
+    "title": "This counter cannot sell yet",
+    "not_persistent": "Chrome has not given this counter permanent storage, so it could delete unsynced bills. Install the POS app (the install icon in the address bar) and open it again. If this stays, call the manager.",
+    "unavailable": "The counter's database cannot be opened. Use current Chrome or Edge, close other POS windows, and reload. If this stays, call the manager.",
+    "too_new": "This counter's database was made by a newer version of the POS. Reload to get the newest version. Do not clear the browser's data.",
+    "damaged": "The counter's database is damaged. Do not clear the browser's data: call the manager, so unsynced bills can be saved.",
+    "outbox_unreadable": "The list of bills waiting to sync cannot be read. Do not clear the browser's data: call the manager.",
+    "reload": "Check again"
+  },
+  "setup": {
+    "title": "Set up this counter",
+    "help": "A manager creates a one-time code in the back office (Counters). Enter the shop code and that code.",
+    "shopCode": "Shop code",
+    "code": "One-time code",
+    "submit": "Set up counter",
+    "busy": "Setting up…",
+    "enrollment_failed": "That code is wrong, used or expired. Ask the manager for a new one.",
+    "too_many_attempts": "Too many wrong codes. Wait 15 minutes, then try a new code.",
+    "offline": "Setting up needs the internet. Check the connection and try again."
+  },
+  "unlock": {
+    "title": "Who is selling?",
+    "shortCode": "Or type your short code",
+    "noStaff": "No staff with a PIN yet. A manager gives each person a temporary PIN in the back office (Staff PINs).",
+    "pin": "PIN",
+    "submit": "Unlock",
+    "back": "Someone else",
+    "checking": "Checking…",
+    "wrong_one": "Wrong PIN. {{count}} try left before you are locked on this counter.",
+    "wrong_other": "Wrong PIN. {{count}} tries left before you are locked on this counter.",
+    "locked": "Locked on this counter after 5 wrong PINs. Ask a manager to unlock you.",
+    "no_pin": "You have no PIN yet. Ask a manager for a temporary PIN."
+  },
+  "choosePin": {
+    "title": "Choose your own PIN",
+    "help": "Your PIN was given by a manager. Choose your own: 4 to 6 digits that only you know.",
+    "newPin": "New PIN",
+    "repeat": "New PIN again",
+    "submit": "Save my PIN",
+    "busy": "Saving…",
+    "mismatch": "The two PINs are not the same.",
+    "offline": "Saving your PIN needs the internet, so every counter learns it. You cannot sell until it is saved.",
+    "wrong_pin": "The temporary PIN was not accepted. Ask the manager for a new one.",
+    "weak_pin": "Choose a harder PIN.",
+    "failed": "Your PIN could not be saved. Ask the manager."
+  },
+  "pinProblem": {
+    "not_digits": "Use digits only.",
+    "too_short": "Use at least 4 digits.",
+    "too_long": "Use at most 6 digits.",
+    "all_same": "Do not repeat one digit.",
+    "sequence": "Do not use a run like 1234 or 4321.",
+    "is_short_code": "Do not use your short code."
+  },
+  "home": {
+    "ready": "{{name}} is selling on this counter.",
+    "placeholder": "Search and bills come next.",
+    "lock": "Lock"
+  },
+  "status": {
+    "online": "Online",
+    "offlineSince": "Offline since {{time}}",
+    "refused": "The server does not accept this counter. Call the manager.",
+    "waiting_one": "{{count}} bill waiting to sync",
+    "waiting_other": "{{count}} bills waiting to sync",
+    "lastSync": "Last sync {{time}}",
+    "neverSynced": "Not synced yet",
+    "locked": "Locked"
   }
 }

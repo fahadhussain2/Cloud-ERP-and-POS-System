@@ -695,3 +695,17 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Risk accepted:** an emergency restore on a day the B2 download cap is already used up waits until 05:00 Karachi, unless a recent backup has been copied off B2 beforehand.
 - **Status:** Accepted (changes D-077)
 
+### D-089 POS shell: SQLite on OPFS, blocking storage checks, column-listed pull, temporary PINs changed at the counter (2026-10-25)
+- **Decision:**
+  - The counter's database is **SQLite WASM in a dedicated worker on OPFS (`opfs-sahpool`)**, changed only by numbered in-place migrations; a rebuild from the server is refused while the outbox has rows (confirms D-039, D-010).
+  - **Storage checks block selling:** persistent storage, a readable database, a known schema and a readable outbox, each with a stop screen.
+  - **Pull** is one call for several datasets with one opaque cursor (architecture §5.3), and **every dataset lists the columns that may leave the server**; `password_hash` and other private columns never do. Specified in `docs/modules/sync/spec.md`.
+  - **PINs:** a manager sets a **temporary PIN** in the back office; the person chooses their own at the counter on first unlock (online), so salesmen need no back-office login and only they know their PIN.
+  - **Unlock** from a list of staff names (or the short code); 5 wrong PINs lock the user on that counter; **auto-lock after 3 minutes** idle and at closing time, not after each bill.
+  - A minimal back office arrives with it: sign in, password change, Staff PINs, Counters.
+- **Why:**
+  - Unsynced bills must survive any app update or browser clean-up (CLAUDE.md rules 6, 9).
+  - `SELECT *` would have sent password hashes to every counter.
+  - Bills are credited to whoever unlocked the counter, so PINs must stay private.
+- **Status:** Accepted (with the W1-02 plan)
+
