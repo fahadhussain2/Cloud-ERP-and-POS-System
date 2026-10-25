@@ -21,7 +21,8 @@ export const httpApi =
   async (method, path, opts = {}) => {
     const headers: Record<string, string> = {};
     if (opts.body !== undefined) headers['content-type'] = 'application/json';
-    if (opts.token) headers['authorization'] = `Bearer ${opts.token}`;
+    // The device token's scheme (platform spec §2).
+    if (opts.token) headers['authorization'] = `Device ${opts.token}`;
     let res: Response;
     try {
       res = await fetchFn(base + path, {
