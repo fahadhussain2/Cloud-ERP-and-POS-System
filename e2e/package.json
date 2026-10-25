@@ -1,0 +1,22 @@
+{
+  "name": "@erp/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@erp/contracts": "workspace:*",
+    "@erp/db": "workspace:*",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}

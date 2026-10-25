@@ -7,7 +7,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 // With a Sentry token (CI only), source maps are uploaded to Sentry's erp-web project and deleted from dist (D-086).
 const sentryToken = process.env['SENTRY_AUTH_TOKEN'];
 // The API on the same origin, as behind the edge proxy (D-065); locally and in E2E it runs on its own port.
-const api = { '/api': process.env['API_URL'] ?? 'http://127.0.0.1:3000' };
+// The Host header is kept, as Caddy keeps it: the API checks Origin against it (CSRF defence).
+const api = { '/api': { target: process.env['API_URL'] ?? 'http://127.0.0.1:3000', changeOrigin: false } };
 
 export default defineConfig({
   plugins: [

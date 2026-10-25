@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit && pnpm -r --parallel typecheck",
     "test": "vitest run --coverage --exclude \"**/*.int.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "e2e": "pnpm --filter @erp/e2e e2e",
     "db:up": "docker compose -f infra/dev/compose.yaml up -d --wait",
     "db:down": "docker compose -f infra/dev/compose.yaml down",
     "dev:db": "pnpm --filter @erp/db exec tsx src/testing/dev.ts",
