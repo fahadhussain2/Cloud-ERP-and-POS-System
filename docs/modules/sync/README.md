@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Not started (build on hold, D-068) |
+| **Status** | In progress: spec v1 (pull) accepted; pull built with W1-02 |
 | **Requirements** | 6 (SYN-01…SYN-06) |
 | **Feature spec needed** | Yes: the sync protocol (push/pull contracts, cursor, gap handling) |
 

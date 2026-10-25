@@ -10,6 +10,8 @@ Open items that must be settled before, or soon after, go-live. Each line names 
 - [ ] **Bill header:** the legacy database has only the shop name. Give the real address, phone and other header lines; until then the receipt uses placeholder lines (W0-13 owner review).
 - [ ] **The 2026 dump:** a current dump in its own folder under `sql_dump/`, before the rehearsals (PRD Q11, W0-12).
 
+- [ ] **Bill print test at the shop** (speed and barcode scan) by mid-November, with real bills once checkout exists (W1-01, deferred; the printer is an HP LaserJet P1005, so lower risk than the dot-matrix assumption).
+
 ## After go-live
 
 - [ ] **Catalog clean-up** from the import reports (W0-13 owner review): 258 items at price 0, 14 with cost above price, 7 duplicate names, PartNo values kept as specs (5,566).
