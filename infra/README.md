@@ -118,6 +118,15 @@ ssh admin@204.168.217.64 sudo erp-obs status
 python infra/observability/grafana/apply.py
 ```
 
+**Uptime checks** (Grafana → Testing & synthetics → Synthetics → Checks; created by hand, the API needs another token): two HTTP checks every 5 minutes from two European probes, with the default status-200 and certificate checks. **The job names must be exactly these**, because the *Website or POS down* alert looks for them; without the checks it fires on missing data.
+
+| Job name | Target |
+|---|---|
+| `erp-app` | `https://app.zorbixtechnologies.com/api/health` |
+| `erp-pos` | `https://pos.zorbixtechnologies.com/api/health` |
+
+Staging isn't checked: its deploys health-check themselves.
+
 **Finding things:** every error response has a `reference` (the request ID).
 - In Sentry, search the `request_id` tag.
 - In Grafana → Explore → the `-logs` data source: `{env="prod"} | json | request_id="<reference>"`. The line's `trace_id` opens the request's trace.

@@ -337,7 +337,7 @@ Goal: when something goes wrong, we can answer **what happened, to which bill, o
 | **Metrics** | OpenTelemetry / Prometheus metrics → **Grafana Cloud** (Mimir) | Hosted | Free |
 | **Traces** | **OpenTelemetry** traces for API requests, sync pushes, postings and DB queries → Grafana Tempo | Hosted | Free |
 | **Collector** | **Grafana Alloy** agent: Docker log files (no Docker socket), server metrics, backup age, PostgreSQL metrics (exporter + `pg_stat_statements`), OTLP from the apps | On the CX33 (about 80 MB; limit 300 MB) | Free |
-| **Uptime** | **Grafana Synthetic Monitoring**: `/api/health` of app, POS and staging every 5 minutes, with certificate expiry (D-086; UptimeRobot's free plan is non-commercial only) | Hosted | Free (about 50k of 100k checks a month) |
+| **Uptime** | **Grafana Synthetic Monitoring**: `/api/health` of the production app and POS every 5 minutes from two places, with certificate expiry (staging isn't checked: its deploys health-check themselves) (D-086; UptimeRobot's free plan is non-commercial only) | Hosted | Free (about 35k of 100k checks a month) |
 | **Dashboards and alert rules** | Grafana Cloud | Hosted | Free |
 | **Alert delivery** | **Slack** from Grafana alerting: `#erp-critical` (phone notifications on) and `#erp-alerts`, plus **email** backup for critical alerts | Hosted | Free |
 
