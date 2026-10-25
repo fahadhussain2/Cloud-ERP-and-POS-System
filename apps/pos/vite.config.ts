@@ -23,6 +23,9 @@ export default defineConfig({
       : []),
   ],
   build: { sourcemap: sentryToken ? 'hidden' : false },
+  // SQLite WASM loads its .wasm file relative to itself: pre-bundling would break that (D-089).
+  optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
+  worker: { format: 'es' },
   test: {
     environment: 'jsdom',
   },
