@@ -1,6 +1,82 @@
 {
   "app": {
     "title": "Back office",
-    "placeholder": "Back office: coming in Wave 1."
+    "loading": "Loading…",
+    "error": "Something went wrong. Reload the page; if it stays, tell the support team."
+  },
+  "login": {
+    "title": "Sign in",
+    "shopCode": "Shop code",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "busy": "Signing in…",
+    "failed": "Sign-in failed. Check the shop code, username and password.",
+    "limited": "Too many tries. Wait a minute and try again."
+  },
+  "password": {
+    "title": "Choose a new password",
+    "help": "Before you continue, replace the password you were given with your own.",
+    "current": "Current password",
+    "new": "New password",
+    "repeat": "New password again",
+    "submit": "Save password",
+    "mismatch": "The two new passwords are not the same.",
+    "wrong": "The current password is wrong."
+  },
+  "passwordProblem": {
+    "too_short": "Use at least 10 characters.",
+    "too_long": "Use at most 256 characters.",
+    "contains_username": "Do not put your username in your password."
+  },
+  "nav": {
+    "staff": "Staff PINs",
+    "counters": "Counters",
+    "signOut": "Sign out"
+  },
+  "home": {
+    "nothing": "There is nothing here for your role yet."
+  },
+  "staff": {
+    "title": "Staff PINs",
+    "help": "Give a new or forgetful person a temporary PIN. At their first unlock the counter makes them choose their own.",
+    "name": "Name",
+    "shortCode": "Short code",
+    "pinState": "PIN",
+    "pin": {
+      "none": "No PIN",
+      "temporary": "Temporary: not chosen yet",
+      "set": "Own PIN"
+    },
+    "give": "Give temporary PIN",
+    "temporaryPin": "Temporary PIN (4 to 6 digits)",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saved": "{{name}} has a temporary PIN. Tell them in person; they choose their own at the counter.",
+    "weak_pin": "Choose a harder PIN: 4 to 6 digits, not a run like 1234 and not one digit repeated."
+  },
+  "counters": {
+    "title": "Counters",
+    "help": "To set up a counter PC, create a one-time code here and type it on that PC within the hour.",
+    "branch": "Branch",
+    "kind": "Kind",
+    "kinds": {
+      "counter": "Sales counter",
+      "cash_desk": "Cash desk",
+      "mobile": "Mobile"
+    },
+    "name": "Name (optional)",
+    "create": "Create a one-time code",
+    "codeShown": "One-time code (shown once, valid until {{time}}):",
+    "code": "Code",
+    "status": "Status",
+    "enrolled": "Set up",
+    "statuses": {
+      "active": "Active",
+      "revoked": "Revoked"
+    },
+    "revoke": "Revoke",
+    "confirmRevoke": "Yes, revoke this counter",
+    "revoked": "{{code}} is revoked: it can no longer sync."
   }
 }
