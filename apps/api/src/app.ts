@@ -4,6 +4,7 @@ import type pg from 'pg';
 
 import { registerAuth } from './auth/routes';
 import { registerDevices } from './devices/routes';
+import { registerSync } from './sync/routes';
 
 export interface AppOptions extends FastifyServerOptions {
   // The image tag of this release (D-075); the deploy checks it after starting.
@@ -68,7 +69,8 @@ export function buildApp({
     void app.register(
       async (api) => {
         const requireAuth = await registerAuth(api, { pool, now });
-        registerDevices(api, { pool, now, requireAuth });
+        const requireDevice = registerDevices(api, { pool, now, requireAuth });
+        registerSync(api, { pool, now, requireAuth, requireDevice });
       },
       { prefix: '/api' },
     );

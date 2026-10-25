@@ -23,3 +23,12 @@ export {
   TokenRequest,
 } from './devices';
 export { TenantSpec } from './tenant-spec';
+export {
+  CounterPinChangeRequest,
+  PULL_DATASETS,
+  PULL_LIMIT_DEFAULT,
+  PULL_LIMIT_MAX,
+  TemporaryPinRequest,
+  type PullDataset,
+  type PullResponse,
+} from './sync';

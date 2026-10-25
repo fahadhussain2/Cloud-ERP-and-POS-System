@@ -235,7 +235,7 @@ describe('temporary PINs', () => {
       payload: { userId, currentPin, newPin },
     });
 
-  it('only a user with admin.users can set one', async () => {
+  it('a manager (admin.devices) can set one, a salesman cannot', async () => {
     expect((await setTemporary(await login('sara'), ids['ali']!, '8642')).statusCode).toBe(403);
     expect((await setTemporary(await login('boss'), ids['sara']!, '8642')).statusCode).toBe(204);
     const sara = (await pull(token, 'datasets=users'))
