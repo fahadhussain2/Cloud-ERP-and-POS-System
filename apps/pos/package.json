@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@erp/contracts": "workspace:*",
+    "@erp/domain": "workspace:*",
     "@erp/observability": "workspace:*",
+    "@sqlite.org/sqlite-wasm": "catalog:",
     "i18next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",

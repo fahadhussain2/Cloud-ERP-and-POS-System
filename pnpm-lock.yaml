@@ -63,6 +63,9 @@ catalogs:
     '@sentry/vite-plugin':
       specifier: 5.4.1
       version: 5.4.1
+    '@sqlite.org/sqlite-wasm':
+      specifier: 3.53.4-build2
+      version: 3.53.4-build2
     '@testing-library/react':
       specifier: ^16.3.3
       version: 16.3.3
@@ -319,9 +322,18 @@ importers:
 
   apps/pos:
     dependencies:
+      '@erp/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@erp/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@erp/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@sqlite.org/sqlite-wasm':
+        specifier: 'catalog:'
+        version: 3.53.4-build2
       i18next:
         specifier: 'catalog:'
         version: 26.5.3(typescript@6.0.3)
@@ -1666,6 +1678,10 @@ packages:
   '@sentry/vite-plugin@5.4.1':
     resolution: {integrity: sha512-poFfn3sQbSFaZpXH8CG27D0eNtDD64wFEniQCb853e7huko9vOl4UP3BjT3vsrnmVuRqagnbxItza10MOC7ysA==}
     engines: {node: '>= 18'}
+
+  '@sqlite.org/sqlite-wasm@3.53.4-build2':
+    resolution: {integrity: sha512-kQVArGJA4z7s56Dm8t+eTBXad4LiohuVj9pfgDNOcxa+Ic5xMrWlLPTq6cT0hw5S4MIvtpsraW+B0wD+IPvC7A==}
+    engines: {node: '>=22'}
 
   '@testing-library/dom@10.4.2':
     resolution: {integrity: sha512-yzr2S9HyAIdhz2/6qHgbs665Q7PKVcDF05vsOlHPxG1mo36gKVesdYVeDLnXgfjJ03CrKRk08knc6+E/9m8v2Q==}
@@ -4310,6 +4326,8 @@ snapshots:
       - rollup
       - supports-color
       - webpack
+
+  '@sqlite.org/sqlite-wasm@3.53.4-build2': {}
 
   '@testing-library/dom@10.4.2':
     dependencies:
