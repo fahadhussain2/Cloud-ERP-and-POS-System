@@ -676,7 +676,7 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 
 ### D-086 Observability on free plans: Grafana sends the Slack alerts and runs the uptime checks (2026-10-24)
 - **Decision:** (amends D-064)
-  - **Uptime checks: Grafana Cloud Synthetic Monitoring** instead of UptimeRobot / Better Stack: HTTPS checks of the app, POS and staging health with certificate expiry, every 5 minutes (about 50k of the free 100k checks a month).
+  - **Uptime checks: Grafana Cloud Synthetic Monitoring** instead of UptimeRobot / Better Stack: HTTPS checks of the production app and POS health with certificate expiry, every 5 minutes from two places (about 35k of the free 100k checks a month). Staging isn't checked (amended 2026-10-25: its deploys health-check themselves, and nobody depends on it being up).
   - **Slack alerts come from Grafana alerting** (free), to `#erp-critical` (with an email copy) and `#erp-alerts`. Sentry's free plan alerts by email only; its Slack integration needs a paid plan.
   - **Sentry:** two projects (`erp-server`, `erp-web`) tagged by app, env, release and request ID. **EU regions** for Sentry and Grafana Cloud, next to the server in Helsinki.
   - Grafana Alloy reads Docker's log files and gets **no Docker socket**.

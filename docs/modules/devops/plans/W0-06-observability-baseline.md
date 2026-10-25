@@ -22,7 +22,7 @@
 | **Every API response has an `x-request-id`** (UUIDv7, or the caller's if valid), and every error body carries it as `reference`. | "Reference: 0193…" in an error message finds the logs, the trace and the Sentry event. |
 | **Errors: Sentry** (free Developer plan, **EU region**): two projects, `erp-server` (API and worker) and `erp-web` (POS and back office), tagged by app, env, release and request ID. Sentry's own alerts are **email** (the free plan has no Slack). Browser source maps are uploaded from CI. | Two projects keep the setup small; tags separate the apps. |
 | **Logs, metrics, traces: Grafana Cloud** (free tier, **EU region**: 50 GB logs, 10k metric series, 50 GB traces, 14 days), fed by **Grafana Alloy** on the server: container logs, server metrics, PostgreSQL metrics, and OpenTelemetry from the apps. | As D-064. Alloy reads Docker's log files and needs **no Docker socket** (that would be root on the server); compose adds the service name to each log line. |
-| **Uptime: Grafana Synthetic Monitoring** instead of UptimeRobot: HTTPS checks of `app` and `pos` health (two probe locations) and staging (one), every 5 minutes, with certificate expiry. | UptimeRobot's free plan is non-commercial only and has no SSL monitoring; Grafana's free tier includes 100k checks a month (these use about 50k), and alerts go through the same rules. |
+| **Uptime: Grafana Synthetic Monitoring** instead of UptimeRobot: HTTPS checks of `app` and `pos` health (two probe locations), every 5 minutes, with certificate expiry. Staging isn't checked (owner, 2026-10-25). | UptimeRobot's free plan is non-commercial only and has no SSL monitoring; Grafana's free tier includes 100k checks a month (these use about 35k), and alerts go through the same rules. |
 | **Alerts: Grafana → Slack**, `#erp-critical` (+ an **email** copy) and `#erp-alerts`. The first rules: site down, backup too old, disk > 85%, a container restarting, any error log line (with its request ID). | One alerting place, free. Sentry adds email for new error types. |
 | **Backup age as a metric:** `erp-db status` also writes a Prometheus text file that Alloy reads. | The *System* dashboard and the "backup too old" alert use the same numbers as the nightly check (W0-05). |
 | **Secrets** (Grafana token, Sentry DSNs) are typed by you at a hidden prompt on the server (`sudo erp-obs secrets`), like the backup secrets. | Nobody else sees them; nothing in git. |
@@ -105,7 +105,7 @@
 | — | The worker image now ships its `node_modules` | Found by a local image build: the worker had no dependencies before, and would have crashed with pino and Sentry. |
 | — | `service.namespace` = env on OpenTelemetry data | Grafana Cloud turns it into the metrics' `job` label (`prod/erp-api`), so prod and staging are told apart. |
 | — | `protobufjs` install script denied, `@sentry/cli`'s allowed | pnpm requires a decision; protobufjs's script only checks versions, Sentry's CLI downloads the binary that uploads source maps. |
-| Synthetic checks and Grafana resources "applied with a script" | Dashboard, alert rules and notification policy by `grafana/apply.py`; the three uptime checks are created in the Grafana UI | The uptime-check API needs a separate token; three checks are quicker by hand and are described in the infra README. |
+| Synthetic checks and Grafana resources "applied with a script" | Dashboard, alert rules and notification policy by `grafana/apply.py`; the two uptime checks are created in the Grafana UI | The uptime-check API needs a separate token; two checks are quicker by hand and are described in the infra README. |
 
 ## Results (2026-10-24)
 
@@ -123,7 +123,7 @@
 | Browser errors | Both staging bundles carry the erp-web DSN; source maps uploaded to Sentry in the build, none served (0 `.map` files in the image). |
 | Alloy | 75 MB of its 300 MB limit; server metrics, logs, backup age and PostgreSQL metrics in Grafana. |
 | Contact points | Test messages reached `#erp-critical`, the email copy and `#erp-alerts`. |
-| Grafana | `apply.py` created the ERP folder, the *System* dashboard, the 8 alert rules and the notification policy; the owner created the three uptime checks. |
+| Grafana | `apply.py` created the ERP folder, the *System* dashboard, the 8 alert rules and the notification policy; the owner created the two production uptime checks (`erp-app`, `erp-pos`; added 2026-10-25 after the site-down rule fired on missing data: they hadn't been saved the first time). |
 
 **Production:** released 2026-10-24 23:21 PKT (tree `4fe3586a…`), images reused from staging, healthy; `POST /api/_test/error` answers `404` there, as intended.
 
