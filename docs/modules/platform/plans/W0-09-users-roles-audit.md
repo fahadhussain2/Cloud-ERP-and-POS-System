@@ -116,7 +116,7 @@ None. W0-11 creates your owner account; until then, staging uses a test tenant.
 | Bug found by the tests: with no trigger arguments, PostgreSQL passes `TG_ARGV` as **NULL**, so the audit row lost its tenant | Fixed with `coalesce(TG_ARGV, '{}')`, before any commit. |
 | The role matrix is a reviewed snapshot file (`golden/role-matrix.snap.json`) | Changing a template changes that file, so the change shows up in review. |
 
-**Default to confirm with the owner:** Salesman (and Cashier) can **sell on credit** (`pos.credit.sell`). Each customer's credit limit still applies, and over-limit needs a manager PIN. Remove it from the template if counters should never sell on credit without a manager.
+**Confirmed by the owner (2026-10-23):** Salesman and Cashier keep **credit sales** (`pos.credit.sell`). Each customer's credit limit still applies, and going over it needs a manager PIN.
 
 ## Results (2026-10-23)
 

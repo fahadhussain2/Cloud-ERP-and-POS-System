@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | W0-01 to W0-04 and W0-06 done; W0-05 done except the last restore drill (results pending) |
+| **Status** | Wave 0 done: W0-01 to W0-06 |
 | **Requirements** | Non-functional: PRD §7 (durability, security, observability), §8 (release plan, go/no-go) |
 | **Feature spec needed** | No: architecture §9 and §11 are the spec |
 
