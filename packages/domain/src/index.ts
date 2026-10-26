@@ -24,6 +24,7 @@ export {
   type PinState,
 } from './device';
 export { DomainError, type DomainErrorCode } from './errors';
+export { normalizeIdentifier } from './identifier';
 export { add, money, mulBp, mulQty, negate, parseMoney, sub, sum, type Money } from './money';
 export {
   can,

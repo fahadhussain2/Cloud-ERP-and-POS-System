@@ -1,4 +1,5 @@
 import {
+  CATALOG_COLUMNS,
   CounterPinChangeRequest,
   makePinVerifier,
   PULL_DATASETS,
@@ -6,6 +7,7 @@ import {
   PULL_LIMIT_MAX,
   TemporaryPinRequest,
   verifyPin,
+  type CatalogDataset,
   type PullDataset,
   type PullResponse,
 } from '@erp/contracts';
@@ -16,7 +18,7 @@ import type pg from 'pg';
 
 import { requirePermission } from '../auth/routes';
 
-// Counter sync (sync spec v1, W1-02, D-089): pull with per-dataset column lists, and the counter PIN change.
+// Counter sync (sync spec v1, W1-02, W1-03, D-089): pull with per-dataset column lists, and the counter PIN change.
 
 interface Deps {
   pool: pg.Pool;
@@ -25,8 +27,13 @@ interface Deps {
   requireDevice: preHandlerAsyncHookHandler;
 }
 
+const isCatalog = (d: PullDataset): d is CatalogDataset => d in CATALOG_COLUMNS;
+
 /** Each dataset's source and the only columns that may leave the server (sync spec §3). */
 function datasetSource(dataset: PullDataset, branchId: string): PullSource {
+  // The catalog (W1-03): the shared column list, tenant-wide; each table is named like its dataset.
+  if (isCatalog(dataset))
+    return { table: dataset, columns: [...Object.keys(CATALOG_COLUMNS[dataset]), 'row_version', 'deleted_at'] };
   switch (dataset) {
     case 'tenant':
       return {

@@ -75,6 +75,9 @@ describe('applying a pull', () => {
             name: 'Delux Autos',
             closing_time: '20:00:00',
             timezone: 'Asia/Karachi',
+            locale: 'en-PK',
+            base_currency: 'PKR',
+            currency_minor_units: 2,
             row_version: '1',
             deleted_at: null,
           },
@@ -101,6 +104,9 @@ describe('applying a pull', () => {
       name: 'Delux Autos',
       closingTime: '20:00:00',
       timeZone: 'Asia/Karachi',
+      locale: 'en-PK',
+      currency: 'PKR',
+      minorUnits: 2,
     });
     expect(db.selectObjects('SELECT permissions FROM roles')).toEqual([
       { permissions: '["pos.sale.create"]' },

@@ -1,10 +1,13 @@
-import type { PullResponse } from '@erp/contracts';
+import { PULL_DATASETS, type PullResponse } from '@erp/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { OfflineError, type Api } from '../net/api';
 import { pullAll, type PullDeps } from './pull';
 
-// The counter's pull loop (sync spec §2, §4): page by page from the stored cursor, each page applied with its cursor.
+// The counter's pull loop (sync spec §2, §4): page by page from the stored cursor, each page applied with its cursor;
+// the last page of a complete pull says so (the first catalog load, W1-03).
+
+const DATASETS = encodeURIComponent(PULL_DATASETS.join(','));
 
 const page = (n: number, hasMore: boolean): PullResponse => ({
   changes: { users: [{ id: `u${n}` }] },
@@ -13,7 +16,7 @@ const page = (n: number, hasMore: boolean): PullResponse => ({
 });
 
 const setup = (replies: (() => Promise<{ status: number; body: unknown }>)[]) => {
-  const applied: [PullResponse['changes'], string][] = [];
+  const applied: [PullResponse['changes'], string, boolean][] = [];
   const paths: string[] = [];
   const tokensUsed: (string | undefined)[] = [];
   let invalidated = 0;
@@ -33,8 +36,8 @@ const setup = (replies: (() => Promise<{ status: number; body: unknown }>)[]) =>
       },
     },
     cursor: () => Promise.resolve(applied.at(-1)?.[1] ?? 'c0'),
-    apply: (changes, cursor) => {
-      applied.push([changes, cursor]);
+    apply: (changes, cursor, done) => {
+      applied.push([changes, cursor, done]);
       return Promise.resolve();
     },
   };
@@ -43,14 +46,20 @@ const setup = (replies: (() => Promise<{ status: number; body: unknown }>)[]) =>
 const ok = (body: unknown) => () => Promise.resolve({ status: 200, body });
 
 describe('pull', () => {
-  it('pulls every page from the stored cursor and applies each with its cursor', async () => {
+  it('pulls every dataset, a full page at a time, from the stored cursor and applies each page with its cursor', async () => {
     const s = setup([ok(page(1, true)), ok(page(2, false))]);
     expect(await pullAll(s.deps)).toEqual({ ok: true, rows: 2 });
+    expect(PULL_DATASETS).toEqual(
+      expect.arrayContaining(['users', 'items', 'item_identifiers', 'item_prices']),
+    );
     expect(s.paths).toEqual([
-      '/api/sync/pull?datasets=tenant%2Cbranch%2Cusers%2Croles%2Cuser_roles&cursor=c0',
-      '/api/sync/pull?datasets=tenant%2Cbranch%2Cusers%2Croles%2Cuser_roles&cursor=c1',
+      `/api/sync/pull?datasets=${DATASETS}&limit=1000&cursor=c0`,
+      `/api/sync/pull?datasets=${DATASETS}&limit=1000&cursor=c1`,
     ]);
-    expect(s.applied.map(([, c]) => c)).toEqual(['c1', 'c2']);
+    expect(s.applied.map(([, c, done]) => [c, done])).toEqual([
+      ['c1', false],
+      ['c2', true],
+    ]);
   });
 
   it('gets a new device token once when the old one is refused', async () => {

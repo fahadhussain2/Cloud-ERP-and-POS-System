@@ -1,10 +1,16 @@
-import type { PullResponse } from '@erp/contracts';
-import type { PinState } from '@erp/domain';
+import {
+  CATALOG_COLUMNS,
+  CATALOG_DATASETS,
+  type CatalogDataset,
+  type ColumnType,
+  type PullResponse,
+} from '@erp/contracts';
+import { money, type PinState } from '@erp/domain';
 
 import type { StaffUser } from '../unlock/unlock';
 import type { SqlDb } from './sql';
 
-// The counter's data access (POS spec §1, §5, sync spec §4, D-089). Runs in the database worker.
+// The counter's data access (POS spec §1, §5, sync spec §3–§4, D-089). Runs in the database worker.
 
 export interface DeviceInfo {
   deviceId: string;
@@ -57,9 +63,88 @@ export const setSync = (db: SqlDb, key: string, value: string): void =>
     [key, value],
   );
 
-/** One pulled page and its cursor, in one transaction: a crash never leaves the cursor ahead of the data. */
-export function applyPull(db: SqlDb, changes: PullResponse['changes'], cursor: string): void {
+/** A pulled value as stored in SQLite: flags as 0/1, JSON as text, money as whole minor units (rule 1). */
+function toSql(type: ColumnType, v: unknown): string | number | null {
+  if (v === null || v === undefined) return null;
+  switch (type) {
+    case 'text':
+      return str(v);
+    case 'bool':
+      return v ? 1 : 0;
+    case 'json':
+      return JSON.stringify(v);
+    case 'money':
+      return money(v as number | string);
+    case 'int': {
+      const n = Number(v);
+      if (!Number.isSafeInteger(n)) throw new Error(`not a whole number: ${str(v)}`);
+      return n;
+    }
+  }
+}
+
+function fromSql(type: ColumnType, v: unknown): unknown {
+  if (v === null || v === undefined) return null;
+  if (type === 'bool') return Number(v) === 1;
+  if (type === 'json') return JSON.parse(str(v)) as unknown;
+  return v;
+}
+
+const catalogColumns = (d: CatalogDataset) => Object.entries(CATALOG_COLUMNS[d]) as [string, ColumnType][];
+
+const UPSERT = Object.fromEntries(
+  CATALOG_DATASETS.map((d) => {
+    const names = [...catalogColumns(d).map(([n]) => n), 'row_version'];
+    const updates = names.filter((n) => n !== 'id').map((n) => `${n} = excluded.${n}`);
+    return [
+      d,
+      `INSERT INTO ${d} (${names.join(', ')}) VALUES (${names.map(() => '?').join(', ')})
+       ON CONFLICT (id) DO UPDATE SET ${updates.join(', ')}`,
+    ];
+  }),
+) as Record<CatalogDataset, string>;
+
+/** The catalog rows of a page (W1-03): upserted with their types; removed rows are deleted. */
+function applyCatalog(db: SqlDb, changes: PullResponse['changes']): void {
+  for (const d of CATALOG_DATASETS) {
+    for (const r of changes[d] ?? []) {
+      if (r['deleted_at'] !== null && r['deleted_at'] !== undefined) {
+        db.exec(`DELETE FROM ${d} WHERE id = ?`, [required(r, 'id')]);
+        continue;
+      }
+      db.exec(UPSERT[d], [
+        ...catalogColumns(d).map(([name, type]) => toSql(type, r[name])),
+        required(r, 'row_version'),
+      ]);
+    }
+  }
+}
+
+/** The whole local catalog, typed as pulled, for the search index (worker start-up). */
+export function loadCatalog(db: SqlDb): Record<CatalogDataset, Record<string, unknown>[]> {
+  const out = {} as Record<CatalogDataset, Record<string, unknown>[]>;
+  for (const d of CATALOG_DATASETS) {
+    const columns = catalogColumns(d);
+    out[d] = db
+      .selectObjects(
+        `SELECT ${columns.map(([n]) => n).join(', ')}, row_version, deleted_at FROM ${d} ORDER BY id`,
+      )
+      .map((r) => ({
+        ...Object.fromEntries(columns.map(([name, type]) => [name, fromSql(type, r[name])])),
+        row_version: r['row_version'],
+        deleted_at: r['deleted_at'],
+      }));
+  }
+  return out;
+}
+
+/**
+ * One pulled page and its cursor, in one transaction: a crash never leaves the cursor ahead of the data. `done` marks
+ * the last page of a complete pull, so the counter knows its first catalog load has finished (POS spec §9).
+ */
+export function applyPull(db: SqlDb, changes: PullResponse['changes'], cursor: string, done = false): void {
   db.transaction(() => {
+    applyCatalog(db, changes);
     for (const r of changes.users ?? []) {
       db.exec(
         `INSERT INTO users (id, username, full_name, short_code, pin_verifier, pin_must_change, status, row_version, deleted_at)
@@ -128,6 +213,7 @@ export function applyPull(db: SqlDb, changes: PullResponse['changes'], cursor: s
     }
     setSync(db, 'pull_cursor', cursor);
     setSync(db, 'last_pull_at', now());
+    if (done) setSync(db, 'pull_complete_at', now());
   });
 }
 
@@ -146,11 +232,28 @@ export const listStaff = (db: SqlDb): StaffUser[] =>
       deletedAt: text(r['deleted_at']),
     }));
 
-export function tenantSettings(db: SqlDb): { name: string; closingTime: string; timeZone: string } | null {
+export interface TenantSettings {
+  name: string;
+  closingTime: string;
+  timeZone: string;
+  /** For formatting numbers, money and dates (CLAUDE.md rule 10). */
+  locale: string;
+  currency: string;
+  minorUnits: number;
+}
+
+export function tenantSettings(db: SqlDb): TenantSettings | null {
   const data = text(db.selectValue('SELECT data FROM tenant WHERE deleted_at IS NULL LIMIT 1'));
   if (!data) return null;
   const t = JSON.parse(data) as Record<string, unknown>;
-  return { name: String(t['name']), closingTime: String(t['closing_time']), timeZone: String(t['timezone']) };
+  return {
+    name: str(t['name']),
+    closingTime: str(t['closing_time']),
+    timeZone: str(t['timezone']),
+    locale: str(t['locale'] ?? 'en'),
+    currency: str(t['base_currency'] ?? 'PKR'),
+    minorUnits: Number(t['currency_minor_units'] ?? 2),
+  };
 }
 
 export function getPinState(db: SqlDb, userId: string): PinState {

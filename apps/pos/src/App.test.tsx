@@ -42,7 +42,15 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
       return Promise.resolve({ ok: true, rows: 0 });
     },
     staff: () => Promise.resolve([staff()]),
-    settings: () => Promise.resolve({ name: 'Delux Autos', closingTime: '22:00', timeZone: 'Asia/Karachi' }),
+    settings: () =>
+      Promise.resolve({
+        name: 'Delux Autos',
+        closingTime: '22:00',
+        timeZone: 'Asia/Karachi',
+        locale: 'en-PK',
+        currency: 'PKR',
+        minorUnits: 2,
+      }),
     getPinState: (id) => Promise.resolve(pins.get(id) ?? { failures: 0, locked: false }),
     setPinState: (id, s) => {
       pins.set(id, s);
@@ -55,6 +63,8 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
     },
     status: () => Promise.resolve({ outboxCount: 0, lastSyncAt: '2026-10-25T05:30:00.000Z' }),
     log: () => Promise.resolve(),
+    search: () => Promise.resolve([]),
+    catalog: () => Promise.resolve({ items: 0, ready: true }),
     ...over,
   };
   return { counter, calls, setDevice: (d: DeviceInfo | null) => (device = d) };
