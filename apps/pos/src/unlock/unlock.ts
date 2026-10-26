@@ -64,13 +64,21 @@ export async function managerUnlock(opts: {
   });
   if (!lockedState.locked) return unchanged('not_locked');
   if (managerState.locked) return unchanged('manager_locked');
-  if (manager.pinVerifier === null || unlockableStaff([manager]).length === 0) return unchanged('not_allowed');
-  const checked = nextPinState(managerState, (await opts.verify(manager.pinVerifier, opts.pin)) ? 'correct' : 'wrong');
+  if (manager.pinVerifier === null || unlockableStaff([manager]).length === 0)
+    return unchanged('not_allowed');
+  const checked = nextPinState(
+    managerState,
+    (await opts.verify(manager.pinVerifier, opts.pin)) ? 'correct' : 'wrong',
+  );
   if (checked.result === 'wrong') return unchanged('wrong', checked.state);
   if (checked.result === 'locked') return unchanged('manager_locked', checked.state);
   // A right PIN, but not someone who may: a temporary PIN not yet replaced, no admin.devices here, or the person
   // themselves.
-  if (manager.pinMustChange || manager.id === lockedUser.id || !can(opts.managerGrants, 'admin.devices', opts.branchId))
+  if (
+    manager.pinMustChange ||
+    manager.id === lockedUser.id ||
+    !can(opts.managerGrants, 'admin.devices', opts.branchId)
+  )
     return unchanged('not_allowed', checked.state);
   return {
     result: 'unlocked',

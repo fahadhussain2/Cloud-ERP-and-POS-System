@@ -10,6 +10,23 @@ export const OWNER_PASSWORD = 'e2e second password';
 export const SALESMAN = { username: 'asif', fullName: 'Asif Khan', shortCode: '12' };
 export const TEMPORARY_PIN = '4831';
 export const OWN_PIN = '7395';
+/** Added by the owner in the back office (W1-04): a manager with a back-office password, and a counter-only salesman. */
+export const MANAGER = {
+  username: 'bilqees',
+  fullName: 'Bilqees Manager',
+  shortCode: '77',
+  temporaryPassword: 'e2e manager temporary',
+  password: 'e2e manager own password',
+  temporaryPin: '2468',
+  pin: '5826',
+};
+export const NEWCOMER = {
+  username: 'bilal',
+  fullName: 'Bilal Ahmed',
+  shortCode: '34',
+  temporaryPin: '3916',
+  pin: '6071',
+};
 
 export const API_PORT = 3100;
 export const POS_PORT = 4173;

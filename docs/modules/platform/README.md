@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-07, W0-09, W0-10, W0-11 done; counter side of PLT-03/PLT-04 built with W1-02 (in review) |
+| **Status** | In progress: W0-07, W0-09, W0-10, W0-11 done; counter side of PLT-03/PLT-04 built with W1-02; staff and user admin (PLT-04, PLT-05 assign) built with W1-04 (in review) |
 | **Requirements** | 13 (PLT-01…PLT-13) |
 | **Feature spec needed** | Yes: device enrollment + PIN security |
 
@@ -41,8 +41,33 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 
 - **Temporary PIN:** `PUT /api/users/:id/temporary-pin { pin }` needs **`admin.devices`** (the Manager template has it, not `admin.users`). It stores the verifier, sets `users.pin_must_change` (migration `0007`), resets `user_login_state.pin_failures` and audits `pin.temporary_set`.
 - **Own PIN at the counter:** `POST /api/sync/pin` (device token) checks the temporary PIN (wrong ones count towards the 5-try lock) and the PIN rules, clears the flag and audits `pin.changed` with the device.
-- **Lists for the back office:** `GET /api/branches`, `GET /api/staff` and `GET /api/devices` (`apps/api/src/admin/routes.ts`).
-- **Back office** (`apps/backoffice`): sign in, the forced password change, *Staff PINs* and *Counters* (one-time codes, revoke).
+- **Lists for the back office:** `GET /api/branches` and `GET /api/devices` (`apps/api/src/admin/routes.ts`); the staff list is `GET /api/users` (W1-04, below).
+- **Back office** (`apps/backoffice`): sign in, the forced password change, *Staff* and *Counters* (one-time codes, revoke).
+
+## Staff and user admin (W1-04, D-091)
+
+- **Who:** people are managed with **`admin.users`** (Owner by template, owner answer 1); **temporary PINs stay with `admin.devices`** (Manager and Owner). One *Staff* screen for both: the actions shown follow the permissions.
+- **API** (`apps/api/src/admin/users.ts`):
+
+  | Route | Permission | What |
+  |---|---|---|
+  | `GET /users` | `admin.users` or `admin.devices` | People with roles, back-office access, PIN state, status, last sign-in; never a hash or verifier |
+  | `GET /roles` | `admin.users` | Roles for the picker |
+  | `POST /users` | `admin.users` | Create: name, username (fixed afterwards), short code, email, roles, optional temporary password |
+  | `PATCH /users/:id` | `admin.users` | Full name, short code, email |
+  | `PUT /users/:id/roles` | `admin.users` | Replace the roles (removed ones soft-deleted, so counters get tombstones) |
+  | `PUT` · `DELETE /users/:id/password` | `admin.users` | Temporary password (must be changed at sign-in) · remove back-office access; both end the person's sessions |
+  | `POST /users/:id/deactivate` · `reactivate` | `admin.users` | Deactivate ends sessions; counters drop the person at their next pull |
+  | `PUT /users/:id/temporary-pin` | `admin.devices` | Unchanged (W1-02) |
+
+- **Guards:**
+  - nobody gives or removes a role, or changes a person, holding rights they don't have (`canGrantRole` in `packages/domain`);
+  - nobody deactivates themselves, removes their own password or their own `admin.users`;
+  - an **active Owner who can sign in always remains**; owner-affecting changes take a per-tenant advisory lock, so two admins can't race past the check.
+- **Never deleted:** people are deactivated, not deleted; documents and the audit trail keep pointing at them.
+- **Audit:** row changes by the W0-09 triggers; `password.set_by_admin` and `password.removed` by the API.
+- **Leaver routine:** deactivate the person, then check *Counters*: an offline counter only learns at its next sync, and until then the person can still unlock it.
+- **Counter side:** manager unlock offline, lock reset on a new PIN, lock when the person selling is removed (POS spec §5).
 
 ## Related
 

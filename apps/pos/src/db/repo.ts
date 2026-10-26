@@ -296,14 +296,16 @@ export const recordPinEvent = (db: SqlDb, e: Omit<PinEvent, 'id' | 'pushedAt'>):
   ]);
 
 export const listPinEvents = (db: SqlDb): PinEvent[] =>
-  db.selectObjects('SELECT id, kind, user_id, by_user_id, at, pushed_at FROM pin_events ORDER BY at, id').map((r) => ({
-    id: String(r['id']),
-    kind: String(r['kind']) as PinEvent['kind'],
-    userId: String(r['user_id']),
-    byUserId: text(r['by_user_id']),
-    at: String(r['at']),
-    pushedAt: text(r['pushed_at']),
-  }));
+  db
+    .selectObjects('SELECT id, kind, user_id, by_user_id, at, pushed_at FROM pin_events ORDER BY at, id')
+    .map((r) => ({
+      id: String(r['id']),
+      kind: String(r['kind']) as PinEvent['kind'],
+      userId: String(r['user_id']),
+      byUserId: text(r['by_user_id']),
+      at: String(r['at']),
+      pushedAt: text(r['pushed_at']),
+    }));
 
 /** A person's roles on this counter, from the pulled roles (D-081), for checks like the manager unlock. */
 export const grantsFor = (db: SqlDb, userId: string): RoleGrant[] =>

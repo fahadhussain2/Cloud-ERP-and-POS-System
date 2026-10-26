@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#49](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/49) |
 | **Module** | platform (with pos for the counter unlock, and `packages/ui`) |
-| **Status** | Accepted (2026-10-26) |
+| **Status** | Accepted (2026-10-26); built, checks green, waiting for Verify 2–3 and review |
 | **Refs** | PLT-04, PLT-05 (assign), PLT-08; PRD §4; platform spec §4; POS spec §5; migration §6; D-051, D-053, D-066, D-081, D-082, D-083, D-089, D-090 |
 | **Depends on** | W1-02 (Staff PINs, Counters, unlock), W1-03 (`packages/ui`, tokens) |
 | **Size** | about 3 days |
@@ -63,32 +63,49 @@ Every change is in the audit log through the W0-09 triggers (before/after, secre
 ## Tests written first
 
 **Domain (golden):**
-- [ ] `canGrantRole`: Owner grants any template; a holder of exactly the Manager permissions grants Manager and Salesman but not Owner or Accountant; nobody without `*` grants a `*` role; branch-scoped grants count only in their branch.
+- [x] `canGrantRole`: Owner grants any template; a holder of exactly the Manager permissions grants Manager and Salesman but not Owner or Accountant; nobody without `*` grants a `*` role; branch-scoped grants count only in their branch.
 
 **API (integration, real database):**
-- [ ] Create a person with roles and no password: no `password_hash`, can't log in; their roles come back in `GET /users`; the audit log has the insert without secrets.
-- [ ] Give a temporary password: login works, then `403 password_change_required` until changed; resetting it ends the person's existing session and clears their login lock.
-- [ ] Remove access: the person's session ends and login fails.
-- [ ] Replace roles: removed rows become tombstones in the counter pull; a Salesman role scoped to a branch comes back with that branch.
-- [ ] Deactivate: the session ends, login fails, the pull sends `status = disabled`; reactivate restores login.
-- [ ] Guards: deactivating yourself → 409; deactivating the last active Owner or removing their Owner role → 409; two concurrent requests removing the last two Owners → exactly one succeeds.
-- [ ] `canGrantRole` enforced: a user with `admin.users` but not every Owner permission can't give Owner (403).
-- [ ] Permissions: a Manager gets `GET /users` and the temporary PIN, and 403 on every other user-admin route; a Salesman gets 403 everywhere.
-- [ ] Duplicate username (any case) or short code → 409 with the field named; another tenant's user id → 404 (RLS).
-- [ ] No response from any route contains `password_hash` or `pin_verifier`.
+- [x] Create a person with roles and no password: no `password_hash`, can't log in; their roles come back in `GET /users`; the audit log has the insert without secrets.
+- [x] Give a temporary password: login works, then `403 password_change_required` until changed; resetting it ends the person's existing session and clears their login lock.
+- [x] Remove access: the person's session ends and login fails.
+- [x] Replace roles: removed rows become tombstones in the counter pull; a Salesman role scoped to a branch comes back with that branch.
+- [x] Deactivate: the session ends, login fails, the pull sends `status = disabled`; reactivate restores login.
+- [x] Guards: deactivating yourself → 409; deactivating the last active Owner or removing their Owner role → 409; two concurrent requests removing the last two Owners → exactly one succeeds.
+- [x] `canGrantRole` enforced: a user with `admin.users` but not every Owner permission can't give Owner (403).
+- [x] Permissions: a Manager gets `GET /users` and the temporary PIN, and 403 on every other user-admin route; a Salesman gets 403 everywhere.
+- [x] Duplicate username (any case) or short code → 409 with the field named; another tenant's user id → 404 (RLS).
+- [x] No response from any route contains `password_hash` or `pin_verifier`.
 
 **Counter (unit, fake worker):**
-- [ ] Manager unlock: a locked person + a manager's right PIN with `admin.devices` → unlocked and a `pin_events` row; a Salesman's PIN → refused; a wrong manager PIN counts towards the manager's lock; a manager whose role is for another branch → refused.
-- [ ] A pull with a new `pin_verifier` resets that person's lock; the same verifier doesn't.
-- [ ] A pull that disables the unlocked person locks the counter.
-- [ ] Local schema 3 upgrades a schema-2 database in place with every row kept (rule 9).
+- [x] Manager unlock: a locked person + a manager's right PIN with `admin.devices` → unlocked and a `pin_events` row; a Salesman's PIN → refused; a wrong manager PIN counts towards the manager's lock; a manager whose role is for another branch → refused.
+- [x] A pull with a new `pin_verifier` resets that person's lock; the same verifier doesn't.
+- [x] A pull that disables the unlocked person locks the counter.
+- [x] Local schema 3 upgrades a schema-2 database in place with every row kept (rule 9).
 
 **Back office (jsdom):**
-- [ ] The menu shows Staff and Counters for an Owner, only what a Manager may open for a Manager, nothing for a Salesman with a password.
-- [ ] `#/staff/<id>` opens that person after a reload; the back button returns to the list.
-- [ ] Each dialog closes on `Esc` and keeps focus order (D-053).
+- [x] The menu shows Staff and Counters for an Owner, only what a Manager may open for a Manager, nothing for a Salesman with a password.
+- [x] `#/staff/<id>` opens that person after a reload; the back button returns to the list.
+- [x] Each dialog closes on `Esc` and keeps focus order (D-053).
 
-**E2E:** the flows in scope item 7.
+- [x] **E2E:** the flows in scope item 7 (10 flows in `e2e/counter.spec.ts`, extending the W1-02/W1-03 ones).
+
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| **A person's password, status and details can only be changed by someone who could give all their roles** (`checkOutranks`), not only roles. New test: a user with `admin.users` but fewer rights than the Owner gets 403 on resetting, removing or deactivating the Owner. | Found while building: without it, anyone with user admin could reset the Owner's password and take over. |
+| **"An Owner remains" means active, with a password**, holding `*` for every branch. The guard runs after the change, inside the transaction, behind a **per-tenant advisory lock** instead of `FOR UPDATE` on owner rows. The race test fails with the lock removed (checked). | A row lock can't see an owner role removed by another transaction; the advisory lock serializes every owner-affecting change, and an owner without a password can't sign in to fix anything. |
+| `GET /api/users` replaces `GET /api/staff`; the two W1-02 tests for it moved to `/api/users` | One list for one screen (owner answer 2). |
+| **Roles on the person form are checkboxes** with one *Branch for roles you tick* picker (default *All branches*); a role already held for a branch keeps it | Delux has one branch; per-role branches stay possible without a picker per row. |
+| `uuidv7()` added to `@erp/contracts`, with tests | The PIN events need device-made ids (rule 7); bills (W1-06) will use the same. |
+| `DialogActions` key hints are `aria-hidden`, with `aria-keyshortcuts` on the buttons | Buttons were named "Save Enter" for screen readers. |
+| Back-office dialogs give focus back to whatever opened them (they open from state, not a Radix trigger); the Esc test waits for it, as the `@erp/ui` test does | Radix returns focus only to a `DialogTrigger`; checked by removing the code (the test fails). |
+| The shadcn `select` and `table` had physical utilities (`pl-2`, `right-2`, `text-left`); changed to logical ones, with a note in the `@erp/ui` README and a test on the table header | Rule 10 (RTL). |
+| `apps/backoffice/src/test-setup.ts` stubs `ResizeObserver` in jsdom | Radix's checkbox measures itself inside a form. |
+| The "following a person's name" test waits for the address | jsdom follows a fragment link a moment later; without waiting, the address leaked into the next test. |
+| Revoking a counter now asks in a dialog (it was an inline second button) | The same D-053 confirmation as the other actions. |
+| Back-office bundle: JS 370 → 532 kB (118 → 168 kB gzipped), CSS 1 → 40 kB | Tailwind, Radix and the bundled fonts, the same set the counter already has. |
 
 ## Order
 
