@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 
-import { cn } from './cn';
+import { cn } from './lib/utils';
 
 /** A white panel with an optional upper-case title (the prototype's `.panel`). */
 export function Panel({
@@ -12,7 +12,7 @@ export function Panel({
   return (
     <section className={cn('rounded-[10px] border border-line bg-surface', className)} {...props}>
       {title && (
-        <h2 className="m-0 px-3.5 pt-2.5 pb-1.5 font-display text-[15px] font-semibold tracking-[.06em] text-muted uppercase">
+        <h2 className="m-0 px-3.5 pt-2.5 pb-1.5 font-display text-[15px] font-semibold tracking-[.06em] text-muted-foreground uppercase">
           {title}
         </h2>
       )}

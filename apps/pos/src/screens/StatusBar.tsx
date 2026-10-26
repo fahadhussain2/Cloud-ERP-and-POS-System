@@ -38,7 +38,7 @@ export function StatusBar({
   return (
     <header className="status-bar flex flex-wrap items-center gap-x-4.5 gap-y-2.5">
       <div className="me-auto flex flex-wrap items-baseline gap-2.5">
-        <span className="font-display text-[26px] font-bold tracking-[.02em] text-accent">
+        <span className="font-display text-[26px] font-bold tracking-[.02em] text-primary">
           {shopName ?? t('app.title')}
         </span>
         {deviceCode && (
@@ -62,10 +62,16 @@ export function StatusBar({
       {connection.state === 'refused' && (
         <span className={cn(pill, 'bg-bad-soft text-bad')}>{t('status.refused')}</span>
       )}
-      <Badge variant={outboxCount > 0 ? 'warn' : 'neutral'} className="waiting text-[12.5px]">
+      <Badge
+        variant="outline"
+        className={cn(
+          'waiting text-[12.5px]',
+          outboxCount > 0 && 'border-transparent bg-warn-soft text-warn',
+        )}
+      >
         {t('status.waiting', { count: outboxCount })}
       </Badge>
-      <span className="text-[12.5px] text-muted">
+      <span className="text-[12.5px] text-muted-foreground">
         {lastSyncAt ? t('status.lastSync', { time: time(new Date(lastSyncAt)) }) : t('status.neverSynced')}
       </span>
       <span className="user font-semibold">{userName ?? t('status.locked')}</span>

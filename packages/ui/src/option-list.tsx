@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 
-import { cn } from './cn';
+import { cn } from './lib/utils';
 
 // A list the keyboard moves through while focus stays in a search box (POS-03): the box owns ↑ ↓ and asks
 // moveSelection(); the list shows the selection, scrolls to it, and takes clicks.

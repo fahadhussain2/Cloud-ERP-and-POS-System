@@ -22,7 +22,7 @@ export function CardScreen({
     >
       <div className={cn('flex w-full flex-col gap-3', wide ? 'max-w-[720px]' : 'max-w-[420px]')}>
         {eyebrow && (
-          <p className="m-0 text-center text-xs font-semibold tracking-[.1em] text-muted uppercase">
+          <p className="m-0 text-center text-xs font-semibold tracking-[.1em] text-muted-foreground uppercase">
             {eyebrow}
           </p>
         )}

@@ -5,6 +5,7 @@ import {
   KeyBar,
   Kbd,
   Label,
+  LABEL_CLASS,
   moveSelection,
   OptionList,
   Panel,
@@ -120,12 +121,12 @@ export function CounterScreen({
               <p className="m-0 font-display text-xl font-semibold">
                 {t('catalog.loading', { count: catalog?.items ?? 0 })}
               </p>
-              <p className="m-0 text-muted">{t('catalog.help')}</p>
+              <p className="m-0 text-muted-foreground">{t('catalog.help')}</p>
             </div>
           ) : (
             <>
               <div className="flex flex-col gap-1.5 px-3.5 pt-3 pb-2">
-                <Label htmlFor="search">
+                <Label htmlFor="search" className={LABEL_CLASS}>
                   {t('search.label')} <Kbd>F2</Kbd>
                 </Label>
                 <Input
@@ -134,7 +135,7 @@ export function CounterScreen({
                   autoFocus
                   autoComplete="off"
                   spellCheck={false}
-                  className="font-mono"
+                  className="h-11 bg-surface-2 font-mono text-base focus-visible:bg-surface"
                   placeholder={t('search.placeholder')}
                   role="combobox"
                   aria-expanded={results.length > 0}
@@ -145,14 +146,16 @@ export function CounterScreen({
                   onKeyDown={onKeyDown}
                 />
               </div>
-              <div className="flex justify-between px-3.5 pb-1.5 text-[11.5px] text-muted">
+              <div className="flex justify-between px-3.5 pb-1.5 text-[11.5px] text-muted-foreground">
                 <span>{count}</span>
                 <span>{t('search.priceHead')}</span>
               </div>
               {text.trim() === '' ? (
-                <p className="m-0 px-3.5 py-4 text-muted">{t('search.hint')}</p>
+                <p className="m-0 px-3.5 py-4 text-muted-foreground">{t('search.hint')}</p>
               ) : results.length === 0 ? (
-                <p className="m-0 px-3.5 py-4 text-muted">{t('search.none', { text: text.trim() })}</p>
+                <p className="m-0 px-3.5 py-4 text-muted-foreground">
+                  {t('search.none', { text: text.trim() })}
+                </p>
               ) : (
                 <OptionList
                   id="results"
@@ -173,10 +176,12 @@ export function CounterScreen({
                         <span className="font-medium wrap-anywhere">
                           {r.name}{' '}
                           {r.status !== 'active' && (
-                            <Badge variant="warn">{t(`item.status.${r.status}`)}</Badge>
+                            <Badge variant="outline" className="border-transparent bg-warn-soft text-warn">
+                              {t(`item.status.${r.status}`)}
+                            </Badge>
                           )}
                         </span>
-                        <span className="text-xs text-muted wrap-anywhere">
+                        <span className="text-xs text-muted-foreground wrap-anywhere">
                           {[
                             [r.variant, r.spec].filter(Boolean).join(' '),
                             r.oem && t('search.oem', { oem: r.oem }),
@@ -189,7 +194,7 @@ export function CounterScreen({
                       </span>
                       <span className="min-w-[76px] text-end font-semibold whitespace-nowrap tabular-nums">
                         {r.price === null ? (
-                          <span className="font-normal text-muted">{t('search.noPrice')}</span>
+                          <span className="font-normal text-muted-foreground">{t('search.noPrice')}</span>
                         ) : (
                           formatMoney(r.price, money)
                         )}
@@ -202,7 +207,7 @@ export function CounterScreen({
           )}
         </Panel>
         <Panel title={t('bill.title')} aria-label={t('bill.title')}>
-          <p className="m-0 px-3.5 py-4 text-muted">{t('bill.soon')}</p>
+          <p className="m-0 px-3.5 py-4 text-muted-foreground">{t('bill.soon')}</p>
         </Panel>
       </div>
       <KeyBar

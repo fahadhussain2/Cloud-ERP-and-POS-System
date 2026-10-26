@@ -84,6 +84,7 @@
 | No toast and no `lucide-react` yet | No screen in W1-03 needs them; they come with their first user (W1-05/W1-06) rather than as unused dependencies. |
 | New dependencies, each published at least 2 weeks before: `tailwindcss` and `@tailwindcss/vite` 4.3.3, `@radix-ui/react-dialog` 1.2.0, `@radix-ui/react-label` 2.1.16, `@radix-ui/react-slot` 1.4.0, `class-variance-authority` 0.7.1, `clsx` 2.1.1, `tailwind-merge` 3.7.0, `@fontsource/barlow-condensed`, `@fontsource/ibm-plex-sans`, `@fontsource/ibm-plex-mono` 5.3.0 | D-066 and owner answer 2. |
 | The E2E catalog has 6 items, not about 30 | Six cover every search flow in scope 6; the large-catalog behaviour is covered by the 20,000-item speed test and Verify 2. |
+| **After merge (owner review):** the button, input, label, dialog, alert and badge now come from the shadcn CLI (`pnpm --filter @erp/ui ui:add`), not hand-written in its style; theme.css maps shadcn's colour names to the prototype. Adds `radix-ui` 1.8.1, `lucide-react` 1.55.0, `tw-animate-css` 1.4.0; drops the three `@radix-ui/react-*` packages. `Field` is now `TextField` | Upstream fixes and new components come from the CLI instead of being rewritten by hand (D-066). |
 
 ## Verify
 

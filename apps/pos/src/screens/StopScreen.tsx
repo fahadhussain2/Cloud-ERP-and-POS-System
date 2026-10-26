@@ -1,4 +1,4 @@
-import { Alert, Button } from '@erp/ui';
+import { Alert, AlertDescription, Button } from '@erp/ui';
 import { useTranslation } from 'react-i18next';
 
 import type { StorageProblem } from '../storage/checks';
@@ -10,10 +10,10 @@ export function StopScreen({ problem }: { problem: StorageProblem }) {
   return (
     <div className="flex h-full flex-col px-4 py-2.5">
       <CardScreen title={t('stop.title')} wide role="alert">
-        <Alert variant="bad" role="none">
-          {t(`stop.${problem}`)}
+        <Alert variant="destructive" role="none">
+          <AlertDescription>{t(`stop.${problem}`)}</AlertDescription>
         </Alert>
-        <Button size="lg" onClick={() => window.location.reload()}>
+        <Button variant="outline" size="lg" onClick={() => window.location.reload()}>
           {t('stop.reload')}
         </Button>
       </CardScreen>

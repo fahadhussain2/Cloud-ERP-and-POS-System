@@ -1,5 +1,5 @@
 import { pinProblem } from '@erp/domain';
-import { Alert, Button, Field } from '@erp/ui';
+import { Alert, AlertDescription, Button, TextField } from '@erp/ui';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -34,12 +34,12 @@ export function ChoosePinScreen({
     else if (r !== 'ok') setMessage(t(`choosePin.${r}`));
   };
 
-  const pinField = 'text-center font-mono text-[22px] tracking-[.4em]';
+  const pinField = 'h-12 text-center font-mono text-[22px] tracking-[.4em]';
   return (
     <CardScreen eyebrow={user.fullName} title={t('choosePin.title')}>
-      <p className="m-0 text-center text-muted">{t('choosePin.help')}</p>
+      <p className="m-0 text-center text-muted-foreground">{t('choosePin.help')}</p>
       <form className="flex flex-col gap-3" onSubmit={(e) => void submit(e)}>
-        <Field
+        <TextField
           label={t('choosePin.newPin')}
           type="password"
           inputMode="numeric"
@@ -49,7 +49,7 @@ export function ChoosePinScreen({
           value={newPin}
           onChange={(e) => setNewPin(e.target.value)}
         />
-        <Field
+        <TextField
           label={t('choosePin.repeat')}
           type="password"
           inputMode="numeric"
@@ -58,8 +58,12 @@ export function ChoosePinScreen({
           value={repeat}
           onChange={(e) => setRepeat(e.target.value)}
         />
-        {message && <Alert variant="bad">{message}</Alert>}
-        <Button type="submit" variant="primary" size="lg" disabled={busy}>
+        {message && (
+          <Alert variant="destructive">
+            <AlertDescription>{message}</AlertDescription>
+          </Alert>
+        )}
+        <Button type="submit" size="lg" disabled={busy}>
           {busy ? t('choosePin.busy') : t('choosePin.submit')}
         </Button>
       </form>

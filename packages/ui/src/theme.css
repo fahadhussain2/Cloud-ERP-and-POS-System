@@ -1,5 +1,6 @@
 /* The look of every screen (W1-03, D-066, D-067): the Tijara POS prototype's colour tokens, mapped into Tailwind's
-   theme so components use classes like bg-surface, text-muted, border-line. Only these colours exist: Tailwind's own
+   theme under shadcn/ui's names (primary, muted-foreground, border…), so components from the shadcn CLI take the
+   prototype's look unchanged, plus our own (surface, ink, line, ok/warn/bad). Only these colours exist: Tailwind's own
    palette is switched off. Light by default; the dark values apply under [data-theme='dark'] (the switcher is
    PLT-13, Wave 2). Printed output never uses these tokens. Import after `@import 'tailwindcss'`. */
 
@@ -22,6 +23,7 @@
   --focus: #2b62c8;
   --select: #e5edfb;
   --shadow: 0 1px 2px rgb(22 32 42 / 0.06), 0 8px 24px rgb(22 32 42 / 0.08);
+  --radius: 0.5rem;
   color-scheme: light;
 }
 
@@ -49,15 +51,32 @@
 
 @theme inline {
   --color-*: initial;
+  /* shadcn/ui's names, on the prototype's colours */
+  --color-background: var(--surface);
+  --color-foreground: var(--ink);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-ink);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--select);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--bad);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--focus);
+  /* our own */
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-ink: var(--ink);
-  --color-muted: var(--muted);
   --color-line: var(--line);
-  --color-accent: var(--accent);
-  --color-accent-ink: var(--accent-ink);
-  --color-accent-soft: var(--accent-soft);
+  --color-primary-soft: var(--accent-soft);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --color-warn: var(--warn);
@@ -69,6 +88,13 @@
   --color-backdrop: rgb(10 16 22 / 0.45);
   --color-transparent: transparent;
   --color-current: currentColor;
+  --color-white: #ffffff;
+  --color-black: #000000;
+  /* shadcn/ui's radius scale: md 6px (buttons, fields), lg 8px, xl 12px (dialogs) */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
   --shadow-panel: var(--shadow);
   /* Bundled with the app (fonts.ts), so they work offline; system fonts are the fallback. */
   --font-display: 'Barlow Condensed', 'Arial Narrow', 'Segoe UI', sans-serif;
@@ -77,6 +103,12 @@
 }
 
 @layer base {
+  /* shadcn/ui's components rely on a plain `border` taking the border colour. */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--line);
+  }
   html,
   body,
   #root {
