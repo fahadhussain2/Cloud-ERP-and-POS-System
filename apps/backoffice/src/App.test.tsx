@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -196,7 +196,9 @@ describe('layout and menu', () => {
   it('following a person’s name sets the address', async () => {
     show(fakeApi(signedIn()).api);
     fireEvent.click(await screen.findByRole('link', { name: 'Asif Khan' }));
-    expect(window.location.hash).toBe('#/staff/u1');
+    // jsdom follows a fragment link a moment later, as a browser does.
+    await waitFor(() => expect(window.location.hash).toBe('#/staff/u1'));
+    expect(await screen.findByRole('heading', { name: 'Asif Khan' })).toBeDefined();
   });
 });
 
@@ -274,8 +276,9 @@ describe('Staff', () => {
     fireEvent.click(add);
     const dialog = await screen.findByRole('dialog');
     fireEvent.keyDown(dialog, { key: 'Escape' });
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(document.activeElement).toBe(add);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    // Radix gives focus back a moment after closing.
+    await waitFor(() => expect(document.activeElement).toBe(add));
   });
 });
 

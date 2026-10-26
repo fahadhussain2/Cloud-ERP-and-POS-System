@@ -14,8 +14,30 @@ export {
   DialogTitle,
   DialogTrigger,
 } from './components/ui/dialog';
+export { Checkbox } from './components/ui/checkbox';
 export { Input } from './components/ui/input';
 export { Label } from './components/ui/label';
+export {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from './components/ui/select';
+export {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './components/ui/table';
+export { PageHeader } from './page-header';
+export { StatusChip, type ChipTone } from './status-chip';
 export { AppFrame } from './app-frame';
 export { DialogActions } from './dialog-actions';
 export { formatMoney, type MoneyFormat } from './format';

@@ -105,7 +105,9 @@
       "save": "Save temporary password",
       "saved": "{{name}} has a temporary password. Their open sessions were ended.",
       "removeConfirm": "{{name}} will be signed out and can no longer use the back office. Counters still work with their PIN.",
-      "removed": "{{name}} no longer has back-office access."
+      "removed": "{{name}} no longer has back-office access.",
+      "optional": "Back-office password (optional)",
+      "optionalHelp": "Leave empty for someone who only works at the counter. Otherwise a temporary one, at least 10 characters: they replace it at their first sign-in."
     },
     "deactivate": "Deactivate",
     "deactivateConfirm": "{{name}} is signed out everywhere and disappears from the counters at their next sync. Their bills and history stay.",
@@ -121,7 +123,13 @@
       "self": "You can't do this to your own account.",
       "last_owner": "The shop must keep at least one active Owner.",
       "weak_password": "Choose a longer temporary password: at least 10 characters, without the username."
-    }
+    },
+    "empty": "No one here.",
+    "actions": "Actions",
+    "notFound": "Person not found",
+    "branchForNew": "Branch for roles you tick",
+    "pinHelp": "Give a temporary PIN to someone new or who forgot theirs. At their first unlock the counter makes them choose their own, and a new PIN also clears a lock on every counter at its next sync.",
+    "reactivateConfirm": "{{name}} can sign in again (if they have a password) and appears on the counters at their next sync."
   },
   "counters": {
     "title": "Counters",
@@ -145,6 +153,10 @@
     },
     "revoke": "Revoke",
     "confirmRevoke": "Yes, revoke this counter",
-    "revoked": "{{code}} is revoked: it can no longer sync."
+    "revoked": "{{code}} is revoked: it can no longer sync.",
+    "newCode": "Set up a counter",
+    "list": "Counters",
+    "confirmTitle": "Revoke {{code}}?",
+    "confirmHelp": "It stops syncing at once and can't be set up again with the same key. Bills it already made are still accepted at sync, flagged for review."
   }
 }
