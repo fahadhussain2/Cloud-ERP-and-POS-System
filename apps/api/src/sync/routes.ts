@@ -33,7 +33,10 @@ const isCatalog = (d: PullDataset): d is CatalogDataset => d in CATALOG_COLUMNS;
 function datasetSource(dataset: PullDataset, branchId: string): PullSource {
   // The catalog (W1-03): the shared column list, tenant-wide; each table is named like its dataset.
   if (isCatalog(dataset))
-    return { table: dataset, columns: [...Object.keys(CATALOG_COLUMNS[dataset]), 'row_version', 'deleted_at'] };
+    return {
+      table: dataset,
+      columns: [...Object.keys(CATALOG_COLUMNS[dataset]), 'row_version', 'deleted_at'],
+    };
   switch (dataset) {
     case 'tenant':
       return {

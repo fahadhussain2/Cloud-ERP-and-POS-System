@@ -277,16 +277,18 @@ export class SearchIndex {
     }
 
     // 4: every word starts a word of the item, or is a year inside one of its vehicle tags.
+    // Plain loops: this runs for every item on every key press.
     const years = words.map((w) => (YEAR.test(w) ? Number(w) : null));
     for (const e of this.entries.values()) {
       if (best.has(e.id)) continue;
       let all = true;
       for (let i = 0; i < words.length && all; i++) {
         const w = words[i]!;
-        const y = years[i] ?? null;
-        all =
-          e.words.some((x) => x.startsWith(w)) ||
-          (y !== null && e.years.some(([from, to]) => from <= y && y <= to));
+        all = false;
+        for (let j = 0; j < e.words.length && !all; j++) all = e.words[j]!.startsWith(w);
+        const y = years[i];
+        if (!all && y !== null && y !== undefined)
+          for (let j = 0; j < e.years.length && !all; j++) all = e.years[j]![0] <= y && y <= e.years[j]![1];
       }
       if (all) hit(e.id, 4);
     }
