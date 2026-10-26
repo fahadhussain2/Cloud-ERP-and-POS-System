@@ -58,7 +58,7 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
   | `PUT /users/:id/roles` | `admin.users` | Replace the roles (removed ones soft-deleted, so counters get tombstones) |
   | `PUT` · `DELETE /users/:id/password` | `admin.users` | Temporary password (must be changed at sign-in) · remove back-office access; both end the person's sessions |
   | `POST /users/:id/deactivate` · `reactivate` | `admin.users` | Deactivate ends sessions; counters drop the person at their next pull |
-  | `PUT /users/:id/temporary-pin` | `admin.devices` | Unchanged (W1-02) |
+  | `PUT /users/:id/temporary-pin` | `admin.devices` | As in W1-02, but never to an Owner or a staff admin the actor doesn't outrank (`canGivePinTo`, 403 `cannot_grant`); `GET /users` says per person (`canGivePin`) |
 
 - **Guards:**
   - nobody gives or removes a role, or changes a person, holding rights they don't have (`canGrantRole` in `packages/domain`);
