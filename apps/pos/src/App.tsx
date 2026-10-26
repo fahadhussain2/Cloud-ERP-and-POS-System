@@ -28,6 +28,8 @@ type Settings = Awaited<ReturnType<Counter['settings']>>;
 
 /** Sync spec §4: every 60 seconds while the counter runs. */
 const PULL_EVERY_MS = 60_000;
+/** After the network comes back: pull at once, then retry while the connection settles. */
+const RECONNECT_RETRY_MS = [0, 1_000, 2_000, 4_000, 8_000, 15_000];
 const AUTO_LOCK_CHECK_MS = 5_000;
 
 export function App({ counter }: { counter: Counter }) {
@@ -56,7 +58,8 @@ export function App({ counter }: { counter: Counter }) {
           ? { state: 'refused', offlineSince: null }
           : { state: 'offline', offlineSince: c.offlineSince ?? new Date() },
     );
-    return refresh();
+    await refresh();
+    return r.ok;
   }, [counter, refresh]);
 
   // Start-up: the checks block everything else (POS spec §3).
@@ -79,16 +82,30 @@ export function App({ counter }: { counter: Counter }) {
     };
   }, [counter, refresh, sync]);
 
-  // Pull every minute and as soon as the connection comes back.
+  // Pull every minute. The status bar follows the network at once (POS spec §7): offline as soon as the browser
+  // says so; when it comes back, the connection often isn't usable yet, so the pull is retried until one succeeds.
   const enrolled = device !== null;
   useEffect(() => {
     if (!enrolled) return;
+    let stopped = false;
     const timer = setInterval(() => void sync(), PULL_EVERY_MS);
-    const online = () => void sync();
-    window.addEventListener('online', online);
+    const offline = () =>
+      setConnection((c) => (c.state === 'offline' ? c : { state: 'offline', offlineSince: new Date() }));
+    const online = async () => {
+      for (const wait of RECONNECT_RETRY_MS) {
+        await new Promise((r) => setTimeout(r, wait));
+        if (stopped || !navigator.onLine) return;
+        if (await sync()) return;
+      }
+    };
+    const onOnline = () => void online();
+    window.addEventListener('offline', offline);
+    window.addEventListener('online', onOnline);
     return () => {
+      stopped = true;
       clearInterval(timer);
-      window.removeEventListener('online', online);
+      window.removeEventListener('offline', offline);
+      window.removeEventListener('online', onOnline);
     };
   }, [enrolled, sync]);
 

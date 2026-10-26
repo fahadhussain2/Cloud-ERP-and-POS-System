@@ -71,7 +71,7 @@ Every check result is written to `diagnostic_log`.
 ## 7. Status bar
 
 Always visible at the **top** of every screen (W1-03 owner answer 1, as in the prototype); the key bar is at the bottom:
-- **Connection:** *Online*, or *Offline since HH:MM* (red after 30 minutes).
+- **Connection:** *Online*, or *Offline since HH:MM* (red after 30 minutes). It changes as soon as the browser loses the network; when the network comes back, the counter pulls at once and retries for about 30 seconds until a pull succeeds, then shows *Online*.
 - **Unsynced:** *N bills waiting to sync* (outbox rows); amber when the oldest is over 10 minutes old.
 - **Last sync** time, the **counter code**, and **who is unlocked**.
 - All text through i18n keys, laid out with CSS logical properties (rule 10).

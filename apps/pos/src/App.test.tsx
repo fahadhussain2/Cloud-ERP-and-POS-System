@@ -208,19 +208,18 @@ describe('counter screens', () => {
   });
 
   it('when the network comes back, retries the pull until one succeeds and shows online', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let online = false;
+    const f = fakeCounter({
+      pull: () => Promise.resolve(online ? { ok: true, rows: 0 } : { ok: false, reason: 'offline' }),
+    });
+    show(f.counter);
+    expect(await screen.findByText(/^Offline since/)).toBeDefined();
+    // From here the clock moves only when the test says, so a busy machine can't change the retry schedule.
+    vi.useFakeTimers();
     try {
-      let online = false;
-      const f = fakeCounter({
-        pull: () => Promise.resolve(online ? { ok: true, rows: 0 } : { ok: false, reason: 'offline' }),
-      });
-      show(f.counter);
-      expect(await screen.findByText(/^Offline since/)).toBeDefined();
       // The browser says online before the connection really works: the first pull still fails.
-      act(() => {
-        window.dispatchEvent(new Event('online'));
-      });
       await act(async () => {
+        window.dispatchEvent(new Event('online'));
         await vi.advanceTimersByTimeAsync(500);
       });
       expect(screen.queryByText(en.status.online)).toBeNull();
