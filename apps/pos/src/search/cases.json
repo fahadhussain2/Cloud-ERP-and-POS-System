@@ -1,0 +1,274 @@
+{
+  "description": "Counter search (POS-02, CAT-02, POS spec §9): what matches and in which order. Each case lists the item codes expected, best first.",
+  "catalog": {
+    "price_tiers": [
+      { "id": "t-retail", "code": "RETAIL", "name": "Retail", "sort": 1, "is_default": true },
+      { "id": "t-mech", "code": "MECHANIC", "name": "Mechanic", "sort": 2, "is_default": false }
+    ],
+    "categories": [
+      { "id": "c-brpd", "code": "BRPD", "name": "BRAKE PADS" },
+      { "id": "c-fnbl", "code": "FNBL", "name": "FAN BELT" },
+      { "id": "c-aflt", "code": "AFLT", "name": "AIR FILTER" },
+      { "id": "c-elec", "code": "ELEC", "name": "ELECTRICAL" },
+      { "id": "c-enol", "code": "ENOL", "name": "ENGINE OIL" },
+      { "id": "c-bear", "code": "BEAR", "name": "BEARING" }
+    ],
+    "brands": [{ "id": "b-kash", "name": "KASHIYAMA" }],
+    "origins": [
+      { "id": "o-jp", "name": "JAPAN" },
+      { "id": "o-tw", "name": "TAIWAN" }
+    ],
+    "vehicle_makes": [
+      { "id": "m-toyota", "name": "TOYOTA" },
+      { "id": "m-suzuki", "name": "SUZUKI" },
+      { "id": "m-honda", "name": "HONDA" }
+    ],
+    "items": [
+      {
+        "id": "i1",
+        "code": "BRPD001",
+        "name": "BRAKE PADS FRONT COROLLA",
+        "category_id": "c-brpd",
+        "brand_id": "b-kash",
+        "origin_id": "o-jp",
+        "variant": "FRONT",
+        "bin_location": "R3-B2",
+        "status": "active"
+      },
+      {
+        "id": "i2",
+        "code": "BRPD002",
+        "name": "BRAKE PADS FRONT CIVIC",
+        "category_id": "c-brpd",
+        "origin_id": "o-tw",
+        "variant": "FRONT",
+        "status": "active"
+      },
+      {
+        "id": "i3",
+        "code": "BRPD003",
+        "name": "BRAKE PADS REAR COROLLA",
+        "category_id": "c-brpd",
+        "variant": "REAR",
+        "status": "dormant"
+      },
+      {
+        "id": "i4",
+        "code": "FNBL001",
+        "name": "FAN BELT CULTUS 4PK-855",
+        "category_id": "c-fnbl",
+        "spec": "4PK-855",
+        "status": "active"
+      },
+      {
+        "id": "i5",
+        "code": "FNBL002",
+        "name": "FAN BELT MEHRAN",
+        "category_id": "c-fnbl",
+        "status": "active"
+      },
+      {
+        "id": "i6",
+        "code": "AFLT001",
+        "name": "AIR FILTER COROLLA",
+        "category_id": "c-aflt",
+        "status": "active"
+      },
+      {
+        "id": "i7",
+        "code": "ELEC001",
+        "name": "SPADE TERMINAL 6MM",
+        "category_id": "c-elec",
+        "status": "active"
+      },
+      {
+        "id": "i8",
+        "code": "ENOL001",
+        "name": "ENGINE OIL 10W-40 4L",
+        "category_id": "c-enol",
+        "origin_id": "o-jp",
+        "status": "active"
+      },
+      {
+        "id": "i9",
+        "code": "BEAR001",
+        "name": "BEARING FRONT WHEEL",
+        "category_id": "c-bear",
+        "status": "discontinued"
+      }
+    ],
+    "item_identifiers": [
+      { "id": "x1", "item_id": "i1", "kind": "barcode", "value": "BRPD001", "normalized_value": "BRPD001" },
+      { "id": "x2", "item_id": "i2", "kind": "barcode", "value": "BRPD002", "normalized_value": "BRPD002" },
+      { "id": "x3", "item_id": "i3", "kind": "barcode", "value": "BRPD003", "normalized_value": "BRPD003" },
+      { "id": "x4", "item_id": "i4", "kind": "barcode", "value": "FNBL001", "normalized_value": "FNBL001" },
+      { "id": "x5", "item_id": "i5", "kind": "barcode", "value": "FNBL002", "normalized_value": "FNBL002" },
+      { "id": "x6", "item_id": "i6", "kind": "barcode", "value": "AFLT001", "normalized_value": "AFLT001" },
+      { "id": "x7", "item_id": "i7", "kind": "barcode", "value": "ELEC001", "normalized_value": "ELEC001" },
+      { "id": "x8", "item_id": "i8", "kind": "barcode", "value": "ENOL001", "normalized_value": "ENOL001" },
+      { "id": "x9", "item_id": "i9", "kind": "barcode", "value": "BEAR001", "normalized_value": "BEAR001" },
+      {
+        "id": "x11",
+        "item_id": "i1",
+        "kind": "oem",
+        "value": "04465-02220",
+        "normalized_value": "0446502220"
+      },
+      {
+        "id": "x12",
+        "item_id": "i2",
+        "kind": "oem",
+        "value": "45022-TBA-A01",
+        "normalized_value": "45022TBAA01"
+      },
+      {
+        "id": "x13",
+        "item_id": "i3",
+        "kind": "oem",
+        "value": "04466-02200",
+        "normalized_value": "0446602200"
+      },
+      {
+        "id": "x14",
+        "item_id": "i4",
+        "kind": "oem",
+        "value": "17521-77E00",
+        "normalized_value": "1752177E00"
+      },
+      {
+        "id": "x15",
+        "item_id": "i5",
+        "kind": "oem",
+        "value": "17521-80000",
+        "normalized_value": "1752180000"
+      },
+      {
+        "id": "x16",
+        "item_id": "i5",
+        "kind": "alternate",
+        "value": "17521-77E00-000",
+        "normalized_value": "1752177E00000"
+      },
+      {
+        "id": "x17",
+        "item_id": "i6",
+        "kind": "oem",
+        "value": "17801-0D060",
+        "normalized_value": "178010D060"
+      },
+      {
+        "id": "x18",
+        "item_id": "i9",
+        "kind": "oem",
+        "value": "90369-T0003",
+        "normalized_value": "90369T0003"
+      }
+    ],
+    "item_compatibility": [
+      {
+        "id": "v1",
+        "item_id": "i1",
+        "make_id": "m-toyota",
+        "model": "COROLLA",
+        "year_from": 2009,
+        "year_to": 2014
+      },
+      {
+        "id": "v2",
+        "item_id": "i2",
+        "make_id": "m-honda",
+        "model": "CIVIC",
+        "year_from": 2016,
+        "year_to": 2021
+      },
+      {
+        "id": "v3",
+        "item_id": "i3",
+        "make_id": "m-toyota",
+        "model": "COROLLA",
+        "year_from": 2015,
+        "year_to": null
+      },
+      {
+        "id": "v4",
+        "item_id": "i4",
+        "make_id": "m-suzuki",
+        "model": "CULTUS",
+        "year_from": 2017,
+        "year_to": null
+      },
+      {
+        "id": "v5",
+        "item_id": "i5",
+        "make_id": "m-suzuki",
+        "model": "MEHRAN",
+        "year_from": 1989,
+        "year_to": 2019
+      },
+      {
+        "id": "v6",
+        "item_id": "i6",
+        "make_id": "m-toyota",
+        "model": "COROLLA",
+        "year_from": 2009,
+        "year_to": 2014
+      }
+    ],
+    "item_prices": [
+      { "id": "p1", "item_id": "i1", "tier_id": "t-retail", "price": "450000" },
+      { "id": "p2", "item_id": "i1", "tier_id": "t-mech", "price": "427500" },
+      { "id": "p3", "item_id": "i4", "tier_id": "t-retail", "price": "130000" }
+    ]
+  },
+  "cases": [
+    { "name": "an exact code, in any case", "text": "brpd001", "expected": ["BRPD001"] },
+    { "name": "a scanned label (the barcode is the code)", "text": "FNBL001", "expected": ["FNBL001"] },
+    { "name": "an OEM number with dashes", "text": "04465-02220", "expected": ["BRPD001"] },
+    { "name": "an OEM number without dashes", "text": "0446502220", "expected": ["BRPD001"] },
+    { "name": "an OEM number in lower case with spaces", "text": "45022 tba a01", "expected": ["BRPD002"] },
+    { "name": "the start of an OEM number", "text": "17801", "expected": ["AFLT001"] },
+    {
+      "name": "the start of OEM numbers shared by two items: shorter name first",
+      "text": "17521",
+      "expected": ["FNBL002", "FNBL001"]
+    },
+    {
+      "name": "an exact identifier ranks above one that only starts with it, whatever the names",
+      "text": "17521-77e00",
+      "expected": ["FNBL001", "FNBL002"]
+    },
+    {
+      "name": "the start of codes lists the family, active items first",
+      "text": "BRPD00",
+      "expected": ["BRPD002", "BRPD001", "BRPD003"]
+    },
+    { "name": "under 4 characters, no part-number prefix", "text": "174", "expected": [] },
+    { "name": "words in any order", "text": "corolla pads", "expected": ["BRPD001", "BRPD003"] },
+    { "name": "the start of words", "text": "brak pad", "expected": ["BRPD002", "BRPD001", "BRPD003"] },
+    {
+      "name": "a word must start a word: pad is not in SPADE",
+      "text": "pad",
+      "expected": ["BRPD002", "BRPD001", "BRPD003"]
+    },
+    {
+      "name": "make, model and a year inside the tag",
+      "text": "brake pads corolla 2012",
+      "expected": ["BRPD001"]
+    },
+    { "name": "a year after an open-ended tag's start", "text": "corolla 2016", "expected": ["BRPD003"] },
+    { "name": "a year alone", "text": "2012", "expected": ["FNBL002", "AFLT001", "BRPD001"] },
+    { "name": "a year outside every tag", "text": "civic 2010", "expected": [] },
+    { "name": "the vehicle make", "text": "toyota filter", "expected": ["AFLT001"] },
+    { "name": "the spec", "text": "4pk", "expected": ["FNBL001"] },
+    { "name": "a word with a dash", "text": "10w-40", "expected": ["ENOL001"] },
+    { "name": "the brand and the origin", "text": "kashiyama japan", "expected": ["BRPD001"] },
+    { "name": "the category name", "text": "belt", "expected": ["FNBL002", "FNBL001"] },
+    {
+      "name": "active items first, then dormant and discontinued",
+      "text": "front",
+      "expected": ["BRPD002", "BRPD001", "BEAR001"]
+    },
+    { "name": "nothing typed", "text": "   ", "expected": [] },
+    { "name": "nothing matches", "text": "xyz", "expected": [] }
+  ]
+}

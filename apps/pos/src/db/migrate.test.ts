@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { CATALOG_COLUMNS, CATALOG_DATASETS } from '@erp/contracts';
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -67,6 +68,31 @@ describe('migrations', () => {
     migrate(db, v2);
     expect(db.selectValue('SELECT schema_version FROM meta')).toBe(2);
     expect(db.selectObjects('SELECT id, note FROM outbox')).toEqual([{ id: 'd1', note: null }]);
+  });
+
+  it("schema 2 adds the catalog tables with exactly the pulled columns, and keeps a W1-02 counter's rows", () => {
+    const db = fresh();
+    migrate(db, MIGRATIONS.slice(0, 1));
+    db.exec(
+      "INSERT INTO users (id, username, full_name, status, row_version) VALUES ('u1', 'sara', 'Sara', 'active', '1')",
+    );
+    db.exec("INSERT INTO pin_state (user_id, failures, locked, updated_at) VALUES ('u1', 3, 0, 'now')");
+    db.exec(
+      "INSERT INTO outbox (id, family, seq, payload, status, attempts, created_at) VALUES ('d1', 'S', 1, '{}', 'pending', 0, 'now')",
+    );
+    db.exec("INSERT INTO sync_state (key, value) VALUES ('pull_cursor', 'c1')");
+    migrate(db);
+    expect(db.selectValue('SELECT schema_version FROM meta')).toBe(LATEST_VERSION);
+    expect(db.selectValue('SELECT full_name FROM users')).toBe('Sara');
+    expect(db.selectValue('SELECT failures FROM pin_state')).toBe(3);
+    expect(db.selectValue('SELECT count(*) FROM outbox')).toBe(1);
+    expect(db.selectValue("SELECT value FROM sync_state WHERE key = 'pull_cursor'")).toBe('c1');
+    for (const dataset of CATALOG_DATASETS) {
+      const columns = db.selectObjects(`PRAGMA table_info(${dataset})`).map((r) => String(r['name']));
+      expect(columns.sort(), dataset).toEqual(
+        [...Object.keys(CATALOG_COLUMNS[dataset]), 'row_version', 'deleted_at'].sort(),
+      );
+    }
   });
 
   it('roll back a migration that fails and leave the previous schema', () => {

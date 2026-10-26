@@ -9,6 +9,7 @@ import {
   getPinState,
   getSync,
   listStaff,
+  loadCatalog,
   log,
   outboxStats,
   setDevice,
@@ -111,6 +112,114 @@ describe('applying a pull', () => {
     applyPull(db, { users: [user('sara')] }, 'cursor-1');
     expect(() => applyPull(db, { users: [user('ali'), { id: 'broken' }] }, 'cursor-2')).toThrow();
     expect(listStaff(db).map((u) => u.id)).toEqual(['sara']);
+    expect(getSync(db, 'pull_cursor')).toBe('cursor-1');
+  });
+});
+
+describe('applying a catalog pull (W1-03)', () => {
+  const row = (id: string, over: Record<string, unknown>) => ({
+    id,
+    row_version: '1',
+    deleted_at: null,
+    ...over,
+  });
+  const catalog = {
+    price_tiers: [row('t1', { code: 'RETAIL', name: 'Retail', sort: 1, is_default: true })],
+    units: [row('u1', { code: 'PCS', name: 'Pieces', allows_fraction: false })],
+    categories: [
+      row('c1', {
+        code: 'BRPD',
+        name: 'Brake pads',
+        parent_id: null,
+        pricing_rule: { floor_min_margin_bp: 500 },
+        return_policy: { returnable: true, window_days: 30 },
+      }),
+    ],
+    brands: [row('b1', { name: 'KASHIYAMA' })],
+    origins: [row('o1', { name: 'JAPAN' })],
+    vehicle_makes: [row('m1', { name: 'TOYOTA' })],
+    items: [
+      row('i1', {
+        code: 'BRPD001',
+        name: 'BRAKE PADS FRONT COROLLA',
+        category_id: 'c1',
+        brand_id: 'b1',
+        origin_id: 'o1',
+        unit_id: 'u1',
+        variant: 'FRONT',
+        spec: null,
+        bin_location: 'R3-B2',
+        floor_price: '400000',
+        tax_code_id: null,
+        status: 'active',
+      }),
+    ],
+    item_identifiers: [
+      row('x1', {
+        item_id: 'i1',
+        kind: 'oem',
+        value: '04465-02220',
+        normalized_value: '0446502220',
+        is_primary: true,
+      }),
+    ],
+    item_compatibility: [
+      row('v1', {
+        item_id: 'i1',
+        make_id: 'm1',
+        model: 'COROLLA',
+        year_from: 2009,
+        year_to: 2014,
+        note: null,
+      }),
+    ],
+    item_prices: [row('p1', { item_id: 'i1', tier_id: 't1', price: '450000' })],
+  };
+
+  it('stores every catalog dataset and loads it back with numbers, flags and JSON restored', () => {
+    applyPull(db, catalog, 'cursor-1');
+    const loaded = loadCatalog(db);
+    expect(loaded.items).toEqual([{ ...catalog.items[0], floor_price: 400000 }]);
+    expect(loaded.item_prices).toEqual([{ ...catalog.item_prices[0], price: 450000 }]);
+    expect(loaded.price_tiers).toEqual(catalog.price_tiers);
+    expect(loaded.categories).toEqual(catalog.categories);
+    expect(loaded.item_identifiers).toEqual(catalog.item_identifiers);
+    expect(loaded.item_compatibility).toEqual(catalog.item_compatibility);
+    expect(getSync(db, 'pull_cursor')).toBe('cursor-1');
+  });
+
+  it('updates changed rows and deletes tombstones', () => {
+    applyPull(db, catalog, 'cursor-1');
+    applyPull(
+      db,
+      {
+        item_prices: [row('p1', { item_id: 'i1', tier_id: 't1', price: '470000', row_version: '2' })],
+        item_identifiers: [{ ...catalog.item_identifiers[0], deleted_at: '2026-10-26T10:00:00Z' }],
+      },
+      'cursor-2',
+    );
+    const loaded = loadCatalog(db);
+    expect(loaded.item_prices.map((p) => p['price'])).toEqual([470000]);
+    expect(loaded.item_identifiers).toEqual([]);
+  });
+
+  it('marks the first complete pull, so the counter knows its catalog is loaded', () => {
+    applyPull(db, catalog, 'cursor-1');
+    expect(getSync(db, 'pull_complete_at')).toBeNull();
+    applyPull(db, {}, 'cursor-2', true);
+    expect(getSync(db, 'pull_complete_at')).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('changes nothing, cursor included, if a price is not whole minor units', () => {
+    applyPull(db, catalog, 'cursor-1');
+    expect(() =>
+      applyPull(
+        db,
+        { item_prices: [row('p2', { item_id: 'i1', tier_id: 't1', price: '12.5' })] },
+        'cursor-2',
+      ),
+    ).toThrow();
+    expect(loadCatalog(db).item_prices).toHaveLength(1);
     expect(getSync(db, 'pull_cursor')).toBe('cursor-1');
   });
 });

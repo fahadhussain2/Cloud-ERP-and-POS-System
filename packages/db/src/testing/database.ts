@@ -105,3 +105,5 @@ export async function createTenant(ownerUrl: string, name: string, code?: string
     await c.end();
   }
 }
+
+export { seedCatalog, TEST_TIERS, type TestItem } from './catalog';
