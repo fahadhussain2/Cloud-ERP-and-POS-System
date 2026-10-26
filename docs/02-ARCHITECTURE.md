@@ -51,7 +51,7 @@ flowchart LR
 | Language | **TypeScript** everywhere (D-027) | One shared domain package for checkout rules |
 | POS app | React + Vite **PWA** (D-010) | Chromium only (Chrome/Edge), installed as an app |
 | POS local DB | **SQLite WASM** in a dedicated Web Worker, persisted on OPFS with the `opfs-sahpool` VFS **(proposed)** | Real SQL and transactions. Does not need cross-origin-isolation headers. |
-| POS search | In-memory index in a worker, built from the local DB at boot and patched on sync **(proposed)** | 20k items easily meets ≤ 100 ms. Custom normalizer for part numbers. |
+| POS search | In-memory index in the database worker, built from the local DB at boot and patched with every pulled page (W1-03) | Real catalog (19,552 items): 3–19 ms from key press to results. One part-number normalizer for importer and counter (`normalizeIdentifier`, `packages/domain`). |
 | Back office | React + Vite SPA (online only) | Shares UI and contract packages with the POS |
 | UI components | **shadcn/ui** (Radix primitives + **Tailwind CSS**), copied into `packages/ui` and themed with the prototype design tokens (D-066) | Accessible, keyboard-friendly, RTL-ready (logical utilities + Radix direction), only used components are bundled |
 | UI support libraries | TanStack Table + Virtual (tables), React Hook Form + Zod (forms, same schemas as `packages/contracts`), TanStack Router + Query (back office), i18next (i18n/RTL), Lucide (icons), `Intl` (number, currency, date formatting) | POS keeps dependencies minimal for fast start on old PCs |

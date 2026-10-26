@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W1-02 (POS shell) built, in review; spec v1 accepted |
+| **Status** | In progress: W1-02 (POS shell) merged; W1-03 (catalog and search, design pass) built, in review |
 | **Requirements** | 17 (POS-01…POS-17) |
 | **Feature spec needed** | Yes: checkout screen and keyboard map; local DB and storage guardrails |
 
@@ -66,10 +66,24 @@ What every later counter task builds on ([spec](spec.md), [plan](plans/W1-02-pos
 | Pull loop (startup, after unlock, every 60 s, when back online) | `sync/pull.ts` |
 | Unlock from the staff list, 5-try lock, auto-lock | `unlock/unlock.ts`, `screens/UnlockScreen.tsx`, `App.tsx` |
 | Choose your own PIN after a temporary one (online only) | `sync/pin.ts`, `screens/ChoosePinScreen.tsx` |
-| Status bar (POS-14) | `screens/StatusBar.tsx` |
+| Status bar at the top (POS-14) | `screens/StatusBar.tsx` |
 | Offline app shell; updates wait until no bill is open | `vite-plugin-pwa` in `vite.config.ts`, `pwa/update.ts` |
 
 The screens talk only to the `Counter` interface (`counter.ts`), so they are tested with a fake; `counter-browser.ts` is the real one. End-to-end flows: `e2e/counter.spec.ts` (`pnpm e2e`). Setting up a shop PC: [infra/counter-setup.md](../../../infra/counter-setup.md).
+
+## Catalog and search (W1-03)
+
+[Plan](plans/W1-03-catalog-search.md), [spec §9](spec.md), [sync spec §3](../sync/spec.md).
+
+| Part | Where |
+|---|---|
+| The catalog datasets and their column lists (shared by API and counter) | `CATALOG_COLUMNS` in `packages/contracts/src/sync.ts` |
+| Local catalog tables (schema 2), applying pages, loading the catalog | `apps/pos/src/db/migrate.ts`, `db/repo.ts` (`applyPull`, `loadCatalog`) |
+| The search index: four match ranks, patched per page, warmed after loads | `apps/pos/src/search/search-index.ts`, golden cases in `search/cases.json` |
+| One part-number normalizer for importer and counter | `normalizeIdentifier` in `packages/domain` |
+| The counter screen: search, bill panel (W1-05), key bar, first-load progress | `apps/pos/src/screens/CounterScreen.tsx` |
+
+**Look and feel:** every screen is built from `packages/ui` ([README](../../../packages/ui/README.md)): shadcn/ui on Radix and Tailwind with the Tijara POS tokens (D-066).
 
 ## Work in this module
 

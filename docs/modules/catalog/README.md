@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Not started (build on hold, D-068) |
+| **Status** | Tables and import built (W0-13); on the counter: pull and search (W1-03, CAT-02); back-office maintenance is W1-15 |
 | **Requirements** | 9 (CAT-01…CAT-09) |
 | **Feature spec needed** | No: the PRD and data model are enough |
 

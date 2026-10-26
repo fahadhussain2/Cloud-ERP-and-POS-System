@@ -62,16 +62,43 @@
 
 ## Tests written first
 
-- [ ] **Pull (integration):** every catalog dataset returns exactly its listed columns (an item never carries `legacy` or `default_supplier_id`); a soft-deleted identifier comes back as a tombstone; another tenant's catalog is never sent; paging over all datasets returns every row once.
-- [ ] **Normalizer (golden):** `17801-0Y040`, `17801 0Y040`, `17801.0y040` and `17801/0Y040` → `178010Y040`; the importer's existing cases still pass through the moved function.
-- [ ] **Local schema 2:** a schema-1 database with users, PIN state and outbox rows upgrades in place with all rows kept; `applyPull` upserts catalog rows and deletes tombstones, in one transaction with the cursor.
-- [ ] **Search cases (golden, `apps/pos/src/search/cases.json`):** exact code in any case; a scanned barcode; an OEM number with and without dashes; an OEM prefix; words in any order; a word prefix (`brak pad`); make + model + year inside and outside the tag's range; `pad` not matching `SPADE`; the rank order across the four levels; dormant after active; a deleted item gone after a patch; a changed price shown after a patch; empty text → nothing; at most 50.
-- [ ] **Search speed:** on a generated 20,000-item catalog, 200 typical queries, each under 50 ms (the PRD allows 100 ms from key press to results).
-- [ ] **Building blocks (jsdom):** the dialog closes on `Esc` and returns focus; the list moves with `↑ ↓` and reports the choice; a key-bar hint clicked does what its key does; `formatMoney` gives `Rs 1,250` for Delux.
-- [ ] **Counter screen (jsdom, fake counter):** `F2` focuses the search; results render with the price; a newer answer replaces an older one, never the reverse; *Loading the catalog* until the first load is done.
-- [ ] **E2E:** the flows in scope item 6.
+- [x] **Pull (integration):** every catalog dataset returns exactly its listed columns (an item never carries `legacy` or `default_supplier_id`); a soft-deleted identifier comes back as a tombstone; another tenant's catalog is never sent; paging over all datasets returns every row once.
+- [x] **Normalizer (golden):** `17801-0Y040`, `17801 0Y040`, `17801.0y040` and `17801/0Y040` → `178010Y040`; the importer's existing cases still pass through the moved function.
+- [x] **Local schema 2:** a schema-1 database with users, PIN state and outbox rows upgrades in place with all rows kept; `applyPull` upserts catalog rows and deletes tombstones, in one transaction with the cursor.
+- [x] **Search cases (golden, `apps/pos/src/search/cases.json`):** exact code in any case; a scanned barcode; an OEM number with and without dashes; an OEM prefix; words in any order; a word prefix (`brak pad`); make + model + year inside and outside the tag's range; `pad` not matching `SPADE`; the rank order across the four levels; dormant after active; a deleted item gone after a patch; a changed price shown after a patch; empty text → nothing; at most 50.
+- [x] **Search speed:** on a generated 20,000-item catalog, 200 typical queries, each under 50 ms (the PRD allows 100 ms from key press to results).
+- [x] **Building blocks (jsdom):** the dialog closes on `Esc` and returns focus; the list moves with `↑ ↓` and reports the choice; a key-bar hint clicked does what its key does; `formatMoney` gives `Rs 1,250` for Delux.
+- [x] **Counter screen (jsdom, fake counter):** `F2` focuses the search; results render with the price; a newer answer replaces an older one, never the reverse; *Loading the catalog* until the first load is done.
+- [x] **E2E:** the flows in scope item 6.
+
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| The catalog column lists live in `@erp/contracts` (`CATALOG_COLUMNS`), used by the API's pull, the counter's local tables and the tests | One list per dataset: the server can't send a column the counter doesn't expect, and a test fails if the local tables differ. |
+| `seedCatalog` in `@erp/db/testing` | The integration tests and the E2E seed build catalogs the way the importer stores them. |
+| **Found by timing the real catalog (Verify 2):** after setup, the counter waited for the whole first pull (~30 s) before showing the staff. Each pulled page now refreshes the screens, and setup goes straight to unlock; the counter screen shows *Loading the catalog* until the pull is complete | The staff list arrives with the first page; the rest of the catalog loads while the salesman unlocks. Covered by new tests (`App.test.tsx`, `pull.test.ts`). |
+| **Found by timing:** the first search after a restart took 152 ms (the index builds its word lists lazily). The index is now warmed after loading and after each complete pull, not after each page | 13 ms afterwards. Warming after every page would add seconds to a first load of ~125 pages; a test checks the warmed first search. |
+| One pull at a time on the counter (`counter-browser.ts`); pulls ask for full pages (1,000 rows) | The first load is longer than the 60-second timer; full pages halve the round trips. |
+| `Field` styles its input with `className` (the wrapper has `wrapperClassName`) | The screens style the input (PIN boxes, codes in mono). |
+| No toast and no `lucide-react` yet | No screen in W1-03 needs them; they come with their first user (W1-05/W1-06) rather than as unused dependencies. |
+| New dependencies, each published at least 2 weeks before: `tailwindcss` and `@tailwindcss/vite` 4.3.3, `@radix-ui/react-dialog` 1.2.0, `@radix-ui/react-label` 2.1.16, `@radix-ui/react-slot` 1.4.0, `class-variance-authority` 0.7.1, `clsx` 2.1.1, `tailwind-merge` 3.7.0, `@fontsource/barlow-condensed`, `@fontsource/ibm-plex-sans`, `@fontsource/ibm-plex-mono` 5.3.0 | D-066 and owner answer 2. |
+| The E2E catalog has 6 items, not about 30 | Six cover every search flow in scope 6; the large-catalog behaviour is covered by the 20,000-item speed test and Verify 2. |
 
 ## Verify
+
+**Results (2026-10-26):**
+
+- **Checks:** `pnpm check`, `pnpm test:integration` and `pnpm e2e` pass; output in the PR.
+- **Real catalog, on this PC** (a throwaway copy of `erp_dev`: 19,552 items, 27,647 identifiers, 18,535 vehicle tags, 58,656 prices; the built POS in Edge, the local API):
+  - staff list after *Set up counter*: **0.4 s**
+  - first catalog load, from *Set up counter* to the search box (with unlock and choosing a PIN in between): **31 s**, under the 60-second rule, so **no snapshot download is needed**
+  - restart (reload, unlock, search box): **3.4 s**
+  - key press to results: **3–19 ms** (`31170`, `seat belt`, `headlight city`, `ACCE039`, `h`, `water`, `17540-66J00`, `suzuki mehran`, `toyota`, `lami hustler`; 3 rounds each)
+  - offline, first search after a reload: **13 ms**
+  - memory of the index: not measured (Chrome's task manager on a counter PC, at Verify 3)
+- **Bundle:** main JS 472.6 → 518.9 kB (148.1 → 163.1 kB gzipped), CSS 1.3 → 19.1 kB, fonts 146 kB; precached app 1,874 → 2,090 KiB.
+
 
 1. `pnpm check`, integration tests and `pnpm e2e`, output shown.
 2. **On your PC, with the real catalog** (the Delux tenant from W0-13, local API): enroll a counter, time the first catalog load (the 60-second rule above), then time searches like `17801`, `fan belt cultus`, `brake pads corolla 2012` (target ≤ 100 ms), and switch the network off and search again. I paste the timings into this plan.

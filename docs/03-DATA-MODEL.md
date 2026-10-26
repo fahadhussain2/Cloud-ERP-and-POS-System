@@ -326,6 +326,8 @@ SQLite WASM in a dedicated worker, on OPFS (`opfs-sahpool`), changed only by num
 | `pin_state` | Wrong PINs and the lock per person on this counter (survives reloads) |
 | `diagnostic_log` | The last 5,000 events (architecture §11.3) |
 
+**Built in W1-03 (local schema 2):** the catalog, with exactly the columns its datasets send (sync spec §3, `CATALOG_COLUMNS` in `@erp/contracts`): `price_tiers`, `units`, `categories`, `brands`, `origins`, `vehicle_makes`, `items`, `item_identifiers`, `item_compatibility`, `item_prices`. Money as whole minor units (`INTEGER`), flags as 0/1, JSON as text. Removed rows are deleted, not kept as tombstones. `sync_state.pull_complete_at` marks the last complete pull (the first catalog load has finished). The search index is built from these tables in memory (POS spec §9).
+
 The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` in IndexedDB (`erp-pos-keys`), and the device token is kept only in memory.
 
 **Planned (later tasks):**
@@ -335,7 +337,7 @@ The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` i
 | `held_bills` | Parked bills (expire at day close) |
 | `local_cash_session` | Open session state (cash desk) |
 | `pending_overlays` | Derived: local unsynced effects on stock and customer balances, overlaid on the server snapshots |
-| Catalog tables | Items, prices, barcodes, stock snapshots (W1-03) |
+| Stock snapshots | Stock balances per item and location (W1-08) |
 
 **Write order when a bill is finalized** (one SQLite transaction):
 1. allocate the sequence number

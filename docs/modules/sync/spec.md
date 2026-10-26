@@ -55,7 +55,7 @@ Each dataset lists its columns explicitly. **A column not listed never leaves th
 
 `legacy` (on every catalog table) never leaves the server. Customers (W1-09), stock balances (W1-08) and the 90-day bills (W1-13) are added by their tasks with the same rules.
 
-**Bootstrap:** the first pull simply starts from the beginning, page by page (about 125k catalog rows for Delux). An interrupted first load resumes from the last committed page. W1-03 measures it on the real catalog; **if it takes more than 60 seconds**, a gzipped snapshot download per dataset (architecture §5.3) is added and specified here.
+**Bootstrap:** the first pull simply starts from the beginning, in full pages of 1,000 rows (about 125k catalog rows for Delux). An interrupted first load resumes from the last committed page. Measured in W1-03 on the real catalog: **31 seconds** from setup to search, under the 60-second rule, so there is no snapshot download. Revisit if a tenant's catalog is much larger.
 
 ## 4. When the counter pulls
 
