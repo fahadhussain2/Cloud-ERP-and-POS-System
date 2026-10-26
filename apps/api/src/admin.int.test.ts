@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from './app';
 import { hashPassword } from './auth/password';
 
-// The lists the back office's Counters and Staff PINs screens read (W1-02, D-089).
+// The lists the back office's Counters and Staff screens read (W1-02, W1-04, D-089).
 
 const SHOP = 'admin-shop';
 const HOST = 'app.example.test';
@@ -85,8 +85,8 @@ describe('back-office lists', () => {
     expect(res.json()).toEqual([{ id: branch, code: 'MAIN', name: 'Main' }]);
   });
 
-  it('staff: managers see who has a PIN, and never a PIN verifier or password hash', async () => {
-    const res = await get('/api/staff', await login('boss'));
+  it('users: managers see who has a PIN, and never a PIN verifier or password hash', async () => {
+    const res = await get('/api/users', await login('boss'));
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual([
       expect.objectContaining({
@@ -108,9 +108,9 @@ describe('back-office lists', () => {
     expect(res.body).not.toContain('$argon2');
   });
 
-  it('staff and devices: not for a salesman', async () => {
+  it('users and devices: not for a salesman', async () => {
     const cookie = await login('sara');
-    expect((await get('/api/staff', cookie)).statusCode).toBe(403);
+    expect((await get('/api/users', cookie)).statusCode).toBe(403);
     expect((await get('/api/devices', cookie)).statusCode).toBe(403);
   });
 

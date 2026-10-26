@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import permissionCases from '../golden/permissions.json';
+import grantCases from '../golden/role-grant.json';
 import limitCases from '../golden/role-limits.json';
 import {
   can,
+  canGrantRole,
   effectiveLimits,
   expandPermissions,
   isPermission,
@@ -42,6 +44,25 @@ runGolden(limitCases as GoldenFile<{ grants: GrantInput[]; branchId: string }>, 
     ),
     i.branchId,
   ),
+);
+
+const toGrant = (g: GrantInput): RoleGrant =>
+  'template' in g
+    ? grant(g.template, g.branchId)
+    : { permissions: g.permissions, limits: g.limits, branchId: g.branchId };
+
+runGolden(
+  grantCases as GoldenFile<{
+    grants: GrantInput[];
+    role: { template: RoleTemplateKey } | { permissions: string[] };
+    branchId: string | null;
+  }>,
+  (i) =>
+    canGrantRole(
+      i.grants.map(toGrant),
+      'template' in i.role ? ROLE_TEMPLATES[i.role.template].permissions : i.role.permissions,
+      i.branchId,
+    ),
 );
 
 describe('role templates', () => {

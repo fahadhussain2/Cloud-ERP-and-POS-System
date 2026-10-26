@@ -42,6 +42,7 @@ describe('migrations', () => {
         'local_series',
         'meta',
         'outbox',
+        'pin_events',
         'pin_state',
         'roles',
         'sync_state',
@@ -93,6 +94,28 @@ describe('migrations', () => {
         [...Object.keys(CATALOG_COLUMNS[dataset]), 'row_version', 'deleted_at'].sort(),
       );
     }
+  });
+
+  it("schema 3 adds the PIN events (W1-04) and keeps a W1-03 counter's rows", () => {
+    const db = fresh();
+    migrate(db, MIGRATIONS.slice(0, 2));
+    db.exec(
+      "INSERT INTO users (id, username, full_name, status, row_version) VALUES ('u1', 'sara', 'Sara', 'active', '1')",
+    );
+    db.exec("INSERT INTO pin_state (user_id, failures, locked, updated_at) VALUES ('u1', 5, 1, 'now')");
+    db.exec(
+      "INSERT INTO outbox (id, family, seq, payload, status, attempts, created_at) VALUES ('d1', 'S', 1, '{}', 'pending', 0, 'now')",
+    );
+    db.exec(
+      "INSERT INTO items (id, code, name, status, row_version) VALUES ('i1', 'AFLT001', 'AIR FILTER', 'active', '1')",
+    );
+    migrate(db);
+    expect(LATEST_VERSION).toBeGreaterThanOrEqual(3);
+    expect(db.selectValue('SELECT locked FROM pin_state')).toBe(1);
+    expect(db.selectValue('SELECT count(*) FROM outbox')).toBe(1);
+    expect(db.selectValue('SELECT name FROM items')).toBe('AIR FILTER');
+    const columns = db.selectObjects('PRAGMA table_info(pin_events)').map((r) => String(r['name']));
+    expect(columns.sort()).toEqual(['at', 'by_user_id', 'id', 'kind', 'pushed_at', 'user_id']);
   });
 
   it('roll back a migration that fails and leave the previous schema', () => {
