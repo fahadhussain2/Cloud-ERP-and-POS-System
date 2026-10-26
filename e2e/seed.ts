@@ -1,5 +1,5 @@
 // The E2E API: a fresh erp_e2e database for each run (the migrations, a test tenant made from the Delux spec, one
-// salesman without a PIN), then the API itself on it, as the app role. Needs DATABASE_URL (a PostgreSQL 17+
+// salesman without a PIN, a small catalog), then the API itself on it, as the app role. Needs DATABASE_URL (a PostgreSQL 17+
 // superuser; locally `pnpm db:up`).
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -7,11 +7,11 @@ import { fileURLToPath } from 'node:url';
 
 import { TenantSpec } from '@erp/contracts';
 import { setupTenant, withTenant } from '@erp/db';
-import { createTestDatabase } from '@erp/db/testing';
+import { createTestDatabase, seedCatalog } from '@erp/db/testing';
 import pg from 'pg';
 
 import { hashPassword } from '../apps/api/src/auth/password';
-import { API_PORT, OWNER, OWNER_FIRST_PASSWORD, SALESMAN, SHOP } from './fixtures';
+import { API_PORT, CATALOG, OWNER, OWNER_FIRST_PASSWORD, SALESMAN, SHOP } from './fixtures';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const NAME = 'erp_e2e';
@@ -41,6 +41,7 @@ await withTenant(pool, { tenantId: dir.rows[0]!.tenant_id }, async (_db, c) => {
      SELECT $1, $2, id FROM erp.roles WHERE template_key = 'salesman'`,
     [dir.rows[0]!.tenant_id, user.rows[0]!.id],
   );
+  await seedCatalog(c, dir.rows[0]!.tenant_id, CATALOG);
 });
 await pool.end();
 console.info(`${NAME}: tenant ${SHOP} ready`);

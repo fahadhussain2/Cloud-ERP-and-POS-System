@@ -1,7 +1,9 @@
+import { Alert, Button, Field } from '@erp/ui';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { EnrollResult } from '../device/session';
+import { CardScreen } from './Card';
 
 /** Device setup (POS spec §4): the shop code and a manager's one-time code. */
 export function SetupScreen({
@@ -25,28 +27,30 @@ export function SetupScreen({
   };
 
   return (
-    <main className="screen">
-      <h1>{t('setup.title')}</h1>
-      <p>{t('setup.help')}</p>
-      <form onSubmit={(e) => void submit(e)}>
-        <label>
-          {t('setup.shopCode')}
-          <input
-            value={tenantCode}
-            onChange={(e) => setTenantCode(e.target.value)}
-            autoComplete="off"
-            required
-          />
-        </label>
-        <label>
-          {t('setup.code')}
-          <input value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" required />
-        </label>
-        {error && <p role="alert">{t(`setup.${error}`)}</p>}
-        <button type="submit" disabled={busy}>
+    <CardScreen title={t('setup.title')}>
+      <p className="m-0 text-center text-muted">{t('setup.help')}</p>
+      <form className="flex flex-col gap-3" onSubmit={(e) => void submit(e)}>
+        <Field
+          label={t('setup.shopCode')}
+          value={tenantCode}
+          onChange={(e) => setTenantCode(e.target.value)}
+          autoComplete="off"
+          autoFocus
+          required
+        />
+        <Field
+          label={t('setup.code')}
+          className="font-mono"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          autoComplete="off"
+          required
+        />
+        {error && <Alert variant="bad">{t(`setup.${error}`)}</Alert>}
+        <Button type="submit" variant="primary" size="lg" disabled={busy}>
           {busy ? t('setup.busy') : t('setup.submit')}
-        </button>
+        </Button>
       </form>
-    </main>
+    </CardScreen>
   );
 }

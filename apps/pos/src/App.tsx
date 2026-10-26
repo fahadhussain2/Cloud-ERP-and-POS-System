@@ -1,9 +1,12 @@
+import { AppFrame } from '@erp/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Counter } from './counter';
 import type { DeviceInfo } from './db/repo';
+import { CardScreen } from './screens/Card';
 import { ChoosePinScreen } from './screens/ChoosePinScreen';
+import { CounterScreen } from './screens/CounterScreen';
 import { SetupScreen } from './screens/SetupScreen';
 import { StatusBar, type Connection } from './screens/StatusBar';
 import { StopScreen } from './screens/StopScreen';
@@ -11,7 +14,7 @@ import { UnlockScreen } from './screens/UnlockScreen';
 import type { StorageProblem } from './storage/checks';
 import { autoLockDue, tryUnlock, unlockableStaff, type StaffUser } from './unlock/unlock';
 
-// The counter shell (POS spec §3-§7, D-089): storage checks → setup → unlock → (choose your PIN) → home.
+// The counter shell (POS spec §3-§9, D-089): storage checks → setup → unlock → (choose your PIN) → the counter screen.
 
 type Phase =
   | { name: 'checking' }
@@ -28,7 +31,7 @@ const PULL_EVERY_MS = 60_000;
 const AUTO_LOCK_CHECK_MS = 5_000;
 
 export function App({ counter }: { counter: Counter }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [phase, setPhase] = useState<Phase>({ name: 'checking' });
   const [device, setDevice] = useState<DeviceInfo | null>(null);
   const [staff, setStaff] = useState<StaffUser[]>([]);
@@ -152,11 +155,7 @@ export function App({ counter }: { counter: Counter }) {
   let screen;
   switch (phase.name) {
     case 'checking':
-      screen = (
-        <main className="screen">
-          <p>{t('app.checking')}</p>
-        </main>
-      );
+      screen = <CardScreen title={t('app.checking')}>{null}</CardScreen>;
       break;
     case 'stop':
       return <StopScreen problem={phase.problem} />;
@@ -164,7 +163,7 @@ export function App({ counter }: { counter: Counter }) {
       screen = <SetupScreen onEnroll={enroll} />;
       break;
     case 'locked':
-      screen = <UnlockScreen staff={staff} onUnlock={unlock} />;
+      screen = <UnlockScreen staff={staff} deviceCode={device?.code ?? null} onUnlock={unlock} />;
       break;
     case 'choose_pin':
       screen = (
@@ -173,29 +172,34 @@ export function App({ counter }: { counter: Counter }) {
       break;
     case 'unlocked':
       screen = (
-        <main className="screen">
-          <h1>{settings?.name ?? t('app.title')}</h1>
-          <p>{t('home.ready', { name: phase.user.fullName })}</p>
-          <p>{t('home.placeholder')}</p>
-          <button type="button" onClick={() => setPhase({ name: 'locked' })}>
-            {t('home.lock')}
-          </button>
-        </main>
+        <CounterScreen
+          counter={counter}
+          money={{
+            locale: settings?.locale ?? i18n.language,
+            currency: settings?.currency ?? 'PKR',
+            minorUnits: settings?.minorUnits ?? 2,
+          }}
+          onLock={() => setPhase({ name: 'locked' })}
+        />
       );
       break;
   }
 
   return (
-    <div className="shell">
+    <AppFrame
+      top={
+        <StatusBar
+          shopName={settings?.name ?? null}
+          deviceCode={device?.code ?? null}
+          connection={connection}
+          outboxCount={status.outboxCount}
+          lastSyncAt={status.lastSyncAt}
+          userName={phase.name === 'unlocked' ? phase.user.fullName : null}
+          timeZone={settings?.timeZone}
+        />
+      }
+    >
       {screen}
-      <StatusBar
-        deviceCode={device?.code ?? null}
-        connection={connection}
-        outboxCount={status.outboxCount}
-        lastSyncAt={status.lastSyncAt}
-        userName={phase.name === 'unlocked' ? phase.user.fullName : null}
-        timeZone={settings?.timeZone}
-      />
-    </div>
+    </AppFrame>
   );
 }

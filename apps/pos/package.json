@@ -13,6 +13,7 @@
     "@erp/contracts": "workspace:*",
     "@erp/domain": "workspace:*",
     "@erp/observability": "workspace:*",
+    "@erp/ui": "workspace:*",
     "@sqlite.org/sqlite-wasm": "catalog:",
     "i18next": "catalog:",
     "react": "catalog:",
@@ -22,11 +23,13 @@
   },
   "devDependencies": {
     "@sentry/vite-plugin": "catalog:",
+    "@tailwindcss/vite": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "jsdom": "catalog:",
+    "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plugin-pwa": "catalog:"

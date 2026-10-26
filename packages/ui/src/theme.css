@@ -1,0 +1,97 @@
+/* The look of every screen (W1-03, D-066, D-067): the Tijara POS prototype's colour tokens, mapped into Tailwind's
+   theme so components use classes like bg-surface, text-muted, border-line. Only these colours exist: Tailwind's own
+   palette is switched off. Light by default; the dark values apply under [data-theme='dark'] (the switcher is
+   PLT-13, Wave 2). Printed output never uses these tokens. Import after `@import 'tailwindcss'`. */
+
+:root {
+  --bg: #eceff2;
+  --surface: #ffffff;
+  --surface-2: #f4f6f8;
+  --ink: #16202a;
+  --muted: #586572;
+  --line: #d1d8df;
+  --accent: #c24e1a;
+  --accent-ink: #ffffff;
+  --accent-soft: #fbe6da;
+  --ok: #1d7a4b;
+  --ok-soft: #dcf1e5;
+  --warn: #8f6200;
+  --warn-soft: #fbefcb;
+  --bad: #b42318;
+  --bad-soft: #fbe3e0;
+  --focus: #2b62c8;
+  --select: #e5edfb;
+  --shadow: 0 1px 2px rgb(22 32 42 / 0.06), 0 8px 24px rgb(22 32 42 / 0.08);
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #0e141a;
+  --surface: #161e26;
+  --surface-2: #1c2630;
+  --ink: #e3e8ed;
+  --muted: #94a1ad;
+  --line: #2b3743;
+  --accent: #f07440;
+  --accent-ink: #1b0f08;
+  --accent-soft: #3a2116;
+  --ok: #4cc38a;
+  --ok-soft: #123020;
+  --warn: #e2b341;
+  --warn-soft: #32280c;
+  --bad: #f2786c;
+  --bad-soft: #3a1715;
+  --focus: #7ea9ff;
+  --select: #1e2c44;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-*: initial;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-focus: var(--focus);
+  --color-select: var(--select);
+  --color-backdrop: rgb(10 16 22 / 0.45);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --shadow-panel: var(--shadow);
+  /* Bundled with the app (fonts.ts), so they work offline; system fonts are the fallback. */
+  --font-display: 'Barlow Condensed', 'Arial Narrow', 'Segoe UI', sans-serif;
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', Consolas, 'Courier New', monospace;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    block-size: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}

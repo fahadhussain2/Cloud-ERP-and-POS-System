@@ -34,7 +34,9 @@
     "wrong_one": "Wrong PIN. {{count}} try left before you are locked on this counter.",
     "wrong_other": "Wrong PIN. {{count}} tries left before you are locked on this counter.",
     "locked": "Locked on this counter after 5 wrong PINs. Ask a manager to unlock you.",
-    "no_pin": "You have no PIN yet. Ask a manager for a temporary PIN."
+    "no_pin": "You have no PIN yet. Ask a manager for a temporary PIN.",
+    "eyebrow": "Counter {{code}} · locked",
+    "recorded": "Every bill is recorded under the person who unlocked the counter."
   },
   "choosePin": {
     "title": "Choose your own PIN",
@@ -57,11 +59,6 @@
     "sequence": "Do not use a run like 1234 or 4321.",
     "is_short_code": "Do not use your short code."
   },
-  "home": {
-    "ready": "{{name}} is selling on this counter.",
-    "placeholder": "Search and bills come next.",
-    "lock": "Lock"
-  },
   "status": {
     "online": "Online",
     "offlineSince": "Offline since {{time}}",
@@ -71,5 +68,48 @@
     "lastSync": "Last sync {{time}}",
     "neverSynced": "Not synced yet",
     "locked": "Locked"
+  },
+  "catalog": {
+    "loading_one": "Loading the catalog… {{count}} item so far",
+    "loading_other": "Loading the catalog… {{count}} items so far",
+    "help": "The first time, this counter downloads the whole catalog. Afterwards it searches without the internet."
+  },
+  "search": {
+    "panel": "Search items",
+    "label": "Search",
+    "placeholder": "Part name, code, OEM number or vehicle",
+    "results": "Search results",
+    "hint": "Type words of the part name in any order, a code, an OEM number, or a car and year: fan belt cultus · 17801 · brake pads corolla 2012.",
+    "none": "No items match “{{text}}”. Try fewer words, or the OEM number.",
+    "items_one": "{{count}} item on this counter",
+    "items_other": "{{count}} items on this counter",
+    "found_one": "{{count}} match",
+    "found_other": "{{count}} matches",
+    "top_one": "Top {{count}} match",
+    "top_other": "Top {{count}} matches",
+    "priceHead": "Price",
+    "noPrice": "No price",
+    "oem": "OEM {{oem}}",
+    "bin": "Bin {{bin}}",
+    "years": "{{from}}–{{to}}",
+    "yearsFrom": "{{from}} on",
+    "yearsTo": "to {{to}}"
+  },
+  "item": {
+    "status": {
+      "dormant": "Dormant",
+      "discontinued": "Discontinued"
+    }
+  },
+  "bill": {
+    "title": "Bill",
+    "soon": "Adding items to a bill comes next. Search works now: try a code, an OEM number or a car and year."
+  },
+  "keys": {
+    "counter": "Counter",
+    "search": "Search",
+    "select": "Select",
+    "clear": "Clear",
+    "lock": "Lock"
   }
 }
