@@ -66,6 +66,8 @@ const ops = {
   getPinState: (userId: string) => repo.getPinState(open(), userId),
   setPinState: (...args: Parameters<typeof repo.setPinState> extends [unknown, ...infer R] ? R : never) =>
     repo.setPinState(open(), ...args),
+  grantsFor: (userId: string) => repo.grantsFor(open(), userId),
+  recordPinEvent: (e: Omit<repo.PinEvent, 'id' | 'pushedAt'>) => repo.recordPinEvent(open(), e),
   outboxStats: () => repo.outboxStats(open()),
   log: (kind: string, detail: Record<string, unknown>) => repo.log(open(), kind, detail),
   /** PBKDF2 with 600k iterations (W0-10): run here, so the UI stays responsive. */

@@ -1,8 +1,10 @@
+import { Button, TextField } from '@erp/ui';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import type { Me } from '../App';
+import { CardScreen } from './CardScreen';
 
 const SHOP_KEY = 'erp.shopCode';
 
@@ -42,42 +44,35 @@ export function LoginScreen({ api, onSignedIn }: { api: Api; onSignedIn: (me: Me
   };
 
   return (
-    <main className="screen">
-      <h1>{t('login.title')}</h1>
-      <form onSubmit={(e) => void submit(e)}>
-        <label>
-          {t('login.shopCode')}
-          <input
-            value={tenantCode}
-            onChange={(e) => setTenantCode(e.target.value)}
-            autoComplete="organization"
-            required
-          />
-        </label>
-        <label>
-          {t('login.username')}
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="username"
-            required
-          />
-        </label>
-        <label>
-          {t('login.password')}
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={busy}>
+    <CardScreen title={t('login.title')}>
+      <form className="flex flex-col gap-3" onSubmit={(e) => void submit(e)}>
+        <TextField
+          label={t('login.shopCode')}
+          value={tenantCode}
+          onChange={(e) => setTenantCode(e.target.value)}
+          autoComplete="organization"
+          required
+        />
+        <TextField
+          label={t('login.username')}
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          autoComplete="username"
+          required
+        />
+        <TextField
+          label={t('login.password')}
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+          required
+          error={error ?? undefined}
+        />
+        <Button type="submit" size="lg" disabled={busy}>
           {busy ? t('login.busy') : t('login.submit')}
-        </button>
+        </Button>
       </form>
-    </main>
+    </CardScreen>
   );
 }

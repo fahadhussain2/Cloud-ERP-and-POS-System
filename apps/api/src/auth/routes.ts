@@ -347,11 +347,21 @@ export function requirePermission(
   requireAuth: preHandlerAsyncHookHandler,
   permission: Permission,
 ): preHandlerAsyncHookHandler[] {
+  return requireAnyPermission(requireAuth, [permission]);
+}
+
+/** preHandlers for a route that needs a logged-in user with at least one of `permissions` (branch-free roles). */
+export function requireAnyPermission(
+  requireAuth: preHandlerAsyncHookHandler,
+  permissions: readonly Permission[],
+): preHandlerAsyncHookHandler[] {
   return [
     requireAuth,
     async (req: FastifyRequest, reply: FastifyReply) => {
-      if (!can(req.auth!.grants, permission, null))
-        await reply.code(403).send({ error: 'forbidden', permission });
+      if (!permissions.some((p) => can(req.auth!.grants, p, null)))
+        await reply
+          .code(403)
+          .send({ error: 'forbidden', permission: permissions.length === 1 ? permissions[0] : permissions });
     },
   ];
 }

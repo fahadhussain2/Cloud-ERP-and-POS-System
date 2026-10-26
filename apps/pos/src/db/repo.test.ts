@@ -8,10 +8,13 @@ import {
   getDevice,
   getPinState,
   getSync,
+  grantsFor,
+  listPinEvents,
   listStaff,
   loadCatalog,
   log,
   outboxStats,
+  recordPinEvent,
   setDevice,
   setPinState,
   tenantSettings,
@@ -266,5 +269,124 @@ describe('the counter itself', () => {
     expect(db.selectValue("SELECT json_extract(detail, '$.i') FROM diagnostic_log ORDER BY id LIMIT 1")).toBe(
       3,
     );
+  });
+});
+
+// W1-04 plan: a new PIN from the server clears the lock; lock and unlock events wait for push (W1-07); grants for
+// the manager unlock come from the pulled roles.
+describe('PIN locks and events (W1-04)', () => {
+  it('a pull with a new PIN verifier clears that person’s lock; the same verifier keeps it', () => {
+    applyPull(db, { users: [user('sara'), user('ali')] }, 'c1');
+    setPinState(db, 'sara', { failures: 5, locked: true });
+    setPinState(db, 'ali', { failures: 5, locked: true });
+    applyPull(
+      db,
+      {
+        users: [
+          user('sara', { pin_verifier: 'v-new', pin_must_change: true, row_version: '2' }),
+          user('ali', { full_name: 'Ali K', row_version: '2' }),
+        ],
+      },
+      'c2',
+    );
+    expect(getPinState(db, 'sara')).toEqual({ failures: 0, locked: false });
+    expect(getPinState(db, 'ali')).toEqual({ failures: 5, locked: true });
+  });
+
+  it('the first pull of a person clears nothing it shouldn’t (no earlier state)', () => {
+    applyPull(db, { users: [user('new')] }, 'c1');
+    expect(getPinState(db, 'new')).toEqual({ failures: 0, locked: false });
+  });
+
+  it('keeps lock and unlock events in order until they are pushed', () => {
+    recordPinEvent(db, { kind: 'locked', userId: 'sara', byUserId: null, at: '2026-10-26T09:00:00.000Z' });
+    recordPinEvent(db, {
+      kind: 'unlocked',
+      userId: 'sara',
+      byUserId: 'boss',
+      at: '2026-10-26T09:05:00.000Z',
+    });
+    expect(listPinEvents(db)).toEqual([
+      expect.objectContaining({
+        kind: 'locked',
+        userId: 'sara',
+        byUserId: null,
+        at: '2026-10-26T09:00:00.000Z',
+        pushedAt: null,
+      }),
+      expect.objectContaining({
+        kind: 'unlocked',
+        userId: 'sara',
+        byUserId: 'boss',
+        at: '2026-10-26T09:05:00.000Z',
+        pushedAt: null,
+      }),
+    ]);
+    const ids = listPinEvents(db).map((e) => e.id);
+    expect(new Set(ids).size).toBe(2);
+    for (const id of ids) expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-/);
+  });
+
+  it('builds a person’s grants from the pulled roles, without removed ones', () => {
+    applyPull(
+      db,
+      {
+        roles: [
+          {
+            id: 'r-man',
+            name: 'Manager',
+            template_key: 'manager',
+            permissions: ['admin.devices', 'pos.void'],
+            limits: { maxDiscountBp: 10000, voidWindow: 'same_day' },
+            row_version: '1',
+            deleted_at: null,
+          },
+          {
+            id: 'r-old',
+            name: 'Old',
+            template_key: null,
+            permissions: ['*'],
+            limits: { maxDiscountBp: 0, voidWindow: 'none' },
+            row_version: '1',
+            deleted_at: null,
+          },
+        ],
+        user_roles: [
+          {
+            id: 'ur1',
+            user_id: 'boss',
+            role_id: 'r-man',
+            branch_id: 'b1',
+            row_version: '1',
+            deleted_at: null,
+          },
+          {
+            id: 'ur2',
+            user_id: 'boss',
+            role_id: 'r-old',
+            branch_id: null,
+            row_version: '2',
+            deleted_at: '2026-10-26T08:00:00Z',
+          },
+          {
+            id: 'ur3',
+            user_id: 'sara',
+            role_id: 'r-man',
+            branch_id: null,
+            row_version: '1',
+            deleted_at: null,
+          },
+        ],
+      },
+      'c',
+    );
+    expect(grantsFor(db, 'boss')).toEqual([
+      {
+        permissions: ['admin.devices', 'pos.void'],
+        limits: { maxDiscountBp: 10000, voidWindow: 'same_day' },
+        branchId: 'b1',
+      },
+    ]);
+    expect(grantsFor(db, 'nobody')).toEqual([]);
   });
 });

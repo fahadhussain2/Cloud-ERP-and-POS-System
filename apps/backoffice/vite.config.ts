@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { sentryVitePlugin } from '@sentry/vite-plugin';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
@@ -12,6 +13,8 @@ const api = { '/api': { target: process.env['API_URL'] ?? 'http://127.0.0.1:3000
 export default defineConfig({
   plugins: [
     react(),
+    // Styles: Tailwind on the prototype's tokens (D-066, @erp/ui/theme.css), as on the counter (W1-04).
+    tailwindcss(),
     ...(sentryToken
       ? [
           sentryVitePlugin({
@@ -30,5 +33,6 @@ export default defineConfig({
   preview: { proxy: api },
   test: {
     environment: 'jsdom',
+    setupFiles: ['./src/test-setup.ts'],
   },
 });

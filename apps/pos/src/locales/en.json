@@ -26,7 +26,7 @@
   "unlock": {
     "title": "Who is selling?",
     "shortCode": "Or type your short code",
-    "noStaff": "No staff with a PIN yet. A manager gives each person a temporary PIN in the back office (Staff PINs).",
+    "noStaff": "No staff with a PIN yet. A manager gives each person a temporary PIN in the back office (Staff).",
     "pin": "PIN",
     "submit": "Unlock",
     "back": "Someone else",
@@ -36,7 +36,16 @@
     "locked": "Locked on this counter after 5 wrong PINs. Ask a manager to unlock you.",
     "no_pin": "You have no PIN yet. Ask a manager for a temporary PIN.",
     "eyebrow": "Counter {{code}} · locked",
-    "recorded": "Every bill is recorded under the person who unlocked the counter."
+    "recorded": "Every bill is recorded under the person who unlocked the counter.",
+    "managerUnlock": "Manager unlock",
+    "managerTitle": "Manager unlock",
+    "managerFor": "Unlock {{name}}: a manager picks their name and enters their own PIN.",
+    "managerPin": "Manager's PIN",
+    "managerSubmit": "Unlock this person",
+    "managerDone": "{{name}} is unlocked. Enter your PIN.",
+    "notAllowed": "This person can't unlock others on this counter. Ask a manager.",
+    "managerLocked": "This manager is locked on this counter too. Ask another manager, or the owner can give a new temporary PIN in the back office.",
+    "notLocked": "This person isn't locked."
   },
   "choosePin": {
     "title": "Choose your own PIN",

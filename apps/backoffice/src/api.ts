@@ -6,7 +6,11 @@ export interface ApiResponse {
   body: unknown;
 }
 
-export type Api = (method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown) => Promise<ApiResponse>;
+export type Api = (
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  path: string,
+  body?: unknown,
+) => Promise<ApiResponse>;
 
 export const httpApi =
   (fetchFn: typeof fetch = fetch): Api =>

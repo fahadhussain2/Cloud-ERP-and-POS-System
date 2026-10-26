@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
@@ -15,6 +16,14 @@ import {
   matchKey,
   moveSelection,
   OptionList,
+  PageHeader,
+  StatusChip,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   TextField,
   useShortcuts,
 } from './index';
@@ -174,5 +183,58 @@ describe('money', () => {
     expect(plain(formatMoney(-5, delux))).toBe('-Rs 0.05');
     expect(plain(formatMoney(9007199254740991, delux))).toBe('Rs 90,071,992,547,409.91');
     expect(() => formatMoney(1.5, delux)).toThrow('not whole minor units');
+  });
+});
+
+// W1-04: the back office's blocks.
+describe('back-office blocks', () => {
+  it('a checkbox has its label as its name and toggles on click', () => {
+    function Box() {
+      const [on, setOn] = useState(false);
+      return (
+        <label>
+          <Checkbox checked={on} onCheckedChange={(v) => setOn(v === true)} /> Salesman
+        </label>
+      );
+    }
+    render(<Box />);
+    const box = screen.getByRole('checkbox', { name: 'Salesman' });
+    expect(box.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(box);
+    expect(box.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('a status chip carries its tone', () => {
+    render(<StatusChip tone="bad">Locked</StatusChip>);
+    const chip = screen.getByText('Locked');
+    expect(chip.getAttribute('data-tone')).toBe('bad');
+    expect(chip.className).toContain('text-bad');
+  });
+
+  it('the page header shows the title as the page heading, its help and actions', () => {
+    render(<PageHeader title="Staff" help="Everyone in the shop" actions={<Button>Add person</Button>} />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Staff' })).toBeDefined();
+    expect(screen.getByText('Everyone in the shop')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Add person' })).toBeDefined();
+  });
+
+  it('table headers align to the start side, for right-to-left (rule 10)', () => {
+    render(
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell>Asif</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+    const head = screen.getByRole('columnheader', { name: 'Name' });
+    expect(head.className).toContain('text-start');
+    expect(head.className).not.toContain('text-left');
   });
 });

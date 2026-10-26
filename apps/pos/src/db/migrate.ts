@@ -103,6 +103,17 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE INDEX item_prices_item ON item_prices (item_id)',
     ],
   },
+  {
+    // PIN locks and manager unlocks on this counter (W1-04, POS spec §5): kept until push reports them to the
+    // server's audit log (W1-07). Not documents, so not in the outbox's numbered series.
+    version: 3,
+    statements: [
+      `CREATE TABLE pin_events (
+        id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('locked', 'unlocked')), user_id TEXT NOT NULL,
+        by_user_id TEXT, at TEXT NOT NULL, pushed_at TEXT
+      )`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

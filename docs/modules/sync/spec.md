@@ -76,6 +76,12 @@ POST /api/sync/pin   { userId, currentPin, newPin }   (device token)
 - Wrong `currentPin` counts towards the same 5-try lock as unlocking.
 - Other counters learn the new verifier at their next pull.
 
+**What a pull changes about PINs on the counter (W1-04):**
+- A **new `pin_verifier`** for a person clears their lock on that counter: the lock protected the old PIN. This is how the owner unlocks someone remotely (a new temporary PIN from the back office).
+- A person who comes back **disabled, deleted or without a PIN** is dropped from the staff list, and if they are the one unlocked, the counter **locks at once**.
+
+**PIN events waiting for push:** locks and manager unlocks are kept in the counter's `pin_events` table (data model §12) with a device-made UUIDv7. **Push (W1-07) sends them** for the server's audit log (`pin.locked`, `pin.unlocked_by_manager`, with the device), idempotent by id, and sets `pushed_at`.
+
 ## 6. Push (W1-06)
 
 To be specified with W1-06, following the invariants already fixed in the architecture (§5.2) and the `sync-protocol` skill: local-first write, batches of ≤ 100 in sequence order, idempotency by document UUIDv7, accept completed sales and record exceptions, quarantine instead of drop, sequence gaps, re-push after a restore.

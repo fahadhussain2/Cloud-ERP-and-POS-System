@@ -5,6 +5,8 @@ import pos from '../apps/pos/src/locales/en.json' with { type: 'json' };
 import { expect, test } from './counter-test';
 import {
   BACKOFFICE_PORT,
+  MANAGER,
+  NEWCOMER,
   OWN_PIN,
   OWNER,
   OWNER_FIRST_PASSWORD,
@@ -17,7 +19,8 @@ import {
 
 // W1-02 plan scope 5: enroll a counter, give a temporary PIN, choose your own at first unlock, unlock, reload
 // offline and still unlock, lock after 5 wrong PINs. W1-03 plan scope 6: search by code, scan, OEM number, words in
-// any order, car and year, also offline.
+// any order, car and year, also offline. W1-04 plan scope 7: the owner adds people with roles, a manager unlocks a
+// locked salesman offline, a deactivated person leaves the counter, a manager's back office has the PIN action only.
 
 const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
 const POS = `http://localhost:${POS_PORT}`;
@@ -31,29 +34,76 @@ const enterPin = async (page: Page, pin: string) => {
   await page.getByRole('button', { name: pos.unlock.submit }).click();
 };
 
-test('a manager signs in, gives a temporary PIN and creates a one-time counter code', async ({ page }) => {
+const signIn = async (page: Page, username: string, password: string) => {
   await page.goto(BACKOFFICE);
   await page.getByLabel(bo.login.shopCode).fill(SHOP);
-  await page.getByLabel(bo.login.username).fill(OWNER.username);
-  await page.getByLabel(bo.login.password).fill(OWNER_FIRST_PASSWORD);
+  await page.getByLabel(bo.login.username).fill(username);
+  await page.getByLabel(bo.login.password).fill(password);
   await page.getByRole('button', { name: bo.login.submit }).click();
+};
 
+const changePassword = async (page: Page, current: string, next: string) => {
   await expect(page.getByRole('heading', { name: bo.password.title })).toBeVisible();
-  await page.getByLabel(bo.password.current).fill(OWNER_FIRST_PASSWORD);
-  await page.getByLabel(bo.password.new, { exact: true }).fill(OWNER_PASSWORD);
-  await page.getByLabel(bo.password.repeat).fill(OWNER_PASSWORD);
+  await page.getByLabel(bo.password.current).fill(current);
+  await page.getByLabel(bo.password.new, { exact: true }).fill(next);
+  await page.getByLabel(bo.password.repeat).fill(next);
   await page.getByRole('button', { name: bo.password.submit }).click();
+};
 
-  const row = page.getByRole('row', { name: new RegExp(SALESMAN.fullName) });
-  await expect(row).toContainText(bo.staff.pin.none);
+const giveTemporaryPin = async (page: Page, fullName: string, pin: string) => {
+  const row = page.getByRole('row', { name: new RegExp(fullName) });
   await row.getByRole('button', { name: bo.staff.give }).click();
-  await page.getByLabel(bo.staff.temporaryPin).fill(TEMPORARY_PIN);
-  await page.getByRole('button', { name: bo.staff.save }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(bo.staff.temporaryPin).fill(pin);
+  await dialog.getByRole('button', { name: bo.staff.save }).click();
   await expect(row).toContainText(bo.staff.pin.temporary);
+};
 
-  await page.getByRole('button', { name: bo.nav.counters }).click();
+const addPerson = async (
+  page: Page,
+  p: { fullName: string; username: string; shortCode: string; temporaryPassword?: string },
+  role: string,
+) => {
+  await page.getByRole('button', { name: bo.staff.add }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(bo.staff.fullName).fill(p.fullName);
+  await dialog.getByLabel(bo.staff.username).fill(p.username);
+  await dialog.getByLabel(bo.staff.shortCodeField).fill(p.shortCode);
+  if (p.temporaryPassword) await dialog.getByLabel(bo.staff.password.optional).fill(p.temporaryPassword);
+  await dialog.getByRole('checkbox', { name: role }).click();
+  await dialog.getByRole('button', { name: bo.staff.create }).click();
+  await expect(page.getByRole('status')).toContainText(p.fullName);
+};
+
+test('the owner signs in, adds a manager and a salesman, gives temporary PINs and a one-time counter code', async ({
+  page,
+}) => {
+  await signIn(page, OWNER.username, OWNER_FIRST_PASSWORD);
+  await changePassword(page, OWNER_FIRST_PASSWORD, OWNER_PASSWORD);
+
+  await expect(page.getByRole('heading', { name: bo.staff.title })).toBeVisible();
+  await addPerson(page, MANAGER, 'Manager');
+  await addPerson(page, NEWCOMER, 'Salesman');
+  const newcomer = page.getByRole('row', { name: new RegExp(NEWCOMER.fullName) });
+  await expect(newcomer).toContainText('Salesman');
+  await expect(newcomer).toContainText(bo.staff.backOfficeNo);
+  await expect(page.getByRole('row', { name: new RegExp(MANAGER.fullName) })).toContainText(
+    bo.staff.backOfficeYes,
+  );
+
+  await expect(page.getByRole('row', { name: new RegExp(SALESMAN.fullName) })).toContainText(
+    bo.staff.pin.none,
+  );
+  await giveTemporaryPin(page, SALESMAN.fullName, TEMPORARY_PIN);
+  await giveTemporaryPin(page, MANAGER.fullName, MANAGER.temporaryPin);
+  await giveTemporaryPin(page, NEWCOMER.fullName, NEWCOMER.temporaryPin);
+
+  await page
+    .getByRole('navigation', { name: bo.nav.menu })
+    .getByRole('link', { name: bo.nav.counters })
+    .click();
   await page.getByRole('button', { name: bo.counters.create }).click();
-  code = (await page.locator('.code strong').textContent()) ?? '';
+  code = (await page.getByRole('status').locator('strong').textContent()) ?? '';
   expect(code).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
 });
 
@@ -142,6 +192,20 @@ test('offline, the counter still starts and the salesman still unlocks', async (
   await context.setOffline(false);
 });
 
+test('the manager and the new salesman choose their own PINs at first unlock', async ({ page }) => {
+  await page.goto(POS);
+  for (const p of [MANAGER, NEWCOMER]) {
+    await page.getByRole('button', { name: new RegExp(p.fullName) }).click();
+    await enterPin(page, p.temporaryPin);
+    await page.getByLabel(pos.choosePin.newPin, { exact: true }).fill(p.pin);
+    await page.getByLabel(pos.choosePin.repeat).fill(p.pin);
+    await page.getByRole('button', { name: pos.choosePin.submit }).click();
+    await expect(page.getByRole('combobox')).toBeVisible();
+    await page.keyboard.press('Alt+L');
+    await expect(page.getByText(pos.unlock.title)).toBeVisible();
+  }
+});
+
 test('5 wrong PINs lock the salesman on this counter, and the lock survives a reload', async ({ page }) => {
   await page.goto(POS);
   await page.getByRole('button', { name: new RegExp(SALESMAN.fullName) }).click();
@@ -156,4 +220,74 @@ test('5 wrong PINs lock the salesman on this counter, and the lock survives a re
   await page.getByRole('button', { name: new RegExp(SALESMAN.fullName) }).click();
   await enterPin(page, OWN_PIN);
   await expect(page.getByRole('alert')).toHaveText(pos.unlock.locked);
+});
+
+test('offline, a manager unlocks the locked salesman with their own PIN, then the salesman unlocks', async ({
+  page,
+  context,
+}) => {
+  await page.goto(POS);
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await context.setOffline(true);
+  await page.reload();
+  await page.getByRole('button', { name: new RegExp(SALESMAN.fullName) }).click();
+  await enterPin(page, OWN_PIN);
+  await expect(page.getByRole('alert')).toHaveText(pos.unlock.locked);
+
+  await page.getByRole('button', { name: pos.unlock.managerUnlock }).click();
+  // A salesman can't do it.
+  await page.getByRole('button', { name: new RegExp(NEWCOMER.fullName) }).click();
+  await page.getByLabel(pos.unlock.managerPin).fill(NEWCOMER.pin);
+  await page.getByRole('button', { name: pos.unlock.managerSubmit }).click();
+  await expect(page.getByRole('alert')).toHaveText(pos.unlock.notAllowed);
+  await page.getByRole('button', { name: pos.unlock.back }).click();
+
+  await page.getByRole('button', { name: new RegExp(MANAGER.fullName) }).click();
+  await page.getByLabel(pos.unlock.managerPin).fill(MANAGER.pin);
+  await page.getByRole('button', { name: pos.unlock.managerSubmit }).click();
+  await expect(page.getByText(pos.unlock.managerDone.replace('{{name}}', SALESMAN.fullName))).toBeVisible();
+  await enterPin(page, OWN_PIN);
+  await expect(page.getByRole('combobox')).toBeVisible();
+  await expect(page.locator('.status-bar')).toContainText(SALESMAN.fullName);
+  await context.setOffline(false);
+});
+
+test('the owner deactivates the new salesman in the back office', async ({ browser }) => {
+  // The back office in its own browser context; the counter keeps its profile.
+  const office = await browser.newContext();
+  const page = await office.newPage();
+  await signIn(page, OWNER.username, OWNER_PASSWORD);
+  await page.getByRole('link', { name: NEWCOMER.fullName }).click();
+  await expect(page.getByRole('heading', { name: NEWCOMER.fullName })).toBeVisible();
+  await page.getByRole('button', { name: bo.staff.deactivate }).click();
+  await page.getByRole('dialog').getByRole('button', { name: bo.staff.deactivate }).click();
+  await expect(page.getByRole('status')).toContainText(NEWCOMER.fullName);
+  await office.close();
+});
+
+test('the counter drops the deactivated salesman at its next sync', async ({ page }) => {
+  await page.goto(POS);
+  await expect(page.locator('.status-bar')).toContainText(pos.status.online);
+  await expect(page.getByRole('button', { name: new RegExp(SALESMAN.fullName) })).toBeVisible();
+  await expect(page.getByRole('button', { name: new RegExp(NEWCOMER.fullName) })).toHaveCount(0);
+});
+
+test('the manager signs in to the back office and can only give temporary PINs', async ({ browser }) => {
+  const office = await browser.newContext();
+  const page = await office.newPage();
+  await signIn(page, MANAGER.username, MANAGER.temporaryPassword);
+  await changePassword(page, MANAGER.temporaryPassword, MANAGER.password);
+  await expect(page.getByRole('heading', { name: bo.staff.title })).toBeVisible();
+  const menu = page.getByRole('navigation', { name: bo.nav.menu });
+  await expect(menu.getByRole('link', { name: bo.nav.staff })).toBeVisible();
+  await expect(menu.getByRole('link', { name: bo.nav.counters })).toBeVisible();
+  await expect(page.getByRole('button', { name: bo.staff.add })).toHaveCount(0);
+  const row = page.getByRole('row', { name: new RegExp(SALESMAN.fullName) });
+  await expect(row.getByRole('button', { name: bo.staff.give })).toBeVisible();
+  await page.getByRole('link', { name: SALESMAN.fullName }).click();
+  await expect(page.getByRole('heading', { name: SALESMAN.fullName })).toBeVisible();
+  await expect(page.getByRole('button', { name: bo.staff.deactivate })).toHaveCount(0);
+  await office.close();
 });

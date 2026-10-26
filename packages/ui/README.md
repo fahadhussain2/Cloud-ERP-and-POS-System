@@ -12,6 +12,7 @@ pnpm --filter @erp/ui ui:add <name> [more names]
 - The script also fixes a CLI quirk: its import rewriting turns our utils alias (`@erp/ui/lib/utils`) into a package named `cn` and installs it. The script points the imports back and removes that package.
 - New dependencies the CLI installs go into the pnpm catalog at a version **at least two weeks old** (as for every dependency).
 - The generated files are ours to change, but **prefer theming through `theme.css` and `className`** over editing them, so a later `ui:add <name>` (with `--overwrite`) brings upstream fixes without losing anything.
+- **One edit is always needed:** the CLI writes some physical utilities. After adding or overwriting, change them to logical ones (rule 10): in `select` `pr-8 pl-2` → `pe-8 ps-2` and `right-2` → `end-2`; in `table` `text-left` → `text-start` and `pr-0` → `pe-0`. A test checks the table header.
 
 ## Using it in an app
 
@@ -32,12 +33,17 @@ pnpm --filter @erp/ui ui:add <name> [more names]
 |---|---|---|
 | `Button` (`buttonVariants`) | shadcn CLI | `default` (orange), `outline`, `secondary`, `ghost`, `destructive`, `link`; sizes `xs`, `sm`, `default`, `lg`, `icon…` |
 | `Input`, `Label` | shadcn CLI | Plain field parts |
+| `Checkbox` | shadcn CLI | Radix checkbox; wrap it in a `label` so the text is its name |
+| `Select`, `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectItem`… | shadcn CLI | Radix select: keyboard- and RTL-correct |
+| `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`… | shadcn CLI | Data tables in the back office |
 | `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription`, `DialogFooter`, `DialogClose`, `DialogTrigger` | shadcn CLI | Radix dialog: focus trap, Esc cancels, focus returns |
 | `Alert`, `AlertTitle`, `AlertDescription` | shadcn CLI | A message in a screen (text goes in `AlertDescription`) |
 | `Badge` | shadcn CLI | A short state chip; states like Dormant use `variant="outline"` with `bg-warn-soft text-warn` |
 | `TextField`, `LABEL_CLASS` | ours | A labelled input with hint and error, wired for screen readers, in the prototype's style |
 | `DialogActions` | ours | The D-053 button bar |
 | `AppFrame`, `Panel` | ours | The one-screen frame; a white panel with an optional title |
+| `PageHeader` | ours | A back-office screen's title, help line and main action (W1-04) |
+| `StatusChip` | ours | A state chip in the prototype's tones: `ok`, `warn`, `bad`, `accent`, `neutral` |
 | `OptionList`, `moveSelection` | ours | A list moved by ↑ ↓ while focus stays in a search box |
 | `KeyBar`, `Kbd`, `useShortcuts`, `matchKey` | ours | Shortcut hints (each also a button) and the window-wide key layer (POS-03) |
 | `formatMoney` | ours | Minor units in the tenant's locale and currency, exact; whole amounts without decimals |

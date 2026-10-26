@@ -2,7 +2,8 @@
   "app": {
     "title": "Back office",
     "loading": "Loading…",
-    "error": "Something went wrong. Reload the page; if it stays, tell the support team."
+    "error": "Something went wrong. Reload the page; if it stays, tell the support team.",
+    "brand": "Tijara"
   },
   "login": {
     "title": "Sign in",
@@ -30,16 +31,22 @@
     "contains_username": "Do not put your username in your password."
   },
   "nav": {
-    "staff": "Staff PINs",
+    "menu": "Menu",
+    "groups": {
+      "people": "People",
+      "shop": "Shop"
+    },
+    "staff": "Staff",
     "counters": "Counters",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "signedIn": "Signed in"
   },
   "home": {
     "nothing": "There is nothing here for your role yet."
   },
   "staff": {
-    "title": "Staff PINs",
-    "help": "Give a new or forgetful person a temporary PIN. At their first unlock the counter makes them choose their own.",
+    "title": "Staff",
+    "help": "Everyone who works in the shop. Give each person a role, a temporary PIN for the counter, and a back-office password only if they need one.",
     "name": "Name",
     "shortCode": "Short code",
     "pinState": "PIN",
@@ -53,7 +60,77 @@
     "save": "Save",
     "cancel": "Cancel",
     "saved": "{{name}} has a temporary PIN. Tell them in person; they choose their own at the counter.",
-    "weak_pin": "Choose a harder PIN: 4 to 6 digits, not a run like 1234 and not one digit repeated."
+    "weak_pin": "Choose a harder PIN: 4 to 6 digits, not a run like 1234 and not one digit repeated.",
+    "back": "All staff",
+    "add": "Add person",
+    "username": "Username",
+    "fullName": "Full name",
+    "email": "Email (optional)",
+    "shortCodeField": "Short code (optional, for unlocking a counter)",
+    "roles": "Roles",
+    "rolesHelp": "Each role gives a set of permissions. Templates follow the shop's job list.",
+    "branch": "Branch",
+    "allBranches": "All branches",
+    "noRoles": "No role",
+    "status": "Status",
+    "statuses": {
+      "active": "Active",
+      "disabled": "Deactivated"
+    },
+    "filter": {
+      "active": "Active",
+      "disabled": "Deactivated"
+    },
+    "backOffice": "Back office",
+    "backOfficeYes": "Has a password",
+    "backOfficeNo": "Counter only",
+    "lastLogin": "Last sign-in",
+    "never": "Never",
+    "details": "Details",
+    "saveDetails": "Save details",
+    "saveRoles": "Save roles",
+    "create": "Save new person",
+    "created": "{{name}} is added.",
+    "detailsSaved": "Details saved.",
+    "rolesSaved": "Roles saved. Counters pick them up at their next sync.",
+    "password": {
+      "title": "Back-office password",
+      "none": "{{name}} has no back-office password and can only unlock counters.",
+      "has": "{{name}} can sign in to the back office.",
+      "give": "Give back-office access",
+      "reset": "Reset password",
+      "remove": "Remove back-office access",
+      "temporary": "Temporary password (at least 10 characters)",
+      "temporaryHelp": "Tell the person in person. They must replace it with their own at their first sign-in.",
+      "save": "Save temporary password",
+      "saved": "{{name}} has a temporary password. Their open sessions were ended.",
+      "removeConfirm": "{{name}} will be signed out and can no longer use the back office. Counters still work with their PIN.",
+      "removed": "{{name}} no longer has back-office access.",
+      "optional": "Back-office password (optional)",
+      "optionalHelp": "Leave empty for someone who only works at the counter. Otherwise a temporary one, at least 10 characters: they replace it at their first sign-in."
+    },
+    "deactivate": "Deactivate",
+    "deactivateConfirm": "{{name}} is signed out everywhere and disappears from the counters at their next sync. Their bills and history stay.",
+    "deactivated": "{{name}} is deactivated.",
+    "reactivate": "Reactivate",
+    "reactivated": "{{name}} is active again.",
+    "pinTitle": "Counter PIN",
+    "errors": {
+      "duplicate_username": "Another person already has this username.",
+      "duplicate_shortCode": "Another person already has this short code.",
+      "duplicate_email": "Another person already has this email.",
+      "cannot_grant": "You can't give or take away a role with rights you don't have yourself.",
+      "self": "You can't do this to your own account.",
+      "last_owner": "The shop must keep at least one active Owner.",
+      "weak_password": "Choose a longer temporary password: at least 10 characters, without the username.",
+      "pin_not_allowed": "Only someone with at least this person's rights can give them a temporary PIN. Ask the owner."
+    },
+    "empty": "No one here.",
+    "actions": "Actions",
+    "notFound": "Person not found",
+    "branchForNew": "Branch for roles you tick",
+    "pinHelp": "Give a temporary PIN to someone new or who forgot theirs. At their first unlock the counter makes them choose their own, and a new PIN also clears a lock on every counter at its next sync.",
+    "reactivateConfirm": "{{name}} can sign in again (if they have a password) and appears on the counters at their next sync."
   },
   "counters": {
     "title": "Counters",
@@ -77,6 +154,10 @@
     },
     "revoke": "Revoke",
     "confirmRevoke": "Yes, revoke this counter",
-    "revoked": "{{code}} is revoked: it can no longer sync."
+    "revoked": "{{code}} is revoked: it can no longer sync.",
+    "newCode": "Set up a counter",
+    "list": "Counters",
+    "confirmTitle": "Revoke {{code}}?",
+    "confirmHelp": "It stops syncing at once and can't be set up again with the same key. Bills it already made are still accepted at sync, flagged for review."
   }
 }

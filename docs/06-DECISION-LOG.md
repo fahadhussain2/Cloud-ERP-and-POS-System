@@ -716,3 +716,18 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - **The shadow pilot keeps 1 Dec** with a smaller scope: the counter sale end to end, sync, posting, cash desk handover, hold and void, opening balances. Cash desk close (W1-11) joins during the pilot; the remaining tasks follow by go-live criticality.
 - **Why:** the full Wave 1 list is about 56 working days and the window about 20 (D-033 accepted this risk). Starting the pilot on time with the counter sale finds real problems earliest.
 - **Status:** Accepted
+
+### D-091 Staff and user admin: Owner manages people, managers give PINs, no one outranks themselves (2026-10-26)
+- **Decision:**
+  - **People are managed with `admin.users`** (Owner by template): add, edit, roles per branch, back-office password, deactivate. **Temporary PINs stay with `admin.devices`** (Manager and Owner, D-089). One *Staff* screen; actions follow the permissions.
+  - **Nobody gives, removes or changes what they don't hold:** a role only by someone holding all of it in its branch (`canGrantRole` in `packages/domain`, a `*` role needs `*`); a person's password, status or details only by someone who could give all their roles. **A temporary PIN** goes to anyone from someone with `admin.devices`, except to a person holding `admin.users` or `*` whom they don't outrank (`canGivePinTo`): otherwise a manager could take over the Owner's PIN on the counters.
+  - **Nobody locks the shop out:** no deactivating yourself, removing your own password or your own `admin.users`; an active Owner who can sign in always remains. Owner-affecting changes are serialized by a per-tenant advisory lock.
+  - **Back-office password is optional**; giving or resetting one means a temporary password the person must change at sign-in (as D-083), and ends their sessions. **People are deactivated, never deleted.**
+  - **Manager unlock on the counter, offline:** the manager's own PIN and `admin.devices` for the branch. A new temporary PIN clears a lock on every counter at its next pull; a pull that removes the person selling locks the counter. Locks and unlocks are kept on the counter (`pin_events`) for the audit log, pushed with W1-07.
+  - **Back-office layout** from the Tijara Goods Receipt prototype: top bar, a side menu showing only screens that exist and are permitted, hash addresses (`#/staff/<id>`).
+- **Why:**
+  - PRD §4: managers run the floor; who works here and with which rights is the owner's (owner answer 1).
+  - Without the "outranks" rule, anyone with user admin could reset the Owner's password and take over.
+  - Without the last-Owner guard, one click would need platform support (D-083) to undo.
+  - Locks hurt most when the internet is down, so the unlock works offline; the owner still has a remote path.
+- **Status:** Accepted (with the W1-04 plan, owner answers 1–4)

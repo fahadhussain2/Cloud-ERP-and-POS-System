@@ -4,8 +4,8 @@ import type pg from 'pg';
 
 import { requirePermission } from '../auth/routes';
 
-// The lists the back office's Counters and Staff PINs screens read (W1-02, D-089). Staff and devices need
-// admin.devices, which managers have; PIN verifiers and password hashes never leave the server.
+// The lists the back office's Counters screen reads (W1-02, D-089). Devices need admin.devices, which managers have.
+// The staff list is GET /api/users (admin/users.ts, W1-04).
 
 interface Deps {
   pool: pg.Pool;
@@ -24,36 +24,6 @@ export function registerAdmin(scope: FastifyInstance, { pool, requireAuth }: Dep
         ),
     );
     return rows;
-  });
-
-  scope.get('/staff', { preHandler: requirePermission(requireAuth, 'admin.devices') }, async (req) => {
-    const a = req.auth!;
-    const { rows } = await withTenant(
-      pool,
-      { tenantId: a.tenantId, userId: a.userId, requestId: req.id },
-      (_db, c) =>
-        c.query<{
-          id: string;
-          username: string;
-          full_name: string;
-          short_code: string | null;
-          status: string;
-          has_pin: boolean;
-          pin_must_change: boolean;
-        }>(
-          `SELECT id, username, full_name, short_code, status, pin_verifier IS NOT NULL AS has_pin, pin_must_change
-         FROM erp.users WHERE deleted_at IS NULL ORDER BY lower(full_name)`,
-        ),
-    );
-    return rows.map((u) => ({
-      id: u.id,
-      username: u.username,
-      fullName: u.full_name,
-      shortCode: u.short_code,
-      status: u.status,
-      hasPin: u.has_pin,
-      pinMustChange: u.pin_must_change,
-    }));
   });
 
   scope.get('/devices', { preHandler: requirePermission(requireAuth, 'admin.devices') }, async (req) => {

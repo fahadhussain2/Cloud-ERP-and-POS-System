@@ -12,7 +12,14 @@ import { StatusBar, type Connection } from './screens/StatusBar';
 import { StopScreen } from './screens/StopScreen';
 import { UnlockScreen } from './screens/UnlockScreen';
 import type { StorageProblem } from './storage/checks';
-import { autoLockDue, tryUnlock, unlockableStaff, type StaffUser } from './unlock/unlock';
+import {
+  autoLockDue,
+  managerUnlock,
+  staysUnlocked,
+  tryUnlock,
+  unlockableStaff,
+  type StaffUser,
+} from './unlock/unlock';
 
 // The counter shell (POS spec §3-§9, D-089): storage checks → setup → unlock → (choose your PIN) → the counter screen.
 
@@ -41,11 +48,23 @@ export function App({ counter }: { counter: Counter }) {
   const [connection, setConnection] = useState<Connection>({ state: null, offlineSince: null });
   const [status, setStatus] = useState({ outboxCount: 0, lastSyncAt: null as string | null });
 
+  // Who is selling, for the pull below (a callback can't read the current phase).
+  const phaseRef = useRef<Phase>(phase);
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
   const refresh = useCallback(async () => {
     const [s, st, set] = await Promise.all([counter.staff(), counter.status(), counter.settings()]);
     setStaff(unlockableStaff(s));
     setStatus(st);
     setSettings(set);
+    // A pull can deactivate the person selling, or take their PIN away: lock at once (W1-04 plan).
+    const p = phaseRef.current;
+    if (p.name === 'unlocked' && !staysUnlocked(s, p.user.id)) {
+      void counter.log('unlock.removed_by_sync', { userId: p.user.id });
+      setPhase({ name: 'locked' });
+    }
     return s;
   }, [counter]);
 
@@ -147,16 +166,53 @@ export function App({ counter }: { counter: Counter }) {
     return r;
   };
 
+  /** Keeps a lock that just happened for the server's audit log (platform spec §4). */
+  const recordLock = async (userId: string, before: { locked: boolean }, after: { locked: boolean }) => {
+    if (!before.locked && after.locked)
+      await counter.recordPinEvent({ kind: 'locked', userId, byUserId: null, at: new Date().toISOString() });
+  };
+
   const unlock = async (user: StaffUser, pin: string) => {
     const pinState = await counter.getPinState(user.id);
     const r = await tryUnlock({ user, pin, pinState, verify: (v, p) => counter.verifyPin(v, p) });
     await counter.setPinState(user.id, r.pinState);
+    await recordLock(user.id, pinState, r.pinState);
     await counter.log(`unlock.${r.result}`, { userId: user.id });
     if (r.result === 'ok') {
       setPhase({ name: 'unlocked', user });
       void sync();
     }
     if (r.result === 'must_change') setPhase({ name: 'choose_pin', user, temporaryPin: pin });
+    return r;
+  };
+
+  const unlockByManager = async (locked: StaffUser, manager: StaffUser, pin: string) => {
+    const [lockedState, managerState, managerGrants] = await Promise.all([
+      counter.getPinState(locked.id),
+      counter.getPinState(manager.id),
+      counter.grants(manager.id),
+    ]);
+    const r = await managerUnlock({
+      lockedUser: locked,
+      lockedState,
+      manager,
+      managerState,
+      managerGrants,
+      branchId: device?.branchId ?? null,
+      pin,
+      verify: (v, p) => counter.verifyPin(v, p),
+    });
+    await counter.setPinState(manager.id, r.managerState);
+    await counter.setPinState(locked.id, r.lockedState);
+    await recordLock(manager.id, managerState, r.managerState);
+    if (r.result === 'unlocked')
+      await counter.recordPinEvent({
+        kind: 'unlocked',
+        userId: locked.id,
+        byUserId: manager.id,
+        at: new Date().toISOString(),
+      });
+    await counter.log(`unlock.manager.${r.result}`, { userId: locked.id, managerId: manager.id });
     return r;
   };
 
@@ -181,7 +237,14 @@ export function App({ counter }: { counter: Counter }) {
       screen = <SetupScreen onEnroll={enroll} />;
       break;
     case 'locked':
-      screen = <UnlockScreen staff={staff} deviceCode={device?.code ?? null} onUnlock={unlock} />;
+      screen = (
+        <UnlockScreen
+          staff={staff}
+          deviceCode={device?.code ?? null}
+          onUnlock={unlock}
+          onManagerUnlock={unlockByManager}
+        />
+      );
       break;
     case 'choose_pin':
       screen = (

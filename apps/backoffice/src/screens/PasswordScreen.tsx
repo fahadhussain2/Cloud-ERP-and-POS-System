@@ -1,7 +1,9 @@
+import { Button, TextField } from '@erp/ui';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { CardScreen } from './CardScreen';
 
 /** The forced password change (W0-11, D-083): until it is done, the API allows nothing else. */
 export function PasswordScreen({ api, onChanged }: { api: Api; onChanged: () => void }) {
@@ -27,45 +29,37 @@ export function PasswordScreen({ api, onChanged }: { api: Api; onChanged: () => 
   };
 
   return (
-    <main className="screen">
-      <h1>{t('password.title')}</h1>
-      <p>{t('password.help')}</p>
-      <form onSubmit={(e) => void submit(e)}>
-        <label>
-          {t('password.current')}
-          <input
-            type="password"
-            value={current}
-            onChange={(e) => setCurrent(e.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
-        <label>
-          {t('password.new')}
-          <input
-            type="password"
-            value={next}
-            onChange={(e) => setNext(e.target.value)}
-            autoComplete="new-password"
-            required
-          />
-        </label>
-        <label>
-          {t('password.repeat')}
-          <input
-            type="password"
-            value={repeat}
-            onChange={(e) => setRepeat(e.target.value)}
-            autoComplete="new-password"
-            required
-          />
-        </label>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={busy}>
+    <CardScreen title={t('password.title')} help={t('password.help')}>
+      <form className="flex flex-col gap-3" onSubmit={(e) => void submit(e)}>
+        <TextField
+          label={t('password.current')}
+          type="password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          autoComplete="current-password"
+          required
+        />
+        <TextField
+          label={t('password.new')}
+          type="password"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          autoComplete="new-password"
+          required
+        />
+        <TextField
+          label={t('password.repeat')}
+          type="password"
+          value={repeat}
+          onChange={(e) => setRepeat(e.target.value)}
+          autoComplete="new-password"
+          required
+          error={error ?? undefined}
+        />
+        <Button type="submit" size="lg" disabled={busy}>
           {t('password.submit')}
-        </button>
+        </Button>
       </form>
-    </main>
+    </CardScreen>
   );
 }

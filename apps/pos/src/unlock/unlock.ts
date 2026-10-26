@@ -1,4 +1,4 @@
-import { nextPinState, type PinState } from '@erp/domain';
+import { can, nextPinState, type PinState, type RoleGrant } from '@erp/domain';
 
 // Unlock and auto-lock (POS spec §5–§6, PLT-01, PLT-04, D-089). The PIN check itself is the W0-10 PBKDF2 verifier,
 // passed in so the worker runs it off the UI thread and tests can use a fast fake.
@@ -38,6 +38,58 @@ export async function tryUnlock(opts: {
   if (next.result === 'ok' && user.pinMustChange) return { result: 'must_change', pinState: next.state };
   return { result: next.result as 'ok' | 'wrong' | 'locked', pinState: next.state };
 }
+
+export type ManagerUnlockResult = 'unlocked' | 'wrong' | 'manager_locked' | 'not_allowed' | 'not_locked';
+
+/**
+ * A manager unlocks a person locked by wrong PINs on this counter (POS spec §5, W1-04 plan), offline: their own PIN,
+ * checked against their verifier, and admin.devices for this counter's branch (the people who give temporary PINs).
+ * Wrong manager PINs count towards the manager's own lock. Both states come back to be stored.
+ */
+export async function managerUnlock(opts: {
+  lockedUser: StaffUser;
+  lockedState: PinState;
+  manager: StaffUser;
+  managerState: PinState;
+  managerGrants: readonly RoleGrant[];
+  branchId: string | null;
+  pin: string;
+  verify: (verifier: string, pin: string) => Promise<boolean>;
+}): Promise<{ result: ManagerUnlockResult; lockedState: PinState; managerState: PinState }> {
+  const { lockedUser, lockedState, manager, managerState } = opts;
+  const unchanged = (result: ManagerUnlockResult, state = managerState) => ({
+    result,
+    lockedState,
+    managerState: state,
+  });
+  if (!lockedState.locked) return unchanged('not_locked');
+  if (managerState.locked) return unchanged('manager_locked');
+  if (manager.pinVerifier === null || unlockableStaff([manager]).length === 0)
+    return unchanged('not_allowed');
+  const checked = nextPinState(
+    managerState,
+    (await opts.verify(manager.pinVerifier, opts.pin)) ? 'correct' : 'wrong',
+  );
+  if (checked.result === 'wrong') return unchanged('wrong', checked.state);
+  if (checked.result === 'locked') return unchanged('manager_locked', checked.state);
+  // A right PIN, but not someone who may: a temporary PIN not yet replaced, no admin.devices here, or the person
+  // themselves.
+  if (
+    manager.pinMustChange ||
+    manager.id === lockedUser.id ||
+    !can(opts.managerGrants, 'admin.devices', opts.branchId)
+  )
+    return unchanged('not_allowed', checked.state);
+  return {
+    result: 'unlocked',
+    lockedState: nextPinState(lockedState, 'manager_unlock').state,
+    managerState: checked.state,
+  };
+}
+
+/** After a pull: may the unlocked person stay unlocked? Not once they are deactivated, deleted or lose their PIN. */
+export const staysUnlocked = (users: readonly StaffUser[], userId: string): boolean =>
+  unlockableStaff(users).some((u) => u.id === userId);
 
 /** The local date (YYYY-MM-DD) and minutes since midnight of `at` in `timeZone`. */
 function localDayMinutes(at: Date, timeZone: string): { day: string; minutes: number } {

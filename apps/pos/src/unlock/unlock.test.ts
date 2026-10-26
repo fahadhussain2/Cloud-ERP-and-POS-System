@@ -1,6 +1,15 @@
+import { ROLE_TEMPLATES, type RoleGrant, type RoleTemplateKey } from '@erp/domain';
 import { describe, expect, it } from 'vitest';
 
-import { autoLockDue, IDLE_LOCK_MS, tryUnlock, unlockableStaff, type StaffUser } from './unlock';
+import {
+  autoLockDue,
+  IDLE_LOCK_MS,
+  managerUnlock,
+  staysUnlocked,
+  tryUnlock,
+  unlockableStaff,
+  type StaffUser,
+} from './unlock';
 
 // Unlock and auto-lock (POS spec §5–§6, PLT-01, PLT-04, owner answers to W1-02). A fake verifier keeps the tests
 // fast; the real one is the W0-10 PBKDF2 check, tested in packages/contracts.
@@ -87,5 +96,117 @@ describe('auto-lock', () => {
     const last = at('2026-11-02T15:05:00Z'); // unlocked again at 20:05 local
     expect(autoLockDue({ ...base, lastActivity: last, now: at('2026-11-02T15:06:00Z') })).toBe(false);
     expect(autoLockDue({ ...base, lastActivity: last, now: at('2026-11-02T15:08:00Z') })).toBe(true);
+  });
+});
+
+// Manager unlock (W1-04 plan; POS spec §5, platform spec §4): offline, with the manager's own PIN and admin.devices
+// for this counter's branch.
+describe('manager unlock', () => {
+  const locked = { failures: 5, locked: true };
+  const grant = (t: RoleTemplateKey, branchId: string | null = null): RoleGrant => ({
+    ...ROLE_TEMPLATES[t],
+    branchId,
+  });
+  const sara = user();
+  const boss = user({ id: 'm1', fullName: 'Boss', pinVerifier: 'pin:2468' });
+  const base = {
+    lockedUser: sara,
+    lockedState: locked,
+    manager: boss,
+    managerState: open,
+    branchId: 'b1',
+    verify,
+  };
+
+  it("a manager's right PIN unlocks the person and clears their count", async () => {
+    expect(await managerUnlock({ ...base, pin: '2468', managerGrants: [grant('manager')] })).toEqual({
+      result: 'unlocked',
+      lockedState: open,
+      managerState: open,
+    });
+  });
+
+  it('a role for this branch counts', async () => {
+    const r = await managerUnlock({ ...base, pin: '2468', managerGrants: [grant('manager', 'b1')] });
+    expect(r.result).toBe('unlocked');
+  });
+
+  it('a manager role for another branch does not', async () => {
+    const r = await managerUnlock({ ...base, pin: '2468', managerGrants: [grant('manager', 'b2')] });
+    expect(r).toEqual({ result: 'not_allowed', lockedState: locked, managerState: open });
+  });
+
+  it("a salesman's right PIN is refused and the person stays locked", async () => {
+    const r = await managerUnlock({ ...base, pin: '2468', managerGrants: [grant('salesman')] });
+    expect(r).toEqual({ result: 'not_allowed', lockedState: locked, managerState: open });
+  });
+
+  it("a wrong manager PIN counts towards the manager's own lock, and 5 lock the manager too", async () => {
+    let managerState = open;
+    for (let i = 1; i <= 5; i++) {
+      const r = await managerUnlock({
+        ...base,
+        managerState,
+        pin: '0000',
+        managerGrants: [grant('manager')],
+      });
+      managerState = r.managerState;
+      expect(r.result).toBe(i < 5 ? 'wrong' : 'manager_locked');
+      expect(r.lockedState).toEqual(locked);
+    }
+    expect(managerState).toEqual({ failures: 5, locked: true });
+    const after = await managerUnlock({
+      ...base,
+      managerState,
+      pin: '2468',
+      managerGrants: [grant('manager')],
+    });
+    expect(after.result).toBe('manager_locked');
+  });
+
+  it('a locked person can’t unlock themselves, even with admin.devices', async () => {
+    const r = await managerUnlock({
+      ...base,
+      manager: sara,
+      managerState: locked,
+      pin: '5739',
+      managerGrants: [grant('manager')],
+    });
+    expect(r.result).toBe('manager_locked');
+    expect(r.lockedState).toEqual(locked);
+  });
+
+  it('a manager who must still change a temporary PIN can’t approve', async () => {
+    const r = await managerUnlock({
+      ...base,
+      manager: { ...boss, pinMustChange: true },
+      pin: '2468',
+      managerGrants: [grant('manager')],
+    });
+    expect(r.result).toBe('not_allowed');
+  });
+
+  it('nothing to do for a person who isn’t locked', async () => {
+    const r = await managerUnlock({
+      ...base,
+      lockedState: { failures: 2, locked: false },
+      pin: '2468',
+      managerGrants: [grant('manager')],
+    });
+    expect(r.result).toBe('not_locked');
+  });
+});
+
+// A pull can take the unlocked person away (W1-04 plan): deactivated, deleted, or their PIN removed.
+describe('staying unlocked after a pull', () => {
+  it('stays unlocked while the person is active with a PIN', () => {
+    expect(staysUnlocked([user()], 'u1')).toBe(true);
+  });
+
+  it('locks when the person is deactivated, deleted or no longer has a PIN, or is gone', () => {
+    expect(staysUnlocked([user({ status: 'disabled' })], 'u1')).toBe(false);
+    expect(staysUnlocked([user({ deletedAt: '2026-10-26T10:00:00Z' })], 'u1')).toBe(false);
+    expect(staysUnlocked([user({ pinVerifier: null })], 'u1')).toBe(false);
+    expect(staysUnlocked([], 'u1')).toBe(false);
   });
 });

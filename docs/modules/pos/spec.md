@@ -57,7 +57,10 @@ Every check result is written to `diagnostic_log`.
 
 - **Screen:** the list of active staff (names from the pulled `users`), picked by click or arrow keys; typing a short code jumps to that person. Then the PIN (4–6 digits, shown as dots).
 - **Check:** locally, in the worker, against the user's PBKDF2 verifier (W0-10, `verifyPin`). The UI stays responsive.
-- **Lockout:** 5 wrong PINs in a row lock that user **on this counter** (`pin_state`, survives reloads). A manager unlocks them by unlocking with their own PIN and choosing *Unlock user*. A right PIN resets the count.
+- **Lockout:** 5 wrong PINs in a row lock that user **on this counter** (`pin_state`, survives reloads). A right PIN resets the count.
+- **Manager unlock (W1-04), offline:** after a lock, the person's PIN screen offers *Manager unlock*. A manager picks their own name (or types their short code) and enters **their own** PIN. The counter checks it against their verifier and that they hold **`admin.devices`** for this counter's branch (the people who give temporary PINs, D-089). Wrong manager PINs count towards the manager's own lock; a right PIN from someone without the permission, or with a temporary PIN not yet replaced, is refused. The locked person then unlocks with their own PIN. Each lock and manager unlock is kept in `pin_events` for the server's audit log (pushed with W1-07).
+- **Remote unlock:** a new temporary PIN from the back office clears the person's lock on every counter at its next pull (owner answer 3 to W1-04).
+- **Removed while selling:** if a pull brings the unlocked person back disabled, deleted or without a PIN, the counter locks at once.
 - **Disabled or deleted users** aren't listed and can't unlock.
 - **Temporary PIN** (`pin_must_change`): the person enters it, then must choose their own PIN (twice). This needs the internet (sync spec §5). Offline, the counter says *Connect to set your PIN* and doesn't unlock.
 - **Who's selling:** the unlocked user is shown in the status bar and recorded on every document (from W1-05).

@@ -47,6 +47,8 @@ export function browserCounter(): Counter {
     getPinState: (id) => db.getPinState(id),
     setPinState: (id, s) => db.setPinState(id, s),
     verifyPin: (verifier, pin) => db.verifyPin(verifier, pin),
+    grants: (userId) => db.grantsFor(userId),
+    recordPinEvent: (e) => db.recordPinEvent(e),
     changePin: (body) => changePin({ api, tokens }, body),
     status: async () => {
       const [outbox, lastSyncAt] = await Promise.all([db.outboxStats(), db.getSync('last_pull_at')]);

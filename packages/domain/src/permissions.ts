@@ -160,6 +160,31 @@ export function can(grants: readonly RoleGrant[], permission: Permission, branch
   );
 }
 
+/**
+ * May someone with `grants` give (or take away) a role with `rolePermissions` in `branchId` (`null` = every
+ * branch)? Only if they hold every one of its permissions there; a `*` role needs a `*` grant (W1-04, D-081).
+ */
+export function canGrantRole(
+  grants: readonly RoleGrant[],
+  rolePermissions: readonly string[],
+  branchId: string | null,
+): boolean {
+  const here = grants.filter((g) => applies(g, branchId));
+  if (rolePermissions.includes('*')) return here.some((g) => g.permissions.includes('*'));
+  return rolePermissions.every((p) => isPermission(p) && can(here, p, branchId));
+}
+
+/**
+ * May someone with `grants` give a temporary PIN to a person holding `target`? With admin.devices, yes, unless the
+ * person manages staff or is an Owner (admin.users or `*`): then only someone who could give them every role they
+ * hold, so nobody takes over a stronger person's PIN on the counters (W1-04, D-091).
+ */
+export function canGivePinTo(grants: readonly RoleGrant[], target: readonly RoleGrant[]): boolean {
+  if (!can(grants, 'admin.devices', null)) return false;
+  const strong = target.some((g) => g.permissions.includes('*') || g.permissions.includes('admin.users'));
+  return !strong || target.every((g) => canGrantRole(grants, g.permissions, g.branchId));
+}
+
 /** Every permission the user has here, as catalog keys (for screens and the "me" response). */
 export function expandPermissions(grants: readonly RoleGrant[], branchId: string | null): Permission[] {
   return PERMISSIONS.filter((p) => can(grants, p, branchId));
