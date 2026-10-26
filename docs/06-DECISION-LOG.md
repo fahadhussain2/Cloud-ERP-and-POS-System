@@ -709,3 +709,10 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Bills are credited to whoever unlocked the counter, so PINs must stay private.
 - **Status:** Accepted (with the W1-02 plan)
 
+### D-090 Wave 1 task list and a smaller pilot on 1 Dec (2026-10-26)
+- **Decision:**
+  - Wave 1 is the 20 tasks in [WAVE-1-TASKS.md](WAVE-1-TASKS.md), one GitHub issue each; each plan is still written and accepted when its task starts (D-069).
+  - Staff and user admin is its own task (W1-04); the design pass (Tijara POS look, shared UI building blocks) is part of W1-03 and W1-04.
+  - **The shadow pilot keeps 1 Dec** with a smaller scope: the counter sale end to end, sync, posting, cash desk handover, hold and void, opening balances. Cash desk close (W1-11) joins during the pilot; the remaining tasks follow by go-live criticality.
+- **Why:** the full Wave 1 list is about 56 working days and the window about 20 (D-033 accepted this risk). Starting the pilot on time with the counter sale finds real problems earliest.
+- **Status:** Accepted
