@@ -39,9 +39,19 @@ const ASIF = {
   hasPin: false,
   pinMustChange: false,
   lastLoginAt: null,
+  canGivePin: true,
   roles: [{ roleId: 'r-sales', name: 'Salesman', templateKey: 'salesman', branchId: null }],
 };
 const LEFT = { ...ASIF, id: 'u2', username: 'old', fullName: 'Old Hand', status: 'disabled' };
+/** Someone the person signed in may not give a PIN to (an Owner, for a manager). */
+const BOSS = {
+  ...ASIF,
+  id: 'u3',
+  username: 'fahad',
+  fullName: 'Fahad Owner',
+  canGivePin: false,
+  roles: [{ roleId: 'r-owner', name: 'Owner', templateKey: 'owner', branchId: null }],
+};
 
 type Handler = (body: unknown) => ApiResponse;
 
@@ -59,7 +69,7 @@ const fakeApi = (routes: Record<string, Handler>) => {
 const signedIn = (me: unknown = OWNER, over: Record<string, Handler> = {}) => ({
   'GET /api/auth/me': () => ({ status: 200, body: me }),
   'GET /api/branches': () => ({ status: 200, body: [{ id: 'b1', code: 'MAIN', name: 'Delux Autos' }] }),
-  'GET /api/users': () => ({ status: 200, body: [ASIF, LEFT] }),
+  'GET /api/users': () => ({ status: 200, body: [ASIF, LEFT, BOSS] }),
   'GET /api/roles': () => ({
     status: 200,
     body: [
@@ -228,6 +238,30 @@ describe('Staff', () => {
     expect(await screen.findByText(i18n.t('staff.saved', { name: 'Asif Khan' }))).toBeDefined();
     expect(calls.find((c) => c.route === 'PUT /api/users/u1/temporary-pin')?.body).toEqual({ pin: '4831' });
     expect(calls.map((c) => c.route)).not.toContain('GET /api/roles');
+  });
+
+  it('a manager has no PIN action for someone they may not give a PIN to (an Owner)', async () => {
+    show(fakeApi(signedIn(MANAGER)).api);
+    const row = (await screen.findByText('Fahad Owner')).closest('tr')!;
+    expect(within(row).queryByRole('button', { name: en.staff.give })).toBeNull();
+    fireEvent.click(within(row).getByRole('link', { name: 'Fahad Owner' }));
+    expect(await screen.findByRole('heading', { name: 'Fahad Owner' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: en.staff.give })).toBeNull();
+  });
+
+  it('explains a refused PIN', async () => {
+    const { api } = fakeApi(
+      signedIn(MANAGER, {
+        'PUT /api/users/u1/temporary-pin': () => ({ status: 403, body: { error: 'cannot_grant' } }),
+      }),
+    );
+    show(api);
+    const row = (await screen.findByText('Asif Khan')).closest('tr')!;
+    fireEvent.click(within(row).getByRole('button', { name: en.staff.give }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(en.staff.temporaryPin), { target: { value: '4831' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: en.staff.save }));
+    expect(await within(dialog).findByText(en.staff.errors.pin_not_allowed)).toBeDefined();
   });
 
   it('an owner adds a person with a role and no password', async () => {

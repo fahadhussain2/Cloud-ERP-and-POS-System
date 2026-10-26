@@ -122,7 +122,8 @@
       "cannot_grant": "You can't give or take away a role with rights you don't have yourself.",
       "self": "You can't do this to your own account.",
       "last_owner": "The shop must keep at least one active Owner.",
-      "weak_password": "Choose a longer temporary password: at least 10 characters, without the username."
+      "weak_password": "Choose a longer temporary password: at least 10 characters, without the username.",
+      "pin_not_allowed": "Only someone with at least this person's rights can give them a temporary PIN. Ask the owner."
     },
     "empty": "No one here.",
     "actions": "Actions",

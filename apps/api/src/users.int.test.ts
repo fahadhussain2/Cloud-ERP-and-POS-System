@@ -163,6 +163,8 @@ interface UserRow {
   hasPin: boolean;
   pinMustChange: boolean;
   lastLoginAt: string | null;
+  /** May the person signed in give this one a temporary PIN? */
+  canGivePin: boolean;
   roles: { roleId: string; name: string; templateKey: string | null; branchId: string | null }[];
 }
 const listUsers = async (cookie: string) => (await send('GET', '/api/users', cookie)).json<UserRow[]>();
@@ -584,6 +586,59 @@ describe('who may change people', () => {
       await send('POST', `/api/users/${id}/reactivate`, cookie),
     ];
     expect(denied.map((r) => r.statusCode)).toEqual([403, 403, 403, 403, 403, 403, 403]);
+  });
+
+  // Bug (W1-04 review): a manager could give the Owner a temporary PIN, choose a new one at a counter and act as the
+  // Owner there. Someone holding admin.users or `*` gets a PIN only from someone who outranks them.
+  it('a manager can’t give a temporary PIN to an Owner or to someone who manages staff', async () => {
+    const manager = await login('manager');
+    const cashier = await addUser('pin.cashier', [roles['cashier']!]);
+    const refused = [
+      await send('PUT', `/api/users/${ids['owner']}/temporary-pin`, manager, { pin: '4826' }),
+      await send('PUT', `/api/users/${ids['staffAdmin']}/temporary-pin`, manager, { pin: '4826' }),
+    ];
+    expect(refused.map((r) => r.statusCode)).toEqual([403, 403]);
+    expect(refused.map((r) => r.json<{ error: string }>().error)).toEqual(['cannot_grant', 'cannot_grant']);
+    const pins = await withTenant(
+      pool,
+      { tenantId: tenant },
+      async (_db, c) =>
+        (
+          await c.query<{ id: string; pin_verifier: string | null }>(
+            'SELECT id, pin_verifier FROM erp.users WHERE id = ANY($1::uuid[])',
+            [[ids['owner'], ids['staffAdmin']]],
+          )
+        ).rows,
+    );
+    expect(pins.every((p) => p.pin_verifier === null)).toBe(true);
+    // The floor still works: a cashier holds cash rights the manager doesn't, and still gets a PIN.
+    expect(
+      (await send('PUT', `/api/users/${cashier}/temporary-pin`, manager, { pin: '4826' })).statusCode,
+    ).toBe(204);
+  });
+
+  it('someone with user admin but fewer rights can’t give the Owner a PIN; the Owner can give anyone one', async () => {
+    const staffAdmin = await login('staffadmin');
+    const toOwner = await send('PUT', `/api/users/${ids['owner']}/temporary-pin`, staffAdmin, {
+      pin: '4826',
+    });
+    expect(toOwner.statusCode).toBe(403);
+    const owner = await login('owner');
+    expect(
+      (await send('PUT', `/api/users/${ids['staffAdmin']}/temporary-pin`, owner, { pin: '4826' })).statusCode,
+    ).toBe(204);
+  });
+
+  it('the list says for whom the person signed in may give a PIN', async () => {
+    const forManager = await listUsers(await login('manager'));
+    const pinFor = (list: UserRow[], username: string) =>
+      list.find((u) => u.username === username)!.canGivePin;
+    expect(pinFor(forManager, 'owner')).toBe(false);
+    expect(pinFor(forManager, 'staffadmin')).toBe(false);
+    expect(pinFor(forManager, 'seller')).toBe(true);
+    const forOwner = await listUsers(await login('owner'));
+    expect(pinFor(forOwner, 'staffadmin')).toBe(true);
+    expect(pinFor(forOwner, 'seller')).toBe(true);
   });
 
   it('a salesman changes nothing', async () => {
