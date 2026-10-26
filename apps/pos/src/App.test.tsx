@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nextProvider } from 'react-i18next';
-import { afterEach, describe, expect, it } from 'vitest';
+import { act } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { SearchResult } from './search/search-index';
 
@@ -191,6 +192,46 @@ describe('counter screens', () => {
     expect(await screen.findByText('C01')).toBeDefined();
     expect(await screen.findByText(i18n.t('status.waiting', { count: 3 }))).toBeDefined();
     await waitFor(() => expect(screen.getByText(/^Offline since/)).toBeDefined());
+  });
+
+  // Bug (owner, 2026-10-26): switching Wi-Fi off or on showed only after the next pull (up to 60 s) or an unlock.
+  it('shows offline as soon as the browser loses the network, without waiting for a pull', async () => {
+    const f = fakeCounter();
+    show(f.counter);
+    expect(await screen.findByText(en.status.online)).toBeDefined();
+    const pulls = f.calls.filter((c) => c === 'pull').length;
+    act(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
+    expect(await screen.findByText(/^Offline since/)).toBeDefined();
+    expect(f.calls.filter((c) => c === 'pull').length).toBe(pulls);
+  });
+
+  it('when the network comes back, retries the pull until one succeeds and shows online', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let online = false;
+      const f = fakeCounter({
+        pull: () => Promise.resolve(online ? { ok: true, rows: 0 } : { ok: false, reason: 'offline' }),
+      });
+      show(f.counter);
+      expect(await screen.findByText(/^Offline since/)).toBeDefined();
+      // The browser says online before the connection really works: the first pull still fails.
+      act(() => {
+        window.dispatchEvent(new Event('online'));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+      expect(screen.queryByText(en.status.online)).toBeNull();
+      online = true;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(screen.getByText(en.status.online)).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
