@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Push is added with W1-06. |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: accepted with the W1-03 plan (2026-10-26). Push is added with W1-06. |
 | **Refs** | SYN-01…SYN-06; architecture §4.1, §5; data model §10, §12; CLAUDE.md rules 6–9; D-009, D-011, D-042, D-047 |
 
 The architecture (§5) sets the principles. This spec fixes the contracts precisely enough to build and test them. **v1 covers pull**, which W1-02 (users and settings for unlock) and W1-03 (the catalog) need. **Push**, server acceptance, gaps and re-push after a restore are specified with W1-06, in a section below.
@@ -38,9 +38,24 @@ Each dataset lists its columns explicitly. **A column not listed never leaves th
 | `roles` | `roles` | the tenant | `id, name, template_key, permissions, limits, row_version, deleted_at` |
 | `user_roles` | `user_roles` | the tenant; branch-specific rows only for the device's branch | `id, user_id, role_id, branch_id, row_version, deleted_at` |
 
-W1-03 adds the catalog datasets (items, identifiers, vehicle tags, prices, tiers, units, categories, brands, origins, makes, parties for search) with the same rules.
+**Catalog datasets (W1-03):** all scoped to the tenant.
 
-**Bootstrap:** for v1 the first pull simply starts from the beginning (these datasets are small). A gzipped snapshot download for the large datasets (items, prices, stock, 90-day bills; architecture §4.1) comes with W1-03 if the plain pull is too slow for ~20k items.
+| Dataset | Table | Columns |
+|---|---|---|
+| `price_tiers` | `price_tiers` | `id, code, name, sort, is_default, row_version, deleted_at` |
+| `units` | `units` | `id, code, name, allows_fraction, row_version, deleted_at` |
+| `categories` | `categories` | `id, code, name, parent_id, pricing_rule, return_policy, row_version, deleted_at` |
+| `brands` | `brands` | `id, name, row_version, deleted_at` |
+| `origins` | `origins` | `id, name, row_version, deleted_at` |
+| `vehicle_makes` | `vehicle_makes` | `id, name, row_version, deleted_at` |
+| `items` | `items` | `id, code, name, category_id, brand_id, origin_id, unit_id, variant, spec, bin_location, floor_price, tax_code_id, status, row_version, deleted_at`. **Never `legacy`, `default_supplier_id`, `min_qty`, `max_qty`, `exclude_from_reorder`.** |
+| `item_identifiers` | `item_identifiers` | `id, item_id, kind, value, normalized_value, is_primary, row_version, deleted_at` |
+| `item_compatibility` | `item_compatibility` | `id, item_id, make_id, model, year_from, year_to, note, row_version, deleted_at` |
+| `item_prices` | `item_prices` | `id, item_id, tier_id, price, row_version, deleted_at` |
+
+`legacy` (on every catalog table) never leaves the server. Customers (W1-09), stock balances (W1-08) and the 90-day bills (W1-13) are added by their tasks with the same rules.
+
+**Bootstrap:** the first pull simply starts from the beginning, page by page (about 125k catalog rows for Delux). An interrupted first load resumes from the last committed page. W1-03 measures it on the real catalog; **if it takes more than 60 seconds**, a gzipped snapshot download per dataset (architecture §5.3) is added and specified here.
 
 ## 4. When the counter pulls
 

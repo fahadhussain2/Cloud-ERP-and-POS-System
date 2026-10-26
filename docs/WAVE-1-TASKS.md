@@ -37,7 +37,7 @@ Sizes are rough working days for one developer. **P** = in the pilot from 1 Dec;
 
 ## Look and feel
 
-No separate design task: the design pass is part of W1-03 (counter) and W1-04 (back office). The look comes from the owner's Tijara POS prototype, read only. Plain CSS on colour tokens, no UI library (old counter PCs, smaller downloads). Every later screen uses the same building blocks, and dark mode (PLT-13, Wave 2) is a second set of token values.
+No separate design task: the design pass is part of W1-03 (counter) and W1-04 (back office). The look comes from the owner's Tijara POS prototype, read only. The components are shadcn/ui on Radix + Tailwind CSS, themed with the prototype's colour tokens (D-066). Every later screen uses the same building blocks, and dark mode (PLT-13, Wave 2) is a second set of token values.
 
 ## Already covered in Wave 0
 
