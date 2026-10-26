@@ -1,11 +1,12 @@
 import {
   CATALOG_COLUMNS,
   CATALOG_DATASETS,
+  uuidv7,
   type CatalogDataset,
   type ColumnType,
   type PullResponse,
 } from '@erp/contracts';
-import { money, type PinState } from '@erp/domain';
+import { money, type PinState, type RoleGrant, type RoleLimits } from '@erp/domain';
 
 import type { StaffUser } from '../unlock/unlock';
 import type { SqlDb } from './sql';
@@ -146,6 +147,10 @@ export function applyPull(db: SqlDb, changes: PullResponse['changes'], cursor: s
   db.transaction(() => {
     applyCatalog(db, changes);
     for (const r of changes.users ?? []) {
+      // A new PIN from the server clears this person's lock here: the lock protected the old PIN (W1-04 plan).
+      const before = db.selectObjects('SELECT pin_verifier FROM users WHERE id = ?', [required(r, 'id')])[0];
+      if (before && text(before['pin_verifier']) !== text(r['pin_verifier']))
+        db.exec('DELETE FROM pin_state WHERE user_id = ?', [required(r, 'id')]);
       db.exec(
         `INSERT INTO users (id, username, full_name, short_code, pin_verifier, pin_must_change, status, row_version, deleted_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -269,6 +274,50 @@ export const setPinState = (db: SqlDb, userId: string, s: PinState): void =>
      ON CONFLICT (user_id) DO UPDATE SET failures = excluded.failures, locked = excluded.locked, updated_at = excluded.updated_at`,
     [userId, s.failures, s.locked ? 1 : 0, now()],
   );
+
+export interface PinEvent {
+  id: string;
+  kind: 'locked' | 'unlocked';
+  userId: string;
+  /** Who unlocked them (a manager); null for a lock. */
+  byUserId: string | null;
+  at: string;
+  pushedAt: string | null;
+}
+
+/** A lock or a manager unlock, kept for the server's audit log (pushed with W1-07). */
+export const recordPinEvent = (db: SqlDb, e: Omit<PinEvent, 'id' | 'pushedAt'>): void =>
+  db.exec('INSERT INTO pin_events (id, kind, user_id, by_user_id, at) VALUES (?, ?, ?, ?, ?)', [
+    uuidv7(Date.parse(e.at)),
+    e.kind,
+    e.userId,
+    e.byUserId,
+    e.at,
+  ]);
+
+export const listPinEvents = (db: SqlDb): PinEvent[] =>
+  db.selectObjects('SELECT id, kind, user_id, by_user_id, at, pushed_at FROM pin_events ORDER BY at, id').map((r) => ({
+    id: String(r['id']),
+    kind: String(r['kind']) as PinEvent['kind'],
+    userId: String(r['user_id']),
+    byUserId: text(r['by_user_id']),
+    at: String(r['at']),
+    pushedAt: text(r['pushed_at']),
+  }));
+
+/** A person's roles on this counter, from the pulled roles (D-081), for checks like the manager unlock. */
+export const grantsFor = (db: SqlDb, userId: string): RoleGrant[] =>
+  db
+    .selectObjects(
+      `SELECT r.permissions, r.limits, ur.branch_id FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+       WHERE ur.user_id = ? AND ur.deleted_at IS NULL AND r.deleted_at IS NULL ORDER BY ur.id`,
+      [userId],
+    )
+    .map((r) => ({
+      permissions: JSON.parse(String(r['permissions'])) as string[],
+      limits: JSON.parse(String(r['limits'])) as RoleLimits,
+      branchId: text(r['branch_id']),
+    }));
 
 /** Unsynced documents: how many, and when the oldest was made (POS spec §7). */
 export function outboxStats(db: SqlDb): { count: number; oldestAt: string | null } {

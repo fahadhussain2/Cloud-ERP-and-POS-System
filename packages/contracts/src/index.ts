@@ -23,6 +23,7 @@ export {
   TokenRequest,
 } from './devices';
 export { TenantSpec } from './tenant-spec';
+export { uuidv7 } from './uuid';
 export {
   CreateUserRequest,
   RoleAssignment,

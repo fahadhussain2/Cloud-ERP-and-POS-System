@@ -1,7 +1,7 @@
 import type { CounterPinChangeRequest } from '@erp/contracts';
-import type { PinState } from '@erp/domain';
+import type { PinState, RoleGrant } from '@erp/domain';
 
-import type { DeviceInfo, TenantSettings } from './db/repo';
+import type { DeviceInfo, PinEvent, TenantSettings } from './db/repo';
 import type { EnrollResult } from './device/session';
 import type { SearchOptions, SearchResult } from './search/search-index';
 import type { CheckResult } from './storage/checks';
@@ -23,6 +23,10 @@ export interface Counter {
   getPinState(userId: string): Promise<PinState>;
   setPinState(userId: string, state: PinState): Promise<void>;
   verifyPin(verifier: string, pin: string): Promise<boolean>;
+  /** A person's roles here, from the pulled roles (the manager unlock checks admin.devices, W1-04). */
+  grants(userId: string): Promise<RoleGrant[]>;
+  /** Keeps a lock or a manager unlock for the server's audit log (pushed with W1-07). */
+  recordPinEvent(event: Omit<PinEvent, 'id' | 'pushedAt'>): Promise<void>;
   changePin(body: CounterPinChangeRequest): Promise<PinChangeResult>;
   status(): Promise<{ outboxCount: number; lastSyncAt: string | null }>;
   log(kind: string, detail: Record<string, unknown>): Promise<void>;

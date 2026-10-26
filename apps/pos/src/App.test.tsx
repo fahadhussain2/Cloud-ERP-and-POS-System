@@ -10,6 +10,7 @@ import type { Counter } from './counter';
 import type { DeviceInfo } from './db/repo';
 import { i18n } from './i18n';
 import en from './locales/en.json';
+import type { RoleGrant } from '@erp/domain';
 import type { StaffUser } from './unlock/unlock';
 
 // The counter's screens over a fake counter (POS spec §3-§7). The PIN check is a plain comparison here; the real
@@ -68,6 +69,11 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
     log: () => Promise.resolve(),
     search: () => Promise.resolve([]),
     catalog: () => Promise.resolve({ items: 0, ready: true }),
+    grants: () => Promise.resolve([]),
+    recordPinEvent: (e) => {
+      calls.push(`pinEvent ${e.kind} ${e.userId} ${e.byUserId ?? '-'}`);
+      return Promise.resolve();
+    },
     ...over,
   };
   return { counter, calls, setDevice: (d: DeviceInfo | null) => (device = d) };
@@ -141,6 +147,100 @@ describe('counter screens', () => {
     }
     enterPin('0000');
     expect(await screen.findByText(en.unlock.locked)).toBeDefined();
+  });
+
+  // W1-04 plan, POS spec §5: a manager unlocks a locked colleague with their own PIN, offline.
+  describe('manager unlock', () => {
+    const MANAGER: RoleGrant = {
+      permissions: ['admin.devices', 'pos.void'],
+      limits: { maxDiscountBp: 10000, voidWindow: 'same_day' },
+      branchId: null,
+    };
+    const SELLER: RoleGrant = {
+      permissions: ['pos.sale.create'],
+      limits: { maxDiscountBp: 10000, voidWindow: 'none' },
+      branchId: null,
+    };
+    const boss = staff({ id: 'm1', fullName: 'Boss Man', shortCode: '99', pinVerifier: '2468' });
+    const zara = staff({ id: 's2', fullName: 'Zara Seller', shortCode: '33', pinVerifier: '1357' });
+    const lockAsif = async () => {
+      fireEvent.click(await screen.findByRole('button', { name: /Asif Khan/ }));
+      for (let i = 0; i < 4; i++) {
+        enterPin('0000');
+        await screen.findByText(i18n.t('unlock.wrong', { count: 4 - i }));
+      }
+      enterPin('0000');
+      await screen.findByText(en.unlock.locked);
+    };
+
+    it('a manager’s PIN unlocks the person, who then unlocks with their own; both events are kept', async () => {
+      const f = fakeCounter({
+        staff: () => Promise.resolve([staff(), boss, zara]),
+        grants: (id) => Promise.resolve(id === 'm1' ? [MANAGER] : [SELLER]),
+      });
+      show(f.counter);
+      await lockAsif();
+      expect(f.calls).toContain('pinEvent locked u1 -');
+      fireEvent.click(screen.getByRole('button', { name: en.unlock.managerUnlock }));
+      expect(await screen.findByText(i18n.t('unlock.managerFor', { name: 'Asif Khan' }))).toBeDefined();
+      expect(screen.queryByRole('button', { name: /Asif Khan/ })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: /Boss Man/ }));
+      fireEvent.change(screen.getByLabelText(en.unlock.managerPin), { target: { value: '2468' } });
+      fireEvent.click(screen.getByRole('button', { name: en.unlock.managerSubmit }));
+      expect(await screen.findByText(i18n.t('unlock.managerDone', { name: 'Asif Khan' }))).toBeDefined();
+      expect(f.calls).toContain('pinEvent unlocked u1 m1');
+      enterPin('4831');
+      expect(await screen.findByRole('combobox')).toBeDefined();
+    });
+
+    it('a salesman’s right PIN is refused and the person stays locked', async () => {
+      const f = fakeCounter({
+        staff: () => Promise.resolve([staff(), boss, zara]),
+        grants: () => Promise.resolve([SELLER]),
+      });
+      show(f.counter);
+      await lockAsif();
+      fireEvent.click(screen.getByRole('button', { name: en.unlock.managerUnlock }));
+      fireEvent.click(await screen.findByRole('button', { name: /Zara Seller/ }));
+      fireEvent.change(screen.getByLabelText(en.unlock.managerPin), { target: { value: '1357' } });
+      fireEvent.click(screen.getByRole('button', { name: en.unlock.managerSubmit }));
+      expect(await screen.findByText(en.unlock.notAllowed)).toBeDefined();
+      expect(f.calls.some((c) => c.startsWith('pinEvent unlocked'))).toBe(false);
+    });
+
+    it('a wrong manager PIN says so and counts against the manager', async () => {
+      const f = fakeCounter({
+        staff: () => Promise.resolve([staff(), boss]),
+        grants: () => Promise.resolve([MANAGER]),
+      });
+      show(f.counter);
+      await lockAsif();
+      fireEvent.click(screen.getByRole('button', { name: en.unlock.managerUnlock }));
+      fireEvent.click(await screen.findByRole('button', { name: /Boss Man/ }));
+      fireEvent.change(screen.getByLabelText(en.unlock.managerPin), { target: { value: '0000' } });
+      fireEvent.click(screen.getByRole('button', { name: en.unlock.managerSubmit }));
+      expect(await screen.findByText(i18n.t('unlock.wrong', { count: 4 }))).toBeDefined();
+      expect(await f.counter.getPinState('m1')).toEqual({ failures: 1, locked: false });
+    });
+  });
+
+  it('locks the counter when a sync deactivates the person who is selling (W1-04)', async () => {
+    let disabled = false;
+    const f = fakeCounter({
+      staff: () => Promise.resolve([staff({ status: disabled ? 'disabled' : 'active' })]),
+    });
+    show(f.counter);
+    fireEvent.click(await screen.findByRole('button', { name: /Asif Khan/ }));
+    enterPin('4831');
+    expect(await screen.findByRole('combobox')).toBeDefined();
+    disabled = true;
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(en.unlock.title)).toBeDefined();
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Asif Khan/ })).toBeNull();
   });
 
   it('typing the short code picks the person', async () => {
