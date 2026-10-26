@@ -24,6 +24,18 @@ export {
 } from './devices';
 export { TenantSpec } from './tenant-spec';
 export {
+  CreateUserRequest,
+  RoleAssignment,
+  RoleSummary,
+  SetRolesRequest,
+  ShortCode,
+  TemporaryPasswordRequest,
+  UpdateUserRequest,
+  Username,
+  UserSummary,
+  type UserAdminError,
+} from './users';
+export {
   CATALOG_COLUMNS,
   CATALOG_DATASETS,
   CounterPinChangeRequest,

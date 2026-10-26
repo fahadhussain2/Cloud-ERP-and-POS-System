@@ -28,6 +28,7 @@ export { normalizeIdentifier } from './identifier';
 export { add, money, mulBp, mulQty, negate, parseMoney, sub, sum, type Money } from './money';
 export {
   can,
+  canGrantRole,
   effectiveLimits,
   expandPermissions,
   isPermission,

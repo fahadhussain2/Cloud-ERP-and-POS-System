@@ -437,6 +437,19 @@ describe('roles and branch', () => {
     expect(res.json()).toEqual({ error: 'cannot_grant' });
   });
 
+  it('nobody changes a person who holds more rights than they do (no takeover of the Owner)', async () => {
+    const cookie = await login('staffadmin');
+    const target = ids['owner']!;
+    const denied = [
+      await send('PUT', `/api/users/${target}/password`, cookie, { temporaryPassword: TEMPORARY }),
+      await send('DELETE', `/api/users/${target}/password`, cookie),
+      await send('POST', `/api/users/${target}/deactivate`, cookie),
+      await send('PATCH', `/api/users/${target}`, cookie, { email: 'takeover@example.test' }),
+    ];
+    expect(denied.map((r) => r.statusCode)).toEqual([403, 403, 403, 403]);
+    expect(await tryLogin('owner')).not.toBeNull();
+  });
+
   it('you can’t take your own user admin away', async () => {
     const res = await send('PUT', `/api/users/${ids['staffAdmin']}/roles`, await login('staffadmin'), {
       roles: [{ roleId: roles['devicesOnly'], branchId: null }],
