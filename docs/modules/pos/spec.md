@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9): draft with the W1-03 plan. Checkout and the keyboard map are added with W1-05. |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). Checkout and the keyboard map are added with W1-05. |
 | **Refs** | POS-01, POS-14, PLT-01, PLT-03, PLT-04; architecture §4.1–§4.4, §8; data model §12; sync spec; CLAUDE.md rules 6, 9, 10; D-009, D-010, D-039, D-082 |
 
 The PRD and architecture describe what the counter does. This spec fixes how its foundations behave, precisely enough to build and test. **v1** covers what W1-02 builds; checkout, the payment pad and the keyboard map come in later versions.
@@ -70,7 +70,7 @@ Every check result is written to `diagnostic_log`.
 
 ## 7. Status bar
 
-Always visible at the bottom of every screen:
+Always visible at the **top** of every screen (W1-03 owner answer 1, as in the prototype); the key bar is at the bottom:
 - **Connection:** *Online*, or *Offline since HH:MM* (red after 30 minutes).
 - **Unsynced:** *N bills waiting to sync* (outbox rows); amber when the oldest is over 10 minutes old.
 - **Last sync** time, the **counter code**, and **who is unlocked**.
@@ -81,7 +81,7 @@ Always visible at the bottom of every screen:
 - The service worker caches the app shell, so the POS starts offline.
 - A new version downloads in the background and **activates only when no bill is open** (at lock, or after finalize), never mid-bill. The server accepts pushes from the previous version (architecture §4.2).
 
-## 9. Search (W1-03, draft for review with its plan)
+## 9. Search (W1-03)
 
 POS-02, CAT-02. One search box (`F2`) on the counter screen; it works the same online and offline.
 

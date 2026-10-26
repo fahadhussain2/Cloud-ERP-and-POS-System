@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#48](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/48) |
 | **Module** | pos (with sync and catalog) |
-| **Status** | Draft for owner review |
+| **Status** | Accepted (2026-10-26) |
 | **Refs** | POS-02, POS-03 (shortcut hints), SYN-01 (catalog), CAT-02 (normalized search), PLT-13 (tokens); architecture §2, §4.1, §5.3; data model §4, §12; sync spec §2–§3; D-014, D-039, D-053, D-056, D-066, D-067, D-089, D-090 |
 | **Depends on** | W1-02 (counter shell, pull), W0-13 (catalog tables, the real Delux catalog on your PC) |
 | **Size** | about 4 days |
@@ -87,8 +87,9 @@
 | Tailwind and Radix make the counter's download bigger | Only the components used are copied in and Tailwind emits only the classes used; the POS build size before and after is reported in the PR. The app is cached offline after the first load. |
 | The design pass grows | Only the blocks listed; the back office waits for W1-04. |
 
-## Questions for the owner
+## Owner answers (2026-10-26)
 
-1. **Status bar at the top** of the counter (as in the prototype), with the key bar at the bottom? The POS spec says bottom today. *Recommended: top.*
-2. **Fonts:** bundle the prototype's fonts (about 200 KB, cached for offline), or use the Windows fonts (Segoe UI, Consolas) and download nothing? *Recommended: bundle, for the prototype's look.*
-3. **Dormant and discontinued items** in search: show them last with a chip (they may still be on a shelf), or hide discontinued ones? *Recommended: show both, last, with a chip.*
+1. **Status bar at the top** of the counter, as in the prototype; the key bar at the bottom.
+2. **Bundle the prototype's fonts** (cached for offline).
+3. **Dormant and discontinued items** are shown, ranked last, with a chip.
+4. (Earlier, in review) **Keep shadcn/ui on Radix + Tailwind** (D-066); the Wave 1 task list was corrected.

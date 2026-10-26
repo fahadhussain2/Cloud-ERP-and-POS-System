@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: draft with the W1-03 plan. Push is added with W1-06. |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: accepted with the W1-03 plan (2026-10-26). Push is added with W1-06. |
 | **Refs** | SYN-01…SYN-06; architecture §4.1, §5; data model §10, §12; CLAUDE.md rules 6–9; D-009, D-011, D-042, D-047 |
 
 The architecture (§5) sets the principles. This spec fixes the contracts precisely enough to build and test them. **v1 covers pull**, which W1-02 (users and settings for unlock) and W1-03 (the catalog) need. **Push**, server acceptance, gaps and re-push after a restore are specified with W1-06, in a section below.
@@ -38,7 +38,7 @@ Each dataset lists its columns explicitly. **A column not listed never leaves th
 | `roles` | `roles` | the tenant | `id, name, template_key, permissions, limits, row_version, deleted_at` |
 | `user_roles` | `user_roles` | the tenant; branch-specific rows only for the device's branch | `id, user_id, role_id, branch_id, row_version, deleted_at` |
 
-**Catalog datasets (W1-03, draft for review with its plan):** all scoped to the tenant.
+**Catalog datasets (W1-03):** all scoped to the tenant.
 
 | Dataset | Table | Columns |
 |---|---|---|
