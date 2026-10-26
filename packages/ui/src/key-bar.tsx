@@ -47,4 +47,3 @@ export function KeyBar({ title, hints }: { title: string; hints: readonly KeyHin
     </footer>
   );
 }
-

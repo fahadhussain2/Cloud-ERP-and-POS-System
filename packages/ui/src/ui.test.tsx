@@ -167,5 +167,8 @@ describe('money', () => {
     expect(plain(formatMoney(125050, delux))).toBe('Rs 1,250.50');
     expect(plain(formatMoney(0, delux))).toBe('Rs 0');
     expect(plain(formatMoney(-5000, delux))).toBe('-Rs 50');
+    expect(plain(formatMoney(-5, delux))).toBe('-Rs 0.05');
+    expect(plain(formatMoney(9007199254740991, delux))).toBe('Rs 90,071,992,547,409.91');
+    expect(() => formatMoney(1.5, delux)).toThrow('not whole minor units');
   });
 });
