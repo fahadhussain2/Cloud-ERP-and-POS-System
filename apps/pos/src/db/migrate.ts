@@ -61,6 +61,48 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE TABLE diagnostic_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, kind TEXT NOT NULL, detail TEXT NOT NULL)',
     ],
   },
+  {
+    // The catalog (W1-03, sync spec §3): exactly the pulled columns. Money is whole minor units (rule 1). Removed rows
+    // are deleted, so deleted_at stays empty; the search index loads each table with one query.
+    version: 2,
+    statements: [
+      `CREATE TABLE price_tiers (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, sort INTEGER NOT NULL, is_default INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE units (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, allows_fraction INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE categories (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, parent_id TEXT, pricing_rule TEXT NOT NULL,
+        return_policy TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE TABLE brands (id TEXT PRIMARY KEY, name TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT)',
+      'CREATE TABLE origins (id TEXT PRIMARY KEY, name TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT)',
+      'CREATE TABLE vehicle_makes (id TEXT PRIMARY KEY, name TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT)',
+      `CREATE TABLE items (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, category_id TEXT, brand_id TEXT, origin_id TEXT,
+        unit_id TEXT, variant TEXT, spec TEXT, bin_location TEXT, floor_price INTEGER, tax_code_id TEXT,
+        status TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE item_identifiers (
+        id TEXT PRIMARY KEY, item_id TEXT NOT NULL, kind TEXT NOT NULL, value TEXT NOT NULL,
+        normalized_value TEXT NOT NULL, is_primary INTEGER NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX item_identifiers_item ON item_identifiers (item_id)',
+      `CREATE TABLE item_compatibility (
+        id TEXT PRIMARY KEY, item_id TEXT NOT NULL, make_id TEXT, model TEXT, year_from INTEGER, year_to INTEGER,
+        note TEXT, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX item_compatibility_item ON item_compatibility (item_id)',
+      `CREATE TABLE item_prices (
+        id TEXT PRIMARY KEY, item_id TEXT NOT NULL, tier_id TEXT NOT NULL, price INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX item_prices_item ON item_prices (item_id)',
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

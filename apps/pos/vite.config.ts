@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { sentryVitePlugin } from '@sentry/vite-plugin';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -13,6 +14,8 @@ const api = { '/api': { target: process.env['API_URL'] ?? 'http://127.0.0.1:3000
 export default defineConfig({
   plugins: [
     react(),
+    // Styles: Tailwind on the prototype's tokens (D-066, @erp/ui/theme.css).
+    tailwindcss(),
     // The app shell works offline (POS spec §8). 'prompt': a new version waits until no bill is open (pwa/update.ts).
     VitePWA({
       registerType: 'prompt',
@@ -24,15 +27,16 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        background_color: '#ffffff',
-        theme_color: '#0b5cad',
+        background_color: '#eceff2',
+        theme_color: '#c24e1a',
         icons: [
           { src: '/icons/pos-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/pos-512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,wasm,png}'],
+        // The bundled fonts (woff2) too, so the counter looks the same offline (W1-03).
+        globPatterns: ['**/*.{js,css,html,wasm,png,woff2}'],
         // SQLite's .wasm is about 870 kB.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         navigateFallback: '/index.html',

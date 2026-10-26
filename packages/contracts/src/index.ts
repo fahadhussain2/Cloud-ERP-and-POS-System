@@ -24,11 +24,15 @@ export {
 } from './devices';
 export { TenantSpec } from './tenant-spec';
 export {
+  CATALOG_COLUMNS,
+  CATALOG_DATASETS,
   CounterPinChangeRequest,
   PULL_DATASETS,
   PULL_LIMIT_DEFAULT,
   PULL_LIMIT_MAX,
   TemporaryPinRequest,
+  type CatalogDataset,
+  type ColumnType,
   type PullDataset,
   type PullResponse,
 } from './sync';

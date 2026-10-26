@@ -1,0 +1,14 @@
+{
+  "description": "Identifier search key (data model §4, CAT-02): upper case, without spaces, dashes, slashes and dots",
+  "cases": [
+    { "name": "an OEM number", "input": "17910-so4 e84", "expected": "17910SO4E84" },
+    { "name": "slashes and dots", "input": "A/B.C-1", "expected": "ABC1" },
+    { "name": "an item code", "input": "ABEA001", "expected": "ABEA001" },
+    { "name": "with dashes", "input": "17801-0Y040", "expected": "178010Y040" },
+    { "name": "with a space", "input": "17801 0Y040", "expected": "178010Y040" },
+    { "name": "with a dot, in lower case", "input": "17801.0y040", "expected": "178010Y040" },
+    { "name": "with a slash", "input": "17801/0Y040", "expected": "178010Y040" },
+    { "name": "tabs and repeated separators", "input": " 045\t65--02 220 ", "expected": "0456502220" },
+    { "name": "nothing left", "input": " - / . ", "expected": "" }
+  ]
+}

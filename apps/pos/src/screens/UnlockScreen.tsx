@@ -1,15 +1,19 @@
 import { PIN_MAX_FAILURES, type PinState } from '@erp/domain';
+import { Alert, Button, Field } from '@erp/ui';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { StaffUser, UnlockResult } from '../unlock/unlock';
+import { CardScreen } from './Card';
 
 /** Unlock (POS spec §5, owner answer 3): pick your name, or type your short code, then your PIN. */
 export function UnlockScreen({
   staff,
+  deviceCode,
   onUnlock,
 }: {
   staff: StaffUser[];
+  deviceCode: string | null;
   onUnlock: (user: StaffUser, pin: string) => Promise<{ result: UnlockResult; pinState: PinState }>;
 }) {
   const { t } = useTranslation();
@@ -18,6 +22,7 @@ export function UnlockScreen({
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const eyebrow = deviceCode ? t('unlock.eyebrow', { code: deviceCode }) : undefined;
 
   const pick = (u: StaffUser | null) => {
     setUser(u);
@@ -46,58 +51,55 @@ export function UnlockScreen({
 
   if (user) {
     return (
-      <main className="screen">
-        <h1>{user.fullName}</h1>
-        <form onSubmit={(e) => void submit(e)}>
-          <label>
-            {t('unlock.pin')}
-            <input
-              type="password"
-              inputMode="numeric"
-              autoComplete="off"
-              autoFocus
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-            />
-          </label>
-          {message && <p role="alert">{message}</p>}
-          <button type="submit" disabled={busy || pin === ''}>
+      <CardScreen eyebrow={eyebrow} title={user.fullName}>
+        <form className="flex flex-col gap-3" onSubmit={(e) => void submit(e)}>
+          <Field
+            label={t('unlock.pin')}
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            autoFocus
+            className="text-center font-mono text-[28px] tracking-[.5em]"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+          />
+          {message && <Alert variant="bad">{message}</Alert>}
+          <Button type="submit" variant="primary" size="lg" disabled={busy || pin === ''}>
             {busy ? t('unlock.checking') : t('unlock.submit')}
-          </button>
-          <button type="button" onClick={() => (pick(null), setShortCode(''))}>
+          </Button>
+          <Button variant="ghost" onClick={() => (pick(null), setShortCode(''))}>
             {t('unlock.back')}
-          </button>
+          </Button>
         </form>
-      </main>
+        <p className="m-0 text-center text-xs text-muted">{t('unlock.recorded')}</p>
+      </CardScreen>
     );
   }
 
   return (
-    <main className="screen">
-      <h1>{t('unlock.title')}</h1>
+    <CardScreen eyebrow={eyebrow} title={t('unlock.title')} wide>
       {staff.length === 0 ? (
-        <p>{t('unlock.noStaff')}</p>
+        <Alert>{t('unlock.noStaff')}</Alert>
       ) : (
-        <ul className="staff-list">
+        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2 p-0">
           {staff.map((u) => (
             <li key={u.id}>
-              <button type="button" onClick={() => pick(u)}>
+              <Button size="lg" className="w-full justify-between" onClick={() => pick(u)}>
                 {u.fullName}
-                {u.shortCode && <span className="short-code">{u.shortCode}</span>}
-              </button>
+                {u.shortCode && <span className="font-mono text-muted">{u.shortCode}</span>}
+              </Button>
             </li>
           ))}
         </ul>
       )}
-      <label>
-        {t('unlock.shortCode')}
-        <input
-          inputMode="numeric"
-          autoComplete="off"
-          value={shortCode}
-          onChange={(e) => typeShortCode(e.target.value)}
-        />
-      </label>
-    </main>
+      <Field
+        label={t('unlock.shortCode')}
+        inputMode="numeric"
+        autoComplete="off"
+        className="font-mono"
+        value={shortCode}
+        onChange={(e) => typeShortCode(e.target.value)}
+      />
+    </CardScreen>
   );
 }

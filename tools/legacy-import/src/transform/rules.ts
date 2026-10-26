@@ -87,8 +87,8 @@ export function oemNumbersInName(name: string): string[] {
   return [...new Set(found)];
 }
 
-/** The search key of an identifier (data model §4). */
-export const normalizeIdentifier = (value: string): string => value.toUpperCase().replace(/[\s\-/.]/g, '');
+/** The search key of an identifier (data model §4): the one rule in packages/domain, shared with the counter. */
+export { normalizeIdentifier } from '@erp/domain';
 
 const AMOUNT = /^(-)?(\d+)(?:\.(\d+))?$/;
 
