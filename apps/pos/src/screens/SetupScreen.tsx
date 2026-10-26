@@ -1,4 +1,4 @@
-import { Alert, Button, Field } from '@erp/ui';
+import { Alert, AlertDescription, Button, TextField } from '@erp/ui';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -28,9 +28,9 @@ export function SetupScreen({
 
   return (
     <CardScreen title={t('setup.title')}>
-      <p className="m-0 text-center text-muted">{t('setup.help')}</p>
+      <p className="m-0 text-center text-muted-foreground">{t('setup.help')}</p>
       <form className="flex flex-col gap-3" onSubmit={(e) => void submit(e)}>
-        <Field
+        <TextField
           label={t('setup.shopCode')}
           value={tenantCode}
           onChange={(e) => setTenantCode(e.target.value)}
@@ -38,7 +38,7 @@ export function SetupScreen({
           autoFocus
           required
         />
-        <Field
+        <TextField
           label={t('setup.code')}
           className="font-mono"
           value={code}
@@ -46,8 +46,12 @@ export function SetupScreen({
           autoComplete="off"
           required
         />
-        {error && <Alert variant="bad">{t(`setup.${error}`)}</Alert>}
-        <Button type="submit" variant="primary" size="lg" disabled={busy}>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{t(`setup.${error}`)}</AlertDescription>
+          </Alert>
+        )}
+        <Button type="submit" size="lg" disabled={busy}>
           {busy ? t('setup.busy') : t('setup.submit')}
         </Button>
       </form>

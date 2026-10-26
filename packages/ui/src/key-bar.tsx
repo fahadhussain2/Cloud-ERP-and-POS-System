@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 
-import { cn } from './cn';
+import { cn } from './lib/utils';
 
 /** One key as printed on a keycap. */
 export function Kbd({ className, ...props }: ComponentProps<'kbd'>) {
@@ -29,18 +29,22 @@ export interface KeyHint {
 export function KeyBar({ title, hints }: { title: string; hints: readonly KeyHint[] }) {
   return (
     <footer className="flex flex-wrap items-center gap-1.5" aria-label={title}>
-      <span className="me-1 text-[11px] font-semibold tracking-[.07em] text-muted uppercase">{title}</span>
+      <span className="me-1 text-[11px] font-semibold tracking-[.07em] text-muted-foreground uppercase">
+        {title}
+      </span>
       {hints.map((h) => (
         <button
           key={h.keys}
           type="button"
           onClick={h.run}
           className={cn(
-            'inline-flex cursor-pointer items-center gap-1.5 rounded-[7px] border bg-surface py-1 ps-[5px] pe-2 text-[12.5px] font-medium hover:border-muted',
-            h.main ? 'border-accent' : 'border-line',
+            'inline-flex cursor-pointer items-center gap-1.5 rounded-[7px] border bg-surface py-1 ps-[5px] pe-2 text-[12.5px] font-medium hover:border-muted-foreground',
+            h.main ? 'border-primary' : 'border-line',
           )}
         >
-          <Kbd className={h.main ? 'border-accent bg-accent text-accent-ink' : undefined}>{h.keys}</Kbd>
+          <Kbd className={h.main ? 'border-primary bg-primary text-primary-foreground' : undefined}>
+            {h.keys}
+          </Kbd>
           {h.label}
         </button>
       ))}

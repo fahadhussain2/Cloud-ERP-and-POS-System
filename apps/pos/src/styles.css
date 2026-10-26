@@ -2,6 +2,8 @@
    blocks in packages/ui; use logical utilities only (px, ms, text-start…), so the layout works right-to-left (CLAUDE.md
    rule 10). */
 @import 'tailwindcss' source(none);
+/* shadcn/ui's enter and exit animations (dialogs). */
+@import 'tw-animate-css';
 @import '@erp/ui/theme.css';
 @source './';
 @source '../../../packages/ui/src';

@@ -6,15 +6,16 @@ import {
   Button,
   Dialog,
   DialogActions,
-  DialogBody,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogTrigger,
-  Field,
   formatMoney,
   KeyBar,
   matchKey,
   moveSelection,
   OptionList,
+  TextField,
   useShortcuts,
 } from './index';
 
@@ -126,8 +127,11 @@ describe('the dialog', () => {
         <DialogTrigger asChild>
           <Button>Open</Button>
         </DialogTrigger>
-        <DialogContent title="Override price">
-          <DialogBody>Body</DialogBody>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Override price</DialogTitle>
+          </DialogHeader>
+          <p>Body</p>
           <DialogActions cancelLabel="Cancel" actionLabel="Approve" onAction={save} />
         </DialogContent>
       </Dialog>,
@@ -149,7 +153,7 @@ describe('the dialog', () => {
 
 describe('a field', () => {
   it('ties its label, and its error, to the input', () => {
-    render(<Field label="PIN" error="Wrong PIN" />);
+    render(<TextField label="PIN" error="Wrong PIN" />);
     const input = screen.getByLabelText('PIN');
     expect(input.getAttribute('aria-invalid')).toBe('true');
     expect(input.getAttribute('aria-describedby')).toBe(screen.getByRole('alert').id);

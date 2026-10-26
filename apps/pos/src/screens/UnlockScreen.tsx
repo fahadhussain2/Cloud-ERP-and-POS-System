@@ -1,5 +1,5 @@
 import { PIN_MAX_FAILURES, type PinState } from '@erp/domain';
-import { Alert, Button, Field } from '@erp/ui';
+import { Alert, AlertDescription, Button, TextField } from '@erp/ui';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -53,25 +53,29 @@ export function UnlockScreen({
     return (
       <CardScreen eyebrow={eyebrow} title={user.fullName}>
         <form className="flex flex-col gap-3" onSubmit={(e) => void submit(e)}>
-          <Field
+          <TextField
             label={t('unlock.pin')}
             type="password"
             inputMode="numeric"
             autoComplete="off"
             autoFocus
-            className="text-center font-mono text-[28px] tracking-[.5em]"
+            className="h-14 text-center font-mono text-[28px] tracking-[.5em]"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
           />
-          {message && <Alert variant="bad">{message}</Alert>}
-          <Button type="submit" variant="primary" size="lg" disabled={busy || pin === ''}>
+          {message && (
+            <Alert variant="destructive">
+              <AlertDescription>{message}</AlertDescription>
+            </Alert>
+          )}
+          <Button type="submit" size="lg" disabled={busy || pin === ''}>
             {busy ? t('unlock.checking') : t('unlock.submit')}
           </Button>
           <Button variant="ghost" onClick={() => (pick(null), setShortCode(''))}>
             {t('unlock.back')}
           </Button>
         </form>
-        <p className="m-0 text-center text-xs text-muted">{t('unlock.recorded')}</p>
+        <p className="m-0 text-center text-xs text-muted-foreground">{t('unlock.recorded')}</p>
       </CardScreen>
     );
   }
@@ -79,20 +83,22 @@ export function UnlockScreen({
   return (
     <CardScreen eyebrow={eyebrow} title={t('unlock.title')} wide>
       {staff.length === 0 ? (
-        <Alert>{t('unlock.noStaff')}</Alert>
+        <Alert>
+          <AlertDescription>{t('unlock.noStaff')}</AlertDescription>
+        </Alert>
       ) : (
         <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2 p-0">
           {staff.map((u) => (
             <li key={u.id}>
-              <Button size="lg" className="w-full justify-between" onClick={() => pick(u)}>
+              <Button variant="outline" size="lg" className="w-full justify-between" onClick={() => pick(u)}>
                 {u.fullName}
-                {u.shortCode && <span className="font-mono text-muted">{u.shortCode}</span>}
+                {u.shortCode && <span className="font-mono text-muted-foreground">{u.shortCode}</span>}
               </Button>
             </li>
           ))}
         </ul>
       )}
-      <Field
+      <TextField
         label={t('unlock.shortCode')}
         inputMode="numeric"
         autoComplete="off"

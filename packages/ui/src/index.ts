@@ -1,16 +1,27 @@
-// The screens' building blocks (D-066): shadcn/ui components on Radix and Tailwind, themed with the prototype's
-// tokens (theme.css), plus our keyboard layer and formatting. Fonts: import '@erp/ui/fonts' once per app.
-export { Alert } from './alert';
+// The screens' building blocks (D-066). `components/ui/` comes from the shadcn/ui CLI (`pnpm --filter @erp/ui ui:add
+// <name>`), themed through theme.css; the rest is ours: the frame, the keyboard layer, formatting. Fonts: import
+// '@erp/ui/fonts' once per app.
+export { Alert, AlertDescription, AlertTitle } from './components/ui/alert';
+export { Badge, badgeVariants } from './components/ui/badge';
+export { Button, buttonVariants } from './components/ui/button';
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from './components/ui/dialog';
+export { Input } from './components/ui/input';
+export { Label } from './components/ui/label';
 export { AppFrame } from './app-frame';
-export { Badge } from './badge';
-export { Button, buttonVariants } from './button';
-export { cn } from './cn';
-export { Dialog, DialogActions, DialogBody, DialogClose, DialogContent, DialogTrigger } from './dialog';
-export { Field } from './field';
+export { DialogActions } from './dialog-actions';
 export { formatMoney, type MoneyFormat } from './format';
-export { Input } from './input';
 export { KeyBar, Kbd, type KeyHint } from './key-bar';
-export { Label } from './label';
+export { cn } from './lib/utils';
 export { moveSelection, OptionList } from './option-list';
 export { Panel } from './panel';
 export { matchKey, useShortcuts, type KeyPress, type Shortcuts } from './shortcuts';
+export { LABEL_CLASS, TextField } from './text-field';
