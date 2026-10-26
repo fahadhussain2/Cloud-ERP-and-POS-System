@@ -128,7 +128,7 @@ export function PersonScreen({
               <StatusChip tone={pin.tone}>{pin.text}</StatusChip>
             </p>
             <p className="m-0 text-muted-foreground">{t('staff.pinHelp')}</p>
-            {active && (
+            {active && person.canGivePin && (
               <div>
                 <Button variant="outline" onClick={() => setDialog('pin')}>
                   {t('staff.give')}

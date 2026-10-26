@@ -7,7 +7,7 @@ import {
   type UserSummary,
 } from '@erp/contracts';
 import { withTenant } from '@erp/db';
-import { can, canGrantRole, type RoleGrant, type RoleLimits } from '@erp/domain';
+import { can, canGivePinTo, canGrantRole, type RoleGrant, type RoleLimits } from '@erp/domain';
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
 import type pg from 'pg';
 
@@ -80,6 +80,33 @@ async function currentAssignments(c: Client, userId: string) {
     [userId],
   );
   return rows.map((r) => ({ id: r.id, roleId: r.role_id, branchId: r.branch_id }));
+}
+
+/** Every person's roles as grants, by user id; one query for the whole list, or for one person. */
+async function grantsByUser(c: Client, userId: string | null = null): Promise<Map<string, RoleGrant[]>> {
+  const { rows } = await c.query<{
+    user_id: string;
+    permissions: string[];
+    limits: RoleLimits;
+    branch_id: string | null;
+  }>(
+    `SELECT ur.user_id, r.permissions, r.limits, ur.branch_id
+     FROM erp.user_roles ur JOIN erp.roles r ON r.tenant_id = ur.tenant_id AND r.id = ur.role_id
+     WHERE ur.deleted_at IS NULL AND r.deleted_at IS NULL AND ($1::uuid IS NULL OR ur.user_id = $1)`,
+    [userId],
+  );
+  const byUser = new Map<string, RoleGrant[]>();
+  for (const r of rows) {
+    const list = byUser.get(r.user_id) ?? [];
+    list.push({ permissions: r.permissions, limits: r.limits, branchId: r.branch_id });
+    byUser.set(r.user_id, list);
+  }
+  return byUser;
+}
+
+/** May the actor give this person a temporary PIN? Not to an Owner or a staff admin they don't outrank (D-091). */
+export async function mayGivePin(c: Client, actor: AuthContext, userId: string): Promise<boolean> {
+  return canGivePinTo(actor.grants, (await grantsByUser(c, userId)).get(userId) ?? []);
 }
 
 /** Refuses unless the actor may give (or take away) every one of these assignments. */
@@ -227,6 +254,7 @@ export function registerUsers(scope: FastifyInstance, { pool, now, requireAuth }
          WHERE u.deleted_at IS NULL
          ORDER BY lower(u.full_name), u.username`,
           );
+          const grants = await grantsByUser(c);
           return rows.map((u): UserSummary => ({
             id: u.id,
             username: u.username,
@@ -238,6 +266,7 @@ export function registerUsers(scope: FastifyInstance, { pool, now, requireAuth }
             hasPin: u.has_pin,
             pinMustChange: u.pin_must_change,
             lastLoginAt: u.last_login_at?.toISOString() ?? null,
+            canGivePin: canGivePinTo(req.auth!.grants, grants.get(u.id) ?? []),
             roles: u.roles,
           }));
         },

@@ -24,7 +24,8 @@ import { useStaffData } from './data';
 import { AddPersonDialog, TemporaryPinDialog } from './dialogs';
 
 // Staff (W1-04, owner answer 2): one list of the shop's people. With admin.users you add and change people; with
-// admin.devices (managers) you give temporary PINs (D-089).
+// admin.devices (managers) you give temporary PINs (D-089), except to people you don't outrank who manage staff or
+// are Owners (`canGivePin`, D-091).
 
 export const pinChip = (t: TFunction, u: UserSummary): { tone: ChipTone; text: string } =>
   !u.hasPin
@@ -41,7 +42,6 @@ export const accessChip = (t: TFunction, u: UserSummary): { tone: ChipTone; text
 export function StaffScreen({ api, permissions }: { api: Api; permissions: readonly string[] }) {
   const { t } = useTranslation();
   const canAdmin = permissions.includes('admin.users');
-  const canPin = permissions.includes('admin.devices') || canAdmin;
   const { users, roles, branches, reload } = useStaffData(api, canAdmin);
   const [filter, setFilter] = useState<'active' | 'disabled'>('active');
   const [adding, setAdding] = useState(false);
@@ -125,7 +125,7 @@ export function StaffScreen({ api, permissions }: { api: Api; permissions: reado
                         <StatusChip tone={pin.tone}>{pin.text}</StatusChip>
                       </TableCell>
                       <TableCell className="text-end">
-                        {canPin && u.status === 'active' && (
+                        {u.canGivePin && u.status === 'active' && (
                           <Button
                             size="sm"
                             variant="outline"

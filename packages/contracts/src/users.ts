@@ -58,6 +58,8 @@ export const UserSummary = z.object({
   hasPin: z.boolean(),
   pinMustChange: z.boolean(),
   lastLoginAt: z.string().nullable(),
+  /** May the person signed in give this one a temporary PIN (canGivePinTo, D-091)? */
+  canGivePin: z.boolean(),
   roles: z.array(
     z.object({
       roleId: z.uuid(),

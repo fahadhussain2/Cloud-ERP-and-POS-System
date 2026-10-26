@@ -5,6 +5,7 @@ import grantCases from '../golden/role-grant.json';
 import limitCases from '../golden/role-limits.json';
 import {
   can,
+  canGivePinTo,
   canGrantRole,
   effectiveLimits,
   expandPermissions,
@@ -64,6 +65,30 @@ runGolden(
       i.branchId,
     ),
 );
+
+describe('who may give a temporary PIN (W1-04, D-091)', () => {
+  it('a manager gives one to salesmen and cashiers, even with rights the manager lacks', () => {
+    expect(canGivePinTo([grant('manager')], [grant('salesman')])).toBe(true);
+    expect(canGivePinTo([grant('manager')], [grant('cashier')])).toBe(true);
+    expect(canGivePinTo([grant('manager')], [])).toBe(true);
+  });
+
+  it('a manager gives none to an Owner or to someone with user admin', () => {
+    expect(canGivePinTo([grant('manager')], [grant('owner')])).toBe(false);
+    const staffAdmin: RoleGrant = { ...grant('salesman'), permissions: ['admin.users'] };
+    expect(canGivePinTo([grant('manager')], [staffAdmin])).toBe(false);
+  });
+
+  it('someone who outranks them does: the Owner gives one to anyone', () => {
+    expect(canGivePinTo([grant('owner')], [grant('owner')])).toBe(true);
+    expect(canGivePinTo([grant('owner')], [grant('manager'), grant('accountant')])).toBe(true);
+  });
+
+  it('nobody without admin.devices gives one', () => {
+    expect(canGivePinTo([grant('salesman')], [grant('salesman')])).toBe(false);
+    expect(canGivePinTo([grant('manager', 'b1')], [grant('salesman')])).toBe(false);
+  });
+});
 
 describe('role templates', () => {
   it('use only permissions from the catalog', () => {

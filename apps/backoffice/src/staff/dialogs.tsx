@@ -327,7 +327,12 @@ export function TemporaryPinDialog({
             setPin('');
             onSaved(person.fullName);
           },
-          (b) => ((b as { error?: string } | null)?.error === 'weak_pin' ? t('staff.weak_pin') : null),
+          (b) => {
+            const error = (b as { error?: string } | null)?.error;
+            if (error === 'weak_pin') return t('staff.weak_pin');
+            if (error === 'cannot_grant') return t('staff.errors.pin_not_allowed');
+            return null;
+          },
         )
       }
     >

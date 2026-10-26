@@ -16,6 +16,7 @@ import { pinProblem, PIN_MAX_FAILURES } from '@erp/domain';
 import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import type pg from 'pg';
 
+import { mayGivePin } from '../admin/users';
 import { requirePermission } from '../auth/routes';
 
 // Counter sync (sync spec v1, W1-02, W1-03, D-089): pull with per-dataset column lists, and the counter PIN change.
@@ -181,7 +182,8 @@ export function registerSync(scope: FastifyInstance, { pool, now, requireAuth, r
   );
 
   // A manager gives someone a temporary PIN (owner answer 2 to W1-02); they choose their own at a counter. Guarded by
-  // admin.devices, which managers have for counters (W0-09 gives admin.users to the owner only).
+  // admin.devices, which managers have for counters (W0-09 gives admin.users to the owner only), and never to an Owner
+  // or a staff admin the actor doesn't outrank (canGivePinTo, D-091).
   scope.put<{ Params: { id: string } }>(
     '/users/:id/temporary-pin',
     { preHandler: requirePermission(requireAuth, 'admin.devices') },
@@ -201,6 +203,8 @@ export function registerSync(scope: FastifyInstance, { pool, now, requireAuth, r
           );
           const user = u.rows[0];
           if (!user) return 'missing' as const;
+          // Not to an Owner or a staff admin the actor doesn't outrank: they could take over that PIN (D-091).
+          if (!(await mayGivePin(c, a, user.id))) return 'refused' as const;
           const problem = pinProblem(body.data.pin, user.short_code);
           if (problem) return { problem };
           await c.query('UPDATE erp.users SET pin_verifier = $1, pin_must_change = true WHERE id = $2', [
@@ -222,6 +226,7 @@ export function registerSync(scope: FastifyInstance, { pool, now, requireAuth, r
         },
       );
       if (outcome === 'missing') return reply.code(404).send({ error: 'not_found' });
+      if (outcome === 'refused') return reply.code(403).send({ error: 'cannot_grant' });
       if (outcome !== 'set') return reply.code(400).send({ error: 'weak_pin', problem: outcome.problem });
       return reply.code(204).send();
     },
