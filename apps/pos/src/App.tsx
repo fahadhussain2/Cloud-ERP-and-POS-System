@@ -48,7 +48,7 @@ export function App({ counter }: { counter: Counter }) {
   }, [counter]);
 
   const sync = useCallback(async () => {
-    const r = await counter.pull();
+    const r = await counter.pull(() => void refresh());
     setConnection((c) =>
       r.ok
         ? { state: 'online', offlineSince: null }
@@ -124,7 +124,8 @@ export function App({ counter }: { counter: Counter }) {
     const r = await counter.enroll(input);
     if (!r.ok) return r;
     setDevice(await counter.device());
-    await sync();
+    // The first pull brings the whole catalog: unlock can start as soon as its first page has the staff.
+    void sync();
     setPhase({ name: 'locked' });
     return r;
   };

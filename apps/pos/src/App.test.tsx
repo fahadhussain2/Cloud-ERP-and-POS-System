@@ -107,6 +107,23 @@ describe('counter screens', () => {
     expect(f.calls).toEqual(['enroll delux K7Q2-M9XD', 'pull']);
   });
 
+  it('after setup, show the staff while the first catalog load is still running', async () => {
+    let finish = () => {};
+    const f = fakeCounter({
+      pull: (onPage) => {
+        onPage?.();
+        return new Promise((resolve) => (finish = () => resolve({ ok: true, rows: 1 })));
+      },
+    });
+    f.setDevice(null);
+    show(f.counter);
+    fireEvent.change(await screen.findByLabelText(en.setup.shopCode), { target: { value: 'delux' } });
+    fireEvent.change(screen.getByLabelText(en.setup.code), { target: { value: 'K7Q2-M9XD' } });
+    fireEvent.click(screen.getByRole('button', { name: en.setup.submit }));
+    expect(await screen.findByRole('button', { name: /Asif Khan/ })).toBeDefined();
+    finish();
+  });
+
   it('unlock with the right PIN; count down wrong ones and lock after the last', async () => {
     const { counter } = fakeCounter();
     show(counter);

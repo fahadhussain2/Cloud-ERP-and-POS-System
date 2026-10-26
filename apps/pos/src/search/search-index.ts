@@ -244,6 +244,11 @@ export class SearchIndex {
     return null;
   }
 
+  /** Builds what the next search needs now (after start-up or a complete pull), so the first key press is fast. */
+  warm(): void {
+    this.refresh();
+  }
+
   search(input: string, opts: SearchOptions = {}): SearchResult[] {
     const words = tokens(input);
     if (words.length === 0) return [];

@@ -14,8 +14,10 @@ export function browserCounter(): Counter {
   const keys = indexedDbKeys();
   const api = httpApi();
   const tokens = createTokenSource({ api, keys, device: () => db.getDevice() });
-  // One pull at a time: the first catalog load takes longer than the 60-second timer (W1-03).
+  // One pull at a time: the first catalog load takes longer than the 60-second timer (W1-03). A caller joining a
+  // running pull still hears about its remaining pages.
   let pulling: Promise<PullResult> | null = null;
+  const listeners = new Set<() => void>();
   const pullOnce = async () => {
     const started = Date.now();
     const r = await pullAll({
@@ -23,6 +25,7 @@ export function browserCounter(): Counter {
       tokens,
       cursor: () => db.getSync('pull_cursor'),
       apply: (changes, cursor, done) => db.applyPull(changes, cursor, done),
+      onPage: () => listeners.forEach((l) => l()),
     });
     await db.log('sync.pull', { ...r, ms: Date.now() - started });
     return r;
@@ -31,7 +34,14 @@ export function browserCounter(): Counter {
     checkStorage: () => runStorageChecks({ ...browserStorage(), openDatabase: () => db.open() }),
     device: () => db.getDevice(),
     enroll: (input) => enroll(input, { api, keys, setDevice: (d) => db.setDevice(d) }),
-    pull: () => (pulling ??= pullOnce().finally(() => (pulling = null))),
+    pull: (onPage) => {
+      if (onPage) listeners.add(onPage);
+      pulling ??= pullOnce().finally(() => {
+        pulling = null;
+        listeners.clear();
+      });
+      return pulling;
+    },
     staff: () => db.listStaff(),
     settings: () => db.tenantSettings(),
     getPinState: (id) => db.getPinState(id),

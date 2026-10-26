@@ -41,6 +41,7 @@ const ops = {
     if (!indexLoaded) {
       const started = performance.now();
       index.apply(repo.loadCatalog(db));
+      index.warm();
       indexLoaded = true;
       repo.log(db, 'search.loaded', { items: index.size, ms: Math.round(performance.now() - started) });
     }
@@ -54,6 +55,8 @@ const ops = {
   applyPull: (...args: Parameters<typeof repo.applyPull> extends [unknown, ...infer R] ? R : never) => {
     repo.applyPull(open(), ...args);
     index.apply(args[0]);
+    // After the last page of a pull, not each page: a first load is ~125 pages.
+    if (args[2]) index.warm();
   },
   search: (text: string, opts?: SearchOptions) => index.search(text, opts),
   /** Items in the index, and whether a complete pull has loaded the catalog (POS spec §9). */

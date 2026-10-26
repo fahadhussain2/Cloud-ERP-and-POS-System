@@ -16,7 +16,8 @@ export interface Counter {
   checkStorage(): Promise<CheckResult>;
   device(): Promise<DeviceInfo | null>;
   enroll(input: { tenantCode: string; code: string }): Promise<EnrollResult>;
-  pull(): Promise<PullResult>;
+  /** Pulls until up to date; `onPage` runs after each page is stored. */
+  pull(onPage?: () => void): Promise<PullResult>;
   staff(): Promise<StaffUser[]>;
   settings(): Promise<TenantSettings | null>;
   getPinState(userId: string): Promise<PinState>;

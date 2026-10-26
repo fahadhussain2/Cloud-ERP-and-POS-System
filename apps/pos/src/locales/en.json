@@ -70,8 +70,8 @@
     "locked": "Locked"
   },
   "catalog": {
-    "loading_one": "Loading the catalog… {{count}} item so far",
-    "loading_other": "Loading the catalog… {{count}} items so far",
+    "loading_one": "Loading the catalog… {{count, number}} item so far",
+    "loading_other": "Loading the catalog… {{count, number}} items so far",
     "help": "The first time, this counter downloads the whole catalog. Afterwards it searches without the internet."
   },
   "search": {
@@ -81,12 +81,12 @@
     "results": "Search results",
     "hint": "Type words of the part name in any order, a code, an OEM number, or a car and year: fan belt cultus · 17801 · brake pads corolla 2012.",
     "none": "No items match “{{text}}”. Try fewer words, or the OEM number.",
-    "items_one": "{{count}} item on this counter",
-    "items_other": "{{count}} items on this counter",
-    "found_one": "{{count}} match",
-    "found_other": "{{count}} matches",
-    "top_one": "Top {{count}} match",
-    "top_other": "Top {{count}} matches",
+    "items_one": "{{count, number}} item on this counter",
+    "items_other": "{{count, number}} items on this counter",
+    "found_one": "{{count, number}} match",
+    "found_other": "{{count, number}} matches",
+    "top_one": "Top {{count, number}} match",
+    "top_other": "Top {{count, number}} matches",
     "priceHead": "Price",
     "noPrice": "No price",
     "oem": "OEM {{oem}}",

@@ -62,6 +62,13 @@ describe('pull', () => {
     ]);
   });
 
+  it('tells the screens after each page, so the staff list shows before a long first load ends', async () => {
+    const s = setup([ok(page(1, true)), ok(page(2, false))]);
+    let pages = 0;
+    await pullAll({ ...s.deps, onPage: () => pages++ });
+    expect(pages).toBe(2);
+  });
+
   it('gets a new device token once when the old one is refused', async () => {
     const s = setup([() => Promise.resolve({ status: 401, body: {} }), ok(page(1, false))]);
     expect(await pullAll(s.deps)).toEqual({ ok: true, rows: 1 });

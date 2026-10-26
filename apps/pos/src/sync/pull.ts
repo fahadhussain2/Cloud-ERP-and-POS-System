@@ -12,6 +12,8 @@ export interface PullDeps {
   tokens: TokenSource;
   cursor: () => Promise<string | null>;
   apply: (changes: PullResponse['changes'], cursor: string, done: boolean) => Promise<unknown>;
+  /** After each applied page: the screens refresh (the staff list arrives long before a first catalog load ends). */
+  onPage?: () => void;
 }
 
 export type PullResult = { ok: true; rows: number } | { ok: false; reason: 'offline' | 'refused' | 'server' };
@@ -41,6 +43,7 @@ export async function pullAll(deps: PullDeps): Promise<PullResult> {
     if (res.status !== 200) return { ok: false, reason: 'server' };
     const page = res.body as PullResponse;
     await deps.apply(page.changes, page.cursor, !page.hasMore);
+    deps.onPage?.();
     rows += Object.values(page.changes).reduce((n, list) => n + list.length, 0);
     if (!page.hasMore) return { ok: true, rows };
   }

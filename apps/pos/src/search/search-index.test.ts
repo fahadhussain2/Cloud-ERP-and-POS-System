@@ -169,6 +169,14 @@ describe('speed (POS-02: results within 100 ms of a key press)', () => {
     return index;
   };
 
+  it('the first search after start-up is fast too, once the index is warmed', () => {
+    const index = big();
+    index.warm();
+    const start = performance.now();
+    index.search('brake pads corolla');
+    expect(performance.now() - start).toBeLessThan(50);
+  });
+
   it('answers typical searches on 20,000 items in under 50 ms each', () => {
     const index = big();
     const queries = [
