@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). Checkout and the keyboard map are added with W1-05. |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). The bill (§10) and the keyboard map (§11): with the W1-05 plan and owner answers (2026-10-27). Payment and printing are added with W1-06. |
 | **Refs** | POS-01, POS-14, PLT-01, PLT-03, PLT-04; architecture §4.1–§4.4, §8; data model §12; sync spec; CLAUDE.md rules 6, 9, 10; D-009, D-010, D-039, D-082 |
 
 The PRD and architecture describe what the counter does. This spec fixes how its foundations behave, precisely enough to build and test. **v1** covers what W1-02 builds; checkout, the payment pad and the keyboard map come in later versions.
@@ -67,7 +67,7 @@ Every check result is written to `diagnostic_log`.
 
 ## 6. Auto-lock
 
-- After **3 minutes** without a key press or click, the counter locks and returns to the staff list (owner answer, W1-02). An open bill isn't lost: it's held for the same user (from W1-05).
+- After **3 minutes** without a key press or click, the counter locks and returns to the staff list (owner answer, W1-02). An open bill isn't lost: it's kept for the same user (§10).
 - At the tenant's **closing time** (Delux 20:00, PLT-01), idle counters lock; a counter in the middle of a bill locks right after it.
 - **Not** after each bill.
 
@@ -101,10 +101,55 @@ POS-02, CAT-02. One search box (`F2`) on the counter screen; it works the same o
 
 - Within a rank: active items first, then dormant and discontinued; then shorter names; then code.
 - **At most 50 results.** Empty text shows a short hint instead of results.
-- A **scan** (characters typed faster than a person types, ending in Enter) that matches rank 1 selects that item at once.
+- A **scan** (characters typed faster than a person types, ending in Enter) adds the item it matches to the bill at once, even before the results are shown (§10).
 
-**Each result shows:** code, name, variant and spec, the first OEM number, the vehicle tag (*Corolla 2009–2014*), bin location, and the price for the default tier (the customer's tier from W1-05). Dormant and discontinued items carry a chip. Stock (Shop · Godown) is added with W1-08.
+**Each result shows:** code, name, variant and spec, the first OEM number, the vehicle tag (*Corolla 2009–2014*), bin location, and the price in the bill's tier (§10; the default tier until another is chosen). Dormant and discontinued items carry a chip. Stock (Shop · Godown) is added with W1-08.
 
-**Keys:** `F2` search · `↑ ↓` select · `Esc` clear · `Alt+L` lock. `Enter` adds the selected item to the bill from W1-05. Every key also appears in the key bar at the bottom, where it can be clicked (D-053).
+**Keys:** `F2` search · `↑ ↓` select · `Esc` clear · `Alt+L` lock. `Enter` adds the selected item to the bill (§10). Every key also appears in the key bar at the bottom, where it can be clicked (D-053). The full map is §11.
 
 **Before the first catalog load finishes**, the counter shows *Loading the catalog… N items* instead of the search.
+
+## 10. The bill (W1-05)
+
+POS-04, PLT-07, D-004. The rules are pure functions in `packages/domain` (`bill.ts`, golden cases in `golden/bill-*.json`); the counter computes with them and the server re-checks synced bills with the same functions (W1-07), recording exceptions, never rejecting (D-011).
+
+**A line** holds the item, the quantity, the **list price** (the bill tier's price when it was added; the default tier's if the item has none in this tier), the **floor** when it was added, and the **unit price** the salesman gives. A later pull doesn't change an open bill.
+
+**Quantity:** more than 0 and at most 9,999; whole numbers unless the item's unit allows fractions (LITRE, METER, FOOT), up to 3 decimals. Adding an item that is already on the bill adds to its line, if that line is still at list price without an approval; otherwise it starts a new line. An item without a list price (none in any tier, or 0) is added only with a typed price.
+
+**Amounts:** line amount = quantity × unit price (rounded half away from zero to the paisa). The **bill discount** is an amount (or a percent of the lines, rounded down to whole rupees); it is split over the lines in proportion to their amounts by largest remainder, and may not exceed them. Total = lines − bill discount. Prices and discounts are typed in **whole rupees** (D-056); cash rounding is W1-06.
+
+**What a price needs**, per line, after its share of the bill discount (compared as line totals, never as rounded unit prices):
+
+| Line amount | Needs |
+|---|---|
+| at or above list (above list shows a chip) | nothing |
+| below list, within the seller's `maxDiscountBp`, at or above the floor | nothing |
+| below list beyond the seller's limit, at or above the floor | approval `below_list`: someone with `pos.override.approve` whose own `maxDiscountBp` covers the discount |
+| below the floor, or no list price | approval `below_floor`: someone with `pos.price.below_floor` |
+
+**When the floor is unknown, it is the list price** (owner answer 1): the server sends each item's effective floor (explicit, or cost + the category's margin) once costs exist (W1-14).
+
+**Approval on the same screen** (PLT-07): the dialog shows the item, list, floor, requested price and seller. The approver picks their name (or types their short code) and enters **their own PIN**, then a **reason**: *Customer bargain, Old or slow stock, Matching a market price, Regular customer*, or *Other* with a note (owner answer 3). The PIN is checked offline like the manager unlock (§5): wrong PINs count towards the approver's own lock; a locked approver, a temporary PIN not yet replaced, or someone without the permission in this branch is refused. **The seller may approve their own price** if they hold the permission, with their PIN and a reason (owner answer 2). The dialog ends with *Cancel (Esc)* and *Approve (Enter)* (D-053).
+
+**An approval is kept on the bill** with its kind, the line (or the bill, for a bill discount), who asked, who approved, the reason, the note, the time and what it approved (a line's list, floor and price; or the bill discount and the lines it covered). It holds while the line's price stays at or above the approved price; lowering it or changing the tier asks again. A bill-discount approval holds while the discount stays at or below the approved one and the lines are unchanged. W1-06 writes the approvals as `overrides` with the document.
+
+**Price tier:** the bill starts on the default tier (Retail); `F7` picks another. Lines still at list move to the new tier's price; bargained lines keep their price and are checked again. From W1-09, choosing a customer sets their tier.
+
+**The open bill is kept on the counter** (`open_bills`, one per person, never pushed) and saved after every change. When the counter locks or the page reloads, it waits for the same person's next unlock; another person starts with their own. `Alt+C` clears it after a confirm. An app update waits while someone is unlocked with lines on their bill (§8).
+
+**The bill panel:** a context strip (*Walk-in · Retail prices*), the lines (number, name, code, list, floor, quantity, price, amount; chips *Bargained −Rs 150*, *Above list*, *Approved by Tariq · Customer bargain*, *Needs approval*), and the totals pinned at the bottom (items, subtotal, discount, **Total** in large figures). The payment pad goes under the total (W1-06).
+
+## 11. Keyboard map (W1-05)
+
+POS-03, D-053, from the prototype. The key bar always shows the keys of the current zone, and each hint is a button that does what its key does.
+
+| Where | Keys |
+|---|---|
+| **Search** (`F2`) | `↑ ↓` result · `Enter` add · `2*` or `1.5*` before the text sets the quantity · `Esc` clear · `Tab` to the bill lines |
+| **Bill lines** (`Tab`) | `↑ ↓` line · `+ −` quantity · `Q` set quantity · `P` price · `D` bill discount · `Del` remove · `Esc` back to search; any other letter types into the search |
+| **Anywhere** | `F2` search · `F7` price tier · `Alt+C` clear the bill · `Alt+L` lock |
+| **Dialogs** | `Enter` the main button · `Esc` cancel · `Tab` next field |
+| **Later tasks** (shown once built) | `F3` return (W1-13) · `F4` customer (W1-09) · `F8` / `Shift+F8` hold and recall (W1-12) · `F9` / `Shift+F9` pay (W1-06) |
+
+`F1`, `F3`, `F5` and `F7` never reach the browser on the counter (no help page, find bar, reload or caret browsing mid-bill). `F6` and `Alt+D` are not used: Chrome keeps them for the address bar.

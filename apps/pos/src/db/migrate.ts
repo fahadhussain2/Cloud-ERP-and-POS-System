@@ -114,6 +114,14 @@ export const MIGRATIONS: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    // The bill each person is building (W1-05, POS spec §10): saved after every change, so a lock or a reload never
+    // loses it. Never pushed; finalizing (W1-06) removes it in the same transaction as the document.
+    version: 4,
+    statements: [
+      'CREATE TABLE open_bills (user_id TEXT PRIMARY KEY, bill TEXT NOT NULL, updated_at TEXT NOT NULL)',
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

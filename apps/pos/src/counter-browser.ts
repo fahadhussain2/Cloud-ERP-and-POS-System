@@ -57,5 +57,11 @@ export function browserCounter(): Counter {
     log: (kind, detail) => db.log(kind, detail),
     search: (text, opts) => db.search(text, opts),
     catalog: () => db.catalogStatus(),
+    tiers: () => db.tiers(),
+    billItem: (itemId, tierId) => db.billItem(itemId, tierId),
+    tierPrices: (itemIds, tierId) => db.tierPrices(itemIds, tierId),
+    openBill: (userId) => db.loadOpenBill(userId),
+    saveOpenBill: (userId, bill) => db.saveOpenBill(userId, bill),
+    clearOpenBill: (userId) => db.clearOpenBill(userId),
   };
 }

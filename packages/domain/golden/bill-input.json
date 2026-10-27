@@ -1,0 +1,90 @@
+{
+  "description": "Typed prices and bill discounts: whole major units only (D-056); a percent discount is taken of the lines and rounded down to whole major units, never more than stated (POS spec §10)",
+  "cases": [
+    {
+      "name": "a price in whole rupees",
+      "input": { "kind": "amount", "text": "1450", "minorUnits": 2 },
+      "expected": 145000
+    },
+    {
+      "name": "with a thousands separator",
+      "input": { "kind": "amount", "text": "1,450", "minorUnits": 2 },
+      "expected": 145000
+    },
+    {
+      "name": "surrounding spaces",
+      "input": { "kind": "amount", "text": " 99 ", "minorUnits": 2 },
+      "expected": 9900
+    },
+    {
+      "name": "zero",
+      "input": { "kind": "amount", "text": "0", "minorUnits": 2 },
+      "expected": 0
+    },
+    {
+      "name": "paisa are refused",
+      "input": { "kind": "amount", "text": "1450.50", "minorUnits": 2 },
+      "error": "too_many_decimals"
+    },
+    {
+      "name": "negative is refused",
+      "input": { "kind": "amount", "text": "-5", "minorUnits": 2 },
+      "error": "negative_amount"
+    },
+    {
+      "name": "not a number",
+      "input": { "kind": "amount", "text": "abc", "minorUnits": 2 },
+      "error": "invalid_number"
+    },
+    {
+      "name": "empty",
+      "input": { "kind": "amount", "text": "", "minorUnits": 2 },
+      "error": "invalid_number"
+    },
+    {
+      "name": "a discount as an amount",
+      "input": { "kind": "discount", "text": "500", "base": 350000, "minorUnits": 2 },
+      "expected": 50000
+    },
+    {
+      "name": "5% of Rs 3,500",
+      "input": { "kind": "discount", "text": "5%", "base": 350000, "minorUnits": 2 },
+      "expected": 17500
+    },
+    {
+      "name": "5% of Rs 3,501 rounds down to whole rupees (Rs 175.05 → Rs 175)",
+      "input": { "kind": "discount", "text": "5%", "base": 350100, "minorUnits": 2 },
+      "expected": 17500
+    },
+    {
+      "name": "2.5 % with a space",
+      "input": { "kind": "discount", "text": "2.5 %", "base": 100000, "minorUnits": 2 },
+      "expected": 2500
+    },
+    {
+      "name": "100%",
+      "input": { "kind": "discount", "text": "100%", "base": 100000, "minorUnits": 2 },
+      "expected": 100000
+    },
+    {
+      "name": "more than 100% is refused",
+      "input": { "kind": "discount", "text": "101%", "base": 100000, "minorUnits": 2 },
+      "error": "invalid_discount"
+    },
+    {
+      "name": "a percent with more than 2 decimals is refused",
+      "input": { "kind": "discount", "text": "1.234%", "base": 100000, "minorUnits": 2 },
+      "error": "too_many_decimals"
+    },
+    {
+      "name": "a negative percent is refused",
+      "input": { "kind": "discount", "text": "-5%", "base": 100000, "minorUnits": 2 },
+      "error": "negative_amount"
+    },
+    {
+      "name": "a discount in paisa is refused",
+      "input": { "kind": "discount", "text": "10.50", "base": 100000, "minorUnits": 2 },
+      "error": "too_many_decimals"
+    }
+  ]
+}

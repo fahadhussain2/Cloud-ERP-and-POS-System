@@ -50,10 +50,11 @@ describe('a search result', () => {
     });
   });
 
-  it("shows another tier's price when asked, and no price when the item has none in that tier", () => {
+  it("shows another tier's price when asked, the default tier's when the item has none there, or none", () => {
     const index = loaded();
     expect(index.search('BRPD001', { tierId: 't-mech' })[0]!.price).toBe(427500);
-    expect(index.search('FNBL001', { tierId: 't-mech' })[0]!.price).toBeNull();
+    // The price a bill line would get (POS spec §10).
+    expect(index.search('FNBL001', { tierId: 't-mech' })[0]!.price).toBe(130000);
     expect(index.search('FNBL002')[0]!.price).toBeNull();
   });
 
@@ -69,6 +70,73 @@ describe('a search result', () => {
     expect(index.search('gasket')).toHaveLength(50);
     expect(index.search('gasket', { limit: 10 })).toHaveLength(10);
     expect(index.size).toBe(80);
+  });
+});
+
+describe('an item for a bill line (POS spec §10)', () => {
+  const withUnits = () => {
+    const index = loaded();
+    index.apply({
+      units: withSync([
+        { id: 'u-pcs', code: 'PCS', name: 'Piece', allows_fraction: false },
+        { id: 'u-m', code: 'METER', name: 'Meter', allows_fraction: true },
+      ]),
+      items: withSync([
+        {
+          id: 'i4',
+          code: 'FNBL001',
+          name: 'FAN BELT CULTUS 4PK-855',
+          category_id: 'c-fnbl',
+          spec: '4PK-855',
+          unit_id: 'u-pcs',
+          floor_price: '120000',
+          status: 'active',
+        },
+        { id: 'i9', code: 'HOSE001', name: 'FUEL HOSE', unit_id: 'u-m', status: 'active' },
+      ]),
+    });
+    return index;
+  };
+
+  it('takes the price in the bill’s tier, the floor and whether the unit allows fractions', () => {
+    expect(withUnits().billItem('i1', 't-mech')).toEqual({
+      itemId: 'i1',
+      code: 'BRPD001',
+      name: 'BRAKE PADS FRONT COROLLA',
+      variant: 'FRONT',
+      spec: null,
+      list: 427500,
+      floor: null,
+      allowsFraction: false,
+    });
+    expect(withUnits().billItem('i4', 't-retail')).toMatchObject({
+      list: 130000,
+      floor: 120000,
+      allowsFraction: false,
+    });
+    expect(withUnits().billItem('i9', null)).toMatchObject({ list: null, floor: null, allowsFraction: true });
+  });
+
+  it("falls back to the default tier's price, and is null for an unknown item", () => {
+    const index = withUnits();
+    expect(index.billItem('i4', 't-mech')?.list).toBe(130000);
+    expect(index.billItem('i4', null)?.list).toBe(130000);
+    expect(index.billItem('nope', 't-retail')).toBeNull();
+  });
+
+  it('gives the prices in another tier for a tier change', () => {
+    expect(withUnits().tierPrices(['i1', 'i4', 'i9'], 't-mech')).toEqual({
+      i1: 427500,
+      i4: 130000,
+      i9: null,
+    });
+  });
+
+  it('lists the tiers in their order', () => {
+    expect(withUnits().tiers()).toEqual([
+      { id: 't-retail', code: 'RETAIL', name: 'Retail', isDefault: true },
+      { id: 't-mech', code: 'MECHANIC', name: 'Mechanic', isDefault: false },
+    ]);
   });
 });
 

@@ -112,13 +112,132 @@
   },
   "bill": {
     "title": "Bill",
-    "soon": "Adding items to a bill comes next. Search works now: try a code, an OEM number or a car and year."
+    "loading": "Opening your bill…",
+    "empty": "Press Enter on a result to add it. A scanned label adds at once. Type 2* before the search for 2 of it.",
+    "walkIn": "Walk-in",
+    "tierPrices": "{{tier}} prices",
+    "lines_one": "{{count, number}} line",
+    "lines_other": "{{count, number}} lines",
+    "head": {
+      "no": "#",
+      "item": "Item",
+      "qty": "Qty",
+      "price": "Price",
+      "amount": "Amount"
+    },
+    "list": "List {{price}}",
+    "noList": "No list price",
+    "floor": "Floor {{price}}",
+    "noFloor": "Floor = list",
+    "bargained": "Bargained −{{amount}}",
+    "aboveList": "Above list",
+    "approved": "Approved by {{name}} · {{reason}}",
+    "needsApproval": "Needs approval",
+    "subtotal": "Subtotal",
+    "lineDiscounts": "Bargained",
+    "billDiscount": "Bill discount",
+    "total": "Total",
+    "billApproved": "Bill discount approved by {{name}} · {{reason}}",
+    "billNeedsApproval": "Bill discount needs approval",
+    "saveFailed": "This bill can’t be saved on this counter. Don’t lock or reload: finish it, and call the manager.",
+    "aboveListTotal": "Above list"
   },
   "keys": {
     "counter": "Counter",
     "search": "Search",
     "select": "Select",
     "clear": "Clear",
-    "lock": "Lock"
+    "lock": "Lock",
+    "add": "Add",
+    "lines": "Bill lines",
+    "line": "Line",
+    "qty": "Qty",
+    "setQty": "Set qty",
+    "price": "Price",
+    "discount": "Bill discount",
+    "remove": "Remove",
+    "back": "Back to search",
+    "tier": "Price tier",
+    "clearBill": "Clear bill",
+    "toLines": "Edit lines"
+  },
+  "dialog": {
+    "cancel": "Cancel"
+  },
+  "qty": {
+    "title": "Quantity",
+    "label": "How many",
+    "action": "Set quantity"
+  },
+  "price": {
+    "title": "Price",
+    "label": "Unit price (whole rupees)",
+    "action": "Set price",
+    "newTitle": "Price for a new item",
+    "noList": "This item has no price. Type the price; it needs an approval."
+  },
+  "discount": {
+    "title": "Bill discount",
+    "label": "Amount or percent, e.g. 500 or 5%",
+    "action": "Set discount",
+    "lines": "Lines"
+  },
+  "tier": {
+    "title": "Price tier",
+    "action": "Use these prices"
+  },
+  "clear": {
+    "title": "Clear this bill?",
+    "body": "Everything on the bill is removed. Nothing has been saved as a sale or printed yet.",
+    "action": "Clear bill"
+  },
+  "approval": {
+    "title": "Approval needed",
+    "below_floor": "Below the floor price: someone who may sell below the floor approves.",
+    "below_list": "Past your discount limit: someone whose own limit covers it approves.",
+    "item": "Item",
+    "list": "List price",
+    "floor": "Floor",
+    "requested": "Requested",
+    "billDiscount": "Bill discount",
+    "seller": "Seller",
+    "who": "Who approves? Pick your name, or type your short code.",
+    "approver": "Approver",
+    "pin": "Approver’s PIN",
+    "reason": "Reason",
+    "note": "Note",
+    "action": "Approve",
+    "checking": "Checking…",
+    "back": "Someone else",
+    "wrong_one": "Wrong PIN. {{count}} try left before this person is locked on this counter.",
+    "wrong_other": "Wrong PIN. {{count}} tries left before this person is locked on this counter.",
+    "locked": "This person is locked on this counter. Ask another approver.",
+    "notAllowed": "This person can’t approve this. Ask a manager.",
+    "noteRequired": "Write a note for “Other”."
+  },
+  "override": {
+    "reason": {
+      "customer_bargain": "Customer bargain",
+      "old_stock": "Old or slow stock",
+      "market_price": "Matching a market price",
+      "regular_customer": "Regular customer",
+      "other": "Other"
+    }
+  },
+  "error": {
+    "invalid_quantity": "That quantity isn’t allowed: more than 0, at most 9,999, and whole unless the item is sold by length or volume.",
+    "too_many_decimals": "Too many decimals: prices are whole rupees, quantities have at most 3 decimals.",
+    "invalid_number": "That isn’t a number.",
+    "out_of_range": "That number is too large.",
+    "not_integer": "That isn’t a whole number.",
+    "price_required": "This item has no price: type one.",
+    "invalid_price": "A price can’t be negative.",
+    "negative_amount": "It can’t be negative.",
+    "invalid_discount": "A discount can be at most 100%.",
+    "discount_too_large": "The discount is more than the bill.",
+    "unknown_line": "That line isn’t on the bill any more.",
+    "nothing_to_approve": "Nothing here needs an approval.",
+    "note_required": "Write a note for “Other”.",
+    "other": "That can’t be done."
   }
 }

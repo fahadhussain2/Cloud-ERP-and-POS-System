@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W1-02 (POS shell) merged; W1-03 (catalog and search, design pass) built, in review |
+| **Status** | In progress: W1-02 (POS shell) and W1-03 (catalog and search, design pass) merged; W1-05 (bill building) built, in review |
 | **Requirements** | 17 (POS-01…POS-17) |
 | **Feature spec needed** | Yes: checkout screen and keyboard map; local DB and storage guardrails |
 
@@ -81,9 +81,22 @@ The screens talk only to the `Counter` interface (`counter.ts`), so they are tes
 | Local catalog tables (schema 2), applying pages, loading the catalog | `apps/pos/src/db/migrate.ts`, `db/repo.ts` (`applyPull`, `loadCatalog`) |
 | The search index: four match ranks, patched per page, warmed after loads | `apps/pos/src/search/search-index.ts`, golden cases in `search/cases.json` |
 | One part-number normalizer for importer and counter | `normalizeIdentifier` in `packages/domain` |
-| The counter screen: search, bill panel (W1-05), key bar, first-load progress | `apps/pos/src/screens/CounterScreen.tsx` |
+| The counter screen: search, bill panel, key bar, first-load progress | `apps/pos/src/screens/CounterScreen.tsx` |
 
 **Look and feel:** every screen is built from `packages/ui` ([README](../../../packages/ui/README.md)): shadcn/ui on Radix and Tailwind with the Tijara POS tokens (D-066).
+
+## Bill building (W1-05)
+
+[Plan](plans/W1-05-bill-building.md), [spec §10–§11](spec.md).
+
+| Part | Where |
+|---|---|
+| The bill rules: amounts, the bill discount split, what a price needs, who may approve, approval validity, every edit, typed prices and discounts (golden cases in `golden/bill-*.json`) | `packages/domain/src/bill.ts` |
+| What a line takes from the catalog (tier price with the default tier as fallback, floor, fractional units), the tiers | `billItem`, `tierPrices`, `tiers` in `apps/pos/src/search/search-index.ts` |
+| The open bill per person (local schema 4), saved after every change | `apps/pos/src/bill/` (`open-bill.ts`, `bill-state.ts`, `use-open-bill.ts`), `open_bills` in `db/repo.ts` |
+| An approver's PIN, checked offline | `apps/pos/src/unlock/approve.ts` |
+| The bill panel, the dialogs (quantity, price, bill discount, tier, clear, approval), the key map | `apps/pos/src/screens/BillPanel.tsx`, `BillDialogs.tsx`, `CounterScreen.tsx` |
+| App updates wait while a bill has lines | `apps/pos/src/bill/bill-open.ts`, `main.tsx` |
 
 ## Work in this module
 

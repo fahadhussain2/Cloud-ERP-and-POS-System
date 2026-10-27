@@ -260,6 +260,9 @@ export function App({ counter }: { counter: Counter }) {
             currency: settings?.currency ?? 'PKR',
             minorUnits: settings?.minorUnits ?? 2,
           }}
+          user={phase.user}
+          staff={staff}
+          branchId={device?.branchId ?? null}
           onLock={() => setPhase({ name: 'locked' })}
         />
       );

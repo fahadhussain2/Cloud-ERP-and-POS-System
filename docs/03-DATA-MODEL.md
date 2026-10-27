@@ -330,6 +330,8 @@ SQLite WASM in a dedicated worker, on OPFS (`opfs-sahpool`), changed only by num
 
 **Built in W1-04 (local schema 3):** `pin_events`: `id` (UUIDv7, made on the counter), `kind` (`locked` | `unlocked`), `user_id`, `by_user_id` (the manager who unlocked; empty for a lock), `at`, `pushed_at`. Locks and manager unlocks on this counter, kept until push reports them to the server's audit log (W1-07; platform spec §4). A pull that brings a new `pin_verifier` for a person deletes their `pin_state` row (POS spec §5).
 
+**Built in W1-05 (local schema 4):** `open_bills`: `user_id` (primary key), `bill` (JSON: `{ version, bill, items }`, the domain bill and what each line shows), `updated_at`. The bill each person is building on this counter, saved after every change so a lock or a reload never loses it (POS spec §10). Never pushed; a stored bill this version can't read is set aside in `diagnostic_log`. W1-06 removes it in the finalize transaction.
+
 The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` in IndexedDB (`erp-pos-keys`), and the device token is kept only in memory.
 
 **Planned (later tasks):**

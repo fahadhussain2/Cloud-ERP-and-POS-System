@@ -51,16 +51,47 @@
 
 ## Tests written first
 
-- [ ] **Pricing (golden):** at list; above list; below list within the role limit; exactly at the role limit; one paisa past it; exactly at the floor; below the floor; floor unknown (list is the floor); no list price; a fractional quantity (1.5 m); a bill discount that pushes one line below its floor while the others stay fine.
-- [ ] **Approvers (golden):** Manager approves below floor; a Salesman can't; a Manager role for another branch doesn't count here; `below_list` needs an approver whose own limit covers the discount; the seller with the permission approves themselves (owner answer 2).
-- [ ] **Totals (golden):** line totals with `mulQty` rounding; the bill discount split sums exactly; subtotal, line discounts (negative above list), bill discount, total; the same item added twice merges, a bargained one doesn't; whole-unit items refuse 1.5.
-- [ ] **Approval validity (golden):** holds after a quantity change and after raising the price; is dropped after lowering the price, a tier change, or a line change under a bill discount.
-- [ ] **Local schema 4:** a schema-3 database with catalog, PIN events and outbox rows upgrades in place with every row kept; save, load and clear an open bill per person; an open bill of an unknown `version` is set aside in `diagnostic_log`, not crashed on.
-- [ ] **Approval dialog (jsdom, fake counter):** a wrong PIN counts towards the approver's lock; a temporary PIN, a locked approver or one without the permission is refused; *Other* needs a note; Enter and the *Approve* button do the same.
-- [ ] **Counter screen (jsdom, fake counter):** Enter adds the selected result; `3*` adds three; a scan adds at once; the key bar follows the zone and each hint does what its key does; lock and unlock bring back the same person's bill, and another person's is empty.
-- [ ] **E2E:** the flows in scope item 4.
+- [x] **Pricing (golden):** at list; above list; below list within the role limit; exactly at the role limit; one paisa past it; exactly at the floor; below the floor; floor unknown (list is the floor); no list price; a fractional quantity (1.5 m); a bill discount that pushes one line below its floor while the others stay fine.
+- [x] **Approvers (golden):** Manager approves below floor; a Salesman can't; a Manager role for another branch doesn't count here; `below_list` needs an approver whose own limit covers the discount; the seller with the permission approves themselves (owner answer 2).
+- [x] **Totals (golden):** line totals with `mulQty` rounding; the bill discount split sums exactly; subtotal, line discounts (negative above list), bill discount, total; the same item added twice merges, a bargained one doesn't; whole-unit items refuse 1.5.
+- [x] **Approval validity (golden):** holds after a quantity change and after raising the price; is dropped after lowering the price, a tier change, or a line change under a bill discount.
+- [x] **Local schema 4:** a schema-3 database with catalog, PIN events and outbox rows upgrades in place with every row kept; save, load and clear an open bill per person; an open bill of an unknown `version` is set aside in `diagnostic_log`, not crashed on.
+- [x] **Approval dialog (jsdom, fake counter):** a wrong PIN counts towards the approver's lock; a temporary PIN, a locked approver or one without the permission is refused; *Other* needs a note; Enter and the *Approve* button do the same.
+- [x] **Counter screen (jsdom, fake counter):** Enter adds the selected result; `3*` adds three; a scan adds at once; the key bar follows the zone and each hint does what its key does; lock and unlock bring back the same person's bill, and another person's is empty.
+- [x] **E2E:** the flows in scope item 4.
+
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| Six golden files instead of three: `bill-pricing` (`priceNeed`), `bill-approvers` (`canApprove`), `bill-totals` (`billAmounts`), `bill-approvals` (`pendingApprovals`), `bill-edits` (every edit, as a list of steps from an empty bill) and `bill-input` (typed prices and discounts) | One file per function keeps each case small and its expected value easy to check by hand. |
+| Edits drop an approval that no longer holds (a lower price, a new tier, back at list; any line change for a bill-discount approval); `pendingApprovals` still checks every approval it finds | The chips on screen and the overrides W1-06 writes show only approvals that apply; the second check guards against a bill saved by an older version. |
+| No list price: the line must be added with a typed price (`price_required`); it never merges | A line always has a unit price, so the totals never meet an empty one. |
+| Search results show the price a line would get: the bill tier's, or the default tier's when the item has none there. One W1-03 test expectation changed with it | A result showing *No price* while Enter adds it at Retail would mislead. |
+| No new `packages/ui` components: the reasons are native radio buttons, the tiers too; what a key can't do shows as a message in the bill panel instead of a toast | Arrow keys move through radio buttons with no extra code, and they test plainly in jsdom; the toast waits for W1-06. |
+| The approver picker lists everyone who can unlock (the W1-04 `StaffPicker`, now its own file); someone without the permission is refused after their PIN | The same flow as the manager unlock, so staff learn one thing. |
+| When the lines take the keyboard, the line just added is the selected one | As in the prototype: the usual next key is `+` or `P` on what was just added. |
+| E2E: the W1-03 scan flow now checks that the scanned item is on the bill, then clears it; `seedCatalog` takes a `floor` and a `fractional` unit, and the E2E catalog has a floor on the brake pads and a hose sold by the metre | A scan ending in Enter adds the item now (§10), as the spec always intended. |
+| The tier dialog takes Enter on a radio button itself | Chrome doesn't submit a form on Enter from a radio button; D-053 needs Enter to do what the main button does. |
+| **Review of PR #74:** money on the counter goes through `add`, `sub`, `negate` and an exact `plainAmount` (in `packages/ui`) for prefilled fields; *has a list price* is `hasListPrice` from `@erp/domain`, and an item without one is found by `addLine` refusing it; a failed save of the open bill is shown on the bill panel and logged; lines above list show as *Above list Rs 100*; quantities are formatted without a float; no approval is judged until the seller's limit has loaded | Review findings 1–7: rule 1, rule 2, POS spec §6 (a bill must not be lost quietly). |
 
 ## Verify
+
+**Results (2026-10-27):**
+
+- **Checks:** `pnpm check` (763 unit tests), `pnpm test:integration` (144) and `pnpm e2e` (14 flows, Edge) pass; output in PR #74.
+- **Real catalog, on this PC.** Setup:
+  - a throwaway copy of `erp_dev` (19,552 items, 3 tiers, no floors yet, so the list price is the floor)
+  - the built POS and back office in Edge at 1366×768, the local API
+  - a salesman and a manager added in the back office, and the counter set up with a one-time code
+
+  Results:
+  - first catalog load, from *Set up counter* to the search box (with choosing two PINs in between): **25 s**
+  - **a 15-line bill from the keyboard only** (7 codes typed like scans, 8 word searches, one `2*`): **Enter to the line on screen 3–11 ms, median 6 ms** (target ≤ 100 ms); key press to results 23–57 ms, median 26 ms
+  - a price below the floor (Rs 1 typed with `P`): Enter to the approval dialog **82 ms**; the manager's short code and PIN, Enter to *Approved by* on the line **408 ms** (the PBKDF2 check in the worker)
+  - lock (`Alt+L`), unlock: PIN to the same 15-line bill **396 ms**
+  - reload: to the staff list **4.7 s**; unlock: PIN to the same bill, approval kept, **929 ms**
+  - not timed on the real catalog: the same bill offline. The offline approval is covered by the E2E flow on the test catalog.
 
 1. `pnpm check`, `pnpm test:integration` and `pnpm e2e`, output shown.
 2. **On your PC, with the real catalog** (local API, built POS in Edge): a 15-line bill from the keyboard only; key press to line added under 100 ms; a below-floor approval with a manager's PIN; lock, unlock, reload, and the bill is still there; offline the same. Timings go into this plan.

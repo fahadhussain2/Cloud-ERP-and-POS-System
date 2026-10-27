@@ -6,6 +6,7 @@ import { I18nextProvider } from 'react-i18next';
 import { registerSW } from 'virtual:pwa-register';
 
 import { App } from './App';
+import { isBillOpen } from './bill/bill-open';
 import { browserCounter } from './counter-browser';
 import { i18n } from './i18n';
 import { applyUpdateWhenSafe } from './pwa/update';
@@ -18,9 +19,9 @@ initBrowserSentry({
   release: import.meta.env.VITE_ERP_VERSION ?? 'dev',
 });
 
-// The app shell offline (POS spec §8). No bills exist before W1-05, so none is ever open yet.
+// The app shell offline (POS spec §8): a new version waits while someone has lines on their bill.
 const updateSW = registerSW({
-  onNeedRefresh: () => applyUpdateWhenSafe({ activate: () => void updateSW(true), billOpen: () => false }),
+  onNeedRefresh: () => applyUpdateWhenSafe({ activate: () => void updateSW(true), billOpen: isBillOpen }),
 });
 
 const root = document.getElementById('root');

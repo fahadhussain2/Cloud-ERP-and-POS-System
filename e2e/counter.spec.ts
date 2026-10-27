@@ -145,14 +145,21 @@ test('the salesman finds parts by code, scan, OEM number, words in any order, an
   await expect(options.first()).toContainText('OEM 04465-02220');
   await expect(options.first()).toContainText('Bin R3-B2');
 
-  // A scanned label: the code typed fast, ending in Enter.
+  // A scanned label: the code typed fast, ending in Enter, puts the item on the bill (W1-05). Cleared again after, so
+  // the bill flows below start empty.
   const box = page.getByRole('combobox');
   await box.fill('');
   await box.pressSequentially('FNBL001', { delay: 5 });
   await box.press('Enter');
-  options = page.getByRole('listbox', { name: pos.search.results }).getByRole('option');
-  await expect(options.first()).toContainText('FAN BELT CULTUS');
-  await expect(options.first()).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('listbox', { name: pos.keys.lines }).getByRole('option').first()).toContainText(
+    'FAN BELT CULTUS',
+  );
+  await page.keyboard.press('Alt+C');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: new RegExp(`^${pos.clear.action}`) })
+    .click();
+  await expect(page.getByText(pos.bill.empty)).toBeVisible();
 
   for (const oem of ['04465-02220', '0446502220', '04465 02220']) {
     options = await searchFor(page, oem);
@@ -290,4 +297,171 @@ test('the manager signs in to the back office and can only give temporary PINs',
   await expect(page.getByRole('heading', { name: SALESMAN.fullName })).toBeVisible();
   await expect(page.getByRole('button', { name: bo.staff.deactivate })).toHaveCount(0);
   await office.close();
+});
+
+// W1-05 plan scope 4: the bill from the keyboard, bargaining and an approval by PIN (offline), the tier, the bill
+// discount, and the bill kept across lock and reload.
+
+const total = (page: Page) => page.getByTestId('bill-total');
+const billLines = (page: Page) => page.getByRole('listbox', { name: pos.keys.lines }).getByRole('option');
+const billPanel = (page: Page) => page.getByRole('region', { name: pos.bill.title });
+const unlockAs = async (page: Page, fullName: string, pin: string) => {
+  await page.getByRole('button', { name: new RegExp(fullName) }).click();
+  await enterPin(page, pin);
+  await expect(page.getByRole('combobox')).toBeVisible();
+};
+const addToBill = async (page: Page, text: string) => {
+  const box = page.getByRole('combobox');
+  await box.fill(text);
+  await expect(
+    page.getByRole('listbox', { name: pos.search.results }).getByRole('option').first(),
+  ).toBeVisible();
+  await box.press('Enter');
+  await expect(box).toHaveValue('');
+};
+/** Types into the open dialog's field and presses Enter, as a salesman would. */
+const answer = async (page: Page, label: string, value: string) => {
+  const field = page.getByRole('dialog').getByLabel(label);
+  await field.fill(value);
+  await field.press('Enter');
+};
+
+test('the salesman builds a bill from the keyboard: Enter, a scan, 1.5*, + −, Q and Del', async ({
+  page,
+}) => {
+  await page.goto(POS);
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await expect(page.getByText(pos.bill.empty)).toBeVisible();
+
+  await addToBill(page, 'brpd001');
+  await expect(total(page)).toHaveText(/Rs\s4,500/);
+  // A scanned label: the code typed fast, then Enter at once.
+  const box = page.getByRole('combobox');
+  await box.pressSequentially('FNBL001', { delay: 5 });
+  await box.press('Enter');
+  await expect(total(page)).toHaveText(/Rs\s5,800/);
+  await addToBill(page, '1.5*hose');
+  await expect(billLines(page)).toHaveCount(3);
+  await expect(billLines(page).nth(2)).toContainText('×1.5');
+  await expect(total(page)).toHaveText(/Rs\s6,100/);
+
+  // The lines take the keyboard; the line just added is selected.
+  await box.press('Tab');
+  await expect(billPanel(page)).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('+');
+  await expect(billLines(page).first()).toContainText('×2');
+  await expect(total(page)).toHaveText(/Rs\s10,600/);
+  await page.keyboard.press('-');
+  await expect(total(page)).toHaveText(/Rs\s6,100/);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Delete');
+  await expect(billLines(page)).toHaveCount(2);
+  await expect(total(page)).toHaveText(/Rs\s4,800/);
+  await page.keyboard.press('q');
+  await answer(page, pos.qty.label, '2.5');
+  await expect(billLines(page).nth(1)).toContainText('×2.5');
+  await expect(total(page)).toHaveText(/Rs\s5,000/);
+});
+
+test('offline, a price within the floor needs nobody; below it, a manager approves with their own PIN', async ({
+  page,
+  context,
+}) => {
+  await page.goto(POS);
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await context.setOffline(true);
+  await page.reload();
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  // The bill from before the reload is still there.
+  await expect(total(page)).toHaveText(/Rs\s5,000/);
+
+  await page.getByRole('combobox').press('Tab');
+  await expect(billPanel(page)).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('p');
+  await answer(page, pos.price.label, '4,200');
+  await expect(billLines(page).first()).toContainText(/Bargained −Rs\s300/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await expect(billPanel(page)).toBeFocused();
+  await page.keyboard.press('p');
+  await answer(page, pos.price.label, '3800');
+  const dialog = page.getByRole('dialog', { name: pos.approval.title });
+  await expect(dialog).toContainText(pos.approval.below_floor);
+  await expect(dialog).toContainText(/Rs\s4,000/);
+
+  // The salesman can't approve their own price below the floor.
+  await dialog.getByRole('button', { name: new RegExp(SALESMAN.fullName) }).click();
+  await answer(page, pos.approval.pin, OWN_PIN);
+  await expect(dialog.getByRole('alert')).toHaveText(pos.approval.notAllowed);
+  await dialog.getByRole('button', { name: pos.approval.back }).click();
+
+  // The manager, by short code: a wrong PIN first, then theirs.
+  await dialog.getByLabel(pos.unlock.shortCode).fill(MANAGER.shortCode);
+  await answer(page, pos.approval.pin, '0000');
+  await expect(dialog.getByRole('alert')).toContainText('4 tries');
+  await answer(page, pos.approval.pin, MANAGER.pin);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(billLines(page).first()).toContainText(`Approved by ${MANAGER.fullName} · Customer bargain`);
+  await expect(total(page)).toHaveText(/Rs\s4,300/);
+  await context.setOffline(false);
+});
+
+test('F7 changes the price tier, D gives a bill discount, and one below the floor needs an approval', async ({
+  page,
+}) => {
+  await page.goto(POS);
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await page.keyboard.press('Alt+C');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: new RegExp(`^${pos.clear.action}`) })
+    .click();
+  await expect(page.getByText(pos.bill.empty)).toBeVisible();
+
+  await addToBill(page, 'brpd001');
+  await page.keyboard.press('F7');
+  await page.getByRole('dialog').getByLabel('Mechanic').check();
+  await page.getByRole('dialog').getByLabel('Mechanic').press('Enter');
+  await expect(total(page)).toHaveText(/Rs\s4,275/);
+  await expect(billPanel(page)).toContainText('Mechanic prices');
+
+  await page.getByRole('combobox').press('Tab');
+  await page.keyboard.press('d');
+  await answer(page, pos.discount.label, '5%');
+  // 5% of Rs 4,275 is Rs 213.75: rounded down to Rs 213, still above the Rs 4,000 floor.
+  await expect(total(page)).toHaveText(/Rs\s4,062/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await expect(billPanel(page)).toBeFocused();
+  await page.keyboard.press('d');
+  await answer(page, pos.discount.label, '300');
+  await expect(page.getByRole('dialog', { name: pos.approval.title })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(billPanel(page)).toContainText(pos.bill.billNeedsApproval);
+  await expect(total(page)).toHaveText(/Rs\s3,975/);
+});
+
+test('F5 does not reload; the bill waits for the same person after a lock, and another person has their own', async ({
+  page,
+}) => {
+  await page.goto(POS);
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await expect(total(page)).toHaveText(/Rs\s3,975/);
+  await page.evaluate(() => ((window as unknown as { stay: number }).stay = 1));
+  await page.keyboard.press('F5');
+  expect(await page.evaluate(() => (window as unknown as { stay?: number }).stay)).toBe(1);
+
+  await page.keyboard.press('Alt+L');
+  await unlockAs(page, MANAGER.fullName, MANAGER.pin);
+  await expect(page.getByText(pos.bill.empty)).toBeVisible();
+  await page.keyboard.press('Alt+L');
+  await page.reload();
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await expect(total(page)).toHaveText(/Rs\s3,975/);
+  await expect(billPanel(page)).toContainText('Mechanic prices');
 });

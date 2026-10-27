@@ -2,19 +2,23 @@
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import type { OpenBill } from '../bill/open-bill';
 import { migrate } from './migrate';
 import {
   applyPull,
+  clearOpenBill,
   getDevice,
   getPinState,
   getSync,
   grantsFor,
   listPinEvents,
   listStaff,
+  loadOpenBill,
   loadCatalog,
   log,
   outboxStats,
   recordPinEvent,
+  saveOpenBill,
   setDevice,
   setPinState,
   tenantSettings,
@@ -388,5 +392,74 @@ describe('PIN locks and events (W1-04)', () => {
       },
     ]);
     expect(grantsFor(db, 'nobody')).toEqual([]);
+  });
+});
+
+describe('the open bill (POS spec §10)', () => {
+  const openBill = (sellerId: string, qty = 1000): OpenBill =>
+    ({
+      version: 1,
+      bill: {
+        version: 1,
+        sellerId,
+        tierId: 'retail',
+        lines: [
+          {
+            id: 'l1',
+            itemId: 'i1',
+            qty,
+            allowsFraction: false,
+            list: 145000,
+            floor: 130000,
+            unitPrice: 145000,
+            approval: null,
+          },
+        ],
+        billDiscount: 0,
+        billApproval: null,
+      },
+      items: { i1: { code: 'AFLT001', name: 'AIR FILTER', variant: null, spec: null } },
+    }) as unknown as OpenBill;
+  const setAside = () =>
+    db
+      .selectObjects("SELECT detail FROM diagnostic_log WHERE kind = 'bill.set_aside'")
+      .map((r) => JSON.parse(String(r['detail'])) as Record<string, unknown>);
+
+  it('keeps one bill per person, replaced on every save', () => {
+    saveOpenBill(db, 'sara', openBill('sara'));
+    saveOpenBill(db, 'ali', openBill('ali'));
+    saveOpenBill(db, 'sara', openBill('sara', 3000));
+    expect(loadOpenBill(db, 'sara')).toEqual(openBill('sara', 3000));
+    expect(loadOpenBill(db, 'ali')).toEqual(openBill('ali'));
+    expect(db.selectValue('SELECT count(*) FROM open_bills')).toBe(2);
+  });
+
+  it('has nothing for someone without a bill', () => {
+    expect(loadOpenBill(db, 'nobody')).toBeNull();
+  });
+
+  it("clears one person's bill only", () => {
+    saveOpenBill(db, 'sara', openBill('sara'));
+    saveOpenBill(db, 'ali', openBill('ali'));
+    clearOpenBill(db, 'sara');
+    expect(loadOpenBill(db, 'sara')).toBeNull();
+    expect(loadOpenBill(db, 'ali')).toEqual(openBill('ali'));
+  });
+
+  it('sets aside a bill of a version it does not know, without crashing', () => {
+    db.exec("INSERT INTO open_bills (user_id, bill, updated_at) VALUES ('sara', ?, 'now')", [
+      JSON.stringify({ ...openBill('sara'), version: 2 }),
+    ]);
+    expect(loadOpenBill(db, 'sara')).toBeNull();
+    expect(db.selectValue('SELECT count(*) FROM open_bills')).toBe(0);
+    expect(setAside()).toEqual([
+      { userId: 'sara', bill: JSON.stringify({ ...openBill('sara'), version: 2 }) },
+    ]);
+  });
+
+  it('sets aside a bill that is not JSON', () => {
+    db.exec("INSERT INTO open_bills (user_id, bill, updated_at) VALUES ('sara', 'not json', 'now')");
+    expect(loadOpenBill(db, 'sara')).toBeNull();
+    expect(setAside()).toEqual([{ userId: 'sara', bill: 'not json' }]);
   });
 });
