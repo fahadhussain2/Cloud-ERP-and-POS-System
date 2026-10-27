@@ -77,6 +77,22 @@
 
 ## Verify
 
+**Results (2026-10-27):**
+
+- **Checks:** `pnpm check` (763 unit tests), `pnpm test:integration` (144) and `pnpm e2e` (14 flows, Edge) pass; output in PR #74.
+- **Real catalog, on this PC.** Setup:
+  - a throwaway copy of `erp_dev` (19,552 items, 3 tiers, no floors yet, so the list price is the floor)
+  - the built POS and back office in Edge at 1366×768, the local API
+  - a salesman and a manager added in the back office, and the counter set up with a one-time code
+
+  Results:
+  - first catalog load, from *Set up counter* to the search box (with choosing two PINs in between): **25 s**
+  - **a 15-line bill from the keyboard only** (7 codes typed like scans, 8 word searches, one `2*`): **Enter to the line on screen 3–11 ms, median 6 ms** (target ≤ 100 ms); key press to results 23–57 ms, median 26 ms
+  - a price below the floor (Rs 1 typed with `P`): Enter to the approval dialog **82 ms**; the manager's short code and PIN, Enter to *Approved by* on the line **408 ms** (the PBKDF2 check in the worker)
+  - lock (`Alt+L`), unlock: PIN to the same 15-line bill **396 ms**
+  - reload: to the staff list **4.7 s**; unlock: PIN to the same bill, approval kept, **929 ms**
+  - not timed on the real catalog: the same bill offline. The offline approval is covered by the E2E flow on the test catalog.
+
 1. `pnpm check`, `pnpm test:integration` and `pnpm e2e`, output shown.
 2. **On your PC, with the real catalog** (local API, built POS in Edge): a 15-line bill from the keyboard only; key press to line added under 100 ms; a below-floor approval with a manager's PIN; lock, unlock, reload, and the bill is still there; offline the same. Timings go into this plan.
 3. **On staging:** the same bill on the seeded catalog, in Chrome.
