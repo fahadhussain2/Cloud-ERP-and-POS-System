@@ -60,6 +60,14 @@
 - [ ] **Counter screen (jsdom, fake counter):** Enter adds the selected result; `3*` adds three; a scan adds at once; the key bar follows the zone and each hint does what its key does; lock and unlock bring back the same person's bill, and another person's is empty.
 - [ ] **E2E:** the flows in scope item 4.
 
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| Six golden files instead of three: `bill-pricing` (`priceNeed`), `bill-approvers` (`canApprove`), `bill-totals` (`billAmounts`), `bill-approvals` (`pendingApprovals`), `bill-edits` (every edit, as a list of steps from an empty bill) and `bill-input` (typed prices and discounts) | One file per function keeps each case small and its expected value easy to check by hand. |
+| Edits drop an approval that no longer holds (a lower price, a new tier, back at list; any line change for a bill-discount approval); `pendingApprovals` still checks every approval it finds | The chips on screen and the overrides W1-06 writes show only approvals that apply; the second check guards against a bill saved by an older version. |
+| No list price: the line must be added with a typed price (`price_required`); it never merges | A line always has a unit price, so the totals never meet an empty one. |
+
 ## Verify
 
 1. `pnpm check`, `pnpm test:integration` and `pnpm e2e`, output shown.
