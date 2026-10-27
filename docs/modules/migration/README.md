@@ -42,6 +42,7 @@ pnpm legacy:import --label dec2025
 ```
 
 - `pnpm dev:db` creates the local `erp_dev` database with the migrations and the Delux tenant (from `infra/db/tenants/delux.json`). Safe to run again.
+- `pnpm dev:reset-password fahad "<temporary password>"` gives the owner (or anyone, by username) a temporary back-office password on `erp_dev`, to change at the next sign-in. Optional third and fourth arguments: another local database (e.g. a copy) and shop code.
 - `pnpm legacy:import` loads units, categories, brands, origins, vehicle makes, parties, items (identifiers, vehicle tags, tier prices) and the legacy expense accounts into it, as the app role under RLS. A second run prints `unchanged` everywhere. `--dry-run` (or the `transform` step) compares and reports without writing.
 - The owner's decisions live in `tools/legacy-import/mapping/delux.json` (codes and catalog words only). Edit it after the review and run the import again.
 - Reports: `tools/legacy-import/out/<label>/reports/index.html` (with CSVs for Excel). Party reports have names and masked phones; `summary.json` has counts only.

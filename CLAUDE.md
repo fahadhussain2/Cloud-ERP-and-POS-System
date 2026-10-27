@@ -48,6 +48,7 @@ Node 24 LTS + pnpm 11 (D-071). Run from the repo root:
 | `pnpm test:watch` | Vitest in watch mode |
 | `pnpm test:integration` | Integration tests (`*.int.test.ts`) against PostgreSQL 17+ at `DATABASE_URL`. They fail without it, and CI always runs them. |
 | `pnpm db:up` · `pnpm db:down` | Local PostgreSQL 17.9 on `127.0.0.1:54329` (Docker). Then: `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:54329/postgres pnpm test:integration` |
+| `pnpm dev:reset-password <user> <password>` | A temporary back-office password on `erp_dev` (shop `delux`), changed at next sign-in; local databases only |
 | `pnpm --filter @erp/<app> dev` | Run one app (`api`, `worker`, `pos`, `backoffice`) |
 | `pnpm e2e` | End-to-end flows (Playwright, `e2e/`): seeds a throwaway `erp_e2e` database at `DATABASE_URL`, starts the API and the built POS and back office. Locally `E2E_CHANNEL=msedge` uses the installed Edge; CI uses Playwright's Chromium. |
 
