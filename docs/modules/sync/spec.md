@@ -2,14 +2,14 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: accepted with the W1-03 plan (2026-10-26). Push is added with W1-06. |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: accepted with the W1-03 plan (2026-10-26). Checkout datasets and the sale document (§6.1): with the W1-06 plan (2026-10-27). Push itself is added with W1-07. |
 | **Refs** | SYN-01…SYN-06; architecture §4.1, §5; data model §10, §12; CLAUDE.md rules 6–9; D-009, D-011, D-042, D-047 |
 
-The architecture (§5) sets the principles. This spec fixes the contracts precisely enough to build and test them. **v1 covers pull**, which W1-02 (users and settings for unlock) and W1-03 (the catalog) need. **Push**, server acceptance, gaps and re-push after a restore are specified with W1-06, in a section below.
+The architecture (§5) sets the principles. This spec fixes the contracts precisely enough to build and test them. **v1 covers pull**, which W1-02 (users and settings for unlock) and W1-03 (the catalog) need. The **sale document** a counter writes to its outbox is fixed with W1-06 (§6.1); **push**, server acceptance, gaps and re-push after a restore are specified with W1-07.
 
 ## 1. Who may sync
 
-- Only an **enrolled, active device** with a valid device token (`Authorization: Device <tenantId>.<token>`, D-082). A revoked device gets `401` on its next call; documents it made before are still accepted later (push, W1-06).
+- Only an **enrolled, active device** with a valid device token (`Authorization: Device <tenantId>.<token>`, D-082). A revoked device gets `401` on its next call; documents it made before are still accepted later (push, W1-07).
 - Every query runs inside `withTenant` with the device's tenant (RLS, rule 5). Branch-scoped datasets are also filtered to the device's branch.
 
 ## 2. Pull
@@ -53,7 +53,17 @@ Each dataset lists its columns explicitly. **A column not listed never leaves th
 | `item_compatibility` | `item_compatibility` | `id, item_id, make_id, model, year_from, year_to, note, row_version, deleted_at` |
 | `item_prices` | `item_prices` | `id, item_id, tier_id, price, row_version, deleted_at` |
 
-`legacy` (on every catalog table) never leaves the server. Customers (W1-09), stock balances (W1-08) and the 90-day bills (W1-13) are added by their tasks with the same rules.
+`legacy` (on every catalog table) never leaves the server.
+
+**Checkout datasets (W1-06):**
+
+| Dataset | Table | Scope | Columns |
+|---|---|---|---|
+| `payment_methods` | `payment_methods` | the tenant | `id, code, name, is_cash, requires_reference, is_active, sort, row_version, deleted_at`. **Never `bank_account_id`** (posting only). |
+| `print_profiles` | `print_profiles` | the tenant | `id, name, paper_format, code_type, copies, template_options, is_tenant_default, row_version, deleted_at` |
+| `device` | `devices` | **only the calling device's own row** | `id, code, print_profile_id, status, row_version, deleted_at`. **Never `public_key`** or who enrolled or revoked it. |
+
+Customers (W1-09), stock balances (W1-08) and the 90-day bills (W1-13) are added by their tasks with the same rules.
 
 **Bootstrap:** the first pull simply starts from the beginning, in full pages of 1,000 rows (about 125k catalog rows for Delux). An interrupted first load resumes from the last committed page. Measured in W1-03 on the real catalog: **31 seconds** from setup to search, under the 60-second rule, so there is no snapshot download. Revisit if a tenant's catalog is much larger.
 
@@ -82,6 +92,31 @@ POST /api/sync/pin   { userId, currentPin, newPin }   (device token)
 
 **PIN events waiting for push:** locks and manager unlocks are kept in the counter's `pin_events` table (data model §12) with a device-made UUIDv7. **Push (W1-07) sends them** for the server's audit log (`pin.locked`, `pin.unlocked_by_manager`, with the device), idempotent by id, and sets `pushed_at`.
 
-## 6. Push (W1-06)
+## 6. Documents and push
 
-To be specified with W1-06, following the invariants already fixed in the architecture (§5.2) and the `sync-protocol` skill: local-first write, batches of ≤ 100 in sequence order, idempotency by document UUIDv7, accept completed sales and record exceptions, quarantine instead of drop, sequence gaps, re-push after a restore.
+### 6.1 The sale document (W1-06)
+
+What a counter writes to `local_documents` and the `outbox` when a bill is finalized (POS spec §12), and what push sends. `SaleDocumentV1` in `@erp/contracts` (zod) is the contract; `buildSaleDocument` in `@erp/domain` makes it, and a test checks every built document against the schema. Money is whole minor units and quantities are thousandths, as JSON integers (rule 1); ids are UUIDs; times are ISO 8601 UTC.
+
+| Field | Content |
+|---|---|
+| `version` | `1` |
+| `id` | UUIDv7 made on the counter: the idempotency key (rule 7) |
+| `family`, `seq`, `number` | `'S'`, the sequence from `local_series` (≥ 1), `C03-S000412` |
+| `kind` | `'sale'` (returns and exchanges come with W1-13) |
+| `deviceId`, `branchId` | from `meta` |
+| `createdAt`, `businessDate` | the counter's clock at finalize; `YYYY-MM-DD` with the tenant's cutoff (D-056) |
+| `sellerId`, `tierId` | who was unlocked; the bill's tier |
+| `customerId`, `walkinPhone` | `null` (W1-09) |
+| `lines[]` | `lineNo` (1…), `itemId`, `qty`, `listPrice` (null without one), `floorPrice` (null = unknown), `unitPrice`, `lineDiscount` (list amount − amount; negative above list), `billShare` (its part of the bill discount), `lineTotal` (amount − bill share) |
+| `amounts` | `subtotal` (sum of list amounts), `lineDiscountTotal`, `billDiscount`, `rounding`, `taxTotal` (0), `total`. Always `subtotal − lineDiscountTotal − billDiscount + rounding = total` |
+| `payments[]` | `method` (payment method code), `amount`, `cashReceived` and `changeDue` (cash only, else null), `reference` (null when none). Amounts add up to `total` |
+| `cashDue`, `handoverStatus` | the cash amount (0 without cash); `'pending'` when above 0, else `'not_applicable'` |
+| `overrides[]` | each approval on the bill (POS spec §10): `kind` (`below_list` \| `below_floor`), `lineNo` (null for the bill discount), `requestedBy`, `approvedBy`, `reason`, `note`, `at`, `values` (a line: `list`, `floor`, `price`; the bill: `billDiscount` and `lines` as `lineNo`, `qty`, `unitPrice`) |
+| `clientVersion` | the app version |
+
+The outbox row's `signature` is the device's ECDSA signature over `canonicalJson(document)` (D-082), added right after the commit. A later version of the document adds a new schema next to v1; the server keeps accepting v1 (architecture §4.2).
+
+### 6.2 Push (W1-07)
+
+To be specified with W1-07, following the invariants already fixed in the architecture (§5.2) and the `sync-protocol` skill: local-first write, batches of ≤ 100 in sequence order, idempotency by document UUIDv7, accept completed sales and record exceptions, quarantine instead of drop, sequence gaps, re-push after a restore.

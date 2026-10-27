@@ -745,3 +745,18 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Every below-floor sale gets a reason, including a manager's own (RPT-10).
   - A lock or a reload must never lose a half-built bill (POS spec §6).
 - **Status:** Accepted (with the W1-05 plan, owner answers 1–4)
+
+### D-093 Finalize and print: one rounded total, number taken in the saving transaction, A5 bill with Code 39, reprint without a PIN (2026-10-27)
+- **Decision:**
+  - **Cash rounding applies to the bill total for every tender** (POS-15, Q5): Delux rounds to Rs 1, the difference is the document's `rounding`, and every payment is a multiple of the increment.
+  - **Payment pad** as in the prototype (D-053), with tender rules in `packages/domain`. Pay is refused while a price still needs an approval. Quick cash: the next multiples of Rs 500, 1,000, 5,000 and 10,000 above the total, the three smallest, topped up with multiples of Rs 5,000.
+  - **The number is taken in the same local transaction** that saves the document and its outbox row and removes the open bill; print comes after the commit. The sale document's shape (`SaleDocumentV1`) is fixed now for W1-07.
+  - **Printing:** an HTML bill to the default printer with `--kiosk-printing`; **A5 landscape stays the Delux default** (A4 is built too); the bill code is Code 39 of the bill number and the cash due. **Thermal templates and the signed QR wait until a tenant needs them.**
+  - **Reprint** (`Alt+P`): anyone unlocked, no PIN, marked REPRINT and logged for the audit log.
+  - **W1-01 follows W1-06:** the shop test prints real bills from a staging counter.
+- **Why:**
+  - One total on screen, on paper, in the bill code and in every payment.
+  - A number taken only when the bill is saved can't leave a gap (POS-13, rule 6).
+  - The Delux printer is a laser (HP LaserJet P1005), its bills print at the cash counter and its scanners read Code 39, so a signed QR adds nothing there yet (D-048).
+  - A jammed shared printer must not stop the shop; a reprinted barcode can't collect cash twice because a handover is unique per bill.
+- **Status:** Accepted (with the W1-06 plan, owner answers 1–4)

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). The bill (§10) and the keyboard map (§11): with the W1-05 plan and owner answers (2026-10-27). Payment and printing are added with W1-06. |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). The bill (§10) and the keyboard map (§11): with the W1-05 plan and owner answers (2026-10-27). Payment and finalize (§12), printing and reprint (§13): with the W1-06 plan and owner answers (2026-10-27). |
 | **Refs** | POS-01, POS-14, PLT-01, PLT-03, PLT-04; architecture §4.1–§4.4, §8; data model §12; sync spec; CLAUDE.md rules 6, 9, 10; D-009, D-010, D-039, D-082 |
 
 The PRD and architecture describe what the counter does. This spec fixes how its foundations behave, precisely enough to build and test. **v1** covers what W1-02 builds; checkout, the payment pad and the keyboard map come in later versions.
@@ -117,7 +117,7 @@ POS-04, PLT-07, D-004. The rules are pure functions in `packages/domain` (`bill.
 
 **Quantity:** more than 0 and at most 9,999; whole numbers unless the item's unit allows fractions (LITRE, METER, FOOT), up to 3 decimals. Adding an item that is already on the bill adds to its line, if that line is still at list price without an approval; otherwise it starts a new line. An item without a list price (none in any tier, or 0) is added only with a typed price.
 
-**Amounts:** line amount = quantity × unit price (rounded half away from zero to the paisa). The **bill discount** is an amount (or a percent of the lines, rounded down to whole rupees); it is split over the lines in proportion to their amounts by largest remainder, and may not exceed them. Total = lines − bill discount. Prices and discounts are typed in **whole rupees** (D-056); cash rounding is W1-06.
+**Amounts:** line amount = quantity × unit price (rounded half away from zero to the paisa). The **bill discount** is an amount (or a percent of the lines, rounded down to whole rupees); it is split over the lines in proportion to their amounts by largest remainder, and may not exceed them. Total = lines − bill discount. Prices and discounts are typed in **whole rupees** (D-056); cash rounding is in §12.
 
 **What a price needs**, per line, after its share of the bill discount (compared as line totals, never as rounded unit prices):
 
@@ -138,7 +138,7 @@ POS-04, PLT-07, D-004. The rules are pure functions in `packages/domain` (`bill.
 
 **The open bill is kept on the counter** (`open_bills`, one per person, never pushed) and saved after every change. When the counter locks or the page reloads, it waits for the same person's next unlock; another person starts with their own. `Alt+C` clears it after a confirm. An app update waits while someone is unlocked with lines on their bill (§8).
 
-**The bill panel:** a context strip (*Walk-in · Retail prices*), the lines (number, name, code, list, floor, quantity, price, amount; chips *Bargained −Rs 150*, *Above list*, *Approved by Tariq · Customer bargain*, *Needs approval*), and the totals pinned at the bottom (items, subtotal, discount, **Total** in large figures). The payment pad goes under the total (W1-06).
+**The bill panel:** a context strip (*Walk-in · Retail prices*), the lines (number, name, code, list, floor, quantity, price, amount; chips *Bargained −Rs 150*, *Above list*, *Approved by Tariq · Customer bargain*, *Needs approval*), and the totals pinned at the bottom (items, subtotal, discount, **Total** in large figures). The payment pad goes under the total (§12).
 
 ## 11. Keyboard map (W1-05)
 
@@ -148,8 +148,86 @@ POS-03, D-053, from the prototype. The key bar always shows the keys of the curr
 |---|---|
 | **Search** (`F2`) | `↑ ↓` result · `Enter` add · `2*` or `1.5*` before the text sets the quantity · `Esc` clear · `Tab` to the bill lines |
 | **Bill lines** (`Tab`) | `↑ ↓` line · `+ −` quantity · `Q` set quantity · `P` price · `D` bill discount · `Del` remove · `Esc` back to search; any other letter types into the search |
-| **Anywhere** | `F2` search · `F7` price tier · `Alt+C` clear the bill · `Alt+L` lock |
+| **Anywhere** | `F2` search · `F7` price tier · `F9` cash · `Shift+F9` split payment · `Alt+P` reprint · `Alt+C` clear the bill · `Alt+L` lock |
 | **Dialogs** | `Enter` the main button · `Esc` cancel · `Tab` next field |
-| **Later tasks** (shown once built) | `F3` return (W1-13) · `F4` customer (W1-09) · `F8` / `Shift+F8` hold and recall (W1-12) · `F9` / `Shift+F9` pay (W1-06) |
+| **Later tasks** (shown once built) | `F3` return (W1-13) · `F4` customer (W1-09) · `F8` / `Shift+F8` hold and recall (W1-12) |
 
-`F1`, `F3`, `F5` and `F7` never reach the browser on the counter (no help page, find bar, reload or caret browsing mid-bill). `F6` and `Alt+D` are not used: Chrome keeps them for the address bar.
+`F1`, `F3`, `F5`, `F7` and `F9` never reach the browser on the counter (no help page, find bar, reload or caret browsing mid-bill). `F6` and `Alt+D` are not used: Chrome keeps them for the address bar.
+
+## 12. Payment and finalize (W1-06)
+
+POS-06, POS-13, POS-15, POS-17, PRD W1 and W3, D-047, D-053. The rules are in `packages/domain`; the counter and, from W1-07, the server use the same functions.
+
+**Total and rounding** (POS-15, owner answer 4): the bill's total is `roundCash(lines − bill discount, tenant.cash_rounding_increment)`, half away from zero, **for every bill whatever the tender**. The difference is the document's `rounding`. The bill panel shows a *Rounding* row only when it isn't zero; with whole-rupee prices that happens only with fractional quantities (1.5 m × Rs 333 = Rs 499.50 → Rs 500, rounding +0.50). Every payment amount is a multiple of the increment.
+
+**The payment pad** sits under the total and never moves (POS-17): *Cash `F9`* (large, accent colour), then one button per other active payment method in its `sort` order (*Bank transfer*, *Raast*, *JazzCash*, *Easypaisa*, *Card*), *On account*, and *Split payment `Shift+F9`*. Only methods the tenant has active are shown.
+
+- All buttons are disabled while the bill is empty.
+- **Pay is refused while any approval is pending** (§10): *Approve the prices first*.
+- *On account* stays disabled until a credit customer can be chosen (W1-09).
+
+**Cash popup** (`F9` or the button): the total in large green figures, *Cash received* (optional, whole rupees), the quick-cash buttons and the change in large figures.
+
+- **Enter with the field empty = the exact amount.** A typed amount below the total is refused: *That's less than the total. Use Split payment if the rest is paid another way.*
+- **Quick cash** (`quickCash(total)`): *Exact*, then three round amounts, each showing its change. For each of Rs 500, 1,000, 5,000 and 10,000, take the next multiple **strictly above** the total; keep the three smallest distinct ones; if fewer than three remain, add the next multiples of Rs 5,000 above the largest. Rs 4,320 → 4,500 / 5,000 / 10,000; Rs 9,800 → 10,000 / 15,000 / 20,000. **One click finalizes.**
+
+**Method popup** (a non-cash button): the amount (the whole total) and one reference field, labelled for the method: *Transfer reference* (bank transfer), *Raast or IBFT ID*, *JazzCash transaction ID*, *Easypaisa transaction ID*, *Card slip number or approval code*. Required when the method `requires_reference`.
+
+**Split popup** (`Shift+F9`): one row per active method (cash first) with an amount and, for non-cash, a reference; cash is prefilled with the total; *Cash received* belongs to the cash row. Under the rows: *Rs X still to cover*, *Rs X too much* or *Fully covered*, and the change. Every tender can be paid from here with the keyboard alone (POS-03).
+
+Every popup ends with *Cancel (Esc)* and *Finalize & print (Enter)* (D-053). Esc leaves the bill as it was.
+
+**Tender rules** (`checkTender`): the first problem found, as an i18n key `tender.<code>`:
+
+| Code | When |
+|---|---|
+| `no_payment` | no payment rows |
+| `unknown_method` | a method that isn't an active pulled method |
+| `on_account_needs_customer` | on account without a credit customer (always, until W1-09) |
+| `duplicate_method` | the same method twice |
+| `amount_not_positive` | an amount ≤ 0 |
+| `amount_not_rounded` | an amount that isn't a multiple of the rounding increment |
+| `reference_required` | a method that requires one, with an empty reference (after trimming) |
+| `reference_too_long` | a reference over 40 characters |
+| `sum_mismatch` | the amounts don't add up exactly to the total |
+| `cash_received_without_cash` | cash received with no cash row |
+| `cash_received_short` | cash received below the cash row's amount |
+
+The **change** is cash received − the cash amount (0 when cash received is empty). The **cash due** is the cash row's amount (0 without one): what the salesman brings to the cash desk (D-047). `handoverStatus` is `pending` when the cash due is above 0, else `not_applicable`.
+
+**Finalize** (`finalizeSale` in the worker, **one SQLite transaction**, data model §12):
+
+1. Read the person's `open_bills` row. If there is none (a second Enter, a click and Enter), return the bill just finalized from it; nothing else is written.
+2. Take `local_series.next_seq` for family `S` (1 on a new counter) and increment it.
+3. Build the document with `buildSaleDocument` (sync spec §6.1): the number is `documentNumber(deviceCode, 'S', seq)`, e.g. `C03-S000412` (at least 6 digits); the business date is `businessDate(createdAt, tenant.timezone, tenant.day_cutoff_hour)` (D-056).
+4. Insert it into `local_documents` and the `outbox` (`pending`, no signature yet).
+5. Delete the `open_bills` row.
+6. Commit. Any error rolls all of it back: no number is used and the open bill is still there (rule 6, POS-13).
+
+**After the commit:**
+
+1. The counter signs the canonical payload with its device key (`signCanonical`, D-082) and stores the signature on the outbox row. If signing fails, the row stays unsigned and push signs it before sending (W1-07).
+2. The bill prints (§13).
+3. A message: *Bill C03-S000412 printed · bring Rs 4,320 to the cash desk, change Rs 680* (or *paid by Raast* without cash), and a new empty bill with the search focused.
+4. The unsynced count in the status bar goes up; an app update may now activate (§8).
+
+## 13. Printing and reprint (W1-06)
+
+POS-09, POS-10, POS-16, architecture §4.5 and §8, D-048, D-055.
+
+**How:** the bill is HTML/CSS rendered into a print-only container and printed with `window.print()`. The counter's browser runs with `--kiosk-printing`, so it goes without a dialog to the **default Windows printer** (Delux: the shared printer at the cash counter). Printing happens only after the bill is committed; a failed print never changes the bill. The browser can't report a paper jam, so the reprint is the remedy.
+
+**Print profile:** the device's `print_profile_id` (pulled `device` dataset), else the tenant default (`is_tenant_default`). Used fields:
+
+| Field | Values built now |
+|---|---|
+| `paper_format` | `a5`: A5 landscape page, 210 × 148 mm (Delux, owner answer 1) · `a4`: A4 portrait page. `thermal_80` and `thermal_58` print the A4 layout until thermal templates are built (owner answer 2) |
+| `code_type` | `barcode` (Code 39). `signed_qr` prints the barcode until it is built (owner answer 2) |
+| `copies` | 1, or 2 = a second page in the same print job |
+| `template_options` | `headerLines` (array of text), `policyText` |
+
+**What the bill shows** (POS-09, Q12, the prototype's layout): the shop name and header lines (`branch.receipt_header`, then the profile's `headerLines`), *SALE BILL*, the bill number, date and time (tenant locale), counter, salesman, customer (*Walk-in*); the lines (#, code, description, quantity, rate, amount); subtotal, discount and rounding when not zero, **TOTAL**; each payment with its reference; *Cash received* and **CHANGE** when there is cash; the policy line (`policyText`, default *Exchange or return within 30 days with this bill.*); the bill code, with its text under the bars. Black on white, no shading. Text through i18n keys, logical CSS properties (rule 10).
+
+**Bill code** (`billCode`, `parseBillCode`): Code 39, no check character, `<bill number> <cash due in whole rupees>`, e.g. `C03-S000412 4320`, or `C03-S000413 0` for a bill paid without cash. A cash due with paisa is refused (it is always rounded at Delux; a tenant whose increment leaves paisa can't use the barcode profile). Parsing ignores spaces around the text and a trailing Enter, and refuses anything else. The bars come from `code39Svg` in `packages/print`.
+
+**Reprint** (`Alt+P`, POS-10, owner answer 3): a dialog lists this counter's bills from `local_documents` (newest first, up to 30 days), filtered as the number is typed; `↑ ↓` and Enter reprint the selected one. **Anyone unlocked may reprint, without a PIN.** The copy carries a **REPRINT** band with the time and who reprinted it. Each reprint is kept in `reprints` (`id` UUIDv7, `document_id`, `number`, `user_id`, `at`, `pushed_at`) and in `diagnostic_log`; push (W1-07) sends it to the audit log as `bill.reprinted`. A reprinted barcode can't collect cash twice: the handover is unique per bill (data model §6).
