@@ -363,6 +363,12 @@ test('the salesman builds a bill from the keyboard: Enter, a scan, 1.5*, + −, 
   await answer(page, pos.qty.label, '2.5');
   await expect(billLines(page).nth(1)).toContainText('×2.5');
   await expect(total(page)).toHaveText(/Rs\s5,000/);
+
+  // End as a salesman does: lock. The bill is saved in the background; unlocking goes through the same database
+  // worker after that save, so the next flow (which reloads) finds this bill, not an earlier one (CI race, 2026-10-27).
+  await page.keyboard.press('Alt+L');
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await expect(total(page)).toHaveText(/Rs\s5,000/);
 });
 
 test('offline, a price within the floor needs nobody; below it, a manager approves with their own PIN', async ({
