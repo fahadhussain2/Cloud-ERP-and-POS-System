@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Issue** | to be opened when the plan is accepted |
+| **Issue** | [#78](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/78) |
 | **Module** | migration (test data), with devops for the server command |
-| **Status** | Draft, for the owner's review (2026-10-27). Replaces the first draft (the real Delux catalog): the owner chose a generated catalog to keep it simple |
+| **Status** | Accepted (2026-10-27). Replaces the first draft (the real Delux catalog): the owner chose a generated catalog to keep it simple |
 | **Refs** | D-076 (no production data on staging: unchanged), D-083 (`erp-tenant`), D-087 (no paid services); sync spec §3; W1-03, W1-05 Verify 3 |
 | **Depends on** | W0-11 (`erp-tenant`, the `demo` shop), W1-03 (`seedCatalog`) |
 | **Size** | about half a day |
