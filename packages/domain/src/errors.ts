@@ -10,7 +10,17 @@ export type DomainErrorCode =
   | 'invalid_increment'
   | 'bad_weights'
   | 'invalid_time_zone'
-  | 'invalid_cutoff';
+  | 'invalid_cutoff'
+  // The bill (POS spec §10, W1-05)
+  | 'invalid_quantity'
+  | 'price_required'
+  | 'invalid_price'
+  | 'negative_amount'
+  | 'invalid_discount'
+  | 'discount_too_large'
+  | 'unknown_line'
+  | 'nothing_to_approve'
+  | 'note_required';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

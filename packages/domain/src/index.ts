@@ -11,6 +11,38 @@ export {
   type SystemRole,
 } from './accounts';
 export { allocate } from './allocate';
+export {
+  addLine,
+  approve,
+  billAmounts,
+  canApprove,
+  changeTier,
+  emptyBill,
+  MAX_LINE_QTY,
+  OVERRIDE_REASONS,
+  parseDiscount,
+  parseWholeAmount,
+  pendingApprovals,
+  priceNeed,
+  removeLine,
+  setBillDiscount,
+  setQty,
+  setUnitPrice,
+  type Approval,
+  type ApprovalKind,
+  type ApprovalTarget,
+  type ApprovedBy,
+  type Bill,
+  type BillAmounts,
+  type BillApprovalValues,
+  type BillLine,
+  type LineAmounts,
+  type LineApprovalValues,
+  type NewLine,
+  type OverrideReason,
+  type PendingApproval,
+  type PriceCheck,
+} from './bill';
 export { businessDate } from './business-date';
 export {
   nextDeviceCode,

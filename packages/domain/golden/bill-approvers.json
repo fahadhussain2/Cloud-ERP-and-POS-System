@@ -1,0 +1,146 @@
+{
+  "description": "Who may approve a price: below_floor needs pos.price.below_floor; below_list needs pos.override.approve and an own limit that covers the discount. Only roles for this branch count (POS spec §10, PLT-07, PRD §4)",
+  "cases": [
+    {
+      "name": "a Manager approves below the floor",
+      "input": {
+        "grants": [{ "template": "manager", "branchId": null }],
+        "branchId": "b1",
+        "need": "below_floor",
+        "discountBp": 2500
+      },
+      "expected": true
+    },
+    {
+      "name": "the Owner approves below the floor",
+      "input": {
+        "grants": [{ "template": "owner", "branchId": null }],
+        "branchId": "b1",
+        "need": "below_floor",
+        "discountBp": 2500
+      },
+      "expected": true
+    },
+    {
+      "name": "a Salesman can't approve below the floor",
+      "input": {
+        "grants": [{ "template": "salesman", "branchId": null }],
+        "branchId": "b1",
+        "need": "below_floor",
+        "discountBp": 100
+      },
+      "expected": false
+    },
+    {
+      "name": "a Cashier can't approve below the floor",
+      "input": {
+        "grants": [{ "template": "cashier", "branchId": null }],
+        "branchId": "b1",
+        "need": "below_floor",
+        "discountBp": 100
+      },
+      "expected": false
+    },
+    {
+      "name": "a Manager role for another branch doesn't count here",
+      "input": {
+        "grants": [
+          { "template": "salesman", "branchId": null },
+          { "template": "manager", "branchId": "b2" }
+        ],
+        "branchId": "b1",
+        "need": "below_floor",
+        "discountBp": 100
+      },
+      "expected": false
+    },
+    {
+      "name": "a Manager role for this branch counts",
+      "input": {
+        "grants": [{ "template": "manager", "branchId": "b1" }],
+        "branchId": "b1",
+        "need": "below_floor",
+        "discountBp": 100
+      },
+      "expected": true
+    },
+    {
+      "name": "a Manager approves a discount past the seller's limit",
+      "input": {
+        "grants": [{ "template": "manager", "branchId": null }],
+        "branchId": "b1",
+        "need": "below_list",
+        "discountBp": 2000
+      },
+      "expected": true
+    },
+    {
+      "name": "a Salesman can't approve past the limit (no pos.override.approve)",
+      "input": {
+        "grants": [{ "template": "salesman", "branchId": null }],
+        "branchId": "b1",
+        "need": "below_list",
+        "discountBp": 100
+      },
+      "expected": false
+    },
+    {
+      "name": "an approver whose own limit is exactly the discount",
+      "input": {
+        "grants": [
+          {
+            "permissions": ["pos.sale.create", "pos.override.approve"],
+            "limits": { "maxDiscountBp": 1000, "voidWindow": "none" },
+            "branchId": null
+          }
+        ],
+        "branchId": "b1",
+        "need": "below_list",
+        "discountBp": 1000
+      },
+      "expected": true
+    },
+    {
+      "name": "an approver whose own limit is under the discount",
+      "input": {
+        "grants": [
+          {
+            "permissions": ["pos.sale.create", "pos.override.approve"],
+            "limits": { "maxDiscountBp": 1000, "voidWindow": "none" },
+            "branchId": null
+          }
+        ],
+        "branchId": "b1",
+        "need": "below_list",
+        "discountBp": 1001
+      },
+      "expected": false
+    },
+    {
+      "name": "pos.override.approve alone doesn't cover below the floor",
+      "input": {
+        "grants": [
+          {
+            "permissions": ["pos.sale.create", "pos.override.approve"],
+            "limits": { "maxDiscountBp": 10000, "voidWindow": "none" },
+            "branchId": null
+          }
+        ],
+        "branchId": "b1",
+        "need": "below_floor",
+        "discountBp": 100
+      },
+      "expected": false
+    },
+    {
+      "name": "below the floor with no list price (no discount to measure)",
+      "input": {
+        "grants": [{ "template": "manager", "branchId": null }],
+        "branchId": "b1",
+        "need": "below_floor",
+        "discountBp": null
+      },
+      "expected": true
+    }
+  ]
+}

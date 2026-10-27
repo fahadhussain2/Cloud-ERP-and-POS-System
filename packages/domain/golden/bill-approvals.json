@@ -1,0 +1,738 @@
+{
+  "description": "Which approvals a bill still needs: each line on its own price (lines first, in order), then the bill discount when its share makes a line worse; an approval holds while what it approved still covers the line (POS spec §10, PLT-07)",
+  "cases": [
+    {
+      "name": "all at list",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 145000,
+              "approval": null
+            },
+            {
+              "id": "l2",
+              "itemId": "i2",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 65000,
+              "floor": 60000,
+              "unitPrice": 65000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": []
+    },
+    {
+      "name": "a line below its floor, not approved",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 120000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": [
+        {
+          "target": {
+            "lineId": "l1"
+          },
+          "need": "below_floor",
+          "discountBp": 1725
+        }
+      ]
+    },
+    {
+      "name": "a line below its floor, approved",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 120000,
+              "approval": {
+                "kind": "below_floor",
+                "requestedBy": "s1",
+                "approvedBy": "m1",
+                "reason": "customer_bargain",
+                "note": null,
+                "at": "2026-11-02T10:00:00.000Z",
+                "values": {
+                  "list": 145000,
+                  "floor": 130000,
+                  "price": 120000
+                }
+              }
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": []
+    },
+    {
+      "name": "approved at a higher price than now",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 120000,
+              "approval": {
+                "kind": "below_floor",
+                "requestedBy": "s1",
+                "approvedBy": "m1",
+                "reason": "customer_bargain",
+                "note": null,
+                "at": "2026-11-02T10:00:00.000Z",
+                "values": {
+                  "list": 145000,
+                  "floor": 130000,
+                  "price": 125000
+                }
+              }
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": [
+        {
+          "target": {
+            "lineId": "l1"
+          },
+          "need": "below_floor",
+          "discountBp": 1725
+        }
+      ]
+    },
+    {
+      "name": "approved against another list price",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 120000,
+              "approval": {
+                "kind": "below_floor",
+                "requestedBy": "s1",
+                "approvedBy": "m1",
+                "reason": "customer_bargain",
+                "note": null,
+                "at": "2026-11-02T10:00:00.000Z",
+                "values": {
+                  "list": 150000,
+                  "floor": 130000,
+                  "price": 120000
+                }
+              }
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": [
+        {
+          "target": {
+            "lineId": "l1"
+          },
+          "need": "below_floor",
+          "discountBp": 1725
+        }
+      ]
+    },
+    {
+      "name": "a below_list approval doesn’t cover below the floor",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 120000,
+              "approval": {
+                "kind": "below_list",
+                "requestedBy": "s1",
+                "approvedBy": "m1",
+                "reason": "customer_bargain",
+                "note": null,
+                "at": "2026-11-02T10:00:00.000Z",
+                "values": {
+                  "list": 145000,
+                  "floor": 130000,
+                  "price": 120000
+                }
+              }
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": [
+        {
+          "target": {
+            "lineId": "l1"
+          },
+          "need": "below_floor",
+          "discountBp": 1725
+        }
+      ]
+    },
+    {
+      "name": "past a 5% limit, not approved: Rs 100 off Rs 1,450 is 690 bp",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 135000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 500
+      },
+      "expected": [
+        {
+          "target": {
+            "lineId": "l1"
+          },
+          "need": "below_list",
+          "discountBp": 690
+        }
+      ]
+    },
+    {
+      "name": "a below_floor approval covers a below_list need",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 135000,
+              "approval": {
+                "kind": "below_floor",
+                "requestedBy": "s1",
+                "approvedBy": "m1",
+                "reason": "customer_bargain",
+                "note": null,
+                "at": "2026-11-02T10:00:00.000Z",
+                "values": {
+                  "list": 145000,
+                  "floor": 130000,
+                  "price": 135000
+                }
+              }
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 500
+      },
+      "expected": []
+    },
+    {
+      "name": "a bill discount within the rules: Rs 100 split 69.05 / 30.95",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 145000,
+              "approval": null
+            },
+            {
+              "id": "l2",
+              "itemId": "i2",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 65000,
+              "floor": 60000,
+              "unitPrice": 65000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 10000,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": []
+    },
+    {
+      "name": "a bill discount taking both lines below their floor: Rs 300 split 207.14 / 92.86",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 145000,
+              "approval": null
+            },
+            {
+              "id": "l2",
+              "itemId": "i2",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 65000,
+              "floor": 60000,
+              "unitPrice": 65000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 30000,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": [
+        {
+          "target": "bill",
+          "need": "below_floor",
+          "discountBp": 1429
+        }
+      ]
+    },
+    {
+      "name": "that bill discount, approved",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 145000,
+              "approval": null
+            },
+            {
+              "id": "l2",
+              "itemId": "i2",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 65000,
+              "floor": 60000,
+              "unitPrice": 65000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 30000,
+          "billApproval": {
+            "kind": "below_floor",
+            "requestedBy": "s1",
+            "approvedBy": "m1",
+            "reason": "regular_customer",
+            "note": null,
+            "at": "2026-11-02T10:00:00.000Z",
+            "values": {
+              "billDiscount": 30000,
+              "lines": [
+                {
+                  "id": "l1",
+                  "qty": 1000,
+                  "unitPrice": 145000
+                },
+                {
+                  "id": "l2",
+                  "qty": 1000,
+                  "unitPrice": 65000
+                }
+              ]
+            }
+          }
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": []
+    },
+    {
+      "name": "a bill discount larger than the approved one",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 145000,
+              "approval": null
+            },
+            {
+              "id": "l2",
+              "itemId": "i2",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 65000,
+              "floor": 60000,
+              "unitPrice": 65000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 30000,
+          "billApproval": {
+            "kind": "below_floor",
+            "requestedBy": "s1",
+            "approvedBy": "m1",
+            "reason": "regular_customer",
+            "note": null,
+            "at": "2026-11-02T10:00:00.000Z",
+            "values": {
+              "billDiscount": 20000,
+              "lines": [
+                {
+                  "id": "l1",
+                  "qty": 1000,
+                  "unitPrice": 145000
+                },
+                {
+                  "id": "l2",
+                  "qty": 1000,
+                  "unitPrice": 65000
+                }
+              ]
+            }
+          }
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": [
+        {
+          "target": "bill",
+          "need": "below_floor",
+          "discountBp": 1429
+        }
+      ]
+    },
+    {
+      "name": "lines changed since the bill discount was approved: Rs 300 over 1,450 and 1,300",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 145000,
+              "approval": null
+            },
+            {
+              "id": "l2",
+              "itemId": "i2",
+              "qty": 2000,
+              "allowsFraction": false,
+              "list": 65000,
+              "floor": 60000,
+              "unitPrice": 65000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 30000,
+          "billApproval": {
+            "kind": "below_floor",
+            "requestedBy": "s1",
+            "approvedBy": "m1",
+            "reason": "regular_customer",
+            "note": null,
+            "at": "2026-11-02T10:00:00.000Z",
+            "values": {
+              "billDiscount": 30000,
+              "lines": [
+                {
+                  "id": "l1",
+                  "qty": 1000,
+                  "unitPrice": 145000
+                },
+                {
+                  "id": "l2",
+                  "qty": 1000,
+                  "unitPrice": 65000
+                }
+              ]
+            }
+          }
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": [
+        {
+          "target": "bill",
+          "need": "below_floor",
+          "discountBp": 1091
+        }
+      ]
+    },
+    {
+      "name": "an approved below-floor line, taken deeper by the bill discount, needs nothing more",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 120000,
+              "approval": {
+                "kind": "below_floor",
+                "requestedBy": "s1",
+                "approvedBy": "m1",
+                "reason": "customer_bargain",
+                "note": null,
+                "at": "2026-11-02T10:00:00.000Z",
+                "values": {
+                  "list": 145000,
+                  "floor": 130000,
+                  "price": 120000
+                }
+              }
+            },
+            {
+              "id": "l2",
+              "itemId": "i2",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 65000,
+              "floor": 60000,
+              "unitPrice": 65000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 5000,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": []
+    },
+    {
+      "name": "an approved line past the limit, taken further by the bill discount: 552 → 646 bp",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 137000,
+              "approval": {
+                "kind": "below_list",
+                "requestedBy": "s1",
+                "approvedBy": "m1",
+                "reason": "customer_bargain",
+                "note": null,
+                "at": "2026-11-02T10:00:00.000Z",
+                "values": {
+                  "list": 145000,
+                  "floor": 130000,
+                  "price": 137000
+                }
+              }
+            },
+            {
+              "id": "l2",
+              "itemId": "i2",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 65000,
+              "floor": 60000,
+              "unitPrice": 65000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 2000,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 500
+      },
+      "expected": [
+        {
+          "target": "bill",
+          "need": "below_list",
+          "discountBp": 646
+        }
+      ]
+    },
+    {
+      "name": "a line need first, then the bill: Rs 150 split 97.30 / 52.70 takes the second line below its floor",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 120000,
+              "approval": null
+            },
+            {
+              "id": "l2",
+              "itemId": "i2",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 65000,
+              "floor": 60000,
+              "unitPrice": 65000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 15000,
+          "billApproval": null
+        },
+        "sellerMaxDiscountBp": 10000
+      },
+      "expected": [
+        {
+          "target": {
+            "lineId": "l1"
+          },
+          "need": "below_floor",
+          "discountBp": 1725
+        },
+        {
+          "target": "bill",
+          "need": "below_floor",
+          "discountBp": 811
+        }
+      ]
+    }
+  ]
+}

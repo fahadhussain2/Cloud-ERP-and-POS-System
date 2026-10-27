@@ -1,0 +1,90 @@
+{
+  "description": "What a line's price needs, from its net amount after its share of the bill discount: nothing, below_list (past the seller's limit) or below_floor. Compared as line totals; the discount is in basis points, rounded up (POS spec §10, POS-04, D-004)",
+  "cases": [
+    {
+      "name": "at list: nothing",
+      "input": { "qty": 1000, "list": 100000, "floor": 90000, "net": 100000, "maxDiscountBp": 10000 },
+      "expected": { "need": null, "discountBp": 0 }
+    },
+    {
+      "name": "above list: nothing",
+      "input": { "qty": 1000, "list": 100000, "floor": 90000, "net": 110000, "maxDiscountBp": 10000 },
+      "expected": { "need": null, "discountBp": 0 }
+    },
+    {
+      "name": "below list, within the role limit and above the floor: nothing",
+      "input": { "qty": 1000, "list": 100000, "floor": 90000, "net": 95000, "maxDiscountBp": 10000 },
+      "expected": { "need": null, "discountBp": 500 }
+    },
+    {
+      "name": "exactly at the floor: nothing",
+      "input": { "qty": 1000, "list": 100000, "floor": 90000, "net": 90000, "maxDiscountBp": 10000 },
+      "expected": { "need": null, "discountBp": 1000 }
+    },
+    {
+      "name": "one paisa below the floor",
+      "input": { "qty": 1000, "list": 100000, "floor": 90000, "net": 89999, "maxDiscountBp": 10000 },
+      "expected": { "need": "below_floor", "discountBp": 1001 }
+    },
+    {
+      "name": "exactly at a 5% role limit: nothing",
+      "input": { "qty": 1000, "list": 100000, "floor": 90000, "net": 95000, "maxDiscountBp": 500 },
+      "expected": { "need": null, "discountBp": 500 }
+    },
+    {
+      "name": "one paisa past a 5% role limit, still above the floor",
+      "input": { "qty": 1000, "list": 100000, "floor": 90000, "net": 94999, "maxDiscountBp": 500 },
+      "expected": { "need": "below_list", "discountBp": 501 }
+    },
+    {
+      "name": "past the role limit and below the floor: the floor wins",
+      "input": { "qty": 1000, "list": 100000, "floor": 90000, "net": 80000, "maxDiscountBp": 500 },
+      "expected": { "need": "below_floor", "discountBp": 2000 }
+    },
+    {
+      "name": "a role with no discount (limit 0) bargains Rs 1",
+      "input": { "qty": 1000, "list": 100000, "floor": 90000, "net": 99900, "maxDiscountBp": 0 },
+      "expected": { "need": "below_list", "discountBp": 10 }
+    },
+    {
+      "name": "floor unknown: the list price is the floor (owner answer 1)",
+      "input": { "qty": 1000, "list": 100000, "floor": null, "net": 99900, "maxDiscountBp": 10000 },
+      "expected": { "need": "below_floor", "discountBp": 10 }
+    },
+    {
+      "name": "floor unknown, at list: nothing",
+      "input": { "qty": 1000, "list": 100000, "floor": null, "net": 100000, "maxDiscountBp": 10000 },
+      "expected": { "need": null, "discountBp": 0 }
+    },
+    {
+      "name": "no list price: always an approval, even above the floor",
+      "input": { "qty": 1000, "list": null, "floor": 90000, "net": 120000, "maxDiscountBp": 10000 },
+      "expected": { "need": "below_floor", "discountBp": null }
+    },
+    {
+      "name": "a list price of 0 counts as none",
+      "input": { "qty": 1000, "list": 0, "floor": null, "net": 50000, "maxDiscountBp": 10000 },
+      "expected": { "need": "below_floor", "discountBp": null }
+    },
+    {
+      "name": "a floor above list (a data error) never blocks selling at list",
+      "input": { "qty": 1000, "list": 100000, "floor": 120000, "net": 100000, "maxDiscountBp": 10000 },
+      "expected": { "need": null, "discountBp": 0 }
+    },
+    {
+      "name": "1.5 m exactly at the floor",
+      "input": { "qty": 1500, "list": 20000, "floor": 18000, "net": 27000, "maxDiscountBp": 10000 },
+      "expected": { "need": null, "discountBp": 1000 }
+    },
+    {
+      "name": "1.5 m one paisa below the floor",
+      "input": { "qty": 1500, "list": 20000, "floor": 18000, "net": 26999, "maxDiscountBp": 10000 },
+      "expected": { "need": "below_floor", "discountBp": 1001 }
+    },
+    {
+      "name": "compared as totals: 3 at Rs 950 is under 3 × floor Rs 951",
+      "input": { "qty": 3000, "list": 100000, "floor": 95100, "net": 285000, "maxDiscountBp": 10000 },
+      "expected": { "need": "below_floor", "discountBp": 500 }
+    }
+  ]
+}
