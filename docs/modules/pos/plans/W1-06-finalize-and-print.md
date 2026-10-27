@@ -65,7 +65,7 @@
 - [x] **Code 39 (golden):** start/stop, each allowed character's pattern, the gap; lower case and other characters refused.
 - [x] **Pull datasets (integration):** each returns only its listed columns (no `bank_account_id`); `device` returns only the caller's row; RLS keeps another tenant's rows out.
 - [x] **Local schema 5:** a schema-4 database with open bills, PIN events and outbox rows upgrades in place with every row kept.
-- [x] **Finalize transaction:** takes the next number, writes the document and outbox row and deletes the open bill together; a failure inside rolls all of it back and the number is not used; a second finalize of the same open bill returns the first result; numbers continue after a reopen.
+- [x] **Finalize transaction:** takes the next number, writes the document and outbox row and deletes the open bill together; a failure inside rolls all of it back and the number is not used; a second finalize of the same open bill returns the first result; the next bill takes the next number (the series lives in `local_series`, so a reload continues it; the reload itself is checked in the E2E).
 - [ ] **Payment popups (jsdom, fake counter):** Enter on an empty field = exact; quick cash finalizes in one click; Esc cancels and the bill is untouched; split shows what is still to cover; Enter and the main button do the same.
 - [ ] **The bill print (jsdom):** shows number, salesman, lines, totals, rounding, payments with references, cash received, change, policy line and the barcode text; REPRINT on a reprint; only i18n keys.
 - [ ] **E2E:** the flows in scope item 6.
