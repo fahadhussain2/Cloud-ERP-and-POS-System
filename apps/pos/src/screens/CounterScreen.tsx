@@ -1,3 +1,23 @@
+import { uuidv7 } from '@erp/contracts';
+import {
+  approve,
+  billAmounts,
+  changeTier,
+  DomainError,
+  effectiveLimits,
+  parseDiscount,
+  parseWholeAmount,
+  pendingApprovals,
+  removeLine,
+  setBillDiscount,
+  setQty,
+  setUnitPrice,
+  type ApprovalTarget,
+  type DomainErrorCode,
+  type Money,
+  type PendingApproval,
+  type Qty,
+} from '@erp/domain';
 import {
   Badge,
   formatMoney,
@@ -10,36 +30,116 @@ import {
   OptionList,
   Panel,
   useShortcuts,
+  type KeyHint,
   type MoneyFormat,
 } from '@erp/ui';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { setBillOpen } from '../bill/bill-open';
+import { addItem, formatQty, parseQuantity, quantityPrefix, tryEdit } from '../bill/bill-state';
+import { useOpenBill, type BillCounter } from '../bill/use-open-bill';
 import type { Counter } from '../counter';
-import type { SearchResult, Vehicle } from '../search/search-index';
+import type { BillItem, SearchResult, Vehicle } from '../search/search-index';
+import { checkApprover } from '../unlock/approve';
+import type { StaffUser } from '../unlock/unlock';
+import { ApprovalDialog, ConfirmDialog, EntryDialog, TierDialog, type ApprovalAttempt } from './BillDialogs';
+import { BillPanel } from './BillPanel';
 
-// The counter screen (POS spec §9, POS-02, POS-03): search on the left, the bill on the right (bill lines come with
-// W1-05), the key bar along the bottom. Every key press searches the local catalog; an older answer never replaces a
-// newer one.
+// The counter screen (POS spec §9–§11, POS-02, POS-03, POS-04, PLT-07): search on the left, the bill on the right,
+// the key bar along the bottom. Every key press searches the local catalog; an older answer never replaces a newer
+// one. Enter (or a scan) adds the selected item; Tab moves to the bill lines, where single keys change a line.
 
 const CATALOG_POLL_MS = 1000;
+
+type Zone = 'search' | 'bill';
+
+type DialogState =
+  | { kind: 'qty'; lineId: string }
+  | { kind: 'price'; lineId: string }
+  | { kind: 'newPrice'; item: BillItem; qty: Qty }
+  | { kind: 'discount' }
+  | { kind: 'tier' }
+  | { kind: 'clear' }
+  | { kind: 'approval'; pending: PendingApproval };
+
+export type CounterScreenCounter = BillCounter &
+  Pick<
+    Counter,
+    | 'search'
+    | 'catalog'
+    | 'billItem'
+    | 'tierPrices'
+    | 'grants'
+    | 'getPinState'
+    | 'setPinState'
+    | 'verifyPin'
+    | 'recordPinEvent'
+    | 'log'
+  >;
+
+const sameTarget = (a: ApprovalTarget, b: ApprovalTarget) =>
+  a === 'bill' || b === 'bill' ? a === b : a.lineId === b.lineId;
 
 export function CounterScreen({
   counter,
   money,
+  user,
+  staff,
+  branchId,
   onLock,
 }: {
-  counter: Pick<Counter, 'search' | 'catalog'>;
+  counter: CounterScreenCounter;
   money: MoneyFormat;
+  /** The person selling: every bill is theirs (POS spec §5). */
+  user: StaffUser;
+  /** Who may be picked as an approver (unlockable staff). */
+  staff: StaffUser[];
+  branchId: string | null;
   onLock: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
+  const panel = useRef<HTMLElement>(null);
   const [text, setText] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [selected, setSelected] = useState(0);
   const [catalog, setCatalog] = useState<{ items: number; ready: boolean } | null>(null);
   const latest = useRef(0);
+  /** The answer for the text in the box, so Enter right after typing (a scan) adds the right item. */
+  const answer = useRef<Promise<SearchResult[]>>(Promise.resolve([]));
+  const shown = useRef({ results, selected });
+  useEffect(() => {
+    shown.current = { results, selected };
+  }, [results, selected]);
+
+  const { openBill, tiers, change, clear, get } = useOpenBill(counter, user.id);
+  const [zone, setZone] = useState<Zone>('search');
+  const [lineSel, setLineSel] = useState(0);
+  const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [maxDiscountBp, setMaxDiscountBp] = useState(0);
+
+  const lines = openBill?.bill.lines ?? [];
+  const tierId = openBill?.bill.tierId;
+  const amounts = openBill ? billAmounts(openBill.bill) : null;
+  const pending = openBill ? pendingApprovals(openBill.bill, maxDiscountBp) : [];
+
+  // The seller's discount limit, from their roles in this branch (PRD §4).
+  useEffect(() => {
+    let stop = false;
+    void counter.grants(user.id).then((g) => {
+      if (!stop) setMaxDiscountBp(effectiveLimits(g, branchId).maxDiscountBp);
+    });
+    return () => {
+      stop = true;
+    };
+  }, [counter, user.id, branchId]);
+
+  // An app update waits while this bill has lines (POS spec §8).
+  const hasLines = lines.length > 0;
+  useEffect(() => setBillOpen(hasLines), [hasLines]);
+  useEffect(() => () => setBillOpen(false), []);
 
   // Until the first catalog load has finished, show its progress instead of the search (POS spec §9).
   const ready = catalog?.ready ?? false;
@@ -58,11 +158,36 @@ export function CounterScreen({
     };
   }, [counter, ready]);
 
-  const type = (value: string) => {
+  // The bill lines take the keyboard when their zone is on.
+  useEffect(() => {
+    if (zone === 'bill' && dialog === null) panel.current?.focus();
+  }, [zone, dialog]);
+
+  const errorKey = (code: DomainErrorCode) =>
+    i18n.exists(`error.${code}`) ? `error.${code}` : 'error.other';
+  const show = (code: DomainErrorCode) => setMessage(t(errorKey(code)));
+  /** A typed value through a domain parser: the value, or the i18n key of what is wrong with it. */
+  const parse = <T,>(fn: () => T): { ok: true; value: T } | { ok: false; key: string } => {
+    try {
+      return { ok: true, value: fn() };
+    } catch (err) {
+      if (err instanceof DomainError) return { ok: false, key: errorKey(err.code) };
+      throw err;
+    }
+  };
+
+  const type = (value: string, tier = tierId) => {
     setText(value);
     const request = ++latest.current;
-    if (value.trim() === '') return setResults([]);
-    void counter.search(value).then((r) => {
+    const { query } = quantityPrefix(value);
+    if (query.trim() === '') {
+      answer.current = Promise.resolve([]);
+      setResults([]);
+      return;
+    }
+    const found = counter.search(query, tier ? { tierId: tier } : undefined);
+    answer.current = found;
+    void found.then((r) => {
       if (request !== latest.current) return;
       setResults(r);
       setSelected(0);
@@ -70,10 +195,11 @@ export function CounterScreen({
   };
 
   const focusSearch = () => {
+    setZone('search');
     input.current?.focus();
     input.current?.select();
   };
-  const clear = () => {
+  const clearSearch = () => {
     type('');
     input.current?.focus();
   };
@@ -82,14 +208,207 @@ export function CounterScreen({
     if (next !== null) setSelected(next);
     return next !== null;
   };
+  const toLines = () => {
+    const n = get()?.bill.lines.length ?? 0;
+    if (n === 0) return;
+    setLineSel((s) => Math.min(s, n - 1));
+    setZone('bill');
+  };
 
-  useShortcuts({ F2: focusSearch, 'Alt+L': onLock });
+  /** Opens the approval a target still needs, if any (POS spec §10). */
+  const askApproval = (target: ApprovalTarget) => {
+    const ob = get();
+    if (!ob) return;
+    const p = pendingApprovals(ob.bill, maxDiscountBp).find((x) => sameTarget(x.target, target));
+    if (p) setDialog({ kind: 'approval', pending: p });
+  };
 
-  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const addBillItem = (item: BillItem, qty: Qty, unitPrice?: Money): string | null => {
+    const id = uuidv7();
+    const err = change((ob) => addItem(ob, item, qty, id, unitPrice));
+    if (err) return errorKey(err);
+    setMessage(null);
+    const now = get()!.bill.lines;
+    const added = now.findIndex((l) => l.id === id);
+    setLineSel(added >= 0 ? added : now.findLastIndex((l) => l.itemId === item.itemId));
+    type('');
+    if (unitPrice !== undefined) askApproval({ lineId: id });
+    return null;
+  };
+
+  /** Enter (or a scan): the selected result, once the search for what is in the box has answered. */
+  const addSelected = async () => {
+    const request = latest.current;
+    const { qty, query } = quantityPrefix(text);
+    if (query.trim() === '' || !openBill) return;
+    const list = await answer.current;
+    if (request !== latest.current) return;
+    const { results: onScreen, selected: sel } = shown.current;
+    const r = list[list === onScreen ? sel : 0];
+    if (!r) return;
+    const item = await counter.billItem(r.id, openBill.bill.tierId);
+    if (!item) return;
+    if (item.list === null || item.list === 0) return setDialog({ kind: 'newPrice', item, qty });
+    const key = addBillItem(item, qty);
+    if (key) setMessage(t(key));
+  };
+
+  const editLine = (edit: Parameters<typeof tryEdit>[1]) => {
+    const err = change((ob) => tryEdit(ob, edit));
+    if (err) show(err);
+    else setMessage(null);
+    return err;
+  };
+
+  const onSearchKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {
       e.preventDefault();
-      clear();
+      clearSearch();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      void addSelected();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      toLines();
     } else if (move(e.key)) e.preventDefault();
+  };
+
+  const lineAction = (key: string) => {
+    const ob = get();
+    const line = ob?.bill.lines[lineSel];
+    if (!ob || !line) return;
+    const step = 1000 as Qty;
+    switch (key) {
+      case '+':
+        return editLine((b) => setQty(b, line.id, (line.qty + step) as Qty));
+      case '-':
+        if (line.qty > step) editLine((b) => setQty(b, line.id, (line.qty - step) as Qty));
+        return;
+      case 'q':
+        return setDialog({ kind: 'qty', lineId: line.id });
+      case 'p':
+        return setDialog({ kind: 'price', lineId: line.id });
+      case 'd':
+        return setDialog({ kind: 'discount' });
+      case 'Delete': {
+        editLine((b) => removeLine(b, line.id));
+        const left = get()?.bill.lines.length ?? 0;
+        if (left === 0) return focusSearch();
+        setLineSel(Math.min(lineSel, left - 1));
+        return;
+      }
+    }
+  };
+
+  const onBillKey = (e: KeyboardEvent<HTMLElement>) => {
+    if (dialog !== null || e.ctrlKey || e.metaKey || e.altKey || e.target !== panel.current) return;
+    const k = e.key;
+    const next = moveSelection(lineSel, k, lines.length);
+    if (next !== null) {
+      e.preventDefault();
+      setLineSel(next);
+    } else if (k === 'Escape' || k === 'Tab') {
+      e.preventDefault();
+      focusSearch();
+    } else if (k === '+' || k === '=' || k === '-') {
+      e.preventDefault();
+      lineAction(k === '=' ? '+' : k);
+    } else if (k === 'Delete' || k === 'Backspace') {
+      e.preventDefault();
+      lineAction('Delete');
+    } else if (['q', 'p', 'd'].includes(k.toLowerCase())) {
+      e.preventDefault();
+      lineAction(k.toLowerCase());
+    } else if (k.length === 1) {
+      // Any other letter types into the search (POS spec §11).
+      e.preventDefault();
+      focusSearch();
+      type(text + k);
+    }
+  };
+
+  const openTier = () => tiers.length > 0 && setDialog({ kind: 'tier' });
+  const openClear = () => (get()?.bill.lines.length ?? 0) > 0 && setDialog({ kind: 'clear' });
+  const ignore = () => {};
+  // F1, F3, F5 never reach the browser on the counter (no help page, find bar or reload mid-bill).
+  useShortcuts(
+    {
+      F2: focusSearch,
+      F7: openTier,
+      'Alt+C': openClear,
+      'Alt+L': onLock,
+      F1: ignore,
+      F3: ignore,
+      F5: ignore,
+    },
+    dialog === null,
+  );
+
+  const m = (minor: number) => formatMoney(minor, money);
+  const nameOf = (id: string) =>
+    staff.find((u) => u.id === id)?.fullName ?? (id === user.id ? user.fullName : id);
+  const lineOf = (id: string) => openBill?.bill.lines.find((l) => l.id === id);
+
+  const attempt =
+    (p: PendingApproval): ApprovalAttempt =>
+    async (approver, pin, reason, note) => {
+      const [before, grants] = await Promise.all([
+        counter.getPinState(approver.id),
+        counter.grants(approver.id),
+      ]);
+      const r = await checkApprover({
+        approver,
+        approverState: before,
+        approverGrants: grants,
+        branchId,
+        need: p.need,
+        discountBp: p.discountBp,
+        pin,
+        verify: (v, x) => counter.verifyPin(v, x),
+      });
+      await counter.setPinState(approver.id, r.approverState);
+      if (!before.locked && r.approverState.locked)
+        await counter.recordPinEvent({
+          kind: 'locked',
+          userId: approver.id,
+          byUserId: null,
+          at: new Date().toISOString(),
+        });
+      await counter.log(`approval.${r.result}`, {
+        sellerId: user.id,
+        approverId: approver.id,
+        need: p.need,
+        target: p.target,
+      });
+      if (r.result === 'approved') {
+        editLine((b) =>
+          approve(b, p.target, maxDiscountBp, {
+            approvedBy: approver.id,
+            reason,
+            note,
+            at: new Date().toISOString(),
+          }),
+        );
+        setDialog(null);
+      }
+      return { result: r.result, failures: r.approverState.failures };
+    };
+
+  const approvalFacts = (p: PendingApproval): [string, ReactNode][] => {
+    if (p.target === 'bill')
+      return [
+        [t('approval.billDiscount'), m(openBill?.bill.billDiscount ?? 0)],
+        [t('approval.seller'), user.fullName],
+      ];
+    const line = lineOf(p.target.lineId);
+    if (!line) return [];
+    return [
+      [t('approval.item'), openBill?.items[line.itemId]?.name ?? line.itemId],
+      [t('approval.list'), line.list !== null && line.list > 0 ? m(line.list) : t('bill.noList')],
+      [t('approval.floor'), line.floor !== null ? m(line.floor) : t('bill.noFloor')],
+      [t('approval.requested'), m(line.unitPrice)],
+      [t('approval.seller'), user.fullName],
+    ];
   };
 
   const vehicle = (v: Vehicle | null) => {
@@ -112,10 +431,45 @@ export function CounterScreen({
         ? t('search.top', { count: results.length })
         : t('search.found', { count: results.length });
 
+  const common: KeyHint[] = [
+    { keys: 'F7', label: t('keys.tier'), run: openTier },
+    { keys: 'Alt+C', label: t('keys.clearBill'), run: openClear },
+    { keys: 'Alt+L', label: t('keys.lock'), run: onLock },
+  ];
+  const hints: KeyHint[] =
+    zone === 'bill'
+      ? [
+          {
+            keys: '↑ ↓',
+            label: t('keys.line'),
+            run: () => setLineSel((s) => Math.min(s + 1, lines.length - 1)),
+          },
+          { keys: '+ −', label: t('keys.qty'), run: () => lineAction('+') },
+          { keys: 'Q', label: t('keys.setQty'), run: () => lineAction('q') },
+          { keys: 'P', label: t('keys.price'), run: () => lineAction('p') },
+          { keys: 'D', label: t('keys.discount'), run: () => lineAction('d') },
+          { keys: 'Del', label: t('keys.remove'), run: () => lineAction('Delete') },
+          { keys: 'Esc', label: t('keys.back'), run: focusSearch },
+          ...common,
+        ]
+      : [
+          { keys: 'F2', label: t('keys.search'), run: focusSearch },
+          { keys: '↑ ↓', label: t('keys.select'), run: () => void move('ArrowDown') },
+          { keys: 'Enter', label: t('keys.add'), run: () => void addSelected(), main: true },
+          { keys: 'Esc', label: t('keys.clear'), run: clearSearch },
+          { keys: 'Tab', label: t('keys.toLines'), run: toLines },
+          ...common,
+        ];
+
+  const dialogLine = dialog && 'lineId' in dialog ? lineOf(dialog.lineId) : undefined;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5">
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-2.5 max-[780px]:grid-cols-1">
-        <Panel aria-label={t('search.panel')} className="flex min-h-0 flex-col overflow-hidden">
+        <Panel
+          aria-label={t('search.panel')}
+          className={`flex min-h-0 flex-col overflow-hidden ${zone === 'search' ? 'border-focus' : ''}`}
+        >
           {!ready ? (
             <div className="flex flex-col gap-2 px-3.5 py-5" role="status">
               <p className="m-0 font-display text-xl font-semibold">
@@ -142,8 +496,9 @@ export function CounterScreen({
                   aria-controls="results"
                   aria-activedescendant={results.length > 0 ? `results-${selected}` : undefined}
                   value={text}
+                  onFocus={() => setZone('search')}
                   onChange={(e) => type(e.target.value)}
-                  onKeyDown={onKeyDown}
+                  onKeyDown={onSearchKey}
                 />
               </div>
               <div className="flex justify-between px-3.5 pb-1.5 text-[11.5px] text-muted-foreground">
@@ -166,6 +521,11 @@ export function CounterScreen({
                   onSelect={(i) => {
                     setSelected(i);
                     input.current?.focus();
+                  }}
+                  onChoose={(i) => {
+                    setSelected(i);
+                    shown.current = { results, selected: i };
+                    void addSelected();
                   }}
                   className="flex-1 px-1.5 pb-2"
                 >
@@ -206,19 +566,148 @@ export function CounterScreen({
             </>
           )}
         </Panel>
-        <Panel title={t('bill.title')} aria-label={t('bill.title')}>
-          <p className="m-0 px-3.5 py-4 text-muted-foreground">{t('bill.soon')}</p>
-        </Panel>
+        <BillPanel
+          openBill={openBill}
+          amounts={amounts}
+          pending={pending}
+          tierName={tiers.find((x) => x.id === tierId)?.name ?? ''}
+          selected={lineSel}
+          active={zone === 'bill'}
+          message={message}
+          money={money}
+          nameOf={nameOf}
+          panelRef={panel}
+          onSelect={(i) => {
+            setLineSel(i);
+            setZone('bill');
+          }}
+          onKeyDown={onBillKey}
+        />
       </div>
-      <KeyBar
-        title={t('keys.counter')}
-        hints={[
-          { keys: 'F2', label: t('keys.search'), run: focusSearch },
-          { keys: '↑ ↓', label: t('keys.select'), run: () => void move('ArrowDown') },
-          { keys: 'Esc', label: t('keys.clear'), run: clear },
-          { keys: 'Alt+L', label: t('keys.lock'), run: onLock },
-        ]}
-      />
+      <KeyBar title={zone === 'bill' ? t('keys.lines') : t('keys.counter')} hints={hints} />
+
+      {dialog?.kind === 'qty' && dialogLine && (
+        <EntryDialog
+          title={t('qty.title')}
+          description={openBill?.items[dialogLine.itemId]?.name}
+          label={t('qty.label')}
+          initial={formatQty(dialogLine.qty, 'en')}
+          actionLabel={t('qty.action')}
+          onClose={() => setDialog(null)}
+          onSubmit={(value) => {
+            const q = parseQuantity(value);
+            if (typeof q === 'string') return errorKey(q);
+            const err = change((ob) => tryEdit(ob, (b) => setQty(b, dialogLine.id, q)));
+            if (err) return errorKey(err);
+            setDialog(null);
+            return null;
+          }}
+        />
+      )}
+      {dialog?.kind === 'price' && dialogLine && (
+        <EntryDialog
+          title={t('price.title')}
+          description={openBill?.items[dialogLine.itemId]?.name}
+          label={t('price.label')}
+          facts={[
+            [
+              t('approval.list'),
+              dialogLine.list !== null && dialogLine.list > 0 ? m(dialogLine.list) : t('bill.noList'),
+            ],
+            [t('approval.floor'), dialogLine.floor !== null ? m(dialogLine.floor) : t('bill.noFloor')],
+          ]}
+          initial={String(dialogLine.unitPrice / 10 ** money.minorUnits)}
+          actionLabel={t('price.action')}
+          onClose={() => setDialog(null)}
+          onSubmit={(value) => {
+            const price = parse(() => parseWholeAmount(value, money.minorUnits));
+            if (!price.ok) return price.key;
+            const err = change((ob) => tryEdit(ob, (b) => setUnitPrice(b, dialogLine.id, price.value)));
+            if (err) return errorKey(err);
+            setMessage(null);
+            setDialog(null);
+            askApproval({ lineId: dialogLine.id });
+            return null;
+          }}
+        />
+      )}
+      {dialog?.kind === 'newPrice' && (
+        <EntryDialog
+          title={t('price.newTitle')}
+          description={t('price.noList')}
+          label={t('price.label')}
+          facts={[[t('approval.item'), dialog.item.name]]}
+          initial=""
+          actionLabel={t('price.action')}
+          onClose={() => setDialog(null)}
+          onSubmit={(value) => {
+            const price = parse(() => parseWholeAmount(value, money.minorUnits));
+            if (!price.ok) return price.key;
+            setDialog(null);
+            return addBillItem(dialog.item, dialog.qty, price.value);
+          }}
+        />
+      )}
+      {dialog?.kind === 'discount' && amounts && (
+        <EntryDialog
+          title={t('discount.title')}
+          label={t('discount.label')}
+          facts={[[t('discount.lines'), m(amounts.total + amounts.billDiscount)]]}
+          initial={amounts.billDiscount > 0 ? String(amounts.billDiscount / 10 ** money.minorUnits) : ''}
+          actionLabel={t('discount.action')}
+          onClose={() => setDialog(null)}
+          onSubmit={(value) => {
+            const base = (amounts.total + amounts.billDiscount) as Money;
+            const amount = parse(() => parseDiscount(value, base, money.minorUnits));
+            if (!amount.ok) return amount.key;
+            const err = change((ob) => tryEdit(ob, (b) => setBillDiscount(b, amount.value)));
+            if (err) return errorKey(err);
+            setMessage(null);
+            setDialog(null);
+            askApproval('bill');
+            return null;
+          }}
+        />
+      )}
+      {dialog?.kind === 'tier' && openBill && (
+        <TierDialog
+          tiers={tiers}
+          current={openBill.bill.tierId}
+          onClose={() => setDialog(null)}
+          onChoose={(id) => {
+            void (async () => {
+              const ob = get()!;
+              const prices = await counter.tierPrices([...new Set(ob.bill.lines.map((l) => l.itemId))], id);
+              editLine((b) => changeTier(b, id, prices));
+              setDialog(null);
+              type(text, id);
+            })();
+          }}
+        />
+      )}
+      {dialog?.kind === 'clear' && (
+        <ConfirmDialog
+          title={t('clear.title')}
+          body={t('clear.body')}
+          actionLabel={t('clear.action')}
+          onClose={() => setDialog(null)}
+          onConfirm={() => {
+            void clear();
+            setDialog(null);
+            setMessage(null);
+            focusSearch();
+          }}
+        />
+      )}
+      {dialog?.kind === 'approval' && (
+        <ApprovalDialog
+          pending={dialog.pending}
+          facts={approvalFacts(dialog.pending)}
+          staff={staff}
+          onApprove={attempt(dialog.pending)}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </div>
   );
 }

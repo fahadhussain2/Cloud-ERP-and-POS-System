@@ -731,3 +731,17 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Without the last-Owner guard, one click would need platform support (D-083) to undo.
   - Locks hurt most when the internet is down, so the unlock works offline; the owner still has a remote path.
 - **Status:** Accepted (with the W1-04 plan, owner answers 1–4)
+
+### D-092 Bill building: list price as the floor until costs arrive, approvals by the approver's own PIN, the open bill kept per person (2026-10-27)
+- **Decision:**
+  - **Prices** (POS-04, D-004): down to the role limit and the floor needs nobody; past the seller's limit needs `pos.override.approve` with an own limit that covers the discount; below the floor, or an item with no list price, needs `pos.price.below_floor`. Compared as line totals after each line's share of the bill discount. A price **above list** is allowed and shown with a chip.
+  - **An item without a known floor uses its list price as the floor** (all imported items until costs arrive). The server sends each item's effective floor from W1-14.
+  - **Approvals on the same screen** (PLT-07): the approver's own PIN, checked offline; wrong PINs count towards their own lock. **The seller may approve their own price** when they hold the permission, still with their PIN and a reason. An approval keeps what it approved and stops holding when the price goes lower, the tier changes, or (for a bill discount) a line changes.
+  - **Reasons are a fixed list** for now (customer bargain, old or slow stock, matching a market price, regular customer, other with a note), with stable codes a later tenant table can adopt.
+  - **The open bill is kept on the counter per person** (local schema 4), saved after every change, never pushed.
+  - **Keys:** the prototype's map, with `F7` for the price tier and `D` for a bill discount; `F6` and `Alt+D` are not used (Chrome keeps them).
+- **Why:**
+  - Without a floor, the Salesman limit (100%) would let any price through with nobody approving.
+  - Every below-floor sale gets a reason, including a manager's own (RPT-10).
+  - A lock or a reload must never lose a half-built bill (POS spec §6).
+- **Status:** Accepted (with the W1-05 plan, owner answers 1–4)

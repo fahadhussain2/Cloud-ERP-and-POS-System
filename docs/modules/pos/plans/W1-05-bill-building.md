@@ -67,6 +67,10 @@
 | Six golden files instead of three: `bill-pricing` (`priceNeed`), `bill-approvers` (`canApprove`), `bill-totals` (`billAmounts`), `bill-approvals` (`pendingApprovals`), `bill-edits` (every edit, as a list of steps from an empty bill) and `bill-input` (typed prices and discounts) | One file per function keeps each case small and its expected value easy to check by hand. |
 | Edits drop an approval that no longer holds (a lower price, a new tier, back at list; any line change for a bill-discount approval); `pendingApprovals` still checks every approval it finds | The chips on screen and the overrides W1-06 writes show only approvals that apply; the second check guards against a bill saved by an older version. |
 | No list price: the line must be added with a typed price (`price_required`); it never merges | A line always has a unit price, so the totals never meet an empty one. |
+| Search results show the price a line would get: the bill tier's, or the default tier's when the item has none there. One W1-03 test expectation changed with it | A result showing *No price* while Enter adds it at Retail would mislead. |
+| No new `packages/ui` components: the reasons are native radio buttons, the tiers too; what a key can't do shows as a message in the bill panel instead of a toast | Arrow keys move through radio buttons with no extra code, and they test plainly in jsdom; the toast waits for W1-06. |
+| The approver picker lists everyone who can unlock (the W1-04 `StaffPicker`, now its own file); someone without the permission is refused after their PIN | The same flow as the manager unlock, so staff learn one thing. |
+| When the lines take the keyboard, the line just added is the selected one | As in the prototype: the usual next key is `+` or `P` on what was just added. |
 
 ## Verify
 
