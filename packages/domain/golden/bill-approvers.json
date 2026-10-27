@@ -4,7 +4,12 @@
     {
       "name": "a Manager approves below the floor",
       "input": {
-        "grants": [{ "template": "manager", "branchId": null }],
+        "grants": [
+          {
+            "template": "manager",
+            "branchId": null
+          }
+        ],
         "branchId": "b1",
         "need": "below_floor",
         "discountBp": 2500
@@ -14,7 +19,12 @@
     {
       "name": "the Owner approves below the floor",
       "input": {
-        "grants": [{ "template": "owner", "branchId": null }],
+        "grants": [
+          {
+            "template": "owner",
+            "branchId": null
+          }
+        ],
         "branchId": "b1",
         "need": "below_floor",
         "discountBp": 2500
@@ -24,7 +34,12 @@
     {
       "name": "a Salesman can't approve below the floor",
       "input": {
-        "grants": [{ "template": "salesman", "branchId": null }],
+        "grants": [
+          {
+            "template": "salesman",
+            "branchId": null
+          }
+        ],
         "branchId": "b1",
         "need": "below_floor",
         "discountBp": 100
@@ -34,7 +49,12 @@
     {
       "name": "a Cashier can't approve below the floor",
       "input": {
-        "grants": [{ "template": "cashier", "branchId": null }],
+        "grants": [
+          {
+            "template": "cashier",
+            "branchId": null
+          }
+        ],
         "branchId": "b1",
         "need": "below_floor",
         "discountBp": 100
@@ -45,8 +65,14 @@
       "name": "a Manager role for another branch doesn't count here",
       "input": {
         "grants": [
-          { "template": "salesman", "branchId": null },
-          { "template": "manager", "branchId": "b2" }
+          {
+            "template": "salesman",
+            "branchId": null
+          },
+          {
+            "template": "manager",
+            "branchId": "b2"
+          }
         ],
         "branchId": "b1",
         "need": "below_floor",
@@ -57,7 +83,12 @@
     {
       "name": "a Manager role for this branch counts",
       "input": {
-        "grants": [{ "template": "manager", "branchId": "b1" }],
+        "grants": [
+          {
+            "template": "manager",
+            "branchId": "b1"
+          }
+        ],
         "branchId": "b1",
         "need": "below_floor",
         "discountBp": 100
@@ -67,7 +98,12 @@
     {
       "name": "a Manager approves a discount past the seller's limit",
       "input": {
-        "grants": [{ "template": "manager", "branchId": null }],
+        "grants": [
+          {
+            "template": "manager",
+            "branchId": null
+          }
+        ],
         "branchId": "b1",
         "need": "below_list",
         "discountBp": 2000
@@ -77,7 +113,12 @@
     {
       "name": "a Salesman can't approve past the limit (no pos.override.approve)",
       "input": {
-        "grants": [{ "template": "salesman", "branchId": null }],
+        "grants": [
+          {
+            "template": "salesman",
+            "branchId": null
+          }
+        ],
         "branchId": "b1",
         "need": "below_list",
         "discountBp": 100
@@ -90,7 +131,10 @@
         "grants": [
           {
             "permissions": ["pos.sale.create", "pos.override.approve"],
-            "limits": { "maxDiscountBp": 1000, "voidWindow": "none" },
+            "limits": {
+              "maxDiscountBp": 1000,
+              "voidWindow": "none"
+            },
             "branchId": null
           }
         ],
@@ -106,7 +150,10 @@
         "grants": [
           {
             "permissions": ["pos.sale.create", "pos.override.approve"],
-            "limits": { "maxDiscountBp": 1000, "voidWindow": "none" },
+            "limits": {
+              "maxDiscountBp": 1000,
+              "voidWindow": "none"
+            },
             "branchId": null
           }
         ],
@@ -122,7 +169,10 @@
         "grants": [
           {
             "permissions": ["pos.sale.create", "pos.override.approve"],
-            "limits": { "maxDiscountBp": 10000, "voidWindow": "none" },
+            "limits": {
+              "maxDiscountBp": 10000,
+              "voidWindow": "none"
+            },
             "branchId": null
           }
         ],
@@ -135,12 +185,32 @@
     {
       "name": "below the floor with no list price (no discount to measure)",
       "input": {
-        "grants": [{ "template": "manager", "branchId": null }],
+        "grants": [
+          {
+            "template": "manager",
+            "branchId": null
+          }
+        ],
         "branchId": "b1",
         "need": "below_floor",
         "discountBp": null
       },
       "expected": true
+    },
+    {
+      "name": "below_list without a discount to measure is never approved",
+      "input": {
+        "grants": [
+          {
+            "template": "manager",
+            "branchId": null
+          }
+        ],
+        "branchId": "b1",
+        "need": "below_list",
+        "discountBp": null
+      },
+      "expected": false
     }
   ]
 }
