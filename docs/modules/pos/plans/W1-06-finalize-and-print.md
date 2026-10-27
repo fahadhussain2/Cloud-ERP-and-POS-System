@@ -57,15 +57,15 @@
 
 ## Tests written first
 
-- [ ] **Sale total (golden):** whole-rupee bill unchanged; 1.5 m × Rs 333 = Rs 499.50 rounds to Rs 500 (rounding +0.50); half rounds away from zero; increment 1 (no rounding); a bill discount then rounding.
-- [ ] **Tender (golden):** exact cash; cash received above (change); received below refused; received without a cash part refused; Raast without a reference refused, with one accepted; split sums exactly, one paisa short or over refused; a method twice refused; a zero payment refused; cash due for cash-only, split and non-cash bills.
-- [ ] **Quick cash (golden):** Rs 4,320 → 4,500 / 5,000 / 10,000; Rs 500 → 1,000 / 5,000 / 10,000; Rs 9,800 → 10,000 / 15,000 / 20,000; Rs 12,000 → 12,500 / 13,000 / 15,000; Rs 99,999 → 100,000 / 105,000 / 110,000; no amount equals the total.
-- [ ] **Number and bill code (golden):** `C03` + 1 → `C03-S000001`; 999,999; the bill code for cash due Rs 4,320 and Rs 0; paisa in the cash due refused (it is rounded); parse back with a trailing Enter or spaces; garbage refused.
-- [ ] **Sale document (golden):** a 3-line bill with a bill discount, a below-floor approval and a split payment → every field, the overrides with their line numbers, cash due, handover status, business date before and after 04:00; the output parses with `SaleDocumentV1`.
-- [ ] **Code 39 (golden):** start/stop, each allowed character's pattern, the gap; lower case and other characters refused.
-- [ ] **Pull datasets (integration):** each returns only its listed columns (no `bank_account_id`); `device` returns only the caller's row; RLS keeps another tenant's rows out.
-- [ ] **Local schema 5:** a schema-4 database with open bills, PIN events and outbox rows upgrades in place with every row kept.
-- [ ] **Finalize transaction:** takes the next number, writes the document and outbox row and deletes the open bill together; a failure inside rolls all of it back and the number is not used; a second finalize of the same open bill returns the first result; numbers continue after a reopen.
+- [x] **Sale total (golden):** whole-rupee bill unchanged; 1.5 m × Rs 333 = Rs 499.50 rounds to Rs 500 (rounding +0.50); half rounds away from zero; increment 1 (no rounding); a bill discount then rounding.
+- [x] **Tender (golden):** exact cash; cash received above (change); received below refused; received without a cash part refused; Raast without a reference refused, with one accepted; split sums exactly, one paisa short or over refused; a method twice refused; a zero payment refused; cash due for cash-only, split and non-cash bills.
+- [x] **Quick cash (golden):** Rs 4,320 → 4,500 / 5,000 / 10,000; Rs 500 → 1,000 / 5,000 / 10,000; Rs 9,800 → 10,000 / 15,000 / 20,000; Rs 12,000 → 12,500 / 13,000 / 15,000; Rs 99,999 → 100,000 / 105,000 / 110,000; no amount equals the total.
+- [x] **Number and bill code (golden):** `C03` + 1 → `C03-S000001`; 999,999; the bill code for cash due Rs 4,320 and Rs 0; paisa in the cash due refused (it is rounded); parse back with a trailing Enter or spaces; garbage refused.
+- [x] **Sale document (golden):** a 3-line bill with a bill discount, a below-floor approval and a split payment → every field, the overrides with their line numbers, cash due, handover status, business date before and after 04:00; the output parses with `SaleDocumentV1`.
+- [x] **Code 39 (golden):** start/stop, each allowed character's pattern, the gap; lower case and other characters refused.
+- [x] **Pull datasets (integration):** each returns only its listed columns (no `bank_account_id`); `device` returns only the caller's row; RLS keeps another tenant's rows out.
+- [x] **Local schema 5:** a schema-4 database with open bills, PIN events and outbox rows upgrades in place with every row kept.
+- [x] **Finalize transaction:** takes the next number, writes the document and outbox row and deletes the open bill together; a failure inside rolls all of it back and the number is not used; a second finalize of the same open bill returns the first result; numbers continue after a reopen.
 - [ ] **Payment popups (jsdom, fake counter):** Enter on an empty field = exact; quick cash finalizes in one click; Esc cancels and the bill is untouched; split shows what is still to cover; Enter and the main button do the same.
 - [ ] **The bill print (jsdom):** shows number, salesman, lines, totals, rounding, payments with references, cash received, change, policy line and the barcode text; REPRINT on a reprint; only i18n keys.
 - [ ] **E2E:** the flows in scope item 6.
