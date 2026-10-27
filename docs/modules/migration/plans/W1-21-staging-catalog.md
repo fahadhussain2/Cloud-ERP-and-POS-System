@@ -39,6 +39,14 @@
 - [ ] **Seed (integration):** seeds a test tenant with RLS on; a second run is refused without writing; `prod` is refused.
 - [ ] **Search on it:** the counter's search index finds a generated item by code, OEM number, words and car + year.
 
+## Changes made while building
+
+| Change | Why |
+|---|---|
+| The seed inserts in bulk (a few statements per 2,000 items), not through `seedCatalog` row by row; lookups (tiers, units, categories, brands, origins, makes) are made if missing first | Row by row took over 10 minutes for 20,000 items; in bulk it takes about 12 s on this PC. |
+| No *search on it* test in this package | `apps/pos` may not import `@erp/db` (lint boundary); the generated items have the same shape as the E2E catalog, whose search is tested end to end, and Verify 2 tries it on staging. |
+| The seed refuses production in `seedGeneratedCatalog` itself as well as in `erp-tenant` | Two locks: the container can't be talked into it either. Checked by running the built entry point with `prod`. |
+
 ## Verify
 
 1. `pnpm check` and `pnpm test:integration`, output shown.

@@ -149,6 +149,12 @@ It prints what it created, any **drift** (spec values that differ from the datab
 ssh admin@204.168.217.64 sudo erp-tenant setup staging demo --generated
 ```
 
+**A test catalog on staging** (W1-21): about 20,000 generated items in Delux's shape, on a staging shop with no items yet. Never real data (D-076); refused for prod:
+```bash
+ssh admin@204.168.217.64 sudo erp-tenant seed-catalog staging demo
+```
+An optional last argument sets the number of items (up to 50,000). Real searches are checked locally on `erp_dev`.
+
 **Forgotten password** (support): sets a generated temporary password that must be changed, lifts a lockout and ends the user's sessions. Give the password to the user in person or by phone:
 ```bash
 ssh admin@204.168.217.64 sudo erp-tenant reset-password prod delux fahad

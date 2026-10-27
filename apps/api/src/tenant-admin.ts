@@ -1,8 +1,9 @@
-// Tenant setup and the support password reset (PLT-11, D-083), run by `erp-tenant` on the server in a one-off
+// Tenant setup, the support password reset (PLT-11, D-083) and a generated test catalog on staging (W1-21), run by `erp-tenant` on the server in a one-off
 // container with the owner role's URL (migrate.env), like the migrate step. The input arrives as JSON on stdin
 // so the password never appears in a command line or the environment; nothing secret is printed.
 import { TenantSpec } from '@erp/contracts';
 import { resetUserPassword, setupTenant } from '@erp/db';
+import { seedGeneratedCatalog } from '@erp/db/testing';
 import { z } from 'zod';
 
 import { hashPassword, passwordProblem } from './auth/password';
@@ -19,6 +20,12 @@ const Input = z.discriminatedUnion('action', [
     tenantCode: z.string(),
     username: z.string(),
     password: z.string(),
+  }),
+  z.object({
+    action: z.literal('seed-catalog'),
+    environment: z.enum(['staging', 'prod']),
+    tenantCode: z.string(),
+    items: z.number().int().min(1).max(50_000),
   }),
 ]);
 
@@ -58,6 +65,10 @@ try {
     list('drift (not applied)', report.drift);
     list('needs attention', report.needsAttention);
     if (report.created.length === 0 && report.drift.length === 0) console.log('no changes');
+  } else if (input.action === 'seed-catalog') {
+    // Refuses production itself too, not only erp-tenant (W1-21).
+    const r = await seedGeneratedCatalog(url, input);
+    console.log(`${input.tenantCode}: ${r.items} generated items seeded in ${(r.ms / 1000).toFixed(1)} s`);
   } else {
     const problem = passwordProblem(input.password, input.username);
     if (problem) fail(`the password is not acceptable: ${problem}`);

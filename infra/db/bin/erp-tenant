@@ -8,6 +8,8 @@
 #                                                        must be changed at the first login
 #   sudo erp-tenant reset-password <env> <shop> <user>   support: a generated temporary password (must be changed),
 #                                                        also lifts a lockout and ends the user's sessions
+#   sudo erp-tenant seed-catalog staging <shop> [items]  a generated test catalog (default 20,000 items) on a staging
+#                                                        shop with no items yet (W1-21); never on prod
 #   sudo erp-tenant list                                 the specs on this server
 #
 # <env> is prod or staging. Re-running setup is safe: it creates only what's missing and reports any value that
@@ -89,11 +91,19 @@ case $cmd in
       die "usage: erp-tenant reset-password <env> <shop> <user>"
     make_input reset-password "$3" "$4" | run_admin "$2" || die "reset failed; the password above was not set"
     ;;
+  seed-catalog)
+    [[ ${2:-} == staging ]] || die "seed-catalog is for staging only: test data never goes to prod"
+    [[ ${3:-} =~ ^[a-z0-9][a-z0-9-]{1,31}$ ]] || die "usage: erp-tenant seed-catalog staging <shop> [items]"
+    items=${4:-20000}
+    [[ $items =~ ^[1-9][0-9]{0,4}$ ]] || die "items must be a number from 1 to 50000"
+    printf '{"action":"seed-catalog","environment":"staging","tenantCode":"%s","items":%d}' "$3" "$items" |
+      run_admin staging || die "seed failed; nothing was changed"
+    ;;
   list)
     find "$SPECS" -maxdepth 1 -name '*.json' -printf '%f\n' 2>/dev/null | sed 's/\.json$//' | sort
     ;;
   *)
-    sed -n '4,12p' "$0" >&2
+    sed -n '4,14p' "$0" >&2
     exit 2
     ;;
 esac
