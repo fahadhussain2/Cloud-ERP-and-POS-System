@@ -22,6 +22,7 @@ export {
   SetPinRequest,
   TokenRequest,
 } from './devices';
+export { SaleDocumentV1 } from './documents';
 export { TenantSpec } from './tenant-spec';
 export { uuidv7 } from './uuid';
 export {
