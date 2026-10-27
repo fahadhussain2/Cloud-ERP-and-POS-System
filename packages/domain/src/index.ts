@@ -18,6 +18,7 @@ export {
   canApprove,
   changeTier,
   emptyBill,
+  hasListPrice,
   MAX_LINE_QTY,
   OVERRIDE_REASONS,
   parseDiscount,

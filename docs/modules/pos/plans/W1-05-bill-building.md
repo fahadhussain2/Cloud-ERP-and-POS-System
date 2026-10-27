@@ -73,6 +73,7 @@
 | When the lines take the keyboard, the line just added is the selected one | As in the prototype: the usual next key is `+` or `P` on what was just added. |
 | E2E: the W1-03 scan flow now checks that the scanned item is on the bill, then clears it; `seedCatalog` takes a `floor` and a `fractional` unit, and the E2E catalog has a floor on the brake pads and a hose sold by the metre | A scan ending in Enter adds the item now (§10), as the spec always intended. |
 | The tier dialog takes Enter on a radio button itself | Chrome doesn't submit a form on Enter from a radio button; D-053 needs Enter to do what the main button does. |
+| **Review of PR #74:** money on the counter goes through `add`, `sub`, `negate` and an exact `plainAmount` (in `packages/ui`) for prefilled fields; *has a list price* is `hasListPrice` from `@erp/domain`, and an item without one is found by `addLine` refusing it; a failed save of the open bill is shown on the bill panel and logged; lines above list show as *Above list Rs 100*; quantities are formatted without a float; no approval is judged until the seller's limit has loaded | Review findings 1–7: rule 1, rule 2, POS spec §6 (a bill must not be lost quietly). |
 
 ## Verify
 

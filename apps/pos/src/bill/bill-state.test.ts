@@ -90,5 +90,7 @@ describe('typed quantities', () => {
     expect(formatQty(qty(2000), 'en-PK')).toBe('2');
     expect(formatQty(qty(1500), 'en-PK')).toBe('1.5');
     expect(formatQty(qty(1005), 'en-PK')).toBe('1.005');
+    expect(formatQty(qty(9999000), 'en-PK')).toBe('9,999');
+    expect(formatQty(qty(-1500), 'en-PK')).toBe('-1.5');
   });
 });

@@ -73,6 +73,17 @@ export function parseQuantity(text: string): Qty | DomainErrorCode {
   }
 }
 
-/** A quantity as people read it: 2, 1.5. Display only; the bill keeps thousandths. */
-export const formatQty = (q: Qty, locale: string): string =>
-  new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(q / QTY_SCALE);
+/**
+ * A quantity as people read it: 2, 1.5, 1.005. The decimal text is built from the integer thousandths (no float), then
+ * formatted for the locale, as formatMoney does with money.
+ */
+export function formatQty(q: Qty, locale: string): string {
+  const abs = Math.abs(q);
+  const fraction = String(abs % QTY_SCALE)
+    .padStart(3, '0')
+    .replace(/0+$/, '');
+  const decimal = `${q < 0 ? '-' : ''}${(abs - (abs % QTY_SCALE)) / QTY_SCALE}${fraction ? `.${fraction}` : ''}`;
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(
+    decimal as Intl.StringNumericLiteral,
+  );
+}

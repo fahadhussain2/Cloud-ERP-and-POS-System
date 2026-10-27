@@ -1,4 +1,11 @@
-import type { Approval, BillAmounts, PendingApproval } from '@erp/domain';
+import {
+  hasListPrice,
+  negate,
+  sub,
+  type Approval,
+  type BillAmounts,
+  type PendingApproval,
+} from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -111,7 +118,7 @@ export function BillPanel({
               const a = amounts!.lines[i]!;
               const item = openBill.items[l.itemId];
               const below = a.amount < a.listAmount;
-              const above = l.list !== null && l.list > 0 && a.amount > a.listAmount;
+              const above = hasListPrice(l.list) && a.amount > a.listAmount;
               return (
                 <div className="grid grid-cols-[22px_minmax(0,1fr)_52px_86px_96px] items-center gap-2 px-2 py-[7px]">
                   <span className="text-muted-foreground tabular-nums">{i + 1}</span>
@@ -120,9 +127,7 @@ export function BillPanel({
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                       <span className="font-mono">{item?.code}</span>
                       <span>
-                        {l.list !== null && l.list > 0
-                          ? t('bill.list', { price: m(l.list) })
-                          : t('bill.noList')}
+                        {hasListPrice(l.list) ? t('bill.list', { price: m(l.list) }) : t('bill.noList')}
                       </span>
                       <span>
                         {l.floor !== null ? t('bill.floor', { price: m(l.floor) }) : t('bill.noFloor')}
@@ -140,7 +145,7 @@ export function BillPanel({
                           variant="outline"
                           className={cn(chip, 'border-line bg-surface-2 text-muted-foreground')}
                         >
-                          {t('bill.bargained', { amount: m(a.listAmount - a.amount) })}
+                          {t('bill.bargained', { amount: m(sub(a.listAmount, a.amount)) })}
                         </Badge>
                       ) : above ? (
                         <Badge variant="outline" className={cn(chip, 'bg-warn-soft text-warn')}>
@@ -168,8 +173,9 @@ export function BillPanel({
           </div>
           {amounts.lineDiscountTotal !== 0 && (
             <div className="flex justify-between gap-3 text-muted-foreground tabular-nums">
-              <span>{t('bill.lineDiscounts')}</span>
-              <span>−{m(amounts.lineDiscountTotal)}</span>
+              {/* Bargained lines take money off; lines above list add it (the sign comes with the amount). */}
+              <span>{t(amounts.lineDiscountTotal > 0 ? 'bill.lineDiscounts' : 'bill.aboveListTotal')}</span>
+              <span>{m(negate(amounts.lineDiscountTotal))}</span>
             </div>
           )}
           {amounts.billDiscount > 0 && (
@@ -191,7 +197,7 @@ export function BillPanel({
                   )
                 )}
               </span>
-              <span>−{m(amounts.billDiscount)}</span>
+              <span>{m(negate(amounts.billDiscount))}</span>
             </div>
           )}
           <div className="flex items-baseline justify-between gap-3">

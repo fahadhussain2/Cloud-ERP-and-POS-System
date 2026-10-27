@@ -123,8 +123,8 @@ export interface ApprovedBy {
 const RANK: Readonly<Record<ApprovalKind, number>> = { below_list: 1, below_floor: 2 };
 const rank = (need: ApprovalKind | null) => (need === null ? 0 : RANK[need]);
 
-/** A list price of 0 counts as none (legacy items without a price). */
-const hasList = (list: Money | null): list is Money => list !== null && list > 0;
+/** Whether a line has a list price: 0 counts as none (legacy items without a price). The counter asks this too. */
+export const hasListPrice = (list: Money | null): list is Money => list !== null && list > 0;
 
 const ZERO = money(0);
 const MAX_QTY: number = MAX_LINE_QTY;
@@ -147,7 +147,7 @@ export function priceNeed(input: {
   maxDiscountBp: number;
 }): PriceCheck {
   const { qty, list, net } = input;
-  if (!hasList(list)) return { need: 'below_floor', discountBp: null };
+  if (!hasListPrice(list)) return { need: 'below_floor', discountBp: null };
   const listAmount = mulQty(qty, list);
   if (net >= listAmount) return { need: null, discountBp: 0 };
   // Rounded up, so "within the limit" (≤) means exactly that.
@@ -185,7 +185,7 @@ export function billAmounts(bill: Bill): BillAmounts {
     const billShare = shares[i]!;
     return {
       id: l.id,
-      listAmount: hasList(l.list) ? mulQty(l.qty, l.list) : amount,
+      listAmount: hasListPrice(l.list) ? mulQty(l.qty, l.list) : amount,
       amount,
       billShare,
       net: sub(amount, billShare),
@@ -320,7 +320,8 @@ export function addLine(bill: Bill, item: NewLine, qty: Qty, lineId: string, uni
     ]);
   if (unitPrice !== undefined) return added(checkPrice(unitPrice));
   const list = item.list;
-  if (!hasList(list)) throw new DomainError('price_required', `item ${item.itemId} has no price: type one`);
+  if (!hasListPrice(list))
+    throw new DomainError('price_required', `item ${item.itemId} has no price: type one`);
   const i = bill.lines.findIndex(
     (l) => l.itemId === item.itemId && l.list === list && l.unitPrice === list && l.approval === null,
   );
@@ -340,7 +341,7 @@ export function setUnitPrice(bill: Bill, lineId: string, price: Money): Bill {
   const i = lineIndex(bill, lineId);
   const line = bill.lines[i]!;
   const a = line.approval;
-  const keeps = a !== null && price >= a.values.price && !(hasList(line.list) && price >= line.list);
+  const keeps = a !== null && price >= a.values.price && !(hasListPrice(line.list) && price >= line.list);
   return replaceLine(bill, i, { ...line, unitPrice: checkPrice(price), approval: keeps ? a : null });
 }
 

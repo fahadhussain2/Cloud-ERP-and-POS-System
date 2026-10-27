@@ -11,14 +11,7 @@ export interface MoneyFormat {
 const formatters = new Map<string, Intl.NumberFormat>();
 
 export function formatMoney(minor: number, f: MoneyFormat): string {
-  if (!Number.isSafeInteger(minor)) throw new Error(`not whole minor units: ${minor}`);
-  const scale = 10 ** f.minorUnits;
-  const abs = Math.abs(minor);
-  const fraction = abs % scale;
-  const digits = fraction === 0 ? 0 : f.minorUnits;
-  const decimal = `${minor < 0 ? '-' : ''}${(abs - fraction) / scale}${
-    digits ? `.${String(fraction).padStart(digits, '0')}` : ''
-  }`;
+  const { decimal, digits } = exactDecimal(minor, f.minorUnits);
   const key = `${f.locale}|${f.currency}|${digits}`;
   let nf = formatters.get(key);
   if (!nf) {
@@ -31,4 +24,24 @@ export function formatMoney(minor: number, f: MoneyFormat): string {
     formatters.set(key, nf);
   }
   return nf.format(decimal as Intl.StringNumericLiteral);
+}
+
+/**
+ * Whole minor units as plain text for a field to edit: 125000 → "1250", 125050 → "1250.50" with 2 minor units. No
+ * symbol and no grouping, with a dot: what parseMoney reads back. Exact, like formatMoney.
+ */
+export const plainAmount = (minor: number, minorUnits: number): string =>
+  exactDecimal(minor, minorUnits).decimal;
+
+/** The exact decimal text of whole minor units, built from integers; whole amounts get no decimals. */
+function exactDecimal(minor: number, minorUnits: number): { decimal: string; digits: number } {
+  if (!Number.isSafeInteger(minor)) throw new Error(`not whole minor units: ${minor}`);
+  const scale = 10 ** minorUnits;
+  const abs = Math.abs(minor);
+  const fraction = abs % scale;
+  const digits = fraction === 0 ? 0 : minorUnits;
+  const decimal = `${minor < 0 ? '-' : ''}${(abs - fraction) / scale}${
+    digits ? `.${String(fraction).padStart(digits, '0')}` : ''
+  }`;
+  return { decimal, digits };
 }

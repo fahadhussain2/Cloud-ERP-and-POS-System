@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
   formatMoney,
+  plainAmount,
   KeyBar,
   matchKey,
   moveSelection,
@@ -183,6 +184,15 @@ describe('money', () => {
     expect(plain(formatMoney(-5, delux))).toBe('-Rs 0.05');
     expect(plain(formatMoney(9007199254740991, delux))).toBe('Rs 90,071,992,547,409.91');
     expect(() => formatMoney(1.5, delux)).toThrow('not whole minor units');
+  });
+
+  it('gives plain text to edit, which reads back exactly (W1-05 review)', () => {
+    expect(plainAmount(145000, 2)).toBe('1450');
+    expect(plainAmount(1250, 2)).toBe('12.50');
+    expect(plainAmount(5, 2)).toBe('0.05');
+    expect(plainAmount(9007199254740991, 2)).toBe('90071992547409.91');
+    expect(plainAmount(1250, 0)).toBe('1250');
+    expect(() => plainAmount(0.5, 2)).toThrow('not whole minor units');
   });
 });
 

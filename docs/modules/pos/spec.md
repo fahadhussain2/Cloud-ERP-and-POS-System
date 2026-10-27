@@ -101,7 +101,7 @@ POS-02, CAT-02. One search box (`F2`) on the counter screen; it works the same o
 
 - Within a rank: active items first, then dormant and discontinued; then shorter names; then code.
 - **At most 50 results.** Empty text shows a short hint instead of results.
-- A **scan** (characters typed faster than a person types, ending in Enter) that matches rank 1 selects that item at once.
+- A **scan** (characters typed faster than a person types, ending in Enter) adds the item it matches to the bill at once, even before the results are shown (§10).
 
 **Each result shows:** code, name, variant and spec, the first OEM number, the vehicle tag (*Corolla 2009–2014*), bin location, and the price in the bill's tier (§10; the default tier until another is chosen). Dormant and discontinued items carry a chip. Stock (Shop · Godown) is added with W1-08.
 

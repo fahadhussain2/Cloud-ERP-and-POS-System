@@ -138,7 +138,9 @@
     "billDiscount": "Bill discount",
     "total": "Total",
     "billApproved": "Bill discount approved by {{name}} · {{reason}}",
-    "billNeedsApproval": "Bill discount needs approval"
+    "billNeedsApproval": "Bill discount needs approval",
+    "saveFailed": "This bill can’t be saved on this counter. Don’t lock or reload: finish it, and call the manager.",
+    "aboveListTotal": "Above list"
   },
   "keys": {
     "counter": "Counter",

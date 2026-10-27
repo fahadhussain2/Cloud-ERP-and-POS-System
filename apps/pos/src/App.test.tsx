@@ -755,4 +755,65 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
     fireEvent.click(within(bar).getByRole('button', { name: new RegExp(en.keys.remove) }));
     expect(await screen.findByText(en.bill.empty)).toBeDefined();
   });
+
+  // Review of PR #74.
+  it('a price above list shows as added money, with one sign', async () => {
+    const { counter } = billCounter();
+    show(counter);
+    const box = await unlockAs(/Asif Khan/, '4831');
+    await add(box, 'brpd');
+    fireEvent.keyDown(box, { key: 'Tab' });
+    await waitFor(() => expect(document.activeElement).toBe(billPanel()));
+    key('p');
+    fireEvent.change(await screen.findByLabelText(en.price.label), { target: { value: '4600' } });
+    fireEvent.click(action(en.price.action));
+    await waitFor(() => expect(total()).toBe('Rs 4,600'));
+    const totals = plain(billPanel().textContent);
+    expect(totals).toContain(`${en.bill.aboveListTotal}Rs 100`);
+    expect(totals).not.toContain('−-');
+  });
+
+  it('the price dialog starts from the line’s price as plain text', async () => {
+    const { counter } = billCounter();
+    show(counter);
+    const box = await unlockAs(/Asif Khan/, '4831');
+    await add(box, 'brpd');
+    fireEvent.keyDown(box, { key: 'Tab' });
+    await waitFor(() => expect(document.activeElement).toBe(billPanel()));
+    key('p');
+    expect((await screen.findByLabelText<HTMLInputElement>(en.price.label)).value).toBe('4500');
+  });
+
+  it('says so when the bill can’t be saved on the counter, instead of losing it quietly', async () => {
+    const logged: string[] = [];
+    const { counter } = billCounter({
+      saveOpenBill: () => Promise.reject(new Error('OPFS full')),
+      log: (kind) => {
+        logged.push(kind);
+        return Promise.resolve();
+      },
+    });
+    show(counter);
+    const box = await unlockAs(/Asif Khan/, '4831');
+    await add(box, 'brpd');
+    expect(await screen.findByText(en.bill.saveFailed)).toBeDefined();
+    expect(logged).toContain('bill.save_failed');
+  });
+
+  it('judges no approval until the seller’s limit is known', async () => {
+    const { counter } = billCounter({
+      grants: (id) => (id === 'u1' ? new Promise<RoleGrant[]>(() => {}) : Promise.resolve([role('manager')])),
+    });
+    show(counter);
+    const box = await unlockAs(/Asif Khan/, '4831');
+    await add(box, 'brpd');
+    fireEvent.keyDown(box, { key: 'Tab' });
+    await waitFor(() => expect(document.activeElement).toBe(billPanel()));
+    key('p');
+    fireEvent.change(await screen.findByLabelText(en.price.label), { target: { value: '4200' } });
+    fireEvent.click(action(en.price.action));
+    await waitFor(() => expect(total()).toBe('Rs 4,200'));
+    expect(screen.queryByText(en.approval.title)).toBeNull();
+    expect(plain(lines()[0]!.textContent)).not.toContain(en.bill.needsApproval);
+  });
 });

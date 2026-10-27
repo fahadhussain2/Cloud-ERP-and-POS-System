@@ -40,7 +40,7 @@ export { PageHeader } from './page-header';
 export { StatusChip, type ChipTone } from './status-chip';
 export { AppFrame } from './app-frame';
 export { DialogActions } from './dialog-actions';
-export { formatMoney, type MoneyFormat } from './format';
+export { formatMoney, plainAmount, type MoneyFormat } from './format';
 export { KeyBar, Kbd, type KeyHint } from './key-bar';
 export { cn } from './lib/utils';
 export { moveSelection, OptionList } from './option-list';

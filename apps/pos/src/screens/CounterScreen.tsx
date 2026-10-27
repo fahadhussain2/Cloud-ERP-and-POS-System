@@ -1,10 +1,12 @@
 import { uuidv7 } from '@erp/contracts';
 import {
+  add,
   approve,
   billAmounts,
   changeTier,
   DomainError,
   effectiveLimits,
+  hasListPrice,
   parseDiscount,
   parseWholeAmount,
   pendingApprovals,
@@ -29,6 +31,7 @@ import {
   moveSelection,
   OptionList,
   Panel,
+  plainAmount,
   useShortcuts,
   type KeyHint,
   type MoneyFormat,
@@ -75,7 +78,6 @@ export type CounterScreenCounter = BillCounter &
     | 'setPinState'
     | 'verifyPin'
     | 'recordPinEvent'
-    | 'log'
   >;
 
 const sameTarget = (a: ApprovalTarget, b: ApprovalTarget) =>
@@ -113,17 +115,18 @@ export function CounterScreen({
     shown.current = { results, selected };
   }, [results, selected]);
 
-  const { openBill, tiers, change, clear, get } = useOpenBill(counter, user.id);
+  const { openBill, tiers, change, clear, get, saveFailed } = useOpenBill(counter, user.id);
   const [zone, setZone] = useState<Zone>('search');
   const [lineSel, setLineSel] = useState(0);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [maxDiscountBp, setMaxDiscountBp] = useState(0);
+  /** The seller's discount limit; null until their roles have loaded, and no approval is judged before then. */
+  const [maxDiscountBp, setMaxDiscountBp] = useState<number | null>(null);
 
   const lines = openBill?.bill.lines ?? [];
   const tierId = openBill?.bill.tierId;
   const amounts = openBill ? billAmounts(openBill.bill) : null;
-  const pending = openBill ? pendingApprovals(openBill.bill, maxDiscountBp) : [];
+  const pending = openBill && maxDiscountBp !== null ? pendingApprovals(openBill.bill, maxDiscountBp) : [];
 
   // The seller's discount limit, from their roles in this branch (PRD §4).
   useEffect(() => {
@@ -218,15 +221,16 @@ export function CounterScreen({
   /** Opens the approval a target still needs, if any (POS spec §10). */
   const askApproval = (target: ApprovalTarget) => {
     const ob = get();
-    if (!ob) return;
+    if (!ob || maxDiscountBp === null) return;
     const p = pendingApprovals(ob.bill, maxDiscountBp).find((x) => sameTarget(x.target, target));
     if (p) setDialog({ kind: 'approval', pending: p });
   };
 
-  const addBillItem = (item: BillItem, qty: Qty, unitPrice?: Money): string | null => {
+  /** Adds an item; the broken rule comes back, e.g. `price_required` for an item without a list price. */
+  const addBillItem = (item: BillItem, qty: Qty, unitPrice?: Money): DomainErrorCode | null => {
     const id = uuidv7();
     const err = change((ob) => addItem(ob, item, qty, id, unitPrice));
-    if (err) return errorKey(err);
+    if (err) return err;
     setMessage(null);
     const now = get()!.bill.lines;
     const added = now.findIndex((l) => l.id === id);
@@ -248,9 +252,10 @@ export function CounterScreen({
     if (!r) return;
     const item = await counter.billItem(r.id, openBill.bill.tierId);
     if (!item) return;
-    if (item.list === null || item.list === 0) return setDialog({ kind: 'newPrice', item, qty });
-    const key = addBillItem(item, qty);
-    if (key) setMessage(t(key));
+    // Whether the item has a price is the domain's call: without one, the salesman types it (POS spec §10).
+    const err = addBillItem(item, qty);
+    if (err === 'price_required') setDialog({ kind: 'newPrice', item, qty });
+    else if (err) show(err);
   };
 
   const editLine = (edit: Parameters<typeof tryEdit>[1]) => {
@@ -381,8 +386,9 @@ export function CounterScreen({
         target: p.target,
       });
       if (r.result === 'approved') {
+        // The dialog opens only once the seller's limit is known (askApproval).
         editLine((b) =>
-          approve(b, p.target, maxDiscountBp, {
+          approve(b, p.target, maxDiscountBp!, {
             approvedBy: approver.id,
             reason,
             note,
@@ -404,7 +410,7 @@ export function CounterScreen({
     if (!line) return [];
     return [
       [t('approval.item'), openBill?.items[line.itemId]?.name ?? line.itemId],
-      [t('approval.list'), line.list !== null && line.list > 0 ? m(line.list) : t('bill.noList')],
+      [t('approval.list'), hasListPrice(line.list) ? m(line.list) : t('bill.noList')],
       [t('approval.floor'), line.floor !== null ? m(line.floor) : t('bill.noFloor')],
       [t('approval.requested'), m(line.unitPrice)],
       [t('approval.seller'), user.fullName],
@@ -573,7 +579,7 @@ export function CounterScreen({
           tierName={tiers.find((x) => x.id === tierId)?.name ?? ''}
           selected={lineSel}
           active={zone === 'bill'}
-          message={message}
+          message={saveFailed ? t('bill.saveFailed') : message}
           money={money}
           nameOf={nameOf}
           panelRef={panel}
@@ -610,13 +616,10 @@ export function CounterScreen({
           description={openBill?.items[dialogLine.itemId]?.name}
           label={t('price.label')}
           facts={[
-            [
-              t('approval.list'),
-              dialogLine.list !== null && dialogLine.list > 0 ? m(dialogLine.list) : t('bill.noList'),
-            ],
+            [t('approval.list'), hasListPrice(dialogLine.list) ? m(dialogLine.list) : t('bill.noList')],
             [t('approval.floor'), dialogLine.floor !== null ? m(dialogLine.floor) : t('bill.noFloor')],
           ]}
-          initial={String(dialogLine.unitPrice / 10 ** money.minorUnits)}
+          initial={plainAmount(dialogLine.unitPrice, money.minorUnits)}
           actionLabel={t('price.action')}
           onClose={() => setDialog(null)}
           onSubmit={(value) => {
@@ -644,7 +647,9 @@ export function CounterScreen({
             const price = parse(() => parseWholeAmount(value, money.minorUnits));
             if (!price.ok) return price.key;
             setDialog(null);
-            return addBillItem(dialog.item, dialog.qty, price.value);
+            const err = addBillItem(dialog.item, dialog.qty, price.value);
+            if (err) show(err);
+            return null;
           }}
         />
       )}
@@ -652,12 +657,12 @@ export function CounterScreen({
         <EntryDialog
           title={t('discount.title')}
           label={t('discount.label')}
-          facts={[[t('discount.lines'), m(amounts.total + amounts.billDiscount)]]}
-          initial={amounts.billDiscount > 0 ? String(amounts.billDiscount / 10 ** money.minorUnits) : ''}
+          facts={[[t('discount.lines'), m(add(amounts.total, amounts.billDiscount))]]}
+          initial={amounts.billDiscount > 0 ? plainAmount(amounts.billDiscount, money.minorUnits) : ''}
           actionLabel={t('discount.action')}
           onClose={() => setDialog(null)}
           onSubmit={(value) => {
-            const base = (amounts.total + amounts.billDiscount) as Money;
+            const base = add(amounts.total, amounts.billDiscount);
             const amount = parse(() => parseDiscount(value, base, money.minorUnits));
             if (!amount.ok) return amount.key;
             const err = change((ob) => tryEdit(ob, (b) => setBillDiscount(b, amount.value)));
@@ -692,7 +697,7 @@ export function CounterScreen({
           actionLabel={t('clear.action')}
           onClose={() => setDialog(null)}
           onConfirm={() => {
-            void clear();
+            void clear(); // a failure shows on the bill panel (saveFailed)
             setDialog(null);
             setMessage(null);
             focusSearch();
