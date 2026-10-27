@@ -1,0 +1,123 @@
+{
+  "description": "A valid tender as the document keeps it: each payment with cash received and change (cash only) and its trimmed reference, the cash due at the cash desk and the change (POS spec §12, data model §5, D-047). Delux methods, increment Rs 1.",
+  "cases": [
+    {
+      "name": "exact cash: no cash received recorded, no change",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "cash", "amount": 432000, "reference": null }],
+          "cashReceived": null
+        }
+      },
+      "expected": {
+        "payments": [
+          { "method": "cash", "amount": 432000, "cashReceived": null, "changeDue": 0, "reference": null }
+        ],
+        "cashDue": 432000,
+        "change": 0
+      }
+    },
+    {
+      "name": "cash with Rs 5,000 handed over: change Rs 680",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "cash", "amount": 432000, "reference": null }],
+          "cashReceived": 500000
+        }
+      },
+      "expected": {
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 432000,
+            "cashReceived": 500000,
+            "changeDue": 68000,
+            "reference": null
+          }
+        ],
+        "cashDue": 432000,
+        "change": 68000
+      }
+    },
+    {
+      "name": "Raast only: nothing for the cash desk, the reference trimmed",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "raast", "amount": 432000, "reference": "  RST-5512 " }],
+          "cashReceived": null
+        }
+      },
+      "expected": {
+        "payments": [
+          {
+            "method": "raast",
+            "amount": 432000,
+            "cashReceived": null,
+            "changeDue": null,
+            "reference": "RST-5512"
+          }
+        ],
+        "cashDue": 0,
+        "change": 0
+      }
+    },
+    {
+      "name": "split JazzCash and cash, rows in the order given",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [
+            { "method": "jazzcash", "amount": 232000, "reference": "JC-88123" },
+            { "method": "cash", "amount": 200000, "reference": null }
+          ],
+          "cashReceived": 500000
+        }
+      },
+      "expected": {
+        "payments": [
+          {
+            "method": "jazzcash",
+            "amount": 232000,
+            "cashReceived": null,
+            "changeDue": null,
+            "reference": "JC-88123"
+          },
+          {
+            "method": "cash",
+            "amount": 200000,
+            "cashReceived": 500000,
+            "changeDue": 300000,
+            "reference": null
+          }
+        ],
+        "cashDue": 200000,
+        "change": 300000
+      }
+    },
+    {
+      "name": "a reference typed on a cash row is not kept",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "cash", "amount": 432000, "reference": "x" }],
+          "cashReceived": null
+        }
+      },
+      "expected": {
+        "payments": [
+          { "method": "cash", "amount": 432000, "cashReceived": null, "changeDue": 0, "reference": null }
+        ],
+        "cashDue": 432000,
+        "change": 0
+      }
+    },
+    {
+      "name": "an invalid tender is refused",
+      "input": { "total": 432000, "tender": { "payments": [], "cashReceived": null } },
+      "error": "invalid_tender"
+    }
+  ]
+}

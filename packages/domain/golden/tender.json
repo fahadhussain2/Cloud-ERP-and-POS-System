@@ -1,0 +1,280 @@
+{
+  "description": "Which tenders are valid (POS spec §12, POS-06, PRD W1, W3): the first problem found, or null. The methods are Delux's (cash; bank transfer, Raast, JazzCash, Easypaisa and card need a reference; on account), the increment Rs 1 unless a case says otherwise.",
+  "cases": [
+    {
+      "name": "exact cash, nothing typed",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "cash", "amount": 432000, "reference": null }],
+          "cashReceived": null
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "cash with Rs 5,000 handed over",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "cash", "amount": 432000, "reference": null }],
+          "cashReceived": 500000
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "cash received exactly the total",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "cash", "amount": 432000, "reference": null }],
+          "cashReceived": 432000
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "cash received less than the cash part",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "cash", "amount": 432000, "reference": null }],
+          "cashReceived": 400000
+        }
+      },
+      "expected": "cash_received_short"
+    },
+    {
+      "name": "cash received on a bill paid by Raast",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "raast", "amount": 432000, "reference": "RST-5512" }],
+          "cashReceived": 500000
+        }
+      },
+      "expected": "cash_received_without_cash"
+    },
+    {
+      "name": "Raast with a reference",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "raast", "amount": 432000, "reference": "RST-5512" }],
+          "cashReceived": null
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "Raast without a reference",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "raast", "amount": 432000, "reference": null }],
+          "cashReceived": null
+        }
+      },
+      "expected": "reference_required"
+    },
+    {
+      "name": "a card reference of only spaces counts as none",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "card", "amount": 432000, "reference": "   " }],
+          "cashReceived": null
+        }
+      },
+      "expected": "reference_required"
+    },
+    {
+      "name": "a reference of exactly 40 characters",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [
+            {
+              "method": "jazzcash",
+              "amount": 432000,
+              "reference": "1234567890123456789012345678901234567890"
+            }
+          ],
+          "cashReceived": null
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "a reference of 41 characters",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [
+            {
+              "method": "jazzcash",
+              "amount": 432000,
+              "reference": "12345678901234567890123456789012345678901"
+            }
+          ],
+          "cashReceived": null
+        }
+      },
+      "expected": "reference_too_long"
+    },
+    {
+      "name": "split: cash and JazzCash, with cash handed over",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [
+            { "method": "cash", "amount": 200000, "reference": null },
+            { "method": "jazzcash", "amount": 232000, "reference": "JC-88123" }
+          ],
+          "cashReceived": 250000
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "split Rs 1 short",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [
+            { "method": "cash", "amount": 200000, "reference": null },
+            { "method": "jazzcash", "amount": 231900, "reference": "JC-88123" }
+          ],
+          "cashReceived": null
+        }
+      },
+      "expected": "sum_mismatch"
+    },
+    {
+      "name": "split one paisa short (increment 1 paisa)",
+      "input": {
+        "total": 432000,
+        "increment": 1,
+        "tender": {
+          "payments": [
+            { "method": "cash", "amount": 200000, "reference": null },
+            { "method": "jazzcash", "amount": 231999, "reference": "JC-88123" }
+          ],
+          "cashReceived": null
+        }
+      },
+      "expected": "sum_mismatch"
+    },
+    {
+      "name": "split one paisa over (increment 1 paisa)",
+      "input": {
+        "total": 432000,
+        "increment": 1,
+        "tender": {
+          "payments": [
+            { "method": "cash", "amount": 200000, "reference": null },
+            { "method": "jazzcash", "amount": 232001, "reference": "JC-88123" }
+          ],
+          "cashReceived": null
+        }
+      },
+      "expected": "sum_mismatch"
+    },
+    {
+      "name": "an amount with paisa when the increment is Rs 1",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [
+            { "method": "cash", "amount": 431950, "reference": null },
+            { "method": "card", "amount": 50, "reference": "APP-1" }
+          ],
+          "cashReceived": null
+        }
+      },
+      "expected": "amount_not_rounded"
+    },
+    {
+      "name": "the same method twice",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [
+            { "method": "cash", "amount": 200000, "reference": null },
+            { "method": "cash", "amount": 232000, "reference": null }
+          ],
+          "cashReceived": null
+        }
+      },
+      "expected": "duplicate_method"
+    },
+    {
+      "name": "a zero payment row",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [
+            { "method": "cash", "amount": 432000, "reference": null },
+            { "method": "raast", "amount": 0, "reference": "RST-1" }
+          ],
+          "cashReceived": null
+        }
+      },
+      "expected": "amount_not_positive"
+    },
+    {
+      "name": "a negative payment row",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [
+            { "method": "cash", "amount": 442000, "reference": null },
+            { "method": "raast", "amount": -10000, "reference": "RST-1" }
+          ],
+          "cashReceived": null
+        }
+      },
+      "expected": "amount_not_positive"
+    },
+    {
+      "name": "no payment rows",
+      "input": { "total": 432000, "tender": { "payments": [], "cashReceived": null } },
+      "expected": "no_payment"
+    },
+    {
+      "name": "a method the tenant doesn't have",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "voucher", "amount": 432000, "reference": "V1" }],
+          "cashReceived": null
+        }
+      },
+      "expected": "unknown_method"
+    },
+    {
+      "name": "on account without a credit customer",
+      "input": {
+        "total": 432000,
+        "tender": {
+          "payments": [{ "method": "on_account", "amount": 432000, "reference": null }],
+          "cashReceived": null
+        }
+      },
+      "expected": "on_account_needs_customer"
+    },
+    {
+      "name": "on account with a credit customer (W1-09)",
+      "input": {
+        "total": 432000,
+        "hasCreditCustomer": true,
+        "tender": {
+          "payments": [{ "method": "on_account", "amount": 432000, "reference": null }],
+          "cashReceived": null
+        }
+      },
+      "expected": null
+    }
+  ]
+}

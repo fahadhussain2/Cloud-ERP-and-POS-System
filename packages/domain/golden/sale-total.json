@@ -1,0 +1,160 @@
+{
+  "description": "The bill's total rounded to the tenant's increment for every tender, half away from zero; the difference is the document's rounding (POS spec §12, POS-15, owner answer 4 to W1-06)",
+  "cases": [
+    {
+      "name": "an empty bill",
+      "input": {
+        "increment": 100,
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        }
+      },
+      "expected": { "beforeRounding": 0, "rounding": 0, "total": 0 }
+    },
+    {
+      "name": "whole rupees need no rounding",
+      "input": {
+        "increment": 100,
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 2000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 145000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        }
+      },
+      "expected": { "beforeRounding": 290000, "rounding": 0, "total": 290000 }
+    },
+    {
+      "name": "1.5 m at Rs 333 = Rs 499.50 rounds up to Rs 500 (half away from zero)",
+      "input": {
+        "increment": 100,
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "hose",
+              "qty": 1500,
+              "allowsFraction": true,
+              "list": 33300,
+              "floor": null,
+              "unitPrice": 33300,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        }
+      },
+      "expected": { "beforeRounding": 49950, "rounding": 50, "total": 50000 }
+    },
+    {
+      "name": "1.25 m at Rs 333 = Rs 416.25 rounds down to Rs 416",
+      "input": {
+        "increment": 100,
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "hose",
+              "qty": 1250,
+              "allowsFraction": true,
+              "list": 33300,
+              "floor": null,
+              "unitPrice": 33300,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        }
+      },
+      "expected": { "beforeRounding": 41625, "rounding": -25, "total": 41600 }
+    },
+    {
+      "name": "an increment of 1 paisa changes nothing",
+      "input": {
+        "increment": 1,
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "hose",
+              "qty": 1500,
+              "allowsFraction": true,
+              "list": 33300,
+              "floor": null,
+              "unitPrice": 33300,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        }
+      },
+      "expected": { "beforeRounding": 49950, "rounding": 0, "total": 49950 }
+    },
+    {
+      "name": "the bill discount comes off first, then the total is rounded",
+      "input": {
+        "increment": 100,
+        "bill": {
+          "version": 1,
+          "sellerId": "s1",
+          "tierId": "retail",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "i1",
+              "qty": 2000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 130000,
+              "unitPrice": 145000,
+              "approval": null
+            },
+            {
+              "id": "l2",
+              "itemId": "hose",
+              "qty": 1500,
+              "allowsFraction": true,
+              "list": 33300,
+              "floor": null,
+              "unitPrice": 33300,
+              "approval": null
+            }
+          ],
+          "billDiscount": 10000,
+          "billApproval": null
+        }
+      },
+      "expected": { "beforeRounding": 329950, "rounding": 50, "total": 330000 }
+    }
+  ]
+}
