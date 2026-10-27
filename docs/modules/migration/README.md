@@ -41,6 +41,7 @@ pnpm dev:db
 pnpm legacy:import --label dec2025
 ```
 
+- Staging gets a **generated** catalog, never the real one (W1-21, D-076): `erp-tenant seed-catalog staging demo` (see the infra README).
 - `pnpm dev:db` creates the local `erp_dev` database with the migrations and the Delux tenant (from `infra/db/tenants/delux.json`). Safe to run again.
 - `pnpm dev:reset-password fahad "<temporary password>"` gives the owner (or anyone, by username) a temporary back-office password on `erp_dev`, to change at the next sign-in. Optional third and fourth arguments: another local database (e.g. a copy) and shop code.
 - `pnpm legacy:import` loads units, categories, brands, origins, vehicle makes, parties, items (identifiers, vehicle tags, tier prices) and the legacy expense accounts into it, as the app role under RLS. A second run prints `unchanged` everywhere. `--dry-run` (or the `transform` step) compares and reports without writing.
