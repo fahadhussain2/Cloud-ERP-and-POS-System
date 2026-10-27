@@ -17,6 +17,7 @@
     "db:up": "docker compose -f infra/dev/compose.yaml up -d --wait",
     "db:down": "docker compose -f infra/dev/compose.yaml down",
     "dev:db": "pnpm --filter @erp/db exec tsx src/testing/dev.ts",
+    "dev:reset-password": "pnpm --filter @erp/api exec tsx src/dev-reset-password.ts",
     "legacy:stage": "pnpm --filter @erp/legacy-import start stage",
     "legacy:import": "pnpm --filter @erp/legacy-import start load",
     "test:watch": "vitest --exclude \"**/*.int.test.ts\"",
