@@ -17,3 +17,15 @@ export interface OpenBill {
   /** By item id. */
   items: Record<string, LineItem>;
 }
+
+/** A stored open bill, or null for one this version doesn't know (another version, or not JSON at all). */
+export function parseOpenBill(stored: string): OpenBill | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(stored);
+  } catch {
+    return null;
+  }
+  const b = value as Partial<OpenBill> | null;
+  return b?.version === 1 && b.bill?.version === 1 && typeof b.items === 'object' ? (b as OpenBill) : null;
+}

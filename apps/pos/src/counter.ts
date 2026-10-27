@@ -1,9 +1,10 @@
 import type { CounterPinChangeRequest } from '@erp/contracts';
-import type { PinState, RoleGrant } from '@erp/domain';
+import type { Money, PinState, RoleGrant } from '@erp/domain';
 
+import type { OpenBill } from './bill/open-bill';
 import type { DeviceInfo, PinEvent, TenantSettings } from './db/repo';
 import type { EnrollResult } from './device/session';
-import type { SearchOptions, SearchResult } from './search/search-index';
+import type { BillItem, SearchOptions, SearchResult, Tier } from './search/search-index';
 import type { CheckResult } from './storage/checks';
 import type { PinChangeResult } from './sync/pin';
 import type { PullResult } from './sync/pull';
@@ -34,4 +35,14 @@ export interface Counter {
   search(text: string, opts?: SearchOptions): Promise<SearchResult[]>;
   /** How much of the catalog is on this counter, and whether its first load has finished. */
   catalog(): Promise<{ items: number; ready: boolean }>;
+  /** The price tiers, in order (POS spec §10). */
+  tiers(): Promise<Tier[]>;
+  /** An item as a bill line takes it: its price in the tier (or the default tier's), floor and unit. */
+  billItem(itemId: string, tierId: string | null): Promise<BillItem | null>;
+  /** Items' list prices in another tier, for a tier change. */
+  tierPrices(itemIds: string[], tierId: string): Promise<Record<string, Money | null>>;
+  /** A person's open bill on this counter, kept across lock and reload (POS spec §10). */
+  openBill(userId: string): Promise<OpenBill | null>;
+  saveOpenBill(userId: string, bill: OpenBill): Promise<void>;
+  clearOpenBill(userId: string): Promise<void>;
 }

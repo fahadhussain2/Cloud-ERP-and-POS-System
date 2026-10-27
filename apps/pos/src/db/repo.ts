@@ -8,7 +8,7 @@ import {
 } from '@erp/contracts';
 import { money, type PinState, type RoleGrant, type RoleLimits } from '@erp/domain';
 
-import type { OpenBill } from '../bill/open-bill';
+import { parseOpenBill, type OpenBill } from '../bill/open-bill';
 import type { StaffUser } from '../unlock/unlock';
 import type { SqlDb } from './sql';
 
@@ -328,17 +328,29 @@ export function outboxStats(db: SqlDb): { count: number; oldestAt: string | null
   return { count: Number(r?.['n'] ?? 0), oldestAt: text(r?.['oldest']) };
 }
 
-const notBuilt = (...args: unknown[]): never => {
-  throw new Error(`not built yet (W1-05): ${args.length} arguments`);
-};
-
 /** Saves a person's open bill on this counter (POS spec §10): one per person, replaced on every change. */
-export const saveOpenBill = (db: SqlDb, userId: string, bill: OpenBill): void => notBuilt(db, userId, bill);
+export const saveOpenBill = (db: SqlDb, userId: string, bill: OpenBill): void =>
+  db.exec(
+    `INSERT INTO open_bills (user_id, bill, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT (user_id) DO UPDATE SET bill = excluded.bill, updated_at = excluded.updated_at`,
+    [userId, JSON.stringify(bill), now()],
+  );
 
 /** A person's open bill, or null. One this version can't read is set aside in the diagnostic log, never crashed on. */
-export const loadOpenBill = (db: SqlDb, userId: string): OpenBill | null => notBuilt(db, userId);
+export function loadOpenBill(db: SqlDb, userId: string): OpenBill | null {
+  const stored = text(db.selectValue('SELECT bill FROM open_bills WHERE user_id = ?', [userId]));
+  if (stored === null) return null;
+  const bill = parseOpenBill(stored);
+  if (bill) return bill;
+  db.transaction(() => {
+    log(db, 'bill.set_aside', { userId, bill: stored });
+    clearOpenBill(db, userId);
+  });
+  return null;
+}
 
-export const clearOpenBill = (db: SqlDb, userId: string): void => notBuilt(db, userId);
+export const clearOpenBill = (db: SqlDb, userId: string): void =>
+  db.exec('DELETE FROM open_bills WHERE user_id = ?', [userId]);
 
 const LOG_KEEP = 5000;
 

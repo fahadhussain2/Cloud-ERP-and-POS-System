@@ -1,5 +1,7 @@
 import type { CatalogDataset } from '@erp/contracts';
-import { money, normalizeIdentifier } from '@erp/domain';
+import { money, normalizeIdentifier, type Money, type NewLine } from '@erp/domain';
+
+import type { LineItem } from '../bill/open-bill';
 
 // The counter's omni-search (POS-02, CAT-02, POS spec §9, W1-03): an in-memory index of the local catalog, inside the
 // database worker. Loaded at start-up from SQLite and patched with every pulled page; search() answers from memory.
@@ -26,11 +28,21 @@ export interface SearchResult {
   vehicle: Vehicle | null;
   bin: string | null;
   status: string;
-  /** Minor units in the requested tier (the default tier if none); null when the item has no price there. */
+  /** Minor units in the requested tier (default: the default tier), or the default tier's when it has none there. */
   price: number | null;
   /** 1 exact code or barcode · 2 exact identifier · 3 identifier prefix · 4 words. */
   rank: 1 | 2 | 3 | 4;
 }
+
+export interface Tier {
+  id: string;
+  code: string;
+  name: string;
+  isDefault: boolean;
+}
+
+/** What adding an item to a bill needs (POS spec §10): the domain's new line, and what the line shows. */
+export type BillItem = NewLine & LineItem;
 
 export interface SearchOptions {
   tierId?: string;
@@ -244,6 +256,49 @@ export class SearchIndex {
     return null;
   }
 
+  /** The price tiers, in their order, for the tier picker (POS spec §10). */
+  tiers(): Tier[] {
+    return [...this.rows.price_tiers.values()]
+      .sort((a, b) => Number(a['sort']) - Number(b['sort']))
+      .map((t) => ({
+        id: String(t['id']),
+        code: String(t['code']),
+        name: String(t['name']),
+        isDefault: Boolean(t['is_default']),
+      }));
+  }
+
+  /** An item's price in `tier`, or the default tier's if it has none there (POS spec §10); null when it has neither. */
+  private priceIn(itemId: string, tier: string | null): Money | null {
+    const prices = this.related('item_prices', itemId);
+    const p =
+      prices.find((x) => x['tier_id'] === tier) ?? prices.find((x) => x['tier_id'] === this.defaultTier());
+    return p ? money(p['price'] as number | string) : null;
+  }
+
+  /** An item as a bill line takes it: its list price in `tierId`, its floor, whether its unit allows fractions. */
+  billItem(itemId: string, tierId: string | null): BillItem | null {
+    const item = this.rows.items.get(itemId);
+    if (!item) return null;
+    const unit = this.rows.units.get(String(item['unit_id']));
+    const floor = item['floor_price'];
+    return {
+      itemId,
+      code: String(item['code']),
+      name: String(item['name']),
+      variant: text(item['variant']),
+      spec: text(item['spec']),
+      list: this.priceIn(itemId, tierId ?? this.defaultTier()),
+      floor: floor === null || floor === undefined ? null : money(floor as number | string),
+      allowsFraction: Boolean(unit?.['allows_fraction']),
+    };
+  }
+
+  /** The list prices of these items in another tier, for a tier change (null = no price there or in the default). */
+  tierPrices(itemIds: readonly string[], tierId: string): Record<string, Money | null> {
+    return Object.fromEntries(itemIds.map((id) => [id, this.priceIn(id, tierId)]));
+  }
+
   /** Builds what the next search needs now (after start-up or a complete pull), so the first key press is fast. */
   warm(): void {
     this.refresh();
@@ -314,7 +369,6 @@ export class SearchIndex {
     const oems = this.related('item_identifiers', e.id).filter((x) => x['kind'] === 'oem');
     const oem = oems.find((x) => x['is_primary']) ?? oems[0];
     const v = this.related('item_compatibility', e.id)[0];
-    const price = tier ? this.related('item_prices', e.id).find((p) => p['tier_id'] === tier) : undefined;
     return {
       id: e.id,
       code: e.code,
@@ -332,7 +386,7 @@ export class SearchIndex {
         : null,
       bin: text(item['bin_location']),
       status: String(item['status']),
-      price: price ? money(price['price'] as number | string) : null,
+      price: this.priceIn(e.id, tier),
       rank,
     };
   }

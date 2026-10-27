@@ -2,6 +2,7 @@
 import { verifyPin } from '@erp/contracts';
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 
+import type { OpenBill } from '../bill/open-bill';
 import { SearchIndex, type SearchOptions } from '../search/search-index';
 import { currentVersion, migrate } from './migrate';
 import * as repo from './repo';
@@ -59,6 +60,13 @@ const ops = {
     if (args[2]) index.warm();
   },
   search: (text: string, opts?: SearchOptions) => index.search(text, opts),
+  /** The bill (POS spec §10): what a line takes from the catalog, the tiers, and each person's open bill. */
+  tiers: () => index.tiers(),
+  billItem: (itemId: string, tierId: string | null) => index.billItem(itemId, tierId),
+  tierPrices: (itemIds: string[], tierId: string) => index.tierPrices(itemIds, tierId),
+  loadOpenBill: (userId: string) => repo.loadOpenBill(open(), userId),
+  saveOpenBill: (userId: string, bill: OpenBill) => repo.saveOpenBill(open(), userId, bill),
+  clearOpenBill: (userId: string) => repo.clearOpenBill(open(), userId),
   /** Items in the index, and whether a complete pull has loaded the catalog (POS spec §9). */
   catalogStatus: () => ({ items: index.size, ready: repo.getSync(open(), 'pull_complete_at') !== null }),
   listStaff: () => repo.listStaff(open()),
