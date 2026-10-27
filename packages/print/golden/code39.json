@@ -1,0 +1,105 @@
+{
+  "description": "Code 39 element patterns: start '*', each character, stop '*'; 9 elements each, bar first, n = narrow, w = wide, exactly 3 wide (POS spec §13, D-055)",
+  "cases": [
+    {
+      "name": "one letter between start and stop",
+      "input": "A",
+      "expected": ["nwnnwnwnn", "wnnnnwnnw", "nwnnwnwnn"]
+    },
+    {
+      "name": "the digits",
+      "input": "0123456789",
+      "expected": [
+        "nwnnwnwnn",
+        "nnnwwnwnn",
+        "wnnwnnnnw",
+        "nnwwnnnnw",
+        "wnwwnnnnn",
+        "nnnwwnnnw",
+        "wnnwwnnnn",
+        "nnwwwnnnn",
+        "nnnwnnwnw",
+        "wnnwnnwnn",
+        "nnwwnnwnn",
+        "nwnnwnwnn"
+      ]
+    },
+    {
+      "name": "the letters",
+      "input": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+      "expected": [
+        "nwnnwnwnn",
+        "wnnnnwnnw",
+        "nnwnnwnnw",
+        "wnwnnwnnn",
+        "nnnnwwnnw",
+        "wnnnwwnnn",
+        "nnwnwwnnn",
+        "nnnnnwwnw",
+        "wnnnnwwnn",
+        "nnwnnwwnn",
+        "nnnnwwwnn",
+        "wnnnnnnww",
+        "nnwnnnnww",
+        "wnwnnnnwn",
+        "nnnnwnnww",
+        "wnnnwnnwn",
+        "nnwnwnnwn",
+        "nnnnnnwww",
+        "wnnnnnwwn",
+        "nnwnnnwwn",
+        "nnnnwnwwn",
+        "wwnnnnnnw",
+        "nwwnnnnnw",
+        "wwwnnnnnn",
+        "nwnnwnnnw",
+        "wwnnwnnnn",
+        "nwwnwnnnn",
+        "nwnnwnwnn"
+      ]
+    },
+    {
+      "name": "the other characters, space included",
+      "input": "-. $/+%",
+      "expected": [
+        "nwnnwnwnn",
+        "nwnnnnwnw",
+        "wwnnnnwnn",
+        "nwwnnnwnn",
+        "nwnwnwnnn",
+        "nwnwnnnwn",
+        "nwnnnwnwn",
+        "nnnwnwnwn",
+        "nwnnwnwnn"
+      ]
+    },
+    {
+      "name": "a short bill code",
+      "input": "C03-S1 0",
+      "expected": [
+        "nwnnwnwnn",
+        "wnwnnwnnn",
+        "nnnwwnwnn",
+        "wnwwnnnnn",
+        "nwnnnnwnw",
+        "nnwnnnwwn",
+        "wnnwnnnnw",
+        "nwwnnnwnn",
+        "nnnwwnwnn",
+        "nwnnwnwnn"
+      ]
+    },
+    { "name": "lower case is refused", "input": "a", "error": "unsupported_character" },
+    {
+      "name": "the start character inside the text is refused",
+      "input": "A*B",
+      "error": "unsupported_character"
+    },
+    {
+      "name": "a character outside Code 39 is refused",
+      "input": "RS 1,250",
+      "error": "unsupported_character"
+    },
+    { "name": "nothing to encode", "input": "", "error": "empty" }
+  ]
+}

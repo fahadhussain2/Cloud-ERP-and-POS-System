@@ -599,6 +599,12 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  packages/print:
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
   packages/ui:
     dependencies:
       '@fontsource/barlow-condensed':
