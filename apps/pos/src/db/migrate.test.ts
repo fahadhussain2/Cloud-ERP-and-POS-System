@@ -118,6 +118,27 @@ describe('migrations', () => {
     expect(columns.sort()).toEqual(['at', 'by_user_id', 'id', 'kind', 'pushed_at', 'user_id']);
   });
 
+  it("schema 4 adds the open bills (W1-05) and keeps a W1-04 counter's rows", () => {
+    const db = fresh();
+    migrate(db, MIGRATIONS.slice(0, 3));
+    db.exec(
+      "INSERT INTO pin_events (id, kind, user_id, at) VALUES ('e1', 'locked', 'u1', '2026-11-02T10:00:00Z')",
+    );
+    db.exec(
+      "INSERT INTO outbox (id, family, seq, payload, status, attempts, created_at) VALUES ('d1', 'S', 1, '{}', 'pending', 0, 'now')",
+    );
+    db.exec(
+      "INSERT INTO items (id, code, name, status, row_version) VALUES ('i1', 'AFLT001', 'AIR FILTER', 'active', '1')",
+    );
+    migrate(db);
+    expect(LATEST_VERSION).toBeGreaterThanOrEqual(4);
+    expect(db.selectValue('SELECT kind FROM pin_events')).toBe('locked');
+    expect(db.selectValue('SELECT count(*) FROM outbox')).toBe(1);
+    expect(db.selectValue('SELECT name FROM items')).toBe('AIR FILTER');
+    const columns = db.selectObjects('PRAGMA table_info(open_bills)').map((r) => String(r['name']));
+    expect(columns.sort()).toEqual(['bill', 'updated_at', 'user_id']);
+  });
+
   it('roll back a migration that fails and leave the previous schema', () => {
     const db = fresh();
     const v1 = MIGRATIONS.slice(0, 1);

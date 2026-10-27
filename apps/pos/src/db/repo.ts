@@ -8,6 +8,7 @@ import {
 } from '@erp/contracts';
 import { money, type PinState, type RoleGrant, type RoleLimits } from '@erp/domain';
 
+import type { OpenBill } from '../bill/open-bill';
 import type { StaffUser } from '../unlock/unlock';
 import type { SqlDb } from './sql';
 
@@ -326,6 +327,18 @@ export function outboxStats(db: SqlDb): { count: number; oldestAt: string | null
   const [r] = db.selectObjects('SELECT count(*) AS n, min(created_at) AS oldest FROM outbox');
   return { count: Number(r?.['n'] ?? 0), oldestAt: text(r?.['oldest']) };
 }
+
+const notBuilt = (...args: unknown[]): never => {
+  throw new Error(`not built yet (W1-05): ${args.length} arguments`);
+};
+
+/** Saves a person's open bill on this counter (POS spec §10): one per person, replaced on every change. */
+export const saveOpenBill = (db: SqlDb, userId: string, bill: OpenBill): void => notBuilt(db, userId, bill);
+
+/** A person's open bill, or null. One this version can't read is set aside in the diagnostic log, never crashed on. */
+export const loadOpenBill = (db: SqlDb, userId: string): OpenBill | null => notBuilt(db, userId);
+
+export const clearOpenBill = (db: SqlDb, userId: string): void => notBuilt(db, userId);
 
 const LOG_KEEP = 5000;
 
