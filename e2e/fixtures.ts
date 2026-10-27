@@ -32,7 +32,10 @@ export const API_PORT = 3100;
 export const POS_PORT = 4173;
 export const BACKOFFICE_PORT = 4174;
 
-/** A small catalog in Delux's shape (W1-03): codes, OEM numbers, vehicle tags, three tiers, an inactive item. */
+/**
+ * A small catalog in Delux's shape (W1-03): codes, OEM numbers, vehicle tags, three tiers, an inactive item. W1-05: a
+ * floor on the brake pads, none elsewhere (the list price is the floor, D-092), and a hose sold by the metre.
+ */
 export const CATALOG: TestItem[] = [
   {
     code: 'BRPD001',
@@ -42,6 +45,7 @@ export const CATALOG: TestItem[] = [
     origin: 'JAPAN',
     variant: 'FRONT',
     bin: 'R3-B2',
+    floor: 400000,
     oem: ['04465-02220'],
     vehicles: [{ make: 'TOYOTA', model: 'COROLLA', from: 2009, to: 2014 }],
     prices: { RETAIL: 450000, MECHANIC: 427500, WHOLESALE: 405000 },
@@ -87,5 +91,14 @@ export const CATALOG: TestItem[] = [
     category: 'ENOL',
     origin: 'JAPAN',
     prices: { RETAIL: 690000 },
+  },
+  {
+    code: 'HOSE001',
+    name: 'FUEL HOSE 8MM',
+    category: 'HOSE',
+    unit: 'METER',
+    fractional: true,
+    floor: 18000,
+    prices: { RETAIL: 20000 },
   },
 ];

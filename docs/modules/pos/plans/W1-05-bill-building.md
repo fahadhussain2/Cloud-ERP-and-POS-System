@@ -51,14 +51,14 @@
 
 ## Tests written first
 
-- [ ] **Pricing (golden):** at list; above list; below list within the role limit; exactly at the role limit; one paisa past it; exactly at the floor; below the floor; floor unknown (list is the floor); no list price; a fractional quantity (1.5 m); a bill discount that pushes one line below its floor while the others stay fine.
-- [ ] **Approvers (golden):** Manager approves below floor; a Salesman can't; a Manager role for another branch doesn't count here; `below_list` needs an approver whose own limit covers the discount; the seller with the permission approves themselves (owner answer 2).
-- [ ] **Totals (golden):** line totals with `mulQty` rounding; the bill discount split sums exactly; subtotal, line discounts (negative above list), bill discount, total; the same item added twice merges, a bargained one doesn't; whole-unit items refuse 1.5.
-- [ ] **Approval validity (golden):** holds after a quantity change and after raising the price; is dropped after lowering the price, a tier change, or a line change under a bill discount.
-- [ ] **Local schema 4:** a schema-3 database with catalog, PIN events and outbox rows upgrades in place with every row kept; save, load and clear an open bill per person; an open bill of an unknown `version` is set aside in `diagnostic_log`, not crashed on.
-- [ ] **Approval dialog (jsdom, fake counter):** a wrong PIN counts towards the approver's lock; a temporary PIN, a locked approver or one without the permission is refused; *Other* needs a note; Enter and the *Approve* button do the same.
-- [ ] **Counter screen (jsdom, fake counter):** Enter adds the selected result; `3*` adds three; a scan adds at once; the key bar follows the zone and each hint does what its key does; lock and unlock bring back the same person's bill, and another person's is empty.
-- [ ] **E2E:** the flows in scope item 4.
+- [x] **Pricing (golden):** at list; above list; below list within the role limit; exactly at the role limit; one paisa past it; exactly at the floor; below the floor; floor unknown (list is the floor); no list price; a fractional quantity (1.5 m); a bill discount that pushes one line below its floor while the others stay fine.
+- [x] **Approvers (golden):** Manager approves below floor; a Salesman can't; a Manager role for another branch doesn't count here; `below_list` needs an approver whose own limit covers the discount; the seller with the permission approves themselves (owner answer 2).
+- [x] **Totals (golden):** line totals with `mulQty` rounding; the bill discount split sums exactly; subtotal, line discounts (negative above list), bill discount, total; the same item added twice merges, a bargained one doesn't; whole-unit items refuse 1.5.
+- [x] **Approval validity (golden):** holds after a quantity change and after raising the price; is dropped after lowering the price, a tier change, or a line change under a bill discount.
+- [x] **Local schema 4:** a schema-3 database with catalog, PIN events and outbox rows upgrades in place with every row kept; save, load and clear an open bill per person; an open bill of an unknown `version` is set aside in `diagnostic_log`, not crashed on.
+- [x] **Approval dialog (jsdom, fake counter):** a wrong PIN counts towards the approver's lock; a temporary PIN, a locked approver or one without the permission is refused; *Other* needs a note; Enter and the *Approve* button do the same.
+- [x] **Counter screen (jsdom, fake counter):** Enter adds the selected result; `3*` adds three; a scan adds at once; the key bar follows the zone and each hint does what its key does; lock and unlock bring back the same person's bill, and another person's is empty.
+- [x] **E2E:** the flows in scope item 4.
 
 ## Changes made while building
 
@@ -71,6 +71,8 @@
 | No new `packages/ui` components: the reasons are native radio buttons, the tiers too; what a key can't do shows as a message in the bill panel instead of a toast | Arrow keys move through radio buttons with no extra code, and they test plainly in jsdom; the toast waits for W1-06. |
 | The approver picker lists everyone who can unlock (the W1-04 `StaffPicker`, now its own file); someone without the permission is refused after their PIN | The same flow as the manager unlock, so staff learn one thing. |
 | When the lines take the keyboard, the line just added is the selected one | As in the prototype: the usual next key is `+` or `P` on what was just added. |
+| E2E: the W1-03 scan flow now checks that the scanned item is on the bill, then clears it; `seedCatalog` takes a `floor` and a `fractional` unit, and the E2E catalog has a floor on the brake pads and a hose sold by the metre | A scan ending in Enter adds the item now (§10), as the spec always intended. |
+| The tier dialog takes Enter on a radio button itself | Chrome doesn't submit a form on Enter from a radio button; D-053 needs Enter to do what the main button does. |
 
 ## Verify
 

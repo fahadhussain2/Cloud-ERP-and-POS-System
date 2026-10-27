@@ -12,9 +12,13 @@ export interface TestItem {
   brand?: string;
   origin?: string;
   unit?: string;
+  /** The unit allows fractions (LITRE, METER, FOOT for Delux); only when the unit is first made. */
+  fractional?: boolean;
   variant?: string;
   spec?: string;
   bin?: string;
+  /** Minor units; none = unknown (the counter then uses the list price, D-092). */
+  floor?: number;
   status?: 'active' | 'dormant' | 'discontinued';
   oem?: string[];
   alternate?: string[];
@@ -75,8 +79,8 @@ export async function seedCatalog(
   for (const it of items) {
     const res = await c.query<{ id: string }>(
       `INSERT INTO erp.items (tenant_id, code, name, category_id, brand_id, origin_id, unit_id, variant, spec,
-         bin_location, status, legacy)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+         bin_location, floor_price, status, legacy)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
       [
         tenantId,
         it.code,
@@ -84,10 +88,14 @@ export async function seedCatalog(
         await lookup('categories', 'code', it.category, { name: it.category }),
         it.brand ? await lookup('brands', 'name', it.brand) : null,
         it.origin ? await lookup('origins', 'name', it.origin) : null,
-        await lookup('units', 'code', it.unit ?? 'PCS', { name: it.unit ?? 'PCS' }),
+        await lookup('units', 'code', it.unit ?? 'PCS', {
+          name: it.unit ?? 'PCS',
+          allows_fraction: it.fractional ?? false,
+        }),
         it.variant ?? null,
         it.spec ?? null,
         it.bin ?? null,
+        it.floor ?? null,
         it.status ?? 'active',
         it.legacy ?? null,
       ],

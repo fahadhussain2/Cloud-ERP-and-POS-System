@@ -162,7 +162,15 @@ export function TierDialog({
       onClose={onClose}
       onSubmit={() => onChoose(chosen)}
     >
-      <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
+      {/* Enter on a radio button doesn't submit a form in every browser: it does here (D-053). */}
+      <fieldset
+        className="m-0 flex flex-col gap-1.5 border-0 p-0"
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          onChoose(chosen);
+        }}
+      >
         <legend className="sr-only">{t('tier.title')}</legend>
         {tiers.map((tier) => (
           <label
