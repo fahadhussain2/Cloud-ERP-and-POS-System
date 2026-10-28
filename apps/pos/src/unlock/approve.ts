@@ -1,4 +1,4 @@
-import { canApprove, nextPinState, type ApprovalKind, type PinState, type RoleGrant } from '@erp/domain';
+import { can, canApprove, nextPinState, type ApprovalKind, type PinState, type RoleGrant } from '@erp/domain';
 
 import { unlockableStaff, type StaffUser } from './unlock';
 
@@ -18,6 +18,32 @@ export async function checkApprover(opts: {
   pin: string;
   verify: (verifier: string, pin: string) => Promise<boolean>;
 }): Promise<{ result: ApproverResult; approverState: PinState }> {
+  return checkStaffPin({
+    ...opts,
+    allowed: (grants) => canApprove(grants, opts.branchId, opts.need, opts.discountBp),
+  });
+}
+
+/** A manager's *Try again* on a refused bill (POS spec §14, owner answer 4 to W1-07): `admin.devices` here. */
+export function checkManager(opts: {
+  approver: StaffUser;
+  approverState: PinState;
+  approverGrants: readonly RoleGrant[];
+  branchId: string | null;
+  pin: string;
+  verify: (verifier: string, pin: string) => Promise<boolean>;
+}): Promise<{ result: ApproverResult; approverState: PinState }> {
+  return checkStaffPin({ ...opts, allowed: (grants) => can(grants, 'admin.devices', opts.branchId) });
+}
+
+async function checkStaffPin(opts: {
+  approver: StaffUser;
+  approverState: PinState;
+  approverGrants: readonly RoleGrant[];
+  allowed: (grants: readonly RoleGrant[]) => boolean;
+  pin: string;
+  verify: (verifier: string, pin: string) => Promise<boolean>;
+}): Promise<{ result: ApproverResult; approverState: PinState }> {
   const { approver, approverState } = opts;
   if (approverState.locked) return { result: 'approver_locked', approverState };
   if (approver.pinVerifier === null || unlockableStaff([approver]).length === 0)
@@ -29,7 +55,7 @@ export async function checkApprover(opts: {
   if (checked.result === 'wrong') return { result: 'wrong', approverState: checked.state };
   if (checked.result === 'locked') return { result: 'approver_locked', approverState: checked.state };
   // A right PIN, but not someone who may: a temporary PIN not yet replaced, or no permission in this branch.
-  if (approver.pinMustChange || !canApprove(opts.approverGrants, opts.branchId, opts.need, opts.discountBp))
+  if (approver.pinMustChange || !opts.allowed(opts.approverGrants))
     return { result: 'not_allowed', approverState: checked.state };
   return { result: 'approved', approverState: checked.state };
 }

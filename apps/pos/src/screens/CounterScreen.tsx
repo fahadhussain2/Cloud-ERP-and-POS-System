@@ -55,6 +55,7 @@ import { ApprovalDialog, ConfirmDialog, EntryDialog, TierDialog, type ApprovalAt
 import { BillPanel } from './BillPanel';
 import { CashDialog, MethodDialog, SplitDialog } from './PaymentDialogs';
 import { PaymentPad } from './PaymentPad';
+import { CLIENT_VERSION } from '../version';
 import { ReprintDialog } from './ReprintDialog';
 
 // The counter screen (POS spec §9–§11, POS-02, POS-03, POS-04, PLT-07): search on the left, the bill on the right,
@@ -62,8 +63,6 @@ import { ReprintDialog } from './ReprintDialog';
 // one. Enter (or a scan) adds the selected item; Tab moves to the bill lines, where single keys change a line.
 
 const CATALOG_POLL_MS = 1000;
-/** Carried by every document (sync spec §6.1); the server accepts the previous version too (architecture §4.2). */
-const CLIENT_VERSION = import.meta.env.VITE_ERP_VERSION ?? 'dev';
 /** The counter's clock at finalize (the document's createdAt). */
 const nowMs = () => Date.now();
 

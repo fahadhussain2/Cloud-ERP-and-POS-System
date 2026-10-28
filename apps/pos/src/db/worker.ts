@@ -1,11 +1,12 @@
 /// <reference lib="webworker" />
-import { verifyPin } from '@erp/contracts';
+import { verifyPin, type PushResult, type SeriesState } from '@erp/contracts';
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 
 import type { OpenBill } from '../bill/open-bill';
 import { SearchIndex, type SearchOptions } from '../search/search-index';
 import * as checkout from './checkout';
 import { currentVersion, migrate } from './migrate';
+import * as outbox from './outbox';
 import * as repo from './repo';
 import { wrapOo1, type SqlDb } from './sql';
 
@@ -76,6 +77,16 @@ const ops = {
   recentDocuments: (since: string, filter: string) => checkout.recentDocuments(open(), since, filter),
   loadDocument: (id: string) => checkout.loadDocument(open(), id),
   recordReprint: (r: Omit<checkout.Reprint, 'id' | 'pushedAt'>) => checkout.recordReprint(open(), r),
+  /** Push (sync spec §6.2–§7, W1-07): the outbox, the answer, re-queue after a restore, audit events, health. */
+  outboxBatch: () => outbox.outboxBatch(open()),
+  ackPush: (results: PushResult[], at: string) => outbox.ackPush(open(), results, at),
+  requeue: (series: SeriesState[]) => outbox.requeue(open(), series, Date.now()),
+  pendingEvents: () => outbox.pendingEvents(open()),
+  ackEvents: (ids: string[], at: string) => outbox.ackEvents(open(), ids, at),
+  localHealth: () => outbox.localHealth(open()),
+  quarantinedRows: () => outbox.quarantinedRows(open()),
+  retryQuarantined: (id: string) => outbox.retryQuarantined(open(), id),
+  pruneDocuments: () => outbox.pruneDocuments(open(), Date.now()),
   /** Items in the index, and whether a complete pull has loaded the catalog (POS spec §9). */
   catalogStatus: () => ({ items: index.size, ready: repo.getSync(open(), 'pull_complete_at') !== null }),
   listStaff: () => repo.listStaff(open()),
