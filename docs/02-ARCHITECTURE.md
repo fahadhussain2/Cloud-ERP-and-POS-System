@@ -176,18 +176,19 @@ Every printed bill carries a scannable code. Its main use is as the **offline pa
 
 ### 5.2 Upstream: push
 ```
-POST /sync/push  { deviceId, clientVersion, deviceClock, documents: [ {id, family, seq, payload, signature} ... ] }
-→ 200 { results: [ {id, status: accepted|duplicate|rejected, exceptions:[...], serverSeq} ... ] }
+POST /api/sync/push  { clientVersion, schemaVersion, deviceClock, health, documents: [ {id, family, seq, payload, signature} ... ], events: [...] }
+→ 200 { serverTime, results: [ {id, status: accepted|duplicate|rejected, exceptions:[...], error} ... ], series: [ {family, through, missing} ], events: [...] }
 ```
+The exact contract, the refusal reasons, the exceptions and the counter's side are in the [sync spec](modules/sync/spec.md) §6.2–§8 (W1-07, D-094). The device is the token's; the request also carries the counter's audit events and health (§11.3), and an empty one is the start-up handshake.
 - The client sends outbox entries **in sequence order**, in batches of up to 100. When online, a push is triggered **immediately on finalize** (not on a timer), so the bill reaches the cash desk queue within seconds (§4.6).
 - The server, per document, in **one database transaction**:
   1. verifies the device token and signature
   2. validates the schema (`packages/contracts`)
   3. re-validates the business rules (`packages/domain`) and records exceptions
-  4. inserts the document, then runs the **posting engine** (stock, party and GL entries) in the same transaction
+  4. inserts the document, then runs the **posting engine** (stock, party and GL entries) in the same transaction (from W1-08)
   5. records the result in `sync_inbox`.
 - A duplicate ID returns the stored original result.
-- **Sequence gaps** (e.g. 411 then 413) are recorded. The device is asked to re-send. The gap stays visible on the device health page until it is resolved.
+- **Sequence gaps** (e.g. 411 then 413) are recorded. Every answer lists what the server holds of each series (`through` and the missing ranges), and the counter re-sends what is missing from its 30-day copy. The gap stays visible on the device health page until it is resolved.
 - Client retry uses exponential backoff with jitter. An entry is removed from the outbox only after an `accepted` or `duplicate` acknowledgement. A `rejected` entry is quarantined and shown in a "needs attention" list, never silently dropped.
 
 ### 5.3 Downstream: pull
