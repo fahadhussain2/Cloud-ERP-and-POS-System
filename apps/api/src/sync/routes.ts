@@ -20,6 +20,7 @@ import type pg from 'pg';
 
 import { mayGivePin } from '../admin/users';
 import { requirePermission } from '../auth/routes';
+import { recordPull } from './push';
 
 // Counter sync (sync spec v1, W1-02, W1-03, W1-06, D-089): pull with per-dataset column lists, and the counter PIN change.
 
@@ -63,6 +64,8 @@ function datasetSource(dataset: PullDataset, branchId: string, deviceId: string)
           'day_cutoff_hour',
           'closing_time',
           'cash_handover_mode',
+          'offline_warning_hours',
+          'offline_strong_warning_hours',
           'status',
           'row_version',
           'deleted_at',
@@ -165,6 +168,7 @@ export function registerSync(scope: FastifyInstance, { pool, now, requireAuth, r
         pool,
         { tenantId: d.tenantId, deviceId: d.deviceId, requestId: req.id },
         async (_db, c) => {
+          await recordPull(c, d.tenantId, d.deviceId, now());
           let remaining = limit;
           for (const dataset of datasets as PullDataset[]) {
             if (remaining === 0) {

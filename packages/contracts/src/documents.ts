@@ -40,26 +40,31 @@ const Payment = z.strictObject({
   reference: z.string().min(1).max(40).nullable(),
 });
 
-const Override = z.strictObject({
-  kind: z.enum(['below_list', 'below_floor']),
-  lineNo: z.int().positive().nullable(),
-  requestedBy: z.uuid(),
-  approvedBy: z.uuid(),
-  reason: OverrideReason,
-  note: z.string().nullable(),
-  at: Instant,
-  values: z.union([
-    z.strictObject({
-      list: NonNegativeMoney.nullable(),
-      floor: NonNegativeMoney.nullable(),
-      price: NonNegativeMoney,
-    }),
-    z.strictObject({
-      billDiscount: NonNegativeMoney,
-      lines: z.array(z.strictObject({ lineNo: z.int().positive(), qty: Qty, unitPrice: NonNegativeMoney })),
-    }),
-  ]),
-});
+const Override = z
+  .strictObject({
+    kind: z.enum(['below_list', 'below_floor']),
+    lineNo: z.int().positive().nullable(),
+    requestedBy: z.uuid(),
+    approvedBy: z.uuid(),
+    reason: OverrideReason,
+    note: z.string().nullable(),
+    at: Instant,
+    values: z.union([
+      z.strictObject({
+        list: NonNegativeMoney.nullable(),
+        floor: NonNegativeMoney.nullable(),
+        price: NonNegativeMoney,
+      }),
+      z.strictObject({
+        billDiscount: NonNegativeMoney,
+        lines: z.array(z.strictObject({ lineNo: z.int().positive(), qty: Qty, unitPrice: NonNegativeMoney })),
+      }),
+    ]),
+  })
+  // A line's approval keeps its price; the bill discount's keeps the discount and the lines (W1-07 relies on it).
+  .refine((o) => (o.lineNo === null) === 'billDiscount' in o.values, {
+    message: 'the values must match the override: a line price, or the bill discount',
+  });
 
 /**
  * A finalized sale, version 1 (sync spec §6.1, W1-06): what `buildSaleDocument` in `@erp/domain` makes and what the

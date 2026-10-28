@@ -1,4 +1,5 @@
 // Database access (server only): Drizzle schema, SQL migrations, tenant context and the change feed (D-078).
+export { createChangeFeed, SYNC_CHANNEL, type ChangeFeed } from './listen';
 export { MIGRATIONS_DIR, migrate, type MigrateOptions } from './migrate';
 export * as schema from './schema';
 export {

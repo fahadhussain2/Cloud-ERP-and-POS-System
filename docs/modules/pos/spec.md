@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). The bill (§10) and the keyboard map (§11): with the W1-05 plan and owner answers (2026-10-27). Payment and finalize (§12), printing and reprint (§13): with the W1-06 plan and owner answers (2026-10-27). |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). The bill (§10) and the keyboard map (§11): with the W1-05 plan and owner answers (2026-10-27). Payment and finalize (§12), printing and reprint (§13): with the W1-06 plan and owner answers (2026-10-27). Push, offline warnings, the revoked counter and device health (§4, §7, §12, §14): with the W1-07 plan and owner answers (2026-10-28), D-094. |
 | **Refs** | POS-01, POS-14, PLT-01, PLT-03, PLT-04; architecture §4.1–§4.4, §8; data model §12; sync spec; CLAUDE.md rules 6, 9, 10; D-009, D-010, D-039, D-082 |
 
 The PRD and architecture describe what the counter does. This spec fixes how its foundations behave, precisely enough to build and test. **v1** covers what W1-02 builds; checkout, the payment pad and the keyboard map come in later versions.
@@ -16,10 +16,10 @@ The PRD and architecture describe what the counter does. This spec fixes how its
 | Table | Holds |
 |---|---|
 | `meta` | `schema_version`, `device_id`, `tenant_id`, `branch_id`, `device_code`, `created_at` |
-| `sync_state` | the pull cursor (opaque, sync spec §2), last pull and push times, server clock offset |
+| `sync_state` | the pull cursor (opaque, sync spec §2), last pull, push and contact times, `pushed_through:<family>`, server clock offset (W1-07) |
 | `local_series` | the next sequence per document family (used from W1-05) |
-| `outbox` | documents waiting to be pushed (used from W1-05) |
-| `local_documents` | this counter's documents for 30 days (used from W1-05) |
+| `outbox` | documents waiting to be pushed (W1-06), and refused ones quarantined (W1-07) |
+| `local_documents` | this counter's documents for 30 days, with their signature for re-push after a server restore (W1-06, W1-07) |
 | pulled tables | `tenant`, `branch`, `users`, `roles`, `user_roles` with the sync spec's columns (§3) |
 | `pin_state` | per user on this counter: wrong tries in a row, locked since |
 | `diagnostic_log` | ring buffer of the last ~5,000 events (architecture §11.3) |
@@ -51,7 +51,8 @@ Every check result is written to `diagnostic_log`.
 1. A manager creates a **one-time code** in the back office (*Counters*), for a branch and a kind (counter, cash desk), valid 15 minutes (W0-10).
 2. On the new PC, the POS shows *Set up this counter*: the manager types the code.
 3. The counter creates its key pair (non-extractable), enrolls with the code and its public key, gets its device code (e.g. `C03`), tenant and branch, stores them in `meta`, then pulls (sync spec).
-4. An enrolled counter never shows setup again. If the server says the device is **revoked**, the counter stops with *This counter was removed*; its unsynced documents are kept and can still be pushed after re-enrollment (W1-06).
+4. An enrolled counter never shows setup again.
+5. **Revoked** (W1-07, owner answer 3): when a pull or push hears `device_revoked` (sync spec §1), the counter stops selling with *This counter was removed* and how many bills it still holds: *don't clear this PC, call the manager*. Nothing is deleted (rule 9). A manager **re-enables** it in the back office (*Counters*); *Check again* reloads, and its bills sync. Re-enrolling the same PC as a new counter while keeping its bills is not built.
 
 ## 5. Unlock
 
@@ -77,6 +78,9 @@ Always visible at the **top** of every screen (W1-03 owner answer 1, as in the p
 - **Connection:** *Online*, or *Offline since HH:MM* (red after 30 minutes). It changes as soon as the browser loses the network; when the network comes back, the counter pulls at once and retries for about 30 seconds until a pull succeeds, then shows *Online*.
 - **Unsynced:** *N bills waiting to sync* (outbox rows); amber when the oldest is over 10 minutes old.
 - **Last sync** time, the **counter code**, and **who is unlocked**.
+- **Needs attention** (W1-07): *N bills need attention* (red) while the server has refused bills (§14).
+- The sync figures are a button that opens the counter's health (§14), like `Alt+S`.
+- **Offline warnings** (SYN-06, owner answer 1 to W1-07), counted from the **last contact**, the last successful push or pull (`sync_state.last_contact_at`, so a reload doesn't reset it): after the tenant's `offline_warning_hours` (8) a banner under the bar, *This counter has not reached the server for 9 hours. Bills are safe here and will sync when the internet is back*; after `offline_strong_warning_hours` (48) in red, *…for 2 days. Bills are safe here, but tell the manager now.* Checked every minute. **Selling is never blocked.** Nothing shows before a counter's first contact.
 - All text through i18n keys, laid out with CSS logical properties (rule 10).
 
 ## 8. App updates
@@ -148,7 +152,7 @@ POS-03, D-053, from the prototype. The key bar always shows the keys of the curr
 |---|---|
 | **Search** (`F2`) | `↑ ↓` result · `Enter` add · `2*` or `1.5*` before the text sets the quantity · `Esc` clear · `Tab` to the bill lines |
 | **Bill lines** (`Tab`) | `↑ ↓` line · `+ −` quantity · `Q` set quantity · `P` price · `D` bill discount · `Del` remove · `Esc` back to search; any other letter types into the search |
-| **Anywhere** | `F2` search · `F7` price tier · `F9` cash · `Shift+F9` split payment · `Alt+P` reprint · `Alt+C` clear the bill · `Alt+L` lock |
+| **Anywhere** | `F2` search · `F7` price tier · `F9` cash · `Shift+F9` split payment · `Alt+P` reprint · `Alt+C` clear the bill · `Alt+L` lock · `Alt+S` counter health (W1-07, also on the staff list) |
 | **Dialogs** | `Enter` the main button · `Esc` cancel · `Tab` next field |
 | **Later tasks** (shown once built) | `F3` return (W1-13) · `F4` customer (W1-09) · `F8` / `Shift+F8` hold and recall (W1-12) |
 
@@ -206,10 +210,11 @@ The **change** is cash received − the cash amount (0 when cash received is emp
 
 **After the commit:**
 
-1. The counter signs the canonical payload with its device key (`signCanonical`, D-082) and stores the signature on the outbox row. If signing fails, the row stays unsigned and push signs it before sending (W1-07).
+1. The counter signs the canonical payload with its device key (`signCanonical`, D-082) and stores the signature on the outbox row. If signing fails, the row stays unsigned and push signs it before sending (sync spec §6.2).
 2. The bill prints (§13).
 3. A message on the bill panel until the next bill starts: *Bill C03-S000412 printed · bring Rs 4,320 to the cash desk, change Rs 680* (or *paid by Raast* without cash), and a new empty bill with the search focused.
 4. The unsynced count in the status bar goes up; an app update may now activate (§8).
+5. **Push at once** (SYN-02, W1-07): online, the bill reaches the server within seconds and the count goes back down; offline it waits, and the counter pushes when the network returns (sync spec §6.2).
 
 ## 13. Printing and reprint (W1-06)
 
@@ -231,3 +236,25 @@ POS-09, POS-10, POS-16, architecture §4.5 and §8, D-048, D-055.
 **Bill code** (`billCode`, `parseBillCode`): Code 39, no check character, `<bill number> <cash due in whole rupees>`, e.g. `C03-S000412 4320`, or `C03-S000413 0` for a bill paid without cash. A cash due with paisa is refused (it is always rounded at Delux; a tenant whose increment leaves paisa can't use the barcode profile). Parsing ignores spaces around the text and a trailing Enter, and refuses anything else. The bars come from `code39Svg` in `packages/print`.
 
 **Reprint** (`Alt+P`, POS-10, owner answer 3): a dialog lists this counter's bills from `local_documents` (newest first, up to 30 days), filtered as the number is typed; `↑ ↓` and Enter reprint the selected one. **Anyone unlocked may reprint, without a PIN.** The copy carries a **REPRINT** band with the time and who reprinted it. Each reprint is kept in `reprints` (`id` UUIDv7, `document_id`, `number`, `user_id`, `at`, `pushed_at`) and in `diagnostic_log`; push (W1-07) sends it to the audit log as `bill.reprinted`. A reprinted barcode can't collect cash twice: the handover is unique per bill (data model §6).
+
+## 14. Device health and needs attention (W1-07)
+
+PLT-09, architecture §11.3, owner answer 4 to W1-07. `HealthDialog` over any screen, opened by clicking the status bar's sync figures or with `Alt+S`, from the staff list, the counter and the revoked screen. **Anyone may look**, offline too; nothing needs a PIN except *Try again*.
+
+**What it shows**, read fresh each time it opens:
+
+| Line | From |
+|---|---|
+| App version, database version | the build (`VITE_ERP_VERSION`), local schema (§2) |
+| Storage | permanent or not, used of quota (`navigator.storage`) |
+| Live updates | the SSE nudge on, or off and checking every minute (sync spec §8) |
+| Last download, last upload, last reached the server | `last_pull_at`, `last_push_at`, `last_contact_at` |
+| Clock difference with the server | from the last push's `serverTime`; over 5 minutes: *set this PC's clock* |
+| Bills waiting to sync, oldest waiting since | the outbox, refused bills included |
+| PIN and reprint records waiting | `pin_events` and `reprints` not yet pushed |
+
+**Needs attention:** the bills the server refused (sync spec §6.2), with their number and the reason in words (`health.error.<code>`). They stay on this counter (rule 9) and are never sent again by themselves.
+
+**Try again** (a manager): pick the manager, their own PIN, checked offline like an approval (`checkManager`: `admin.devices` for this branch; a wrong PIN counts towards the manager's own lock, §10). The bill goes back to the queue and is pushed at once; *Bill … will be sent again* shows. Use it once the cause is fixed (the [needs-attention runbook](../../runbooks/bill-needs-attention.md)).
+
+The same figures reach the server with every push and show on the back office's **Counters** list for every counter (sync spec §6.2): last seen, waiting (amber after 10 minutes, red after 4 hours), refused, app version, clock (red over 5 minutes), storage, missing bills.

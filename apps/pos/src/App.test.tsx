@@ -8,7 +8,7 @@ import type { OpenBill } from './bill/open-bill';
 import type { BillItem, SearchResult } from './search/search-index';
 
 import { App } from './App';
-import type { Counter } from './counter';
+import type { Counter, CounterHealth } from './counter';
 import type { CheckoutSettings, PaymentMethodRow } from './db/checkout';
 import type { DeviceInfo } from './db/repo';
 import { i18n } from './i18n';
@@ -22,6 +22,7 @@ import {
   type SaleDocument,
   type Tender,
 } from '@erp/domain';
+import type { PushOutcome } from './sync/push';
 import type { StaffUser } from './unlock/unlock';
 
 // The counter's screens over a fake counter (POS spec §3-§7). The PIN check is a plain comparison here; the real
@@ -39,10 +40,37 @@ const staff = (over: Partial<StaffUser> = {}): StaffUser => ({
   ...over,
 });
 
+const PUSHED: PushOutcome = {
+  ok: true,
+  accepted: 0,
+  duplicate: 0,
+  rejected: 0,
+  requeued: 0,
+  serverTime: '2026-10-25T05:30:00.000Z',
+};
+const OFFLINE_PUSH: PushOutcome = { ok: false, reason: 'offline' };
+const HEALTH: CounterHealth = {
+  outboxCount: 2,
+  oldestUnsyncedAt: '2026-10-25T05:00:00.000Z',
+  quarantinedCount: 1,
+  lastPullAt: '2026-10-25T05:30:00.000Z',
+  lastPushAt: '2026-10-25T05:31:00.000Z',
+  lastContactAt: '2026-10-25T05:31:00.000Z',
+  eventsWaiting: 3,
+  appVersion: '0.7.0',
+  schemaVersion: 6,
+  storagePersisted: true,
+  storageUsage: 41_000_000,
+  storageQuota: 2_000_000_000,
+  serverOffsetMs: 1500,
+};
+
 const fakeCounter = (over: Partial<Counter> = {}) => {
   let device: DeviceInfo | null = DEVICE;
   const pins = new Map<string, { failures: number; locked: boolean }>();
   const calls: string[] = [];
+  // Pushes are counted apart: the scheduler pushes at start-up and after sales, which would crowd the call lists.
+  const pushes = { n: 0 };
   const counter: Counter = {
     checkStorage: () =>
       Promise.resolve({ ok: true, health: { schemaVersion: 1, quickCheck: 'ok', outboxCount: 0 } }),
@@ -65,6 +93,8 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
         locale: 'en-PK',
         currency: 'PKR',
         minorUnits: 2,
+        offlineWarningHours: 8,
+        offlineStrongWarningHours: 48,
       }),
     getPinState: (id) => Promise.resolve(pins.get(id) ?? { failures: 0, locked: false }),
     setPinState: (id, s) => {
@@ -76,7 +106,25 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
       calls.push(`changePin ${b.userId} ${b.currentPin} ${b.newPin}`);
       return Promise.resolve('ok');
     },
-    status: () => Promise.resolve({ outboxCount: 0, lastSyncAt: '2026-10-25T05:30:00.000Z' }),
+    status: () =>
+      Promise.resolve({
+        outboxCount: 0,
+        lastSyncAt: '2026-10-25T05:30:00.000Z',
+        lastContactAt: new Date().toISOString(),
+        attention: 0,
+      }),
+    push: () => {
+      pushes.n++;
+      return Promise.resolve(PUSHED);
+    },
+    listen: () => () => undefined,
+    health: () => Promise.resolve(HEALTH),
+    needsAttention: () => Promise.resolve([]),
+    retryBill: (id) => {
+      calls.push(`retry ${id}`);
+      return Promise.resolve(true);
+    },
+    prune: () => Promise.resolve(0),
     log: () => Promise.resolve(),
     search: () => Promise.resolve([]),
     catalog: () => Promise.resolve({ items: 0, ready: true }),
@@ -99,7 +147,7 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
     print: () => {},
     ...over,
   };
-  return { counter, calls, setDevice: (d: DeviceInfo | null) => (device = d) };
+  return { counter, calls, pushes, setDevice: (d: DeviceInfo | null) => (device = d) };
 };
 
 const show = (counter: Counter) =>
@@ -309,7 +357,8 @@ describe('counter screens', () => {
   it('the status bar shows the counter, the bills waiting and when the counter went offline', async () => {
     const { counter } = fakeCounter({
       pull: () => Promise.resolve({ ok: false, reason: 'offline' }),
-      status: () => Promise.resolve({ outboxCount: 3, lastSyncAt: null }),
+      push: () => Promise.resolve(OFFLINE_PUSH),
+      status: () => Promise.resolve({ outboxCount: 3, lastSyncAt: null, lastContactAt: null, attention: 0 }),
     });
     show(counter);
     expect(await screen.findByText('C01')).toBeDefined();
@@ -334,6 +383,7 @@ describe('counter screens', () => {
     let online = false;
     const f = fakeCounter({
       pull: () => Promise.resolve(online ? { ok: true, rows: 0 } : { ok: false, reason: 'offline' }),
+      push: () => Promise.resolve(online ? PUSHED : OFFLINE_PUSH),
     });
     show(f.counter);
     expect(await screen.findByText(/^Offline since/)).toBeDefined();
@@ -1094,5 +1144,115 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
       expect(f.reprints).toEqual(['C01-S000001 u1']);
       await waitFor(() => expect(notice()).toBe('Bill C01-S000001 reprinted'));
     });
+  });
+});
+
+// W1-07: push at start-up, the offline warnings (SYN-06, owner answer 1), the counter's health page (PLT-09, POS spec
+// §14, owner answer 4) and a revoked counter (owner answer 3).
+describe('push, offline warnings and counter health (W1-07)', () => {
+  const HOUR = 3_600_000;
+  const MANAGER: RoleGrant = {
+    permissions: ['admin.devices'],
+    limits: { maxDiscountBp: 10000, voidWindow: 'same_day' },
+    branchId: null,
+  };
+  const boss = staff({ id: 'm1', fullName: 'Boss Man', shortCode: '99', pinVerifier: '2468' });
+  const REFUSED = {
+    id: 'doc-7',
+    family: 'S' as const,
+    seq: 7,
+    number: 'C01-S000007',
+    error: 'bad_schema',
+    attempts: 1,
+    createdAt: '2026-10-25T05:00:00.000Z',
+  };
+  const offlineFor = (hours: number) => ({
+    pull: () => Promise.resolve({ ok: false as const, reason: 'offline' as const }),
+    push: () => Promise.resolve(OFFLINE_PUSH),
+    status: () =>
+      Promise.resolve({
+        outboxCount: 4,
+        lastSyncAt: null,
+        lastContactAt: new Date(Date.now() - hours * HOUR).toISOString(),
+        attention: 0,
+      }),
+  });
+
+  it('pushes at start-up: the handshake, even with nothing to send', async () => {
+    const f = fakeCounter();
+    show(f.counter);
+    await screen.findByRole('button', { name: /Asif Khan/ });
+    await waitFor(() => expect(f.pushes.n).toBeGreaterThan(0));
+  });
+
+  it('says nothing for 7 hours offline, warns at 8 hours, and selling goes on', async () => {
+    show(fakeCounter(offlineFor(7)).counter);
+    await screen.findByRole('button', { name: /Asif Khan/ });
+    expect(screen.queryByText(/not reached the server/)).toBeNull();
+    cleanup();
+    show(fakeCounter(offlineFor(9.5)).counter);
+    expect(await screen.findByText(i18n.t('status.offlineWarning', { hours: 9 }))).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: /Asif Khan/ }));
+    enterPin('4831');
+    expect(await screen.findByRole('combobox')).toBeDefined();
+  });
+
+  it('warns strongly after 48 hours', async () => {
+    show(fakeCounter(offlineFor(49)).counter);
+    expect(await screen.findByText(i18n.t('status.offlineStrong', { days: 2 }))).toBeDefined();
+  });
+
+  it('opens the health page from the status bar: versions, storage, sync times, waiting and refused bills', async () => {
+    const f = fakeCounter({ needsAttention: () => Promise.resolve([REFUSED]) });
+    show(f.counter);
+    await screen.findByRole('button', { name: /Asif Khan/ });
+    fireEvent.click(screen.getByRole('button', { name: en.status.openHealth }));
+    expect(await screen.findByText(en.health.title)).toBeDefined();
+    for (const text of ['0.7.0', en.health.persisted, 'C01-S000007', en.health.error.bad_schema])
+      expect(screen.getByText(text, { exact: false })).toBeDefined();
+    expect(screen.getByText(en.health.sseOff)).toBeDefined();
+  });
+
+  it('Alt+S opens it too, even on the staff list', async () => {
+    show(fakeCounter().counter);
+    await screen.findByRole('button', { name: /Asif Khan/ });
+    fireEvent.keyDown(window, { key: 's', altKey: true });
+    expect(await screen.findByText(en.health.noAttention)).toBeDefined();
+  });
+
+  it('Try again needs a manager’s own PIN with admin.devices; a wrong one counts against them', async () => {
+    const f = fakeCounter({
+      staff: () => Promise.resolve([staff(), boss]),
+      grants: (id) => Promise.resolve(id === 'm1' ? [MANAGER] : []),
+      needsAttention: () => Promise.resolve([REFUSED]),
+    });
+    show(f.counter);
+    await screen.findByRole('button', { name: /Asif Khan/ });
+    fireEvent.click(screen.getByRole('button', { name: en.status.openHealth }));
+    fireEvent.click(await screen.findByRole('button', { name: en.health.tryAgain }));
+    fireEvent.click(await screen.findByRole('button', { name: /Asif Khan/ }));
+    fireEvent.change(screen.getByLabelText(en.health.pin), { target: { value: '4831' } });
+    fireEvent.click(screen.getByRole('button', { name: en.health.tryAgain }));
+    expect(await screen.findByText(en.health.notAllowed)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: en.health.back }));
+    fireEvent.click(await screen.findByRole('button', { name: /Boss Man/ }));
+    fireEvent.change(screen.getByLabelText(en.health.pin), { target: { value: '0000' } });
+    fireEvent.click(screen.getByRole('button', { name: en.health.tryAgain }));
+    expect(await screen.findByText(i18n.t('health.wrong', { count: 4 }))).toBeDefined();
+    expect(await f.counter.getPinState('m1')).toEqual({ failures: 1, locked: false });
+    fireEvent.change(screen.getByLabelText(en.health.pin), { target: { value: '2468' } });
+    fireEvent.click(screen.getByRole('button', { name: en.health.tryAgain }));
+    expect(await screen.findByText(i18n.t('health.retried', { number: 'C01-S000007' }))).toBeDefined();
+    expect(f.calls).toContain('retry doc-7');
+  });
+
+  it('a revoked counter stops selling and says how many bills it still holds', async () => {
+    const f = fakeCounter({
+      push: () => Promise.resolve({ ok: false, reason: 'revoked' }),
+      status: () => Promise.resolve({ outboxCount: 3, lastSyncAt: null, lastContactAt: null, attention: 0 }),
+    });
+    show(f.counter);
+    expect(await screen.findByText(i18n.t('revoked.body', { count: 3 }))).toBeDefined();
+    expect(screen.queryByRole('button', { name: /Asif Khan/ })).toBeNull();
   });
 });

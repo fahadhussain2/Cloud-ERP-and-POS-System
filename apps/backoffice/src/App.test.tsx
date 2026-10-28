@@ -414,3 +414,125 @@ describe('Counters', () => {
     expect(calls.map((c) => c.route)).toContain('POST /api/devices/d1/revoke');
   });
 });
+
+// W1-07 (PLT-09, owner answer 3): each counter's health from its last push, and Re-enable for a revoked one.
+describe('Counters: health and Re-enable (W1-07)', () => {
+  const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+  const device = (over: Record<string, unknown>) => ({
+    id: 'd1',
+    code: 'C01',
+    name: null,
+    kind: 'counter',
+    branchId: 'b1',
+    status: 'active',
+    enrolledAt: '2026-10-25T05:00:00.000Z',
+    revokedAt: null,
+    health: null,
+    ...over,
+  });
+  const health = (over: Record<string, unknown> = {}) => ({
+    lastSeenAt: ago(1),
+    lastPushAt: ago(1),
+    lastPullAt: ago(1),
+    clientVersion: '0.7.0',
+    schemaVersion: 6,
+    outboxCount: 0,
+    oldestUnsyncedAt: null,
+    quarantinedCount: 0,
+    storagePersisted: true,
+    storageUsage: 41_000_000,
+    storageQuota: 2_000_000_000,
+    clockSkewMs: 800,
+    openGaps: 0,
+    ...over,
+  });
+  /** The tone of the chip with `text` in `row`; a text ending in a space matches the chip that starts with it. */
+  const tone = (row: HTMLElement, text: string) =>
+    within(row)
+      .getByText(text.endsWith(' ') ? (t) => t.startsWith(text) : text)
+      .closest('[data-tone]')
+      ?.getAttribute('data-tone');
+
+  it('shows each counter’s health, colouring what needs an eye', async () => {
+    const { api } = fakeApi(
+      signedIn(OWNER, {
+        'GET /api/devices': () => ({
+          status: 200,
+          body: [
+            device({ health: health() }),
+            device({
+              id: 'd2',
+              code: 'C02',
+              health: health({
+                outboxCount: 3,
+                oldestUnsyncedAt: ago(300),
+                quarantinedCount: 1,
+                storagePersisted: false,
+                clockSkewMs: -420_000,
+                openGaps: 2,
+                clientVersion: '0.6.0',
+              }),
+            }),
+            device({ id: 'd3', code: 'C03' }),
+          ],
+        }),
+      }),
+    );
+    window.location.hash = '#/counters';
+    show(api);
+    const fine = (await screen.findByText('C01')).closest('tr')!;
+    expect(tone(fine, en.counters.waitingNone)).toBe('ok');
+    expect(tone(fine, en.counters.clockOk)).toBe('ok');
+    expect(within(fine).getByText('0.7.0')).toBeDefined();
+
+    const troubled = screen.getByText('C02').closest('tr')!;
+    expect(within(troubled).getByText('0.6.0')).toBeDefined();
+    expect(tone(troubled, '3 since ')).toBe('bad');
+    expect(tone(troubled, i18n.t('counters.attention', { count: 1 }))).toBe('bad');
+    expect(tone(troubled, i18n.t('counters.clockOff', { minutes: 7 }))).toBe('bad');
+    expect(tone(troubled, en.counters.storageBad)).toBe('bad');
+    expect(tone(troubled, i18n.t('counters.gapsOpen', { count: 2 }))).toBe('bad');
+
+    const unseen = screen.getByText('C03').closest('tr')!;
+    expect(within(unseen).getByText(en.counters.notSeen)).toBeDefined();
+  });
+
+  it('bills waiting over 10 minutes are amber, under it plain', async () => {
+    const { api } = fakeApi(
+      signedIn(OWNER, {
+        'GET /api/devices': () => ({
+          status: 200,
+          body: [
+            device({ health: health({ outboxCount: 1, oldestUnsyncedAt: ago(15) }) }),
+            device({ id: 'd2', code: 'C02', health: health({ outboxCount: 1, oldestUnsyncedAt: ago(2) }) }),
+          ],
+        }),
+      }),
+    );
+    window.location.hash = '#/counters';
+    show(api);
+    expect(tone((await screen.findByText('C01')).closest('tr')!, '1 since ')).toBe('warn');
+    expect(tone(screen.getByText('C02').closest('tr')!, '1 since ')).toBe('neutral');
+  });
+
+  it('re-enables a revoked counter after a confirmation', async () => {
+    const { api, calls } = fakeApi(
+      signedIn(OWNER, {
+        'GET /api/devices': () => ({
+          status: 200,
+          body: [device({ status: 'revoked', revokedAt: '2026-10-28T09:00:00.000Z' })],
+        }),
+        'POST /api/devices/d1/reenable': () => ({ status: 204, body: null }),
+      }),
+    );
+    window.location.hash = '#/counters';
+    show(api);
+    const row = (await screen.findByText('C01')).closest('tr')!;
+    expect(within(row).queryByRole('button', { name: en.counters.revoke })).toBeNull();
+    fireEvent.click(within(row).getByRole('button', { name: en.counters.reenable }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: en.counters.confirmReenable }));
+    await screen.findByText(i18n.t('counters.reenabled', { code: 'C01' }));
+    expect(calls.map((c) => c.route)).toContain('POST /api/devices/d1/reenable');
+  });
+});

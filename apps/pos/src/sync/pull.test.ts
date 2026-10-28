@@ -1,6 +1,7 @@
 import { PULL_DATASETS, type PullResponse } from '@erp/contracts';
 import { describe, expect, it } from 'vitest';
 
+import { DeviceRefusedError } from '../device/session';
 import { OfflineError, type Api } from '../net/api';
 import { pullAll, type PullDeps } from './pull';
 
@@ -84,6 +85,10 @@ describe('pull', () => {
       () => Promise.resolve({ status: 401, body: {} }),
     ]);
     expect(await pullAll(refused.deps)).toEqual({ ok: false, reason: 'refused' });
+    const revoked = setup([
+      () => Promise.reject(Object.assign(new DeviceRefusedError('challenge refused'), { revoked: true })),
+    ]);
+    expect(await pullAll(revoked.deps)).toEqual({ ok: false, reason: 'revoked' });
     const failing = setup([ok(page(1, true)), () => Promise.resolve({ status: 500, body: {} })]);
     expect(await pullAll(failing.deps)).toEqual({ ok: false, reason: 'server' });
     expect(failing.applied).toHaveLength(1);

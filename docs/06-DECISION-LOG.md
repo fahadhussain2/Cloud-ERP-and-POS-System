@@ -760,3 +760,21 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - The Delux printer is a laser (HP LaserJet P1005), its bills print at the cash counter and its scanners read Code 39, so a signed QR adds nothing there yet (D-048).
   - A jammed shared printer must not stop the shop; a reprinted barcode can't collect cash twice because a handover is unique per bill.
 - **Status:** Accepted (with the W1-06 plan, owner answers 1–4)
+
+### D-094 Push sync: accept and flag, a counter pushes its own bills, restores heal themselves, SSE nudge, health on both sides (2026-10-28)
+- **Decision:**
+  - **Push** (`POST /api/sync/push`) sends up to 100 documents in sequence order with the counter's audit events and health; each document in its own transaction. An empty push is the start-up handshake. The contract is in the [sync spec](modules/sync/spec.md) §6.2.
+  - **Refused only when a document can't be trusted or stored:** unsigned, a bad signature, a malformed payload, an id or number already taken by another document, a reference that isn't the tenant's, another device's document. **Everything else is accepted** and re-checked with `reviewSale` in `packages/domain`; what looks wrong becomes an exception: below the floor or past a limit without a covering approval, **figures that don't add up (accepted and flagged, owner answer 2)**, clock skew, made while revoked, a sequence gap.
+  - **A counter pushes only its own documents,** verified with its own key. Re-enrolling a PC as a new counter while carrying its old bills is not built.
+  - **Refused bills wait on the counter under *Needs attention*;** a manager's own PIN (`admin.devices`) sends one again (owner answer 4). Anyone may open the counter's health page (`Alt+S`).
+  - **Gaps and restores heal themselves:** every answer lists each series' `through` and missing ranges, and the counter puts back what the server lacks from its 30-day copy.
+  - **A revoked counter is told so** (`device_revoked`), stops selling and keeps its bills; **Re-enable** in the back office brings it back, and documents made in between are flagged (owner answer 3).
+  - **SSE nudge:** `pg_notify` from every pulled table, one `LISTEN` connection in the API, `changes-available` at most every 2 s per tenant; the counter pulls on it and polls every 5 minutes while it is up. Caddy passes the stream unbuffered.
+  - **Offline warnings** after 8 and 48 hours without reaching the server, per tenant, never blocking a sale (owner answer 1).
+  - **Device health** on the counter and, for every counter, on the back office's Counters list; the SSE nudge and the Counters columns both stay in this task (owner answer 5).
+- **Why:**
+  - A completed sale is a fact (SYN-03, D-011): refusing one the counter computed wrongly would hide it; flagging it keeps it in the books and on the exceptions report.
+  - Verifying with the pushing device's own key keeps the trust model simple until a PC must carry another counter's bills.
+  - A restore must not lose the bills made after its point (SYN-05); the counters already hold them, so they put them back without anyone asking.
+  - The owner and managers should see a sick counter before the day's reconciliation does.
+- **Status:** Accepted (with the W1-07 plan, owner answers 1–5)

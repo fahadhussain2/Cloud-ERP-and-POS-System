@@ -78,6 +78,13 @@ export {
 export { parseQty, qty, QTY_SCALE, type Qty } from './quantity';
 export { roundCash, type CashRounding } from './rounding';
 export {
+  reviewSale,
+  type ApprovalCause,
+  type InconsistencyCode,
+  type ReviewContext,
+  type SaleFinding,
+} from './review-sale';
+export {
   billCode,
   buildSaleDocument,
   documentNumber,

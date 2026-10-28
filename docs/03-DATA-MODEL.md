@@ -141,6 +141,8 @@ A **single document type** covers sales, returns and exchanges:
 
 This keeps the one-screen exchange (D-006) to one document, one number, one receipt and one cash movement.
 
+**Built in W1-07 (migration 0008):** `sales_documents`, `sales_lines`, `sales_payments` and `overrides` as below, filled by push (sync spec §6.2). Also on the document: the signed `payload` (jsonb) exactly as the device sent it, its `payload_hash`, the `signature`, and `exception_count`; on each line its `bill_share` of the bill discount; on each payment its `line_no` (the order on the bill). `id` is the device-made UUIDv7 (rule 7); `(device_id, seq)` is unique, the number is only indexed (one that doesn't follow from them is accepted and flagged). The app role never updates or deletes lines, payments or overrides (rule 3). The void and return fields come with W1-12 and W1-13, `unit_cost` with posting (W1-08).
+
 **sales_documents**
 | Field | Notes |
 |---|---|
@@ -267,9 +269,17 @@ Journal vouchers written by the accountant are stored as `journal_entries` with 
 
 ## 10. Sync and control
 
-**sync_inbox:** `document_id (PK), device_id, family, seq, status (accepted|duplicate|rejected), result jsonb, payload_hash, received_at`
+**sync_inbox:** `tenant_id, document_id (PK together), device_id, family, seq, status (accepted|rejected), result jsonb, payload_hash, received_at, attempts`. A `duplicate` is an answer, not a stored state; a rejected row is checked again when the document comes back (sync spec §6.2).
 
-**exceptions:** `kind (below_floor_no_override|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature), severity, document_type, document_id, device_id, user_id, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`
+**exceptions:** `kind (below_floor_no_override|discount_over_limit|document_inconsistent|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature), severity (low|medium|high), document_type, document_id, device_id, user_id, business_date, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`. Clock skew is unique per device and business date.
+
+**Built in W1-07** with the two above (migration 0008, sync spec §6.2–§8):
+
+- **device_series:** `tenant_id, device_id, family (PK together), through, max_seq`: every seq from 1 to `through` has arrived.
+- **sequence_gaps:** `device_id, family, from_seq, to_seq, opened_at, resolved_at`.
+- **device_status:** one row per device: `last_seen_at, last_push_at, last_pull_at, client_version, schema_version, outbox_count, oldest_unsynced_at, quarantined_count, storage_persisted, storage_usage, storage_quota, clock_skew_ms` (PLT-09).
+- **tenants** gains `offline_warning_hours` (8) and `offline_strong_warning_hours` (48), pulled with the tenant (SYN-06); **devices** gains `last_revoked_at, reenabled_at, reenabled_by_user_id` (Re-enable keeps the revocation, sync spec §1).
+- Every pulled table has `sync_notify` statement triggers sending its tenant on the `erp_sync` channel (the SSE nudge, sync spec §8).
 
 ---
 
@@ -333,6 +343,8 @@ SQLite WASM in a dedicated worker, on OPFS (`opfs-sahpool`), changed only by num
 **Built in W1-05 (local schema 4):** `open_bills`: `user_id` (primary key), `bill` (JSON: `{ version, bill, items }`, the domain bill and what each line shows), `updated_at`. The bill each person is building on this counter, saved after every change so a lock or a reload never loses it (POS spec §10). Never pushed; a stored bill this version can't read is set aside in `diagnostic_log`. W1-06 removes it in the finalize transaction.
 
 **Built in W1-06 (local schema 5):** `payment_methods`, `print_profiles` and `device` (this counter's own row), with exactly the pulled columns (sync spec §3, `CHECKOUT_COLUMNS` in `@erp/contracts`); `reprints`: `id` (UUIDv7), `document_id`, `number`, `user_id`, `at`, `pushed_at`, kept until push reports them to the audit log as `bill.reprinted` (W1-07); an index on `local_documents.created_at` for the reprint list. Finalizing writes `local_series`, `local_documents` and `outbox` and deletes the person's `open_bills` row in **one transaction** (POS spec §12); the outbox row's `signature` is added right after the commit.
+
+**Built in W1-07 (local schema 6):** `local_documents.signature`, copied from the outbox row when the server acks it, so a document can be pushed again after a server restore; an index on `local_documents (family, seq)` for the re-queue. `sync_state` keys `pushed_through:<family>`, `last_push_at`, `last_contact_at` (the last successful push or pull) and `server_clock_offset_ms`. An acked row leaves the outbox; a refused one stays `quarantined` with its error (sync spec §6.2, POS spec §14). Documents older than 30 days are pruned at start-up, never one still in the outbox (rule 9).
 
 The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` in IndexedDB (`erp-pos-keys`), and the device token is kept only in memory.
 

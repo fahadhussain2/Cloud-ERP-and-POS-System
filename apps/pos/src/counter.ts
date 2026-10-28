@@ -3,6 +3,7 @@ import type { Money, PinState, RoleGrant, SaleDocument } from '@erp/domain';
 
 import type { OpenBill } from './bill/open-bill';
 import type { CheckoutSettings, DocumentSummary, FinalizeRequest, Finalized, Reprint } from './db/checkout';
+import type { LocalHealth, QuarantinedRow } from './db/outbox';
 import type { DeviceInfo, PinEvent, TenantSettings } from './db/repo';
 import type { EnrollResult } from './device/session';
 import type { PrintJob } from './print/print-job';
@@ -10,10 +11,32 @@ import type { BillItem, SearchOptions, SearchResult, Tier } from './search/searc
 import type { CheckResult } from './storage/checks';
 import type { PinChangeResult } from './sync/pin';
 import type { PullResult } from './sync/pull';
+import type { PushOutcome } from './sync/push';
 import type { StaffUser } from './unlock/unlock';
 
 // Everything the counter screens need from the PC and the server, in one place, so the screens can be tested with a
 // fake. The real one is browserCounter() (counter-browser.ts).
+
+export interface CounterStatus {
+  /** Bills not yet on the server, refused ones included. */
+  outboxCount: number;
+  lastSyncAt: string | null;
+  /** The last successful push or pull: the offline warnings count from it (SYN-06). */
+  lastContactAt: string | null;
+  /** Bills the server refused (Needs attention). */
+  attention: number;
+}
+
+export interface CounterHealth extends LocalHealth {
+  appVersion: string;
+  schemaVersion: number;
+  /** From the browser; null when it can't say. */
+  storagePersisted: boolean | null;
+  storageUsage: number | null;
+  storageQuota: number | null;
+  /** The server's clock minus this counter's, at the last push; null before one. */
+  serverOffsetMs: number | null;
+}
 
 export interface Counter {
   checkStorage(): Promise<CheckResult>;
@@ -31,7 +54,19 @@ export interface Counter {
   /** Keeps a lock or a manager unlock for the server's audit log (pushed with W1-07). */
   recordPinEvent(event: Omit<PinEvent, 'id' | 'pushedAt'>): Promise<void>;
   changePin(body: CounterPinChangeRequest): Promise<PinChangeResult>;
-  status(): Promise<{ outboxCount: number; lastSyncAt: string | null }>;
+  status(): Promise<CounterStatus>;
+  /** Pushes the outbox, the audit events and the health; an empty outbox is the handshake (sync spec §6.2, W1-07). */
+  push(): Promise<PushOutcome>;
+  /** Opens the SSE nudge (sync spec §8); returns the close. */
+  listen(handlers: { onChanges: () => void; onConnected: (connected: boolean) => void }): () => void;
+  /** This counter's health (PLT-09, POS spec §14). */
+  health(): Promise<CounterHealth>;
+  /** Bills the server refused, waiting under Needs attention. */
+  needsAttention(): Promise<QuarantinedRow[]>;
+  /** Puts a refused bill back in the queue (a manager's *Try again*). */
+  retryBill(id: string): Promise<boolean>;
+  /** Drops this counter's documents older than 30 days, never one still to sync (rule 9). */
+  prune(): Promise<number>;
   log(kind: string, detail: Record<string, unknown>): Promise<void>;
   /** Omni-search over the local catalog (POS spec §9). */
   search(text: string, opts?: SearchOptions): Promise<SearchResult[]>;

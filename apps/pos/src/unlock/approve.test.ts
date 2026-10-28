@@ -1,7 +1,7 @@
 import { ROLE_TEMPLATES, type RoleGrant, type RoleTemplateKey } from '@erp/domain';
 import { describe, expect, it } from 'vitest';
 
-import { checkApprover } from './approve';
+import { checkApprover, checkManager } from './approve';
 import type { StaffUser } from './unlock';
 
 // An approver's PIN on the same screen (POS spec §10, PLT-07), checked offline like the manager unlock (§5).
@@ -89,5 +89,31 @@ describe('an approval by PIN', () => {
     expect((await check({ need: 'below_list', discountBp: 1001, approverGrants: [limited] })).result).toBe(
       'not_allowed',
     );
+  });
+});
+
+describe("a manager's Try again on a refused bill (POS spec §14, W1-07)", () => {
+  const manager = (over: Partial<Parameters<typeof checkManager>[0]> = {}) =>
+    checkManager({
+      approver: person(),
+      approverState: open,
+      approverGrants: [role('manager')],
+      branchId: 'b1',
+      pin: '4321',
+      verify,
+      ...over,
+    });
+
+  it('a manager with admin.devices here may; a salesman or another branch’s manager may not', async () => {
+    expect((await manager()).result).toBe('approved');
+    expect((await manager({ approverGrants: [role('salesman')] })).result).toBe('not_allowed');
+    expect((await manager({ approverGrants: [role('manager', 'b2')] })).result).toBe('not_allowed');
+  });
+
+  it('a wrong PIN counts towards the manager’s own lock', async () => {
+    expect(await manager({ pin: '0000' })).toEqual({
+      result: 'wrong',
+      approverState: { failures: 1, locked: false },
+    });
   });
 });

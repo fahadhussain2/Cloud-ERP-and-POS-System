@@ -229,7 +229,10 @@ export function applyPull(db: SqlDb, changes: PullResponse['changes'], cursor: s
       }
     }
     setSync(db, 'pull_cursor', cursor);
-    setSync(db, 'last_pull_at', now());
+    const at = now();
+    setSync(db, 'last_pull_at', at);
+    // What the offline warnings count from (SYN-06): any successful push or pull.
+    setSync(db, 'last_contact_at', at);
     if (done) setSync(db, 'pull_complete_at', now());
   });
 }
@@ -257,6 +260,9 @@ export interface TenantSettings {
   locale: string;
   currency: string;
   minorUnits: number;
+  /** Hours without reaching the server before the warning and the strong warning (SYN-06, W1-07). */
+  offlineWarningHours: number;
+  offlineStrongWarningHours: number;
 }
 
 export function tenantSettings(db: SqlDb): TenantSettings | null {
@@ -270,6 +276,9 @@ export function tenantSettings(db: SqlDb): TenantSettings | null {
     locale: str(t['locale'] ?? 'en'),
     currency: str(t['base_currency'] ?? 'PKR'),
     minorUnits: Number(t['currency_minor_units'] ?? 2),
+    // The PRD's defaults until the tenant row carries them (pulled before W1-07).
+    offlineWarningHours: Number(t['offline_warning_hours'] ?? 8),
+    offlineStrongWarningHours: Number(t['offline_strong_warning_hours'] ?? 48),
   };
 }
 

@@ -30,7 +30,11 @@ There are **no long-lived device secrets** besides the non-extractable key. A de
 3. The server verifies the signature with the stored public key and checks that the device is **active**. It then issues an **access token valid for 15 minutes**. Only the token's SHA-256 is stored.
 4. Requests carry `Authorization: Device <tenantId>.<token>`. The server sets the tenant context from it and looks the token up **under RLS**, the same pattern as back-office sessions (D-081).
 
-So there's no refresh token to steal or rotate. **Revoking a device** (`admin.devices`) deletes its tokens, and no new ones can be issued. Documents it already created are still accepted at sync, flagged for review (architecture §4.3, D-011).
+So there's no refresh token to steal or rotate. **Revoking a device** (`admin.devices`) deletes its tokens, and no new ones can be issued: its challenge answers `401 { error: 'device_revoked' }` (W1-07), so the counter can say so and keep its bills (POS spec §4). Any other refusal is `device_refused`; a busy (`429`) or failing (`5xx`) challenge is retried by the counter like being offline.
+
+**Re-enable** (`POST /api/devices/:id/reenable`, `admin.devices`, owner answer 3 to W1-07): the device is active again and gets tokens with the same key. The revocation is kept (`last_revoked_at`, `reenabled_at`), and documents it created in between are accepted with a `revoked_device_doc` exception (sync spec §6.2, architecture §4.3, D-011). Audited like every device change.
+
+**One token for callers asking together:** pull, push and the SSE stream start at once on the counter; one challenge serves them all (W1-07).
 
 ## 3. Document signatures
 
