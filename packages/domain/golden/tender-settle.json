@@ -115,6 +115,30 @@
       }
     },
     {
+      "name": "on account for a credit customer (W1-09): no reference, nothing for the cash desk",
+      "input": {
+        "total": 432000,
+        "hasCreditCustomer": true,
+        "tender": {
+          "payments": [{ "method": "on_account", "amount": 432000, "reference": "" }],
+          "cashReceived": null
+        }
+      },
+      "expected": {
+        "payments": [
+          {
+            "method": "on_account",
+            "amount": 432000,
+            "cashReceived": null,
+            "changeDue": null,
+            "reference": null
+          }
+        ],
+        "cashDue": 0,
+        "change": 0
+      }
+    },
+    {
       "name": "an invalid tender is refused",
       "input": { "total": 432000, "tender": { "payments": [], "cashReceived": null } },
       "error": "invalid_tender"

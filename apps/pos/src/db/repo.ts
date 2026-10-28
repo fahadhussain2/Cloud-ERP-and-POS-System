@@ -1,8 +1,11 @@
 import {
   CATALOG_COLUMNS,
   CATALOG_DATASETS,
+  CHECKOUT_COLUMNS,
+  CHECKOUT_DATASETS,
   uuidv7,
   type CatalogDataset,
+  type CheckoutDataset,
   type ColumnType,
   type PullResponse,
 } from '@erp/contracts';
@@ -94,9 +97,16 @@ function fromSql(type: ColumnType, v: unknown): unknown {
 
 const catalogColumns = (d: CatalogDataset) => Object.entries(CATALOG_COLUMNS[d]) as [string, ColumnType][];
 
+/** Pulled datasets stored with exactly their typed columns: the catalog (W1-03) and checkout (W1-06). */
+const TYPED_COLUMNS: Record<CatalogDataset | CheckoutDataset, Record<string, ColumnType>> = {
+  ...CATALOG_COLUMNS,
+  ...CHECKOUT_COLUMNS,
+};
+const TYPED_DATASETS = [...CATALOG_DATASETS, ...CHECKOUT_DATASETS];
+
 const UPSERT = Object.fromEntries(
-  CATALOG_DATASETS.map((d) => {
-    const names = [...catalogColumns(d).map(([n]) => n), 'row_version'];
+  TYPED_DATASETS.map((d) => {
+    const names = [...Object.keys(TYPED_COLUMNS[d]), 'row_version'];
     const updates = names.filter((n) => n !== 'id').map((n) => `${n} = excluded.${n}`);
     return [
       d,
@@ -104,18 +114,19 @@ const UPSERT = Object.fromEntries(
        ON CONFLICT (id) DO UPDATE SET ${updates.join(', ')}`,
     ];
   }),
-) as Record<CatalogDataset, string>;
+) as Record<CatalogDataset | CheckoutDataset, string>;
 
-/** The catalog rows of a page (W1-03): upserted with their types; removed rows are deleted. */
-function applyCatalog(db: SqlDb, changes: PullResponse['changes']): void {
-  for (const d of CATALOG_DATASETS) {
+/** The typed rows of a page: upserted with their types; removed rows are deleted. */
+function applyTyped(db: SqlDb, changes: PullResponse['changes']): void {
+  for (const d of TYPED_DATASETS) {
+    const columns = Object.entries(TYPED_COLUMNS[d]);
     for (const r of changes[d] ?? []) {
       if (r['deleted_at'] !== null && r['deleted_at'] !== undefined) {
         db.exec(`DELETE FROM ${d} WHERE id = ?`, [required(r, 'id')]);
         continue;
       }
       db.exec(UPSERT[d], [
-        ...catalogColumns(d).map(([name, type]) => toSql(type, r[name])),
+        ...columns.map(([name, type]) => toSql(type, r[name])),
         required(r, 'row_version'),
       ]);
     }
@@ -146,7 +157,7 @@ export function loadCatalog(db: SqlDb): Record<CatalogDataset, Record<string, un
  */
 export function applyPull(db: SqlDb, changes: PullResponse['changes'], cursor: string, done = false): void {
   db.transaction(() => {
-    applyCatalog(db, changes);
+    applyTyped(db, changes);
     for (const r of changes.users ?? []) {
       // A new PIN from the server clears this person's lock here: the lock protected the old PIN (W1-04 plan).
       const before = db.selectObjects('SELECT pin_verifier FROM users WHERE id = ?', [required(r, 'id')])[0];

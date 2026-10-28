@@ -275,6 +275,18 @@
         }
       },
       "expected": null
+    },
+    {
+      "name": "an increment that isn't positive is refused",
+      "input": {
+        "total": 432000,
+        "increment": 0,
+        "tender": {
+          "payments": [{ "method": "cash", "amount": 432000, "reference": null }],
+          "cashReceived": null
+        }
+      },
+      "error": "invalid_increment"
     }
   ]
 }

@@ -1,5 +1,6 @@
 import {
   CATALOG_COLUMNS,
+  CHECKOUT_COLUMNS,
   CounterPinChangeRequest,
   makePinVerifier,
   PULL_DATASETS,
@@ -8,6 +9,7 @@ import {
   TemporaryPinRequest,
   verifyPin,
   type CatalogDataset,
+  type CheckoutDataset,
   type PullDataset,
   type PullResponse,
 } from '@erp/contracts';
@@ -19,7 +21,7 @@ import type pg from 'pg';
 import { mayGivePin } from '../admin/users';
 import { requirePermission } from '../auth/routes';
 
-// Counter sync (sync spec v1, W1-02, W1-03, D-089): pull with per-dataset column lists, and the counter PIN change.
+// Counter sync (sync spec v1, W1-02, W1-03, W1-06, D-089): pull with per-dataset column lists, and the counter PIN change.
 
 interface Deps {
   pool: pg.Pool;
@@ -29,15 +31,22 @@ interface Deps {
 }
 
 const isCatalog = (d: PullDataset): d is CatalogDataset => d in CATALOG_COLUMNS;
+const isCheckout = (d: PullDataset): d is CheckoutDataset => d in CHECKOUT_COLUMNS;
 
 /** Each dataset's source and the only columns that may leave the server (sync spec §3). */
-function datasetSource(dataset: PullDataset, branchId: string): PullSource {
+function datasetSource(dataset: PullDataset, branchId: string, deviceId: string): PullSource {
   // The catalog (W1-03): the shared column list, tenant-wide; each table is named like its dataset.
   if (isCatalog(dataset))
     return {
       table: dataset,
       columns: [...Object.keys(CATALOG_COLUMNS[dataset]), 'row_version', 'deleted_at'],
     };
+  // Payment methods and print profiles (W1-06): tenant-wide; the device: only the caller's own row.
+  if (isCheckout(dataset)) {
+    const columns = [...Object.keys(CHECKOUT_COLUMNS[dataset]), 'row_version', 'deleted_at'];
+    if (dataset === 'device') return { table: 'devices', columns, where: 'id = $4', params: [deviceId] };
+    return { table: dataset, columns };
+  }
   switch (dataset) {
     case 'tenant':
       return {
@@ -164,7 +173,7 @@ export function registerSync(scope: FastifyInstance, { pool, now, requireAuth, r
             }
             const page = await pullColumns(
               c,
-              datasetSource(dataset, d.branchId),
+              datasetSource(dataset, d.branchId, d.deviceId),
               cursor[dataset] ?? START,
               remaining,
             );

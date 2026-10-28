@@ -26,19 +26,55 @@ export interface Code39Options {
   quiet: number;
 }
 
-const notBuilt = (...args: unknown[]): never => {
-  throw new Error(`not built yet (W1-06): ${args.length} arguments`);
-};
+/** The patterns of `CODE39_CHARACTERS`, in the same order. */
+// prettier-ignore
+const PATTERNS = [
+  'nnnwwnwnn', 'wnnwnnnnw', 'nnwwnnnnw', 'wnwwnnnnn', 'nnnwwnnnw', 'wnnwwnnnn',
+  'nnwwwnnnn', 'nnnwnnwnw', 'wnnwnnwnn', 'nnwwnnwnn', 'wnnnnwnnw', 'nnwnnwnnw',
+  'wnwnnwnnn', 'nnnnwwnnw', 'wnnnwwnnn', 'nnwnwwnnn', 'nnnnnwwnw', 'wnnnnwwnn',
+  'nnwnnwwnn', 'nnnnwwwnn', 'wnnnnnnww', 'nnwnnnnww', 'wnwnnnnwn', 'nnnnwnnww',
+  'wnnnwnnwn', 'nnwnwnnwn', 'nnnnnnwww', 'wnnnnnwwn', 'nnwnnnwwn', 'nnnnwnwwn',
+  'wwnnnnnnw', 'nwwnnnnnw', 'wwwnnnnnn', 'nwnnwnnnw', 'wwnnwnnnn', 'nwwnwnnnn',
+  'nwnnnnwnw', 'wwnnnnwnn', 'nwwnnnwnn', 'nwnwnwnnn', 'nwnwnnnwn', 'nwnnnwnwn',
+  'nnnwnwnwn',
+];
+const START_STOP = 'nwnnwnwnn';
+const PATTERN = new Map([...CODE39_CHARACTERS].map((c, i) => [c, PATTERNS[i]!]));
 
 /**
  * The element pattern of each character, start and stop included: 9 elements per character, bar first, `n` narrow
  * and `w` wide. A narrow space separates the characters.
  */
 export function encodeCode39(text: string): string[] {
-  return notBuilt(text);
+  if (text === '') throw new Code39Error('empty', 'nothing to encode');
+  const patterns = [...text].map((c) => {
+    const p = PATTERN.get(c);
+    if (p === undefined) throw new Code39Error('unsupported_character', `Code 39 can't carry "${c}"`);
+    return p;
+  });
+  return [START_STOP, ...patterns, START_STOP];
 }
+
+// Rounded so fractional widths don't print as 0.30000000000000004.
+const unit = (n: number) => String(Math.round(n * 1000) / 1000);
 
 /** An SVG image of the barcode, black bars on nothing, sized in the options' units. */
 export function code39Svg(text: string, options: Code39Options): string {
-  return notBuilt(text, options);
+  const { narrow, wide, height, quiet } = options;
+  const bars: string[] = [];
+  let x = quiet * narrow;
+  encodeCode39(text).forEach((pattern, i) => {
+    if (i > 0) x += narrow;
+    [...pattern].forEach((element, j) => {
+      const width = element === 'w' ? wide : narrow;
+      if (j % 2 === 0)
+        bars.push(`<rect x="${unit(x)}" y="0" width="${unit(width)}" height="${unit(height)}"/>`);
+      x += width;
+    });
+  });
+  const total = x + quiet * narrow;
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${unit(total)} ${unit(height)}" ` +
+    `preserveAspectRatio="none" shape-rendering="crispEdges" fill="#000">${bars.join('')}</svg>`
+  );
 }
