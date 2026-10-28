@@ -142,13 +142,13 @@ async function loadSetting(c: pg.ClientBase, device: Device): Promise<Setting> {
     'SELECT public_key, last_revoked_at, reenabled_at FROM erp.devices WHERE id = $1',
     [device.deviceId],
   );
-  // Every method, active or not: one switched off during an outage is still a valid payment (reviewSale).
+  // Every method, active, switched off or removed: one taken away during an outage still paid a sale (SYN-03).
   const m = await c.query<{
     id: string;
     code: PaymentMethodCode;
     is_cash: boolean;
     requires_reference: boolean;
-  }>('SELECT id, code, is_cash, requires_reference FROM erp.payment_methods WHERE deleted_at IS NULL');
+  }>('SELECT id, code, is_cash, requires_reference FROM erp.payment_methods');
   const shop = await c.query<{ id: string }>(
     `SELECT id FROM erp.locations WHERE branch_id = $1 AND kind = 'shop' AND deleted_at IS NULL ORDER BY code LIMIT 1`,
     [device.branchId],
@@ -528,29 +528,35 @@ async function advanceSeries(c: pg.ClientBase, device: Device, s: Setting, doc: 
   );
 }
 
-/** Every family the device has documents in: `through`, and the ranges missing above it. */
+/**
+ * Every family the device has documents in: `through`, and the ranges missing above it. Every number above `through`
+ * that never arrived lies in an open gap (a jump opens one), so only those ranges are read: the cost follows the
+ * gaps, not the device's history.
+ */
 async function seriesOf(c: pg.ClientBase, device: Device): Promise<SeriesState[]> {
-  const series = await c.query<{ family: SeriesState['family']; through: number; max_seq: number }>(
-    'SELECT family, through, max_seq FROM erp.device_series WHERE device_id = $1 ORDER BY family',
+  const series = await c.query<{ family: SeriesState['family']; through: number }>(
+    'SELECT family, through FROM erp.device_series WHERE device_id = $1 ORDER BY family',
     [device.deviceId],
   );
-  const out: SeriesState[] = [];
-  for (const r of series.rows) {
+  const gaps = await c.query<{ family: string; from_seq: number; to_seq: number; present: number[] }>(
+    `SELECT g.family, g.from_seq, g.to_seq,
+       ARRAY(SELECT DISTINCT i.seq FROM erp.sync_inbox i WHERE i.device_id = g.device_id AND i.family = g.family
+             AND i.seq BETWEEN g.from_seq AND g.to_seq ORDER BY i.seq) AS present
+     FROM erp.sequence_gaps g WHERE g.device_id = $1 AND g.resolved_at IS NULL ORDER BY g.family, g.from_seq`,
+    [device.deviceId],
+  );
+  return series.rows.map((r) => {
     const missing: [number, number][] = [];
-    if (r.max_seq > r.through) {
-      const present = await c.query<{ seq: number }>(
-        'SELECT DISTINCT seq FROM erp.sync_inbox WHERE device_id = $1 AND family = $2 AND seq > $3 ORDER BY seq',
-        [device.deviceId, r.family, r.through],
-      );
-      let last = r.through;
-      for (const p of present.rows) {
-        if (p.seq > last + 1) missing.push([last + 1, p.seq - 1]);
-        last = p.seq;
+    for (const g of gaps.rows.filter((x) => x.family === r.family)) {
+      let next = g.from_seq;
+      for (const seq of g.present) {
+        if (seq > next) missing.push([next, seq - 1]);
+        next = seq + 1;
       }
+      if (next <= g.to_seq) missing.push([next, g.to_seq]);
     }
-    out.push({ family: r.family, through: r.through, missing });
-  }
-  return out;
+    return { family: r.family, through: r.through, missing };
+  });
 }
 
 /** The counter's audit events (sync spec §5): each with its own id, so a re-send is stored once. */

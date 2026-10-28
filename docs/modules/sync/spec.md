@@ -25,7 +25,7 @@ GET /api/sync/pull?datasets=users,roles,user_roles,tenant,branch&cursor=<opaque>
 - **Paging:** at most `limit` rows in total per call (default 500, max 1,000), filled dataset by dataset in the requested order. `hasMore` is true while any dataset has more; the client repeats the call with the new cursor until it's false.
 - **Tombstones:** soft-deleted rows (`deleted_at` set) are returned like any change; the client deletes or hides them locally.
 - **Rows contain only their dataset's listed columns** (§3), as JSON: `bigint` and `numeric` as strings, timestamps as ISO 8601, `bytea` as base64url. Sync and audit bookkeeping (`txid`, `created_by_user_id`…) is left out; `row_version` and `deleted_at` are kept.
-- **Errors:** `400 { error: 'unknown_dataset' | 'bad_cursor' | 'bad_limit' }`, `401` for a missing, expired or revoked device token. Pull never changes server data.
+- **Errors:** `400 { error: 'unknown_dataset' | 'bad_cursor' | 'bad_limit' }`, `401` for a missing, expired or revoked device token. Pull changes no business data; it only records its time on the device's health (`device_status.last_pull_at`, W1-07).
 
 ## 3. Datasets (v1)
 
