@@ -11,15 +11,14 @@ export interface OfflineThresholds {
 /** The PRD's examples, used until the tenant sends its own (an older server). */
 export const DEFAULT_THRESHOLDS: OfflineThresholds = { warningHours: 8, strongHours: 48 };
 
-const notBuilt = (...args: unknown[]): never => {
-  throw new Error(`not built yet (W1-07): ${args.length} arguments`);
-};
-
 /** `none` before the first contact: a counter that never reached the server is still being set up. */
 export function offlineLevel(
   lastContactAt: string | null,
   nowMs: number,
   t: OfflineThresholds,
 ): OfflineLevel {
-  return notBuilt(lastContactAt, nowMs, t);
+  if (lastContactAt === null) return 'none';
+  const hours = (nowMs - Date.parse(lastContactAt)) / 3_600_000;
+  if (hours >= t.strongHours) return 'strong';
+  return hours >= t.warningHours ? 'warning' : 'none';
 }

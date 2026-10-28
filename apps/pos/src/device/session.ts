@@ -54,6 +54,14 @@ export async function enroll(
 
 export class DeviceRefusedError extends Error {
   override name = 'DeviceRefusedError';
+
+  constructor(
+    message: string,
+    /** The server says this counter was revoked in the back office (sync spec §1, W1-07). */
+    readonly revoked = false,
+  ) {
+    super(message);
+  }
 }
 
 export interface TokenSource {
@@ -74,23 +82,39 @@ export function createTokenSource(deps: {
 }): TokenSource {
   const now = deps.now ?? Date.now;
   let cached: { token: string; expiresAt: number } | null = null;
+  // Pull, push and the SSE stream ask at the same moment (W1-07): one challenge serves them all.
+  let fetching: Promise<string> | null = null;
+  /** A busy (429) or failing (5xx) server is not a refusal: callers retry it like being offline. */
+  const refusedOrBusy = (status: number, message: string, revoked = false) =>
+    status === 429 || status >= 500 ? new OfflineError(message) : new DeviceRefusedError(message, revoked);
+
+  const fetchToken = async () => {
+    const [device, pair] = await Promise.all([deps.device(), deps.keys.get()]);
+    if (!device || !pair) throw new DeviceRefusedError('this counter is not enrolled');
+    const { tenantId, deviceId } = device;
+    const ch = await deps.api('POST', '/api/devices/challenge', { body: { tenantId, deviceId } });
+    if (ch.status !== 200) {
+      const revoked = (ch.body as { error?: unknown } | null)?.error === 'device_revoked';
+      throw refusedOrBusy(ch.status, 'challenge refused', revoked);
+    }
+    const { nonce } = ch.body as { nonce: string };
+    const signature = await signCanonical(pair.privateKey, { tenantId, deviceId, nonce });
+    const t = await deps.api('POST', '/api/devices/token', {
+      body: { tenantId, deviceId, nonce, signature },
+    });
+    if (t.status !== 200) throw refusedOrBusy(t.status, 'token refused');
+    const b = t.body as { accessToken: string; expiresAt: string };
+    cached = { token: b.accessToken, expiresAt: Date.parse(b.expiresAt) };
+    return cached.token;
+  };
+
   return {
-    async get() {
-      if (cached && cached.expiresAt - RENEW_MS > now()) return cached.token;
-      const [device, pair] = await Promise.all([deps.device(), deps.keys.get()]);
-      if (!device || !pair) throw new DeviceRefusedError('this counter is not enrolled');
-      const { tenantId, deviceId } = device;
-      const ch = await deps.api('POST', '/api/devices/challenge', { body: { tenantId, deviceId } });
-      if (ch.status !== 200) throw new DeviceRefusedError('challenge refused');
-      const { nonce } = ch.body as { nonce: string };
-      const signature = await signCanonical(pair.privateKey, { tenantId, deviceId, nonce });
-      const t = await deps.api('POST', '/api/devices/token', {
-        body: { tenantId, deviceId, nonce, signature },
+    get() {
+      if (cached && cached.expiresAt - RENEW_MS > now()) return Promise.resolve(cached.token);
+      fetching ??= fetchToken().finally(() => {
+        fetching = null;
       });
-      if (t.status !== 200) throw new DeviceRefusedError('token refused');
-      const b = t.body as { accessToken: string; expiresAt: string };
-      cached = { token: b.accessToken, expiresAt: Date.parse(b.expiresAt) };
-      return cached.token;
+      return fetching;
     },
     invalidate() {
       cached = null;

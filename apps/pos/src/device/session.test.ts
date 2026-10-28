@@ -142,6 +142,33 @@ describe('device token', () => {
     await expect(tokens.get()).rejects.toMatchObject({ name: 'DeviceRefusedError', revoked: false });
   });
 
+  it('callers asking at once share one challenge (pull, push and the SSE stream start together, W1-07)', async () => {
+    const { generateDeviceKey } = await import('@erp/contracts');
+    const keys = memoryKeys();
+    await keys.put(await generateDeviceKey());
+    const { api, calls } = server(keys);
+    const tokens = createTokenSource({ api, keys, device: () => Promise.resolve(device), now: () => clock });
+    const got = await Promise.all([tokens.get(), tokens.get(), tokens.get()]);
+    expect(new Set(got).size).toBe(1);
+    expect(calls.filter((c) => c === '/api/devices/challenge')).toHaveLength(1);
+  });
+
+  it('a busy or failing server is not a refusal: it is retried like being offline', async () => {
+    const { generateDeviceKey } = await import('@erp/contracts');
+    const keys = memoryKeys();
+    await keys.put(await generateDeviceKey());
+    for (const status of [429, 503]) {
+      const api: Api = () => Promise.resolve({ status, body: { error: 'too_many_requests' } });
+      const tokens = createTokenSource({
+        api,
+        keys,
+        device: () => Promise.resolve(device),
+        now: () => clock,
+      });
+      await expect(tokens.get()).rejects.toBeInstanceOf(OfflineError);
+    }
+  });
+
   it('says when the refusal is because the counter was revoked (W1-07, sync spec §1)', async () => {
     const { generateDeviceKey } = await import('@erp/contracts');
     const keys = memoryKeys();

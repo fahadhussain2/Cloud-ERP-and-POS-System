@@ -16,7 +16,8 @@ export interface PullDeps {
   onPage?: () => void;
 }
 
-export type PullResult = { ok: true; rows: number } | { ok: false; reason: 'offline' | 'refused' | 'server' };
+export type PullResult =
+  { ok: true; rows: number } | { ok: false; reason: 'offline' | 'refused' | 'revoked' | 'server' };
 
 export async function pullAll(deps: PullDeps): Promise<PullResult> {
   let rows = 0;
@@ -30,7 +31,9 @@ export async function pullAll(deps: PullDeps): Promise<PullResult> {
       res = await deps.api('GET', `/api/sync/pull?${query.toString()}`, { token: await deps.tokens.get() });
     } catch (err) {
       if (err instanceof OfflineError) return { ok: false, reason: 'offline' };
-      if (err instanceof DeviceRefusedError) return { ok: false, reason: 'refused' };
+      // A revoked counter stops, keeping its unsynced bills (sync spec §1, W1-07).
+      if (err instanceof DeviceRefusedError)
+        return { ok: false, reason: err.revoked ? 'revoked' : 'refused' };
       throw err;
     }
     if (res.status === 401 && !retried) {
