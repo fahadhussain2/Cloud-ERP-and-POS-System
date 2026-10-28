@@ -207,6 +207,13 @@ describe('pull', () => {
     expect(body.changes['user_roles']!.some((r) => r['user_id'] === ids['ali'])).toBe(false);
   });
 
+  it('sends the offline warning thresholds with the tenant: 8 and 48 hours by default (SYN-06, W1-07)', async () => {
+    const body = (await pull(token, 'datasets=tenant')).json<PullBody>();
+    expect(body.changes['tenant']).toEqual([
+      expect.objectContaining({ offline_warning_hours: 8, offline_strong_warning_hours: 48 }),
+    ]);
+  });
+
   it("never shows another tenant's rows", async () => {
     const body = (await pull(otherToken, 'datasets=users')).json<PullBody>();
     expect(body.changes['users']!.map((u) => u['username'])).toEqual(['otherboss']);
