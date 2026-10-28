@@ -149,6 +149,15 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE INDEX local_documents_created ON local_documents (created_at)',
     ],
   },
+  {
+    // Push (W1-07, sync spec §7): a document keeps its signature after its outbox row is acked, so it can be pushed
+    // again after a server restore; the re-queue reads documents by series.
+    version: 6,
+    statements: [
+      'ALTER TABLE local_documents ADD COLUMN signature TEXT',
+      'CREATE INDEX local_documents_series ON local_documents (family, seq)',
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;
