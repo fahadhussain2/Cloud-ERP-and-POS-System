@@ -247,19 +247,22 @@ export function registerDevices(scope: FastifyInstance, { pool, now, requireAuth
       const { tenantId, deviceId } = body.data;
       const t = now();
       const nonce = toBase64Url(randomBytes(32));
-      const ok = await withTenant(pool, { tenantId, requestId: req.id }, async (_db, c) => {
-        const d = await c.query(
-          "SELECT 1 FROM erp.devices WHERE id = $1 AND status = 'active' AND deleted_at IS NULL",
+      const outcome = await withTenant(pool, { tenantId, requestId: req.id }, async (_db, c) => {
+        const d = await c.query<{ status: string }>(
+          'SELECT status FROM erp.devices WHERE id = $1 AND deleted_at IS NULL',
           [deviceId],
         );
-        if (d.rowCount === 0) return false;
+        const status = d.rows[0]?.status;
+        // A revoked counter is told so, so it can keep its unsynced bills and call a manager (sync spec §1, W1-07).
+        if (status !== 'active') return status === 'revoked' ? 'revoked' : 'refused';
         await c.query(
           'INSERT INTO erp.device_challenges (tenant_id, device_id, nonce_hash, expires_at) VALUES ($1, $2, $3, $4)',
           [tenantId, deviceId, hashToken(nonce), new Date(t.getTime() + CHALLENGE_MS)],
         );
-        return true;
+        return 'ok';
       });
-      if (!ok) return reply.code(401).send({ error: 'device_refused' });
+      if (outcome === 'revoked') return reply.code(401).send({ error: 'device_revoked' });
+      if (outcome !== 'ok') return reply.code(401).send({ error: 'device_refused' });
       return { nonce };
     },
   );
@@ -320,6 +323,31 @@ export function registerDevices(scope: FastifyInstance, { pool, now, requireAuth
           await c.query('DELETE FROM erp.device_tokens WHERE device_id = $1', [req.params.id]);
           return true;
         },
+      );
+      if (!done) return reply.code(404).send({ error: 'unknown_device' });
+      return reply.code(204).send();
+    },
+  );
+
+  // Re-enable a counter revoked by mistake (owner answer 3 to W1-07): it gets tokens again and pushes its bills; the
+  // revocation is kept, so what it made meanwhile is flagged revoked_device_doc. Audited by the devices trigger.
+  scope.post<{ Params: { id: string } }>(
+    '/devices/:id/reenable',
+    { preHandler: requirePermission(requireAuth, 'admin.devices') },
+    async (req, reply) => {
+      const a = req.auth!;
+      const done = await withTenant(
+        pool,
+        { tenantId: a.tenantId, userId: a.userId, requestId: req.id },
+        async (_db, c) =>
+          (
+            await c.query(
+              `UPDATE erp.devices SET status = 'active', last_revoked_at = revoked_at, revoked_at = NULL,
+                 revoked_by_user_id = NULL, reenabled_at = $1, reenabled_by_user_id = $2
+               WHERE id = $3 AND status = 'revoked' AND deleted_at IS NULL`,
+              [now(), a.userId, req.params.id],
+            )
+          ).rowCount === 1,
       );
       if (!done) return reply.code(404).send({ error: 'unknown_device' });
       return reply.code(204).send();

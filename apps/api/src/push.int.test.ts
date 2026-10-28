@@ -641,7 +641,7 @@ describe('audit events (sync spec §5, POS spec §13)', () => {
       {
         id: ids[0],
         action: 'pin.locked',
-        entity: 'user',
+        entity: 'users',
         entity_id: sara,
         user_id: sara,
         device_id: c.deviceId,
@@ -650,7 +650,7 @@ describe('audit events (sync spec §5, POS spec §13)', () => {
       {
         id: ids[1],
         action: 'pin.unlocked_by_manager',
-        entity: 'user',
+        entity: 'users',
         entity_id: sara,
         user_id: boss,
         device_id: c.deviceId,
@@ -659,7 +659,7 @@ describe('audit events (sync spec §5, POS spec §13)', () => {
       {
         id: ids[2],
         action: 'bill.reprinted',
-        entity: 'sales_document',
+        entity: 'sales_documents',
         entity_id: doc.id,
         user_id: sara,
         device_id: c.deviceId,
@@ -729,7 +729,8 @@ describe('revoked devices (sync spec §1, owner answer 3)', () => {
     const before = sale(c, 1);
     const revoked = await post(`/api/devices/${c.deviceId}/revoke`, {}, cookie);
     expect(revoked.statusCode).toBe(204);
-    const during = sale(c, 2, { createdAtMs: Date.now() + 1000 });
+    // Made after the revocation and before Re-enable.
+    const during = sale(c, 2, { createdAtMs: Date.now() });
 
     expect((await pushRaw(c, request([]))).statusCode).toBe(401);
     expect(await tokenFor(tenant, c.deviceId, c.keys)).toEqual({

@@ -71,6 +71,16 @@
 
 The three left open (the banner, the health screen, the E2E) are written with the screens during the build, as in W1-06.
 
+## Build notes (2026-10-28)
+
+- **Server re-check:** four golden cases were added while reaching 100% coverage: a bill discount larger than the lines (an `amounts` and a `rounding` finding, no price check on it), an approver the server doesn't know, and approvals naming a line that isn't on the bill. `SaleDocumentV1` now refuses an override whose values don't match it (a line's price, or the bill discount), which the re-check relies on.
+- **A device pushes only its own documents.** A document is verified with the key of the device it names: well signed by another device → `wrong_device`, otherwise `bad_signature`. Carrying a re-enrolled PC's old documents is not built (owner answer 3).
+- **The bill number isn't unique on its own:** `(device, seq)` is. A number that doesn't follow from them is accepted and flagged (`document_inconsistent`), so a unique index on it could have refused a sale.
+- **Re-enable keeps the revocation window:** `devices` gains `last_revoked_at`, `reenabled_at` and `reenabled_by_user_id`; a document created between the two is `revoked_device_doc`. The `device_revoked` answer comes from the challenge call (revoking deletes the tokens, so a push with an old token is a plain `401`).
+- **Clock skew** is recorded with the device's health, once per device and business day, not in each document's result.
+- **Audit events** use the existing entity names (`users`, `sales_documents`), with the counter's time as `at`.
+- **The change feed** (`createChangeFeed` in `packages/db`) opens its `LISTEN` connection with the first stream and reconnects after 5 s if it drops; the stream closes after 15 minutes, the token's life.
+
 ## Verify
 
 1. `pnpm check`, `pnpm test:integration` and `pnpm e2e`, output shown.
