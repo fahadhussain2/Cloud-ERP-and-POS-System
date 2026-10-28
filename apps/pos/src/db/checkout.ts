@@ -44,6 +44,8 @@ export interface CheckoutSettings {
   cutoffHour: number;
   methods: PaymentMethodRow[];
   printProfile: PrintProfile | null;
+  /** The branch's receipt header lines, printed under the shop name. */
+  receiptHeader: string[];
 }
 
 export interface FinalizeRequest {
@@ -107,7 +109,18 @@ export function checkoutSettings(db: SqlDb): CheckoutSettings | null {
     cutoffHour: Number(t['day_cutoff_hour']),
     methods,
     printProfile: printProfile(db),
+    receiptHeader: receiptHeader(db),
   };
+}
+
+/** The branch's address and phone, then its `receipt_header.lines` (POS spec §13). */
+function receiptHeader(db: SqlDb): string[] {
+  const data = text(db.selectValue('SELECT data FROM branch WHERE deleted_at IS NULL LIMIT 1'));
+  if (data === null) return [];
+  const b = JSON.parse(data) as { address?: unknown; phone?: unknown; receipt_header?: { lines?: unknown } };
+  const lines = b.receipt_header?.lines;
+  const extra: unknown[] = Array.isArray(lines) ? (lines as unknown[]) : [];
+  return [b.address, b.phone, ...extra].filter((l): l is string => typeof l === 'string' && l.trim() !== '');
 }
 
 /** The device's own profile, else the tenant default (POS spec §13). */

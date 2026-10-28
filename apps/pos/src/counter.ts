@@ -1,9 +1,11 @@
 import type { CounterPinChangeRequest } from '@erp/contracts';
-import type { Money, PinState, RoleGrant } from '@erp/domain';
+import type { Money, PinState, RoleGrant, SaleDocument } from '@erp/domain';
 
 import type { OpenBill } from './bill/open-bill';
+import type { CheckoutSettings, DocumentSummary, FinalizeRequest, Finalized, Reprint } from './db/checkout';
 import type { DeviceInfo, PinEvent, TenantSettings } from './db/repo';
 import type { EnrollResult } from './device/session';
+import type { PrintJob } from './print/print-job';
 import type { BillItem, SearchOptions, SearchResult, Tier } from './search/search-index';
 import type { CheckResult } from './storage/checks';
 import type { PinChangeResult } from './sync/pin';
@@ -45,4 +47,14 @@ export interface Counter {
   openBill(userId: string): Promise<OpenBill | null>;
   saveOpenBill(userId: string, bill: OpenBill): Promise<void>;
   clearOpenBill(userId: string): Promise<void>;
+  /** Rounding, business day, payment methods and the print profile; null before the first pull (POS spec §12). */
+  checkout(): Promise<CheckoutSettings | null>;
+  /** Finalizes the person's open bill in one local transaction, then signs it (POS spec §12). */
+  finalize(req: FinalizeRequest): Promise<Finalized>;
+  /** This counter's bills since `since`, newest first, for the reprint list (POS spec §13). */
+  recentBills(since: string, filter: string): Promise<DocumentSummary[]>;
+  bill(id: string): Promise<SaleDocument | null>;
+  recordReprint(r: Omit<Reprint, 'id' | 'pushedAt'>): Promise<Reprint>;
+  /** Prints a bill on the default printer (`window.print()` under `--kiosk-printing`, POS spec §13). */
+  print(job: PrintJob): void;
 }

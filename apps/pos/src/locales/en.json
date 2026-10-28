@@ -140,7 +140,8 @@
     "billApproved": "Bill discount approved by {{name}} · {{reason}}",
     "billNeedsApproval": "Bill discount needs approval",
     "saveFailed": "This bill can’t be saved on this counter. Don’t lock or reload: finish it, and call the manager.",
-    "aboveListTotal": "Above list"
+    "aboveListTotal": "Above list",
+    "rounding": "Rounding"
   },
   "keys": {
     "counter": "Counter",
@@ -159,7 +160,9 @@
     "back": "Back to search",
     "tier": "Price tier",
     "clearBill": "Clear bill",
-    "toLines": "Edit lines"
+    "toLines": "Edit lines",
+    "pay": "Pay cash",
+    "reprint": "Reprint"
   },
   "dialog": {
     "cancel": "Cancel"
@@ -238,6 +241,93 @@
     "unknown_line": "That line isn’t on the bill any more.",
     "nothing_to_approve": "Nothing here needs an approval.",
     "note_required": "Write a note for “Other”.",
+    "invalid_tender": "These payments don't pay the bill.",
+    "empty_bill": "The bill is empty.",
+    "approval_pending": "Approve the prices first.",
     "other": "That can’t be done."
+  },
+  "pay": {
+    "pad": "Payment",
+    "cash": "Cash",
+    "split": "Split payment",
+    "approveFirst": "Approve the prices first.",
+    "notReady": "The payment methods haven't arrived on this counter yet. Wait for the sync, then try again.",
+    "total": "Total",
+    "amount": "Amount",
+    "cashTitle": "Cash",
+    "cashReceived": "Cash received",
+    "quickCash": "Quick cash",
+    "exact": "Exact",
+    "change": "Change",
+    "changeAmount": "change {{amount}}",
+    "lessThanTotal": "That's less than the total. Use Split payment if the rest is paid another way.",
+    "finalize": "Finalize & print",
+    "saving": "Saving…",
+    "failed": "This bill couldn't be saved on this counter. Try again; if it happens again, call the manager.",
+    "reference": {
+      "bank_transfer": "Transfer reference",
+      "raast": "Raast or IBFT ID",
+      "jazzcash": "JazzCash transaction ID",
+      "easypaisa": "Easypaisa transaction ID",
+      "card": "Card slip number or approval code",
+      "other": "Reference"
+    },
+    "optional": "{{label}} (optional)",
+    "splitTitle": "Split payment",
+    "amountOf": "{{method}} amount",
+    "referenceOf": "{{method}}: {{label}}",
+    "toCover": "{{amount}} still to cover",
+    "tooMuch": "{{amount}} too much",
+    "covered": "Fully covered",
+    "done": "Bill {{number}} printed · bring {{cash}} to the cash desk",
+    "doneChange": "Bill {{number}} printed · bring {{cash}} to the cash desk, change {{change}}",
+    "doneNoCash": "Bill {{number}} printed · paid by {{methods}}"
+  },
+  "tender": {
+    "no_payment": "Enter how the bill is paid.",
+    "unknown_method": "That payment method isn't active on this counter.",
+    "on_account_needs_customer": "On account needs a credit customer.",
+    "duplicate_method": "Each payment method can be used once.",
+    "amount_not_positive": "Every amount must be more than 0.",
+    "amount_not_rounded": "Amounts are whole rupees.",
+    "reference_required": "Enter the reference for this payment.",
+    "reference_too_long": "A reference has at most 40 characters.",
+    "sum_mismatch": "The payments must add up exactly to the total.",
+    "cash_received_without_cash": "Cash received needs a cash amount.",
+    "cash_received_short": "Cash received is less than the cash amount."
+  },
+  "reprint": {
+    "title": "Reprint a bill",
+    "help": "This counter's bills of the last 30 days. Type part of the number; ↑ ↓ and Enter reprint.",
+    "search": "Bill number",
+    "action": "Reprint",
+    "none": "No bill of the last 30 days has that number.",
+    "empty": "No bills on this counter in the last 30 days.",
+    "done": "Bill {{number}} reprinted"
+  },
+  "print": {
+    "saleBill": "SALE BILL",
+    "reprint": "REPRINT · {{at}} · {{by}}",
+    "number": "Bill no.",
+    "date": "Date",
+    "counter": "Counter",
+    "salesman": "Salesman",
+    "customer": "Customer",
+    "walkIn": "Walk-in",
+    "head": {
+      "no": "#",
+      "code": "Code",
+      "description": "Description",
+      "qty": "Qty",
+      "rate": "Rate",
+      "amount": "Amount"
+    },
+    "subtotal": "Subtotal",
+    "discount": "Discount",
+    "rounding": "Rounding",
+    "total": "TOTAL",
+    "cashReceived": "Cash received",
+    "change": "CHANGE",
+    "policy": "Exchange or return within 30 days with this bill."
   }
 }

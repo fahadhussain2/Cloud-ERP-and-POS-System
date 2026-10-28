@@ -1,8 +1,11 @@
+import { signCanonical } from '@erp/contracts';
+
 import type { Counter } from './counter';
 import { createDbClient } from './db/client';
 import { indexedDbKeys } from './device/keys';
 import { createTokenSource, enroll } from './device/session';
 import { httpApi } from './net/api';
+import { printBill } from './print/print-bill';
 import { browserStorage, runStorageChecks } from './storage/checks';
 import { changePin } from './sync/pin';
 import { pullAll, type PullResult } from './sync/pull';
@@ -63,5 +66,23 @@ export function browserCounter(): Counter {
     openBill: (userId) => db.loadOpenBill(userId),
     saveOpenBill: (userId, bill) => db.saveOpenBill(userId, bill),
     clearOpenBill: (userId) => db.clearOpenBill(userId),
+    checkout: () => db.checkoutSettings(),
+    finalize: async (req) => {
+      const r = await db.finalizeSale(req);
+      // After the commit (POS spec §12): a failed signature leaves the row unsigned, and push signs it (W1-07).
+      if (!r.repeated)
+        try {
+          const pair = await keys.get();
+          if (!pair) throw new Error('no device key');
+          await db.setSignature(r.document.id, await signCanonical(pair.privateKey, r.document));
+        } catch (err) {
+          await db.log('bill.sign_failed', { documentId: r.document.id, error: String(err) });
+        }
+      return r;
+    },
+    recentBills: (since, filter) => db.recentDocuments(since, filter),
+    bill: (id) => db.loadDocument(id),
+    recordReprint: (r) => db.recordReprint(r),
+    print: (job) => printBill(job),
   };
 }
