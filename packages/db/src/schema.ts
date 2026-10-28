@@ -54,6 +54,9 @@ export const tenants = erp.table('tenants', {
   lockDate: date('lock_date'),
   settings: jsonb('settings').notNull(),
   status: text('status', { enum: ['active', 'suspended', 'closed'] }).notNull(),
+  /** Hours without reaching the server before the counter warns, and warns strongly (SYN-06, W1-07). */
+  offlineWarningHours: smallint('offline_warning_hours').notNull(),
+  offlineStrongWarningHours: smallint('offline_strong_warning_hours').notNull(),
   ...syncColumns,
   ...auditColumns,
 });
@@ -180,6 +183,10 @@ export const devices = erp.table('devices', {
   enrolledByUserId: uuid('enrolled_by_user_id'),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   revokedByUserId: uuid('revoked_by_user_id'),
+  /** Kept through a Re-enable (W1-07): documents made between the two are flagged. */
+  lastRevokedAt: timestamp('last_revoked_at', { withTimezone: true }),
+  reenabledAt: timestamp('reenabled_at', { withTimezone: true }),
+  reenabledByUserId: uuid('reenabled_by_user_id'),
   /** Null = the tenant's default print profile (D-055). */
   printProfileId: uuid('print_profile_id'),
   ...syncColumns,
@@ -464,4 +471,178 @@ export const itemPrices = erp.table('item_prices', {
   price: bigint('price', { mode: 'number' }).notNull(),
   ...syncColumns,
   ...auditColumns,
+});
+
+/** A finalized sale, return or exchange as pushed (data model §5, W1-07); `id` is the device-made UUIDv7. */
+export const salesDocuments = erp.table('sales_documents', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  number: text('number').notNull(),
+  seq: integer('seq').notNull(),
+  kind: text('kind', { enum: ['sale', 'return', 'exchange'] }).notNull(),
+  status: text('status', { enum: ['finalized', 'voided'] }).notNull(),
+  businessDate: date('business_date').notNull(),
+  createdAtDevice: timestamp('created_at_device', { withTimezone: true }).notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  salespersonUserId: uuid('salesperson_user_id').notNull(),
+  customerPartyId: uuid('customer_party_id'),
+  walkinPhone: text('walkin_phone'),
+  priceTierId: uuid('price_tier_id').notNull(),
+  subtotal: bigint('subtotal', { mode: 'number' }).notNull(),
+  lineDiscountTotal: bigint('line_discount_total', { mode: 'number' }).notNull(),
+  billDiscount: bigint('bill_discount', { mode: 'number' }).notNull(),
+  rounding: bigint('rounding', { mode: 'number' }).notNull(),
+  taxTotal: bigint('tax_total', { mode: 'number' }).notNull(),
+  total: bigint('total', { mode: 'number' }).notNull(),
+  cashDue: bigint('cash_due', { mode: 'number' }).notNull(),
+  handoverStatus: text('handover_status', {
+    enum: ['not_applicable', 'pending', 'received', 'paid_out'],
+  }).notNull(),
+  payload: jsonb('payload').notNull(),
+  payloadHash: bytea('payload_hash').notNull(),
+  signature: bytea('signature').notNull(),
+  clientVersion: text('client_version').notNull(),
+  exceptionCount: integer('exception_count').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const salesLines = erp.table('sales_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  documentId: uuid('document_id').notNull(),
+  lineNo: smallint('line_no').notNull(),
+  itemId: uuid('item_id').notNull(),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+  listPrice: bigint('list_price', { mode: 'number' }),
+  unitPrice: bigint('unit_price', { mode: 'number' }).notNull(),
+  lineDiscount: bigint('line_discount', { mode: 'number' }).notNull(),
+  billShare: bigint('bill_share', { mode: 'number' }).notNull(),
+  lineTotal: bigint('line_total', { mode: 'number' }).notNull(),
+  floorPriceAtSale: bigint('floor_price_at_sale', { mode: 'number' }),
+  taxCodeId: uuid('tax_code_id'),
+  taxAmount: bigint('tax_amount', { mode: 'number' }).notNull(),
+  locationId: uuid('location_id'),
+  /** Set by posting (W1-08). */
+  unitCost: bigint('unit_cost', { mode: 'number' }),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const salesPayments = erp.table('sales_payments', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  documentId: uuid('document_id').notNull(),
+  lineNo: smallint('line_no').notNull(),
+  methodId: uuid('method_id').notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  cashReceived: bigint('cash_received', { mode: 'number' }),
+  changeDue: bigint('change_due', { mode: 'number' }),
+  reference: text('reference'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+/** Approvals on a document (PLT-07); `lineId` null = the bill discount. */
+export const overrides = erp.table('overrides', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  documentId: uuid('document_id').notNull(),
+  lineId: uuid('line_id'),
+  kind: text('kind', {
+    enum: [
+      'below_list',
+      'below_floor',
+      'credit_limit',
+      'offline_cap',
+      'no_receipt_return',
+      'return_permission',
+      'return_outside_policy',
+      'void',
+      'reprint',
+    ],
+  }).notNull(),
+  requestedByUserId: uuid('requested_by_user_id').notNull(),
+  approvedByUserId: uuid('approved_by_user_id').notNull(),
+  reasonCode: text('reason_code').notNull(),
+  note: text('note'),
+  values: jsonb('values').notNull(),
+  atDevice: timestamp('at_device', { withTimezone: true }).notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+const family = (name: string) => text(name, { enum: ['S', 'H', 'R', 'M', 'Z'] });
+
+/** Each pushed document's result (sync spec §6.2). */
+export const syncInbox = erp.table('sync_inbox', {
+  tenantId: uuid('tenant_id').notNull(),
+  documentId: uuid('document_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  family: family('family').notNull(),
+  seq: integer('seq').notNull(),
+  status: text('status', { enum: ['accepted', 'rejected'] }).notNull(),
+  result: jsonb('result').notNull(),
+  payloadHash: bytea('payload_hash').notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  attempts: integer('attempts').notNull(),
+});
+
+/** Exceptions for review (data model §10, RPT-10). */
+export const exceptions = erp.table('exceptions', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  kind: text('kind').notNull(),
+  severity: text('severity', { enum: ['low', 'medium', 'high'] }).notNull(),
+  documentType: text('document_type'),
+  documentId: uuid('document_id'),
+  deviceId: uuid('device_id'),
+  userId: uuid('user_id'),
+  businessDate: date('business_date').notNull(),
+  details: jsonb('details').notNull(),
+  status: text('status', { enum: ['open', 'reviewed', 'dismissed'] }).notNull(),
+  reviewedByUserId: uuid('reviewed_by_user_id'),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  ...auditColumns,
+});
+
+/** Every seq from 1 to `through` has arrived; `maxSeq` is the highest seen (sync spec §7). */
+export const deviceSeries = erp.table('device_series', {
+  tenantId: uuid('tenant_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  family: family('family').notNull(),
+  through: integer('through').notNull(),
+  maxSeq: integer('max_seq').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+export const sequenceGaps = erp.table('sequence_gaps', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  family: family('family').notNull(),
+  fromSeq: integer('from_seq').notNull(),
+  toSeq: integer('to_seq').notNull(),
+  openedAt: timestamp('opened_at', { withTimezone: true }).notNull(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+});
+
+/** Each device's last health snapshot (PLT-09). */
+export const deviceStatus = erp.table('device_status', {
+  tenantId: uuid('tenant_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull(),
+  lastPushAt: timestamp('last_push_at', { withTimezone: true }),
+  lastPullAt: timestamp('last_pull_at', { withTimezone: true }),
+  clientVersion: text('client_version'),
+  schemaVersion: integer('schema_version'),
+  outboxCount: integer('outbox_count'),
+  oldestUnsyncedAt: timestamp('oldest_unsynced_at', { withTimezone: true }),
+  quarantinedCount: integer('quarantined_count'),
+  storagePersisted: boolean('storage_persisted'),
+  storageUsage: bigint('storage_usage', { mode: 'number' }),
+  storageQuota: bigint('storage_quota', { mode: 'number' }),
+  clockSkewMs: integer('clock_skew_ms'),
 });
