@@ -720,6 +720,64 @@ describe('device health (PLT-09)', () => {
     for (const key of ['lastSeenAt', 'lastPushAt', 'lastPullAt']) expect(typeof health![key]).toBe('string');
     expect(Math.abs(health!['clockSkewMs'] as number)).toBeLessThan(60_000);
   });
+
+  it('counts the bills a push just delivered as no longer waiting, and the refused ones as needing attention', async () => {
+    const cookie = await login('boss');
+    const c = await enroll(cookie, branch);
+    const health = async () =>
+      (
+        await app().inject({
+          method: 'GET',
+          url: '/api/devices',
+          headers: { host: HOST },
+          cookies: { erp_session: cookie },
+        })
+      )
+        .json<{ id: string; health: Record<string, unknown> }[]>()
+        .find((d) => d.id === c.deviceId)!.health;
+    const [a, b, d] = [sale(c, 1), sale(c, 2), sale(c, 3)];
+    // The counter reports its health as it was before sending: three waiting, the oldest bill 1.
+    await push(c, [await signed(c, a), await signed(c, b), { ...(await signed(c, d)), signature: null }], {
+      health: {
+        outboxCount: 3,
+        oldestUnsyncedAt: a.createdAt,
+        quarantinedCount: 0,
+        storagePersisted: true,
+        storageUsage: null,
+        storageQuota: null,
+        lastPullAt: null,
+      },
+    });
+    expect(await health()).toMatchObject({
+      outboxCount: 1,
+      quarantinedCount: 1,
+      oldestUnsyncedAt: a.createdAt,
+    });
+    await push(c, [], {
+      health: {
+        outboxCount: 1,
+        oldestUnsyncedAt: d.createdAt,
+        quarantinedCount: 1,
+        storagePersisted: true,
+        storageUsage: null,
+        storageQuota: null,
+        lastPullAt: null,
+      },
+    });
+    const all = sale(c, 4);
+    await push(c, [await signed(c, all)], {
+      health: {
+        outboxCount: 1,
+        oldestUnsyncedAt: all.createdAt,
+        quarantinedCount: 0,
+        storagePersisted: true,
+        storageUsage: null,
+        storageQuota: null,
+        lastPullAt: null,
+      },
+    });
+    expect(await health()).toMatchObject({ outboxCount: 0, quarantinedCount: 0, oldestUnsyncedAt: null });
+  });
 });
 
 describe('revoked devices (sync spec §1, owner answer 3)', () => {

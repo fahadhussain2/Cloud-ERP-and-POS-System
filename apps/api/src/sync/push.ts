@@ -115,7 +115,7 @@ export function registerPush(scope: FastifyInstance, { pool, now, requireDevice 
 
     const { events, series } = await withTenant(pool, ctx, async (_db, c) => {
       const stored = await storeEvents(c, device, body.events, req.id);
-      await recordHealth(c, device, setting, body, received);
+      await recordHealth(c, device, setting, body, results, received);
       return { events: stored, series: await seriesOf(c, device) };
     });
     req.log.info(
@@ -582,10 +582,29 @@ async function storeEvents(c: pg.ClientBase, device: Device, events: PushEvent[]
   return events.map((e) => e.id);
 }
 
-/** The device's health (PLT-09) and, once a day, a clock skew over 5 minutes (architecture §4.4). */
-async function recordHealth(c: pg.ClientBase, device: Device, s: Setting, body: PushRequest, at: Date) {
+/**
+ * The device's health (PLT-09) and, once a day, a clock skew over 5 minutes (architecture §4.4). The counter reports
+ * its outbox as it was before sending, so what this push delivered no longer waits, and what it refused now needs
+ * attention; with nothing left waiting there is no oldest.
+ */
+async function recordHealth(
+  c: pg.ClientBase,
+  device: Device,
+  s: Setting,
+  body: PushRequest,
+  results: readonly PushResult[],
+  at: Date,
+) {
   const skew = at.getTime() - Date.parse(body.deviceClock);
-  const h = body.health;
+  const delivered = results.filter((r) => r.status !== 'rejected').length;
+  const refused = results.length - delivered;
+  const waiting = Math.max(0, body.health.outboxCount - delivered);
+  const h = {
+    ...body.health,
+    outboxCount: waiting,
+    oldestUnsyncedAt: waiting === 0 ? null : body.health.oldestUnsyncedAt,
+    quarantinedCount: body.health.quarantinedCount + refused,
+  };
   await c.query(
     `INSERT INTO erp.device_status (tenant_id, device_id, last_seen_at, last_push_at, client_version, schema_version,
        outbox_count, oldest_unsynced_at, quarantined_count, storage_persisted, storage_usage, storage_quota,
