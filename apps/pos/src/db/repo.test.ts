@@ -114,11 +114,36 @@ describe('applying a pull', () => {
       locale: 'en-PK',
       currency: 'PKR',
       minorUnits: 2,
+      // Not sent by this tenant row: the PRD's defaults (SYN-06, W1-07).
+      offlineWarningHours: 8,
+      offlineStrongWarningHours: 48,
     });
     expect(db.selectObjects('SELECT permissions FROM roles')).toEqual([
       { permissions: '["pos.sale.create"]' },
     ]);
     expect(db.selectValue('SELECT count(*) FROM user_roles')).toBe(1);
+  });
+
+  it('takes the offline warning thresholds from the tenant (SYN-06, W1-07)', () => {
+    applyPull(
+      db,
+      {
+        tenant: [
+          {
+            id: 't1',
+            name: 'Delux Autos',
+            closing_time: '20:00:00',
+            timezone: 'Asia/Karachi',
+            offline_warning_hours: 6,
+            offline_strong_warning_hours: 24,
+            row_version: '1',
+            deleted_at: null,
+          },
+        ],
+      },
+      'c',
+    );
+    expect(tenantSettings(db)).toMatchObject({ offlineWarningHours: 6, offlineStrongWarningHours: 24 });
   });
 
   it('changes nothing, cursor included, if a row is bad', () => {

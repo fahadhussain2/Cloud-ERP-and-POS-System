@@ -193,6 +193,37 @@ describe('migrations', () => {
     expect(columns('reprints')).toEqual(['at', 'document_id', 'id', 'number', 'pushed_at', 'user_id']);
   });
 
+  it("schema 6 keeps each document's signature for re-push (W1-07) and keeps a W1-06 counter's rows", () => {
+    const db = fresh();
+    migrate(db, MIGRATIONS.slice(0, 5));
+    db.exec("INSERT INTO open_bills (user_id, bill, updated_at) VALUES ('sara', '{}', 'now')");
+    db.exec(
+      "INSERT INTO pin_events (id, kind, user_id, at) VALUES ('e1', 'locked', 'u1', '2026-11-02T10:00:00Z')",
+    );
+    db.exec(
+      "INSERT INTO reprints (id, document_id, number, user_id, at) VALUES ('r1', 'd1', 'C03-S000001', 'u1', 'now')",
+    );
+    db.exec(
+      `INSERT INTO local_documents (id, family, seq, number, kind, business_date, payload, created_at)
+       VALUES ('d1', 'S', 1, 'C03-S000001', 'sale', '2026-11-02', '{}', 'now')`,
+    );
+    db.exec(
+      "INSERT INTO outbox (id, family, seq, payload, signature, status, attempts, created_at) VALUES ('d1', 'S', 1, '{}', 'sig', 'pending', 0, 'now')",
+    );
+    db.exec("INSERT INTO local_series (family, next_seq) VALUES ('S', 2)");
+    migrate(db);
+    expect(LATEST_VERSION).toBeGreaterThanOrEqual(6);
+    for (const table of ['open_bills', 'pin_events', 'reprints', 'local_documents', 'outbox'])
+      expect(db.selectValue(`SELECT count(*) FROM ${table}`)).toBe(1);
+    expect(db.selectValue('SELECT signature FROM outbox')).toBe('sig');
+    expect(db.selectValue("SELECT next_seq FROM local_series WHERE family = 'S'")).toBe(2);
+    const columns = db.selectObjects('PRAGMA table_info(local_documents)').map((r) => String(r['name']));
+    expect(columns).toContain('signature');
+    expect(db.selectValue('SELECT signature FROM local_documents')).toBeNull();
+    const indexes = db.selectObjects('PRAGMA index_list(local_documents)').map((r) => String(r['name']));
+    expect(indexes).toContain('local_documents_series');
+  });
+
   it('roll back a migration that fails and leave the previous schema', () => {
     const db = fresh();
     const v1 = MIGRATIONS.slice(0, 1);

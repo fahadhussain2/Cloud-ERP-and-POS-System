@@ -139,6 +139,20 @@ describe('device token', () => {
     await keys.put(await generateDeviceKey());
     const { api } = server(keys, 401);
     const tokens = createTokenSource({ api, keys, device: () => Promise.resolve(device), now: () => clock });
-    await expect(tokens.get()).rejects.toMatchObject({ name: 'DeviceRefusedError' });
+    await expect(tokens.get()).rejects.toMatchObject({ name: 'DeviceRefusedError', revoked: false });
+  });
+
+  it('says when the refusal is because the counter was revoked (W1-07, sync spec §1)', async () => {
+    const { generateDeviceKey } = await import('@erp/contracts');
+    const keys = memoryKeys();
+    await keys.put(await generateDeviceKey());
+    const api: Api = (_m, path) =>
+      Promise.resolve(
+        path === '/api/devices/challenge'
+          ? { status: 401, body: { error: 'device_revoked' } }
+          : { status: 500, body: null },
+      );
+    const tokens = createTokenSource({ api, keys, device: () => Promise.resolve(device), now: () => clock });
+    await expect(tokens.get()).rejects.toMatchObject({ name: 'DeviceRefusedError', revoked: true });
   });
 });
