@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 
 // Push (sync spec §6.2, SYN-02, SYN-03, SYN-05, W1-07): a counter sends its outbox in sequence order, with its audit
 // events and a health snapshot; the server answers per document and with what it holds of the device's series.
@@ -110,16 +110,90 @@ export interface PushResponse {
 /** The SSE events on `GET /api/sync/events` (sync spec §8). */
 export const SYNC_EVENTS = { changesAvailable: 'changes-available' } as const;
 
-const notBuilt = <T>(name: string) =>
-  ({
-    safeParse: () => {
-      throw new Error(`${name}: not built yet (W1-07)`);
-    },
-    parse: () => {
-      throw new Error(`${name}: not built yet (W1-07)`);
-    },
-  }) as unknown as z.ZodType<T>;
+const Instant = z.iso.datetime();
+const Family = z.enum(['S', 'H', 'R', 'M', 'Z']);
+const Count = z.int().nonnegative();
+
+const PushDocumentSchema = z.strictObject({
+  id: z.uuid(),
+  family: Family,
+  seq: z.int().positive(),
+  payload: z.unknown(),
+  signature: z.string().min(1).max(200).nullable(),
+});
+
+const PushEventSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ id: z.uuid(), kind: z.literal('pin.locked'), at: Instant, userId: z.uuid() }),
+  z.strictObject({
+    id: z.uuid(),
+    kind: z.literal('pin.unlocked_by_manager'),
+    at: Instant,
+    userId: z.uuid(),
+    byUserId: z.uuid(),
+  }),
+  z.strictObject({
+    id: z.uuid(),
+    kind: z.literal('bill.reprinted'),
+    at: Instant,
+    userId: z.uuid(),
+    documentId: z.uuid(),
+    number: z.string().min(1).max(40),
+  }),
+]);
+
+const DeviceHealthSchema = z.strictObject({
+  outboxCount: Count,
+  oldestUnsyncedAt: Instant.nullable(),
+  quarantinedCount: Count,
+  storagePersisted: z.boolean(),
+  storageUsage: Count.nullable(),
+  storageQuota: Count.nullable(),
+  lastPullAt: Instant.nullable(),
+});
 
 /** Zod schemas for the above; the API parses requests with them and the counter parses answers. */
-export const PushRequestSchema = notBuilt<PushRequest>('PushRequestSchema');
-export const PushResponseSchema = notBuilt<PushResponse>('PushResponseSchema');
+export const PushRequestSchema: z.ZodType<PushRequest> = z
+  .strictObject({
+    clientVersion: z.string().min(1).max(40),
+    schemaVersion: z.int().positive(),
+    deviceClock: Instant,
+    health: DeviceHealthSchema,
+    documents: z.array(PushDocumentSchema).max(PUSH_BATCH_MAX),
+    events: z.array(PushEventSchema).max(PUSH_EVENTS_MAX),
+  })
+  .superRefine((r, ctx) => {
+    // Ascending seq within each family (architecture §5.2), and each document once.
+    const last = new Map<string, number>();
+    const ids = new Set<string>();
+    r.documents.forEach((d, i) => {
+      const before = last.get(d.family);
+      if ((before !== undefined && d.seq <= before) || ids.has(d.id))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['documents', i],
+          message: 'out of sequence order, or sent twice',
+        });
+      last.set(d.family, d.seq);
+      ids.add(d.id);
+    });
+  });
+
+export const PushResponseSchema: z.ZodType<PushResponse> = z.strictObject({
+  serverTime: Instant,
+  results: z.array(
+    z.strictObject({
+      id: z.uuid(),
+      status: z.enum(['accepted', 'duplicate', 'rejected']),
+      exceptions: z.array(z.enum(EXCEPTION_KINDS)),
+      error: z.enum(REJECT_CODES).nullable(),
+    }),
+  ),
+  series: z.array(
+    z.strictObject({
+      family: Family,
+      through: Count,
+      missing: z.array(z.tuple([z.int().positive(), z.int().positive()])),
+    }),
+  ),
+  events: z.array(z.uuid()),
+});
