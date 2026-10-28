@@ -67,9 +67,9 @@
 - [x] **Local schema 6:** a schema-5 database with open bills, outbox rows, PIN events and reprints upgrades in place with every row kept; pruning removes a 31-day-old document but never one still in the outbox.
 - [x] **Offline warnings (jsdom; the levels at 8 and 48 hours and the tenant’s thresholds are already unit-tested in `sync/offline.test.ts` and `db/repo.test.ts`):** nothing before 8 h since the last contact; the warning at 8 h; the strong one at 48 h; the thresholds come from the tenant; the bill can still be finalized.
 - [x] **Device health screen (jsdom, fake counter):** shows versions, storage, last push and pull, waiting and quarantined bills; *Try again* asks for a manager PIN; only i18n keys.
-- [ ] **E2E:** the flows in scope item 8.
+- [x] **E2E:** the flows in scope item 8 (`e2e/sync.spec.ts`), plus revoke and Re-enable.
 
-The E2E flows of scope item 8 are written next; the existing flows were updated in the counter build (below).
+Every test in this list is written and passing (build notes below).
 
 ## Build notes (2026-10-28)
 
@@ -83,6 +83,9 @@ The E2E flows of scope item 8 are written next; the existing flows were updated 
 - **The counter (2026-10-28):** the push scheduler lives in the app shell: a push at start-up (the handshake), after every finalize, on reconnect and with the minute timer, which also pulls (every 5 minutes instead while the SSE nudge is up). The health page is a dialog over any screen (the sync figures in the status bar, or `Alt+S`); *Try again* uses the approval PIN check with `admin.devices` (`checkManager`). A revoked counter shows its own stop screen with the bills it still holds; *Check again* reloads.
 - **The device token is fetched once for callers asking together:** pull, push and the SSE stream start at the same moment, and three challenges per start hit the 30-a-minute limit in the E2E run. A busy (429) or failing (5xx) token call is now treated like being offline (retried), not as a refusal.
 - **Existing E2E flows changed:** online bills now reach the server at once, so two assertions of *N bills waiting to sync* became *0* (within 5 s), the Raast and split flow waits for its bills too, and the offline flow now expects 1, its own bill. Not yet checked in a real browser: that `Alt+S` reaches the page in the installed app.
+- **Back office (2026-10-28):** the Counters list shows each counter as of its last contact: *Last seen*, *Waiting* (amber after 10 minutes, red after 4 hours, plus the refused bills), *App*, *Clock* (red over 5 minutes), *Storage*, *Missing bills*; a revoked counter has *Re-enable*, confirmed in a dialog. Caddy serves `/api/sync/events` on its own route, flushed at once and never compressed (`encode` moved to the other routes); `caddy validate` passes with 2.11.7.
+- **The server corrects the reported health by what the push delivered:** the counter reports its outbox as it was before sending, so the server subtracts the bills it just accepted (and clears the oldest when none are left) and adds the ones it refused. Found by the E2E run, where a restore re-push left *11 waiting* on the Counters list.
+- **E2E (`e2e/sync.spec.ts`):** the clock flow runs last and puts the clock back, because Playwright's clock stays on the whole browser profile once installed. A flow waits for *Last sync* before trusting *0 bills waiting* (the status bar shows 0 before the counter has read its outbox).
 
 ## Verify
 
