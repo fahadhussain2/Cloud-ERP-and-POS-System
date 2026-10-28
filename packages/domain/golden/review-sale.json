@@ -572,6 +572,84 @@
       ]
     },
     {
+      "name": "15% off approved by someone the server doesn’t know: not permitted",
+      "input": {
+        "document": {
+          "version": 1,
+          "id": "019a3f6e-7b10-7c3a-9d2e-5b8f1a2c3d4e",
+          "family": "S",
+          "seq": 412,
+          "number": "C03-S000412",
+          "kind": "sale",
+          "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "createdAt": "2026-11-02T10:15:30.000Z",
+          "businessDate": "2026-11-02",
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "customerId": null,
+          "walkinPhone": null,
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "listPrice": 100000,
+              "floorPrice": 80000,
+              "unitPrice": 85000,
+              "lineDiscount": 15000,
+              "billShare": 0,
+              "lineTotal": 85000
+            }
+          ],
+          "amounts": {
+            "subtotal": 100000,
+            "lineDiscountTotal": 15000,
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0,
+            "total": 85000
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 85000,
+              "cashReceived": null,
+              "changeDue": 0,
+              "reference": null
+            }
+          ],
+          "cashDue": 85000,
+          "handoverStatus": "pending",
+          "overrides": [
+            {
+              "kind": "below_list",
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a9",
+              "reason": "customer_bargain",
+              "note": null,
+              "at": "2026-11-02T10:14:05.000Z",
+              "lineNo": 1,
+              "values": {
+                "list": 100000,
+                "floor": 80000,
+                "price": 85000
+              }
+            }
+          ],
+          "clientVersion": "0.7.0"
+        }
+      },
+      "expected": [
+        {
+          "kind": "discount_over_limit",
+          "lineNo": 1,
+          "discountBp": 1500,
+          "cause": "not_permitted"
+        }
+      ]
+    },
+    {
       "name": "below the floor, approved by a manager with pos.price.below_floor: no findings",
       "input": {
         "document": {
@@ -940,6 +1018,84 @@
       ]
     },
     {
+      "name": "an approval for a line number that isn’t on the bill counts for nothing",
+      "input": {
+        "document": {
+          "version": 1,
+          "id": "019a3f6e-7b10-7c3a-9d2e-5b8f1a2c3d4e",
+          "family": "S",
+          "seq": 412,
+          "number": "C03-S000412",
+          "kind": "sale",
+          "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "createdAt": "2026-11-02T10:15:30.000Z",
+          "businessDate": "2026-11-02",
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "customerId": null,
+          "walkinPhone": null,
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "listPrice": 100000,
+              "floorPrice": 80000,
+              "unitPrice": 70000,
+              "lineDiscount": 30000,
+              "billShare": 0,
+              "lineTotal": 70000
+            }
+          ],
+          "amounts": {
+            "subtotal": 100000,
+            "lineDiscountTotal": 30000,
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0,
+            "total": 70000
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 70000,
+              "cashReceived": null,
+              "changeDue": 0,
+              "reference": null
+            }
+          ],
+          "cashDue": 70000,
+          "handoverStatus": "pending",
+          "overrides": [
+            {
+              "kind": "below_floor",
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "customer_bargain",
+              "note": null,
+              "at": "2026-11-02T10:14:05.000Z",
+              "lineNo": 2,
+              "values": {
+                "list": 100000,
+                "floor": 80000,
+                "price": 70000
+              }
+            }
+          ],
+          "clientVersion": "0.7.0"
+        }
+      },
+      "expected": [
+        {
+          "kind": "below_floor_no_override",
+          "lineNo": 1,
+          "discountBp": 3000,
+          "cause": "no_approval"
+        }
+      ]
+    },
+    {
       "name": "an unknown floor: the list price is the floor, so 5% off without approval is below the floor",
       "input": {
         "document": {
@@ -1301,6 +1457,105 @@
         }
       },
       "expected": []
+    },
+    {
+      "name": "a bill approval that names a line not on the bill doesn’t cover the discount",
+      "input": {
+        "document": {
+          "version": 1,
+          "id": "019a3f6e-7b10-7c3a-9d2e-5b8f1a2c3d4e",
+          "family": "S",
+          "seq": 412,
+          "number": "C03-S000412",
+          "kind": "sale",
+          "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "createdAt": "2026-11-02T10:15:30.000Z",
+          "businessDate": "2026-11-02",
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "customerId": null,
+          "walkinPhone": null,
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "listPrice": 50000,
+              "floorPrice": 30000,
+              "unitPrice": 50000,
+              "lineDiscount": 0,
+              "billShare": 7500,
+              "lineTotal": 42500
+            },
+            {
+              "lineNo": 2,
+              "itemId": "019a0000-0000-7000-8000-0000000000c2",
+              "qty": 1000,
+              "listPrice": 50000,
+              "floorPrice": 30000,
+              "unitPrice": 50000,
+              "lineDiscount": 0,
+              "billShare": 7500,
+              "lineTotal": 42500
+            }
+          ],
+          "amounts": {
+            "subtotal": 100000,
+            "lineDiscountTotal": 0,
+            "billDiscount": 15000,
+            "rounding": 0,
+            "taxTotal": 0,
+            "total": 85000
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 85000,
+              "cashReceived": null,
+              "changeDue": 0,
+              "reference": null
+            }
+          ],
+          "cashDue": 85000,
+          "handoverStatus": "pending",
+          "overrides": [
+            {
+              "kind": "below_list",
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "regular_customer",
+              "note": null,
+              "at": "2026-11-02T10:14:05.000Z",
+              "lineNo": null,
+              "values": {
+                "billDiscount": 15000,
+                "lines": [
+                  {
+                    "lineNo": 1,
+                    "qty": 1000,
+                    "unitPrice": 50000
+                  },
+                  {
+                    "lineNo": 3,
+                    "qty": 1000,
+                    "unitPrice": 50000
+                  }
+                ]
+              }
+            }
+          ],
+          "clientVersion": "0.7.0"
+        }
+      },
+      "expected": [
+        {
+          "kind": "discount_over_limit",
+          "lineNo": null,
+          "discountBp": 1500,
+          "cause": "not_covered"
+        }
+      ]
     },
     {
       "name": "a 5% bill discount, within the seller’s limit: no findings",
@@ -1971,6 +2226,75 @@
           "kind": "document_inconsistent",
           "lineNo": null,
           "code": "amounts",
+          "problem": null
+        }
+      ]
+    },
+    {
+      "name": "a bill discount larger than the lines: amounts and rounding, and no price check on it",
+      "input": {
+        "document": {
+          "version": 1,
+          "id": "019a3f6e-7b10-7c3a-9d2e-5b8f1a2c3d4e",
+          "family": "S",
+          "seq": 412,
+          "number": "C03-S000412",
+          "kind": "sale",
+          "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "createdAt": "2026-11-02T10:15:30.000Z",
+          "businessDate": "2026-11-02",
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "customerId": null,
+          "walkinPhone": null,
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "listPrice": 100000,
+              "floorPrice": 80000,
+              "unitPrice": 100000,
+              "lineDiscount": 0,
+              "billShare": 0,
+              "lineTotal": 100000
+            }
+          ],
+          "amounts": {
+            "subtotal": 100000,
+            "lineDiscountTotal": 0,
+            "billDiscount": 200000,
+            "rounding": 0,
+            "taxTotal": 0,
+            "total": 100000
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 100000,
+              "cashReceived": null,
+              "changeDue": 0,
+              "reference": null
+            }
+          ],
+          "cashDue": 100000,
+          "handoverStatus": "pending",
+          "overrides": [],
+          "clientVersion": "0.7.0"
+        }
+      },
+      "expected": [
+        {
+          "kind": "document_inconsistent",
+          "lineNo": null,
+          "code": "amounts",
+          "problem": null
+        },
+        {
+          "kind": "document_inconsistent",
+          "lineNo": null,
+          "code": "rounding",
           "problem": null
         }
       ]

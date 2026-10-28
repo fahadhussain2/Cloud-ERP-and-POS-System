@@ -152,6 +152,12 @@ describe('SaleDocumentV1', () => {
     expect(accepts({ ...sale(), overrides: [{ ...o, reason: 'because' }] })).toBe(false);
   });
 
+  it("refuses an override whose values don't match it: a line's price, or the bill discount (W1-07)", () => {
+    const [line, bill] = sale().overrides;
+    expect(accepts({ ...sale(), overrides: [{ ...line!, values: bill!.values }] })).toBe(false);
+    expect(accepts({ ...sale(), overrides: [{ ...bill!, values: line!.values }] })).toBe(false);
+  });
+
   it('refuses a document without lines or payments, or missing a field', () => {
     expect(accepts({ ...sale(), lines: [] })).toBe(false);
     expect(accepts({ ...sale(), payments: [] })).toBe(false);
