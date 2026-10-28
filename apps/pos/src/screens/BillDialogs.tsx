@@ -23,7 +23,7 @@ import { StaffPicker } from './StaffPicker';
 // after its action, which does exactly what Enter does.
 
 /** A dialog around a form: title, optional text, the fields, the D-053 bar. Gives focus back where it came from. */
-function FormDialog({
+export function FormDialog({
   title,
   description,
   actionLabel,
@@ -74,7 +74,7 @@ function FormDialog({
 }
 
 /** Label/value pairs above a field: the item, list price, floor… */
-function Facts({ facts }: { facts: readonly (readonly [string, ReactNode])[] }) {
+export function Facts({ facts }: { facts: readonly (readonly [string, ReactNode])[] }) {
   if (facts.length === 0) return null;
   return (
     <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-1 text-[13.5px]">

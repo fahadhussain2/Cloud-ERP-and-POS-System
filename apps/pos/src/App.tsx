@@ -263,7 +263,9 @@ export function App({ counter }: { counter: Counter }) {
           user={phase.user}
           staff={staff}
           branchId={device?.branchId ?? null}
+          shopName={settings?.name ?? ''}
           onLock={() => setPhase({ name: 'locked' })}
+          onSaved={() => void refresh()}
         />
       );
       break;

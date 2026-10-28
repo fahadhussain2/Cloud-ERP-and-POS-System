@@ -20,7 +20,14 @@ export type DomainErrorCode =
   | 'discount_too_large'
   | 'unknown_line'
   | 'nothing_to_approve'
-  | 'note_required';
+  | 'note_required'
+  // Finalize and print (POS spec §12–§13, W1-06)
+  | 'invalid_tender'
+  | 'empty_bill'
+  | 'approval_pending'
+  | 'invalid_sequence'
+  | 'invalid_device_code'
+  | 'invalid_bill_code';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

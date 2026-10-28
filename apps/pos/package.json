@@ -13,6 +13,7 @@
     "@erp/contracts": "workspace:*",
     "@erp/domain": "workspace:*",
     "@erp/observability": "workspace:*",
+    "@erp/print": "workspace:*",
     "@erp/ui": "workspace:*",
     "@sqlite.org/sqlite-wasm": "catalog:",
     "i18next": "catalog:",

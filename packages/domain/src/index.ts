@@ -77,3 +77,30 @@ export {
 } from './permissions';
 export { parseQty, qty, QTY_SCALE, type Qty } from './quantity';
 export { roundCash, type CashRounding } from './rounding';
+export {
+  billCode,
+  buildSaleDocument,
+  documentNumber,
+  parseBillCode,
+  saleTotal,
+  type BillCode,
+  type DocumentFamily,
+  type SaleContext,
+  type SaleDocument,
+  type SaleDocumentLine,
+  type SaleDocumentOverride,
+  type SaleTotal,
+} from './sale-document';
+export {
+  checkTender,
+  MAX_REFERENCE_LENGTH,
+  quickCash,
+  settleTender,
+  type PaymentMethodCode,
+  type PaymentMethodInfo,
+  type SettledPayment,
+  type Settlement,
+  type Tender,
+  type TenderLine,
+  type TenderProblem,
+} from './tender';

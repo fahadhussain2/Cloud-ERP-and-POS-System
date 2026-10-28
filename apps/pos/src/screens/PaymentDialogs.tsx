@@ -1,0 +1,363 @@
+import {
+  checkTender,
+  DomainError,
+  money as toMoney,
+  negate,
+  parseWholeAmount,
+  quickCash,
+  sub,
+  sum,
+  type Money,
+  type Tender,
+  type TenderLine,
+} from '@erp/domain';
+import {
+  Alert,
+  AlertDescription,
+  Button,
+  cn,
+  formatMoney,
+  Input,
+  LABEL_CLASS,
+  plainAmount,
+  TextField,
+} from '@erp/ui';
+import { useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import type { CheckoutSettings, PaymentMethodRow } from '../db/checkout';
+import { FormDialog } from './BillDialogs';
+
+// Paying a bill (POS spec §12, POS-06, POS-17, D-053): the Cash, method and Split popups. Each ends with Cancel (Esc)
+// and Finalize & print (Enter); Esc leaves the bill as it was. The rules are checkTender's; `onPay` finalizes and
+// answers with the i18n key of what went wrong, or null.
+
+export type Pay = (tender: Tender) => Promise<string | null>;
+
+interface PayProps {
+  settings: CheckoutSettings;
+  total: Money;
+  money: { locale: string; currency: string; minorUnits: number };
+  onPay: Pay;
+  onClose: () => void;
+}
+
+/** A typed whole amount: empty, a value, or the i18n key of what is wrong with it. */
+type Typed = { kind: 'empty' } | { kind: 'ok'; value: Money } | { kind: 'bad'; key: string };
+
+function useAmounts(minorUnits: number) {
+  const { i18n } = useTranslation();
+  const keyOf = (err: unknown) => {
+    if (!(err instanceof DomainError)) throw err;
+    return i18n.exists(`error.${err.code}`) ? `error.${err.code}` : 'error.other';
+  };
+  const read = (text: string): Typed => {
+    if (text.trim() === '') return { kind: 'empty' };
+    try {
+      return { kind: 'ok', value: parseWholeAmount(text, minorUnits) };
+    } catch (err) {
+      return { kind: 'bad', key: keyOf(err) };
+    }
+  };
+  return { read, keyOf };
+}
+
+/** Runs one payment at a time: a second Enter while the first is saving does nothing. */
+function usePaying(onPay: Pay) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pay = async (tender: Tender) => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const problem = await onPay(tender);
+    setBusy(false);
+    if (problem) setError(t(problem));
+  };
+  return { busy, error, setError: (key: string | null) => setError(key && t(key)), pay };
+}
+
+function Problem({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <Alert variant="destructive">
+      <AlertDescription>{text}</AlertDescription>
+    </Alert>
+  );
+}
+
+function Big({ label, children, tone }: { label: string; children: ReactNode; tone?: 'good' }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className={LABEL_CLASS}>{label}</span>
+      <span
+        className={cn(
+          'font-display text-[34px] leading-none font-bold tabular-nums',
+          tone === 'good' && 'text-ok',
+        )}
+      >
+        {children}
+      </span>
+    </div>
+  );
+}
+
+const check = (s: CheckoutSettings, total: Money, tender: Tender) =>
+  checkTender({ total, increment: s.increment, methods: s.methods, tender, hasCreditCustomer: false });
+
+/** Cash (`F9`): Enter with the field empty is the exact amount; the quick-cash buttons finalize in one click. */
+export function CashDialog({ settings, total, money, onPay, onClose }: PayProps) {
+  const { t } = useTranslation();
+  const m = (minor: number) => formatMoney(minor, money);
+  const { read } = useAmounts(money.minorUnits);
+  const { busy, error, setError, pay } = usePaying(onPay);
+  const [text, setText] = useState('');
+  const cash = settings.methods.find((x) => x.isCash)?.code ?? 'cash';
+  const tender = (cashReceived: Money | null): Tender => ({
+    payments: [{ method: cash, amount: total, reference: null }],
+    cashReceived,
+  });
+  const typed = read(text);
+  const change = typed.kind === 'ok' && typed.value >= total ? sub(typed.value, total) : null;
+
+  const submit = () => {
+    if (typed.kind === 'empty') return void pay(tender(null));
+    if (typed.kind === 'bad') return setError(typed.key);
+    if (typed.value < total) return setError('pay.lessThanTotal');
+    void pay(tender(typed.value));
+  };
+
+  return (
+    <FormDialog
+      title={t('pay.cashTitle')}
+      actionLabel={busy ? t('pay.saving') : t('pay.finalize')}
+      busy={busy}
+      onClose={onClose}
+      onSubmit={submit}
+    >
+      <Big label={t('pay.total')} tone="good">
+        <span data-testid="pay-total">{m(total)}</span>
+      </Big>
+      <TextField
+        label={t('pay.cashReceived')}
+        inputMode="numeric"
+        autoComplete="off"
+        autoFocus
+        className="h-12 font-mono text-xl"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          setError(null);
+        }}
+      />
+      <div className="flex flex-wrap gap-2" role="group" aria-label={t('pay.quickCash')}>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => void pay(tender(null))}>
+          {t('pay.exact')}
+        </Button>
+        {quickCash(total, toMoney(10 ** money.minorUnits)).map((a) => (
+          <Button
+            key={a}
+            type="button"
+            variant="outline"
+            disabled={busy}
+            className="flex h-auto flex-col items-start py-1.5"
+            onClick={() => void pay(tender(a))}
+          >
+            <span className="font-semibold tabular-nums">{m(a)}</span>
+            <span className="text-xs text-muted-foreground">
+              {t('pay.changeAmount', { amount: m(sub(a, total)) })}
+            </span>
+          </Button>
+        ))}
+      </div>
+      <Big label={t('pay.change')}>
+        <span data-testid="pay-change">{m(change ?? 0)}</span>
+      </Big>
+      <Problem text={error} />
+    </FormDialog>
+  );
+}
+
+/** The reference field's label for a method (POS spec §12), "(optional)" when the method doesn't require one. */
+function useReferenceLabel() {
+  const { t, i18n } = useTranslation();
+  return (method: PaymentMethodRow) => {
+    const key = `pay.reference.${method.code}`;
+    const label = t(i18n.exists(key) ? key : 'pay.reference.other');
+    return method.requiresReference ? label : t('pay.optional', { label });
+  };
+}
+
+/** A non-cash method (Bank transfer, Raast, JazzCash…): the whole total, and its reference. */
+export function MethodDialog({
+  method,
+  settings,
+  total,
+  money,
+  onPay,
+  onClose,
+}: PayProps & { method: PaymentMethodRow }) {
+  const { t } = useTranslation();
+  const referenceLabel = useReferenceLabel();
+  const { busy, error, setError, pay } = usePaying(onPay);
+  const [reference, setReference] = useState('');
+
+  const submit = () => {
+    const tender: Tender = {
+      payments: [
+        { method: method.code, amount: total, reference: reference.trim() === '' ? null : reference },
+      ],
+      cashReceived: null,
+    };
+    const problem = check(settings, total, tender);
+    if (problem) return setError(`tender.${problem}`);
+    void pay(tender);
+  };
+
+  return (
+    <FormDialog
+      title={method.name}
+      actionLabel={busy ? t('pay.saving') : t('pay.finalize')}
+      busy={busy}
+      onClose={onClose}
+      onSubmit={submit}
+    >
+      <Big label={t('pay.amount')} tone="good">
+        <span data-testid="pay-total">{formatMoney(total, money)}</span>
+      </Big>
+      <TextField
+        label={referenceLabel(method)}
+        autoComplete="off"
+        autoFocus
+        className="font-mono"
+        value={reference}
+        onChange={(e) => {
+          setReference(e.target.value);
+          setError(null);
+        }}
+      />
+      <Problem text={error} />
+    </FormDialog>
+  );
+}
+
+/** Split payment (`Shift+F9`): one row per method, cash first and prefilled with the total; cash received on its row. */
+export function SplitDialog({ settings, total, money, onPay, onClose }: PayProps) {
+  const { t } = useTranslation();
+  const m = (minor: number) => formatMoney(minor, money);
+  const referenceLabel = useReferenceLabel();
+  const { read } = useAmounts(money.minorUnits);
+  const { busy, error, setError, pay } = usePaying(onPay);
+  // On account needs a credit customer (W1-09).
+  const rows = settings.methods
+    .filter((x) => x.code !== 'on_account')
+    .sort((a, b) => Number(b.isCash) - Number(a.isCash));
+  const first = rows[0]?.code;
+  const [amounts, setAmounts] = useState<Record<string, string>>(
+    first ? { [first]: plainAmount(total, money.minorUnits) } : {},
+  );
+  const [references, setReferences] = useState<Record<string, string>>({});
+  const [receivedText, setReceivedText] = useState('');
+
+  const typed = rows.map((r) => ({ row: r, amount: read(amounts[r.code] ?? '') }));
+  const covered = sum(typed.flatMap((x) => (x.amount.kind === 'ok' ? [x.amount.value] : [])));
+  const left = sub(total, covered);
+  const cashRow = typed.find((x) => x.row.isCash);
+  const received = read(receivedText);
+  const change =
+    cashRow?.amount.kind === 'ok' && received.kind === 'ok' && received.value >= cashRow.amount.value
+      ? sub(received.value, cashRow.amount.value)
+      : toMoney(0);
+
+  const submit = () => {
+    const bad =
+      typed.find((x) => x.amount.kind === 'bad')?.amount ?? (received.kind === 'bad' ? received : null);
+    if (bad?.kind === 'bad') return setError(bad.key);
+    const payments: TenderLine[] = typed.flatMap(({ row, amount }) =>
+      amount.kind === 'ok' && amount.value !== 0
+        ? [{ method: row.code, amount: amount.value, reference: references[row.code]?.trim() || null }]
+        : [],
+    );
+    const tender: Tender = { payments, cashReceived: received.kind === 'ok' ? received.value : null };
+    const problem = check(settings, total, tender);
+    if (problem) return setError(`tender.${problem}`);
+    void pay(tender);
+  };
+
+  const edit =
+    (setter: (v: Record<string, string>) => void, all: Record<string, string>, code: string) =>
+    (value: string) => {
+      setter({ ...all, [code]: value });
+      setError(null);
+    };
+
+  return (
+    <FormDialog
+      title={t('pay.splitTitle')}
+      actionLabel={busy ? t('pay.saving') : t('pay.finalize')}
+      busy={busy}
+      onClose={onClose}
+      onSubmit={submit}
+    >
+      <Big label={t('pay.total')} tone="good">
+        <span data-testid="pay-total">{m(total)}</span>
+      </Big>
+      <div className="flex flex-col gap-2">
+        {rows.map((row, i) => (
+          <div
+            key={row.code}
+            className="grid grid-cols-[110px_minmax(0,1fr)_minmax(0,1.4fr)] items-center gap-2"
+          >
+            <span className="font-semibold">{row.name}</span>
+            <Input
+              aria-label={t('pay.amountOf', { method: row.name })}
+              inputMode="numeric"
+              autoComplete="off"
+              autoFocus={i === 0}
+              className="font-mono tabular-nums"
+              value={amounts[row.code] ?? ''}
+              onChange={(e) => edit(setAmounts, amounts, row.code)(e.target.value)}
+            />
+            {row.isCash ? (
+              <Input
+                aria-label={t('pay.cashReceived')}
+                placeholder={t('pay.cashReceived')}
+                inputMode="numeric"
+                autoComplete="off"
+                className="font-mono tabular-nums"
+                value={receivedText}
+                onChange={(e) => {
+                  setReceivedText(e.target.value);
+                  setError(null);
+                }}
+              />
+            ) : (
+              <Input
+                aria-label={t('pay.referenceOf', { method: row.name, label: referenceLabel(row) })}
+                placeholder={referenceLabel(row)}
+                autoComplete="off"
+                className="font-mono"
+                value={references[row.code] ?? ''}
+                onChange={(e) => edit(setReferences, references, row.code)(e.target.value)}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="m-0 font-semibold" role="status" data-testid="split-left">
+        {left > 0
+          ? t('pay.toCover', { amount: m(left) })
+          : left < 0
+            ? t('pay.tooMuch', { amount: m(negate(left)) })
+            : t('pay.covered')}
+      </p>
+      {cashRow && (
+        <Big label={t('pay.change')}>
+          <span data-testid="pay-change">{m(change)}</span>
+        </Big>
+      )}
+      <Problem text={error} />
+    </FormDialog>
+  );
+}

@@ -11,6 +11,7 @@ import {
   parseWholeAmount,
   pendingApprovals,
   removeLine,
+  saleTotal,
   setBillDiscount,
   setQty,
   setUnitPrice,
@@ -19,6 +20,8 @@ import {
   type Money,
   type PendingApproval,
   type Qty,
+  type SaleDocument,
+  type Tender,
 } from '@erp/domain';
 import {
   Badge,
@@ -43,17 +46,26 @@ import { setBillOpen } from '../bill/bill-open';
 import { addItem, formatQty, parseQuantity, quantityPrefix, tryEdit } from '../bill/bill-state';
 import { useOpenBill, type BillCounter } from '../bill/use-open-bill';
 import type { Counter } from '../counter';
+import type { CheckoutSettings, DocumentSummary, PaymentMethodRow } from '../db/checkout';
+import type { PrintJob } from '../print/print-job';
 import type { BillItem, SearchResult, Vehicle } from '../search/search-index';
 import { checkApprover } from '../unlock/approve';
 import type { StaffUser } from '../unlock/unlock';
 import { ApprovalDialog, ConfirmDialog, EntryDialog, TierDialog, type ApprovalAttempt } from './BillDialogs';
 import { BillPanel } from './BillPanel';
+import { CashDialog, MethodDialog, SplitDialog } from './PaymentDialogs';
+import { PaymentPad } from './PaymentPad';
+import { ReprintDialog } from './ReprintDialog';
 
 // The counter screen (POS spec §9–§11, POS-02, POS-03, POS-04, PLT-07): search on the left, the bill on the right,
 // the key bar along the bottom. Every key press searches the local catalog; an older answer never replaces a newer
 // one. Enter (or a scan) adds the selected item; Tab moves to the bill lines, where single keys change a line.
 
 const CATALOG_POLL_MS = 1000;
+/** Carried by every document (sync spec §6.1); the server accepts the previous version too (architecture §4.2). */
+const CLIENT_VERSION = import.meta.env.VITE_ERP_VERSION ?? 'dev';
+/** The counter's clock at finalize (the document's createdAt). */
+const nowMs = () => Date.now();
 
 type Zone = 'search' | 'bill';
 
@@ -64,7 +76,11 @@ type DialogState =
   | { kind: 'discount' }
   | { kind: 'tier' }
   | { kind: 'clear' }
-  | { kind: 'approval'; pending: PendingApproval };
+  | { kind: 'approval'; pending: PendingApproval }
+  | { kind: 'cash' }
+  | { kind: 'method'; method: PaymentMethodRow }
+  | { kind: 'split' }
+  | { kind: 'reprint' };
 
 export type CounterScreenCounter = BillCounter &
   Pick<
@@ -78,6 +94,12 @@ export type CounterScreenCounter = BillCounter &
     | 'setPinState'
     | 'verifyPin'
     | 'recordPinEvent'
+    | 'checkout'
+    | 'finalize'
+    | 'recentBills'
+    | 'bill'
+    | 'recordReprint'
+    | 'print'
   >;
 
 const sameTarget = (a: ApprovalTarget, b: ApprovalTarget) =>
@@ -89,7 +111,9 @@ export function CounterScreen({
   user,
   staff,
   branchId,
+  shopName,
   onLock,
+  onSaved,
 }: {
   counter: CounterScreenCounter;
   money: MoneyFormat;
@@ -98,7 +122,11 @@ export function CounterScreen({
   /** Who may be picked as an approver (unlockable staff). */
   staff: StaffUser[];
   branchId: string | null;
+  /** Printed at the top of every bill. */
+  shopName: string;
   onLock: () => void;
+  /** A bill was saved: the unsynced count goes up (POS spec §7). */
+  onSaved?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
@@ -120,6 +148,10 @@ export function CounterScreen({
   const [lineSel, setLineSel] = useState(0);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  /** What the last bill came to, until the next one starts (POS spec §12, after the commit). */
+  const [notice, setNotice] = useState<string | null>(null);
+  /** Rounding, payment methods and the print profile; null before the first pull. */
+  const [settings, setSettings] = useState<CheckoutSettings | null>(null);
   /** The seller's discount limit; null until their roles have loaded, and no approval is judged before then. */
   const [maxDiscountBp, setMaxDiscountBp] = useState<number | null>(null);
 
@@ -127,6 +159,17 @@ export function CounterScreen({
   const tierId = openBill?.bill.tierId;
   const amounts = openBill ? billAmounts(openBill.bill) : null;
   const pending = openBill && maxDiscountBp !== null ? pendingApprovals(openBill.bill, maxDiscountBp) : [];
+  const total = openBill && settings ? saleTotal(openBill.bill, settings.increment) : null;
+
+  useEffect(() => {
+    let stop = false;
+    void counter.checkout().then((s) => {
+      if (!stop) setSettings(s);
+    });
+    return () => {
+      stop = true;
+    };
+  }, [counter]);
 
   // The seller's discount limit, from their roles in this branch (PRD §4).
   useEffect(() => {
@@ -232,6 +275,7 @@ export function CounterScreen({
     const err = change((ob) => addItem(ob, item, qty, id, unitPrice));
     if (err) return err;
     setMessage(null);
+    setNotice(null);
     const now = get()!.bill.lines;
     const added = now.findIndex((l) => l.id === id);
     setLineSel(added >= 0 ? added : now.findLastIndex((l) => l.itemId === item.itemId));
@@ -332,6 +376,117 @@ export function CounterScreen({
     }
   };
 
+  /** Opens a payment popup (POS spec §12): never for an empty bill, nor while a price waits for an approval. */
+  const openPay = async (kind: 'cash' | 'split' | PaymentMethodRow) => {
+    const ob = get();
+    if (!ob || ob.bill.lines.length === 0 || maxDiscountBp === null) return;
+    if (pendingApprovals(ob.bill, maxDiscountBp).length > 0) return setMessage(t('pay.approveFirst'));
+    // Fresh each time: the first pull may have brought the methods since the screen opened.
+    const s = await counter.checkout();
+    setSettings(s);
+    if (!s || s.methods.length === 0) return setMessage(t('pay.notReady'));
+    setMessage(null);
+    setDialog(
+      kind === 'cash'
+        ? { kind: 'cash' }
+        : kind === 'split'
+          ? { kind: 'split' }
+          : { kind: 'method', method: kind },
+    );
+  };
+
+  const methodName = (code: string) => settings?.methods.find((x) => x.code === code)?.name ?? code;
+  const tenantZone = () => settings?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const itemName = (i: { name: string; variant: string | null }) =>
+    [i.name, i.variant].filter(Boolean).join(' ');
+
+  /** Sends a bill to the printer; a print that fails changes nothing, and Alt+P prints it again (POS spec §13). */
+  const printDocument = (document: SaleDocument, items: PrintJob['items'], reprint: PrintJob['reprint']) => {
+    try {
+      counter.print({
+        document,
+        profile: settings?.printProfile ?? null,
+        shopName,
+        headerLines: [...(settings?.receiptHeader ?? []), ...(settings?.printProfile?.headerLines ?? [])],
+        items,
+        sellerName: nameOf(document.sellerId),
+        methodNames: Object.fromEntries((settings?.methods ?? []).map((x) => [x.code, x.name])),
+        money,
+        timeZone: tenantZone(),
+        reprint,
+      });
+    } catch (err) {
+      void counter.log('bill.print_failed', { number: document.number, error: String(err) });
+    }
+  };
+
+  const describe = (d: SaleDocument) => {
+    const cash = d.payments.find((p) => p.changeDue !== null);
+    if (!cash)
+      return t('pay.doneNoCash', {
+        number: d.number,
+        methods: d.payments.map((p) => methodName(p.method)).join(' + '),
+      });
+    if (cash.changeDue)
+      return t('pay.doneChange', { number: d.number, cash: m(d.cashDue), change: m(cash.changeDue) });
+    return t('pay.done', { number: d.number, cash: m(d.cashDue) });
+  };
+
+  /** Finalize & print (POS spec §12): saved first, in one local transaction; printed only after the commit. */
+  const pay = async (tender: Tender): Promise<string | null> => {
+    const ob = get();
+    let saved;
+    try {
+      saved = await counter.finalize({
+        userId: user.id,
+        id: uuidv7(),
+        createdAtMs: nowMs(),
+        clientVersion: CLIENT_VERSION,
+        tender,
+      });
+    } catch (err) {
+      if (err instanceof DomainError) return errorKey(err.code);
+      void counter.log('bill.finalize_failed', { sellerId: user.id, error: String(err) });
+      return 'pay.failed';
+    }
+    const { document, repeated } = saved;
+    setDialog(null);
+    await clear();
+    // A second Enter gets the same bill back: it was printed the first time.
+    if (!repeated)
+      printDocument(
+        document,
+        Object.fromEntries(
+          Object.entries(ob?.items ?? {}).map(([id, i]) => [id, { code: i.code, name: itemName(i) }]),
+        ),
+        null,
+      );
+    setNotice(describe(document));
+    onSaved?.();
+    focusSearch();
+    return null;
+  };
+
+  /** Reprint (POS spec §13): marked REPRINT with when and who, and kept for the audit log. */
+  const reprintBill = async (summary: DocumentSummary) => {
+    const document = await counter.bill(summary.id);
+    if (!document) return;
+    const at = new Date().toISOString();
+    await counter.recordReprint({ documentId: document.id, number: document.number, userId: user.id, at });
+    const ids = [...new Set(document.lines.map((l) => l.itemId))];
+    const found = await Promise.all(ids.map((id) => counter.billItem(id, null)));
+    const items = Object.fromEntries(
+      ids.flatMap((id, i) => {
+        const item = found[i];
+        return item ? [[id, { code: item.code, name: itemName(item) }] as const] : [];
+      }),
+    );
+    printDocument(document, items, { at, by: user.fullName });
+    setDialog(null);
+    setNotice(t('reprint.done', { number: document.number }));
+    focusSearch();
+  };
+
   const openTier = () => tiers.length > 0 && setDialog({ kind: 'tier' });
   const openClear = () => (get()?.bill.lines.length ?? 0) > 0 && setDialog({ kind: 'clear' });
   const ignore = () => {};
@@ -342,6 +497,9 @@ export function CounterScreen({
       F7: openTier,
       'Alt+C': openClear,
       'Alt+L': onLock,
+      F9: () => void openPay('cash'),
+      'Shift+F9': () => void openPay('split'),
+      'Alt+P': () => setDialog({ kind: 'reprint' }),
       F1: ignore,
       F3: ignore,
       F5: ignore,
@@ -438,8 +596,10 @@ export function CounterScreen({
         : t('search.found', { count: results.length });
 
   const common: KeyHint[] = [
+    { keys: 'F9', label: t('keys.pay'), run: () => void openPay('cash') },
     { keys: 'F7', label: t('keys.tier'), run: openTier },
     { keys: 'Alt+C', label: t('keys.clearBill'), run: openClear },
+    { keys: 'Alt+P', label: t('keys.reprint'), run: () => setDialog({ kind: 'reprint' }) },
     { keys: 'Alt+L', label: t('keys.lock'), run: onLock },
   ];
   const hints: KeyHint[] =
@@ -575,13 +735,24 @@ export function CounterScreen({
         <BillPanel
           openBill={openBill}
           amounts={amounts}
+          total={total}
           pending={pending}
           tierName={tiers.find((x) => x.id === tierId)?.name ?? ''}
           selected={lineSel}
           active={zone === 'bill'}
           message={saveFailed ? t('bill.saveFailed') : message}
+          notice={notice}
           money={money}
           nameOf={nameOf}
+          pad={
+            <PaymentPad
+              methods={settings?.methods ?? []}
+              disabled={lines.length === 0}
+              onCash={() => void openPay('cash')}
+              onMethod={(method) => void openPay(method)}
+              onSplit={() => void openPay('split')}
+            />
+          }
           panelRef={panel}
           onSelect={(i) => {
             setLineSel(i);
@@ -702,6 +873,43 @@ export function CounterScreen({
             setMessage(null);
             focusSearch();
           }}
+        />
+      )}
+      {dialog?.kind === 'cash' && settings && total && (
+        <CashDialog
+          settings={settings}
+          total={total.total}
+          money={money}
+          onPay={pay}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'method' && settings && total && (
+        <MethodDialog
+          method={dialog.method}
+          settings={settings}
+          total={total.total}
+          money={money}
+          onPay={pay}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'split' && settings && total && (
+        <SplitDialog
+          settings={settings}
+          total={total.total}
+          money={money}
+          onPay={pay}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'reprint' && (
+        <ReprintDialog
+          list={counter.recentBills}
+          money={money}
+          timeZone={tenantZone()}
+          onReprint={reprintBill}
+          onClose={() => setDialog(null)}
         />
       )}
       {dialog?.kind === 'approval' && (

@@ -22,6 +22,7 @@ export {
   SetPinRequest,
   TokenRequest,
 } from './devices';
+export { SaleDocumentV1 } from './documents';
 export { TenantSpec } from './tenant-spec';
 export { uuidv7 } from './uuid';
 export {
@@ -39,12 +40,15 @@ export {
 export {
   CATALOG_COLUMNS,
   CATALOG_DATASETS,
+  CHECKOUT_COLUMNS,
+  CHECKOUT_DATASETS,
   CounterPinChangeRequest,
   PULL_DATASETS,
   PULL_LIMIT_DEFAULT,
   PULL_LIMIT_MAX,
   TemporaryPinRequest,
   type CatalogDataset,
+  type CheckoutDataset,
   type ColumnType,
   type PullDataset,
   type PullResponse,

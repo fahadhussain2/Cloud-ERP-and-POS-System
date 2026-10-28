@@ -139,6 +139,60 @@ describe('migrations', () => {
     expect(columns.sort()).toEqual(['bill', 'updated_at', 'user_id']);
   });
 
+  it("schema 5 adds payment methods, print profiles, the device and reprints (W1-06) and keeps a W1-05 counter's rows", () => {
+    const db = fresh();
+    migrate(db, MIGRATIONS.slice(0, 4));
+    db.exec("INSERT INTO open_bills (user_id, bill, updated_at) VALUES ('sara', '{}', 'now')");
+    db.exec(
+      "INSERT INTO pin_events (id, kind, user_id, at) VALUES ('e1', 'locked', 'u1', '2026-11-02T10:00:00Z')",
+    );
+    db.exec(
+      "INSERT INTO outbox (id, family, seq, payload, status, attempts, created_at) VALUES ('d1', 'S', 1, '{}', 'pending', 0, 'now')",
+    );
+    db.exec("INSERT INTO local_series (family, next_seq) VALUES ('S', 2)");
+    migrate(db);
+    expect(LATEST_VERSION).toBeGreaterThanOrEqual(5);
+    expect(db.selectValue('SELECT count(*) FROM open_bills')).toBe(1);
+    expect(db.selectValue('SELECT count(*) FROM pin_events')).toBe(1);
+    expect(db.selectValue('SELECT count(*) FROM outbox')).toBe(1);
+    expect(db.selectValue("SELECT next_seq FROM local_series WHERE family = 'S'")).toBe(2);
+    const columns = (table: string) =>
+      db
+        .selectObjects(`PRAGMA table_info(${table})`)
+        .map((r) => String(r['name']))
+        .sort();
+    expect(columns('payment_methods')).toEqual(
+      [
+        'id',
+        'code',
+        'name',
+        'is_cash',
+        'requires_reference',
+        'is_active',
+        'sort',
+        'row_version',
+        'deleted_at',
+      ].sort(),
+    );
+    expect(columns('print_profiles')).toEqual(
+      [
+        'id',
+        'name',
+        'paper_format',
+        'code_type',
+        'copies',
+        'template_options',
+        'is_tenant_default',
+        'row_version',
+        'deleted_at',
+      ].sort(),
+    );
+    expect(columns('device')).toEqual(
+      ['id', 'code', 'print_profile_id', 'status', 'row_version', 'deleted_at'].sort(),
+    );
+    expect(columns('reprints')).toEqual(['at', 'document_id', 'id', 'number', 'pushed_at', 'user_id']);
+  });
+
   it('roll back a migration that fails and leave the previous schema', () => {
     const db = fresh();
     const v1 = MIGRATIONS.slice(0, 1);

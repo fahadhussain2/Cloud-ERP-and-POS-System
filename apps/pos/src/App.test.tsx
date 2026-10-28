@@ -9,10 +9,19 @@ import type { BillItem, SearchResult } from './search/search-index';
 
 import { App } from './App';
 import type { Counter } from './counter';
+import type { CheckoutSettings, PaymentMethodRow } from './db/checkout';
 import type { DeviceInfo } from './db/repo';
 import { i18n } from './i18n';
+import type { PrintJob } from './print/print-job';
 import en from './locales/en.json';
-import { ROLE_TEMPLATES, type Money, type RoleGrant } from '@erp/domain';
+import {
+  buildSaleDocument,
+  ROLE_TEMPLATES,
+  type Money,
+  type RoleGrant,
+  type SaleDocument,
+  type Tender,
+} from '@erp/domain';
 import type { StaffUser } from './unlock/unlock';
 
 // The counter's screens over a fake counter (POS spec §3-§7). The PIN check is a plain comparison here; the real
@@ -82,6 +91,12 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
       calls.push(`pinEvent ${e.kind} ${e.userId} ${e.byUserId ?? '-'}`);
       return Promise.resolve();
     },
+    checkout: () => Promise.resolve(null),
+    finalize: () => Promise.reject(new Error('no bill')),
+    recentBills: () => Promise.resolve([]),
+    bill: () => Promise.resolve(null),
+    recordReprint: () => Promise.reject(new Error('no bill')),
+    print: () => {},
     ...over,
   };
   return { counter, calls, setDevice: (d: DeviceInfo | null) => (device = d) };
@@ -815,5 +830,269 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
     await waitFor(() => expect(total()).toBe('Rs 4,200'));
     expect(screen.queryByText(en.approval.title)).toBeNull();
     expect(plain(lines()[0]!.textContent)).not.toContain(en.bill.needsApproval);
+  });
+  describe('paying and printing (W1-06, POS spec §12–§13)', () => {
+    const METHODS: PaymentMethodRow[] = [
+      { id: 'pm1', code: 'cash', name: 'Cash', isCash: true, requiresReference: false, sort: 1 },
+      { id: 'pm3', code: 'raast', name: 'Raast', isCash: false, requiresReference: true, sort: 3 },
+      { id: 'pm4', code: 'jazzcash', name: 'JazzCash', isCash: false, requiresReference: true, sort: 4 },
+      { id: 'pm7', code: 'on_account', name: 'On account', isCash: false, requiresReference: false, sort: 7 },
+    ];
+    const SETTINGS: CheckoutSettings = {
+      increment: 100 as Money,
+      timeZone: 'Asia/Karachi',
+      cutoffHour: 4,
+      methods: METHODS,
+      printProfile: null,
+      receiptHeader: [],
+    };
+
+    /** The bill counter, with a finalize that builds the real document from the saved open bill. */
+    const payCounter = (over: Partial<Counter> = {}) => {
+      const f = billCounter({ checkout: () => Promise.resolve(SETTINGS), ...over });
+      const docs: SaleDocument[] = [];
+      const printed: PrintJob[] = [];
+      const reprints: string[] = [];
+      const finalized: Tender[] = [];
+      f.counter.finalize = (req) => {
+        finalized.push(req.tender);
+        const ob = f.bills.get(req.userId);
+        if (!ob) return Promise.resolve({ document: docs.at(-1)!, repeated: true });
+        try {
+          const document = buildSaleDocument({
+            bill: ob.bill,
+            tender: req.tender,
+            methods: METHODS,
+            sellerMaxDiscountBp: 10000,
+            hasCreditCustomer: false,
+            context: {
+              id: req.id,
+              seq: docs.length + 1,
+              deviceId: 'd',
+              deviceCode: 'C01',
+              branchId: 'b',
+              createdAtMs: req.createdAtMs,
+              timeZone: 'Asia/Karachi',
+              cutoffHour: 4,
+              increment: 100 as Money,
+              clientVersion: req.clientVersion,
+            },
+          });
+          f.bills.delete(req.userId);
+          docs.push(document);
+          return Promise.resolve({ document, repeated: false });
+        } catch (err) {
+          return Promise.reject(err instanceof Error ? err : new Error(String(err)));
+        }
+      };
+      f.counter.print = (job) => void printed.push(job);
+      f.counter.recentBills = () =>
+        Promise.resolve(
+          [...docs].reverse().map((d) => ({
+            id: d.id,
+            number: d.number,
+            createdAt: d.createdAt,
+            total: d.amounts.total,
+            cashDue: d.cashDue,
+          })),
+        );
+      f.counter.bill = (id) => Promise.resolve(docs.find((d) => d.id === id) ?? null);
+      f.counter.recordReprint = (r) => {
+        reprints.push(`${r.number} ${r.userId}`);
+        return Promise.resolve({ ...r, id: 'r1', pushedAt: null });
+      };
+      return { ...f, docs, printed, reprints, finalized };
+    };
+
+    const dialog = () => screen.getByRole('dialog');
+    const notice = () => plain(screen.queryByRole('status')?.textContent);
+    const finalizeButton = () =>
+      within(dialog()).getByRole('button', { name: new RegExp(`^${en.pay.finalize}`) });
+    /** What Enter does in a popup: submits its form. */
+    const enter = (field: HTMLElement) => fireEvent.submit(field.closest('form')!);
+    const sold = async (counter: Counter) => {
+      show(counter);
+      const box = await unlockAs(/Asif Khan/, '4831');
+      await add(box, 'brpd');
+      return box;
+    };
+
+    it('F9 then Enter with the field empty pays the exact amount, prints after saving and starts a new bill', async () => {
+      const f = payCounter();
+      const box = await sold(f.counter);
+      fireEvent.keyDown(window, { key: 'F9' });
+      const received = await within(await screen.findByRole('dialog')).findByLabelText(en.pay.cashReceived);
+      expect(plain(screen.getByTestId('pay-total').textContent)).toBe('Rs 4,500');
+      enter(received);
+      await waitFor(() => expect(f.docs).toHaveLength(1));
+      expect(f.docs[0]!.payments).toEqual([
+        { method: 'cash', amount: 450000, cashReceived: null, changeDue: 0, reference: null },
+      ]);
+      expect(f.printed.map((j) => [j.document.number, j.reprint, j.sellerName])).toEqual([
+        ['C01-S000001', null, 'Asif Khan'],
+      ]);
+      expect(f.printed[0]!.items['BRPD001']).toEqual({
+        code: 'BRPD001',
+        name: 'BRAKE PADS FRONT COROLLA FRONT',
+      });
+      await waitFor(() =>
+        expect(notice()).toBe('Bill C01-S000001 printed · bring Rs 4,500 to the cash desk'),
+      );
+      expect(await screen.findByText(en.bill.empty)).toBeDefined();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      await waitFor(() => expect(document.activeElement).toBe(box));
+    });
+
+    it('the main button does what Enter does', async () => {
+      const f = payCounter();
+      await sold(f.counter);
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${en.pay.cash}`) }));
+      await screen.findByRole('dialog');
+      fireEvent.click(finalizeButton());
+      await waitFor(() => expect(f.docs).toHaveLength(1));
+      expect(f.docs[0]!.cashDue).toBe(450000);
+    });
+
+    it('quick cash shows each change and finalizes in one click', async () => {
+      const f = payCounter();
+      await sold(f.counter);
+      fireEvent.keyDown(window, { key: 'F9' });
+      const quick = within(await screen.findByRole('group', { name: en.pay.quickCash }));
+      expect(quick.getAllByRole('button').map((b) => plain(b.textContent))).toEqual([
+        en.pay.exact,
+        'Rs 5,000change Rs 500',
+        'Rs 10,000change Rs 5,500',
+        'Rs 15,000change Rs 10,500',
+      ]);
+      // Formatted money has a no-break space after Rs: pick the button by its place.
+      fireEvent.click(quick.getAllByRole('button')[1]!);
+      await waitFor(() => expect(f.docs).toHaveLength(1));
+      expect(f.docs[0]!.payments[0]).toMatchObject({ cashReceived: 500000, changeDue: 50000 });
+      await waitFor(() =>
+        expect(notice()).toBe('Bill C01-S000001 printed · bring Rs 4,500 to the cash desk, change Rs 500'),
+      );
+    });
+
+    it('typed cash shows the change; less than the total is refused; Esc leaves the bill as it was', async () => {
+      const f = payCounter();
+      await sold(f.counter);
+      fireEvent.keyDown(window, { key: 'F9' });
+      const received = await within(await screen.findByRole('dialog')).findByLabelText(en.pay.cashReceived);
+      fireEvent.change(received, { target: { value: '5000' } });
+      expect(plain(screen.getByTestId('pay-change').textContent)).toBe('Rs 500');
+      fireEvent.change(received, { target: { value: '4000' } });
+      enter(received);
+      expect(await within(dialog()).findByText(en.pay.lessThanTotal)).toBeDefined();
+      expect(f.finalized).toHaveLength(0);
+      fireEvent.keyDown(received, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(total()).toBe('Rs 4,500');
+      expect(lines()).toHaveLength(1);
+      expect(f.docs).toHaveLength(0);
+    });
+
+    it('Raast needs its reference, labelled for Raast; the bill is then paid without cash', async () => {
+      const f = payCounter();
+      await sold(f.counter);
+      const pad = within(screen.getByRole('group', { name: en.pay.pad }));
+      // On account waits for a credit customer (W1-09).
+      expect(pad.getByRole<HTMLButtonElement>('button', { name: 'On account' }).disabled).toBe(true);
+      fireEvent.click(pad.getByRole('button', { name: 'Raast' }));
+      const reference = await within(await screen.findByRole('dialog')).findByLabelText(
+        en.pay.reference.raast,
+      );
+      enter(reference);
+      expect(await within(dialog()).findByText(en.tender.reference_required)).toBeDefined();
+      fireEvent.change(reference, { target: { value: ' RST-5512 ' } });
+      enter(reference);
+      await waitFor(() => expect(f.docs).toHaveLength(1));
+      expect(f.docs[0]).toMatchObject({
+        payments: [{ method: 'raast', amount: 450000, reference: 'RST-5512' }],
+        cashDue: 0,
+        handoverStatus: 'not_applicable',
+      });
+      await waitFor(() => expect(notice()).toBe('Bill C01-S000001 printed · paid by Raast'));
+    });
+
+    it('Shift+F9 splits: what is still to cover, then cash and JazzCash with cash received', async () => {
+      const f = payCounter();
+      await sold(f.counter);
+      fireEvent.keyDown(window, { key: 'F9', shiftKey: true });
+      const d = within(await screen.findByRole('dialog'));
+      const left = () => plain(screen.getByTestId('split-left').textContent);
+      const cash = d.getByLabelText('Cash amount');
+      expect((cash as HTMLInputElement).value).toBe('4500');
+      expect(left()).toBe(en.pay.covered);
+      expect(d.queryByLabelText('On account amount')).toBeNull();
+      fireEvent.change(cash, { target: { value: '2000' } });
+      expect(left()).toBe('Rs 2,500 still to cover');
+      fireEvent.change(d.getByLabelText('JazzCash amount'), { target: { value: '3000' } });
+      expect(left()).toBe('Rs 500 too much');
+      fireEvent.change(d.getByLabelText('JazzCash amount'), { target: { value: '2500' } });
+      enter(cash);
+      expect(await d.findByText(en.tender.reference_required)).toBeDefined();
+      fireEvent.change(d.getByLabelText(`JazzCash: ${en.pay.reference.jazzcash}`), {
+        target: { value: 'JC-88123' },
+      });
+      fireEvent.change(d.getByLabelText(en.pay.cashReceived), { target: { value: '5000' } });
+      expect(plain(screen.getByTestId('pay-change').textContent)).toBe('Rs 3,000');
+      enter(cash);
+      await waitFor(() => expect(f.docs).toHaveLength(1));
+      expect(f.docs[0]!.payments).toEqual([
+        { method: 'cash', amount: 200000, cashReceived: 500000, changeDue: 300000, reference: null },
+        { method: 'jazzcash', amount: 250000, cashReceived: null, changeDue: null, reference: 'JC-88123' },
+      ]);
+      expect(f.docs[0]!.cashDue).toBe(200000);
+    });
+
+    it('pay is refused while a price waits for an approval', async () => {
+      const f = payCounter();
+      const box = await sold(f.counter);
+      fireEvent.keyDown(box, { key: 'Tab' });
+      await waitFor(() => expect(document.activeElement).toBe(billPanel()));
+      key('p');
+      fireEvent.change(await screen.findByLabelText(en.price.label), { target: { value: '3500' } });
+      fireEvent.click(action(en.price.action));
+      // The approval opens by itself; the salesman closes it without one.
+      fireEvent.keyDown(await screen.findByText(en.approval.title), { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      fireEvent.keyDown(window, { key: 'F9' });
+      expect(await screen.findByText(en.pay.approveFirst)).toBeDefined();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(f.finalized).toHaveLength(0);
+    });
+
+    it('the pay buttons are off while the bill is empty, and F9 does nothing', async () => {
+      const f = payCounter();
+      show(f.counter);
+      await unlockAs(/Asif Khan/, '4831');
+      const pad = within(await screen.findByRole('group', { name: en.pay.pad }));
+      expect(
+        pad.getByRole<HTMLButtonElement>('button', { name: new RegExp(`^${en.pay.cash}`) }).disabled,
+      ).toBe(true);
+      fireEvent.keyDown(window, { key: 'F9' });
+      await act(() => Promise.resolve());
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('Alt+P reprints a bill of this counter, marked REPRINT and kept for the audit log', async () => {
+      const f = payCounter();
+      const box = await sold(f.counter);
+      fireEvent.keyDown(window, { key: 'F9' });
+      enter(await within(await screen.findByRole('dialog')).findByLabelText(en.pay.cashReceived));
+      await waitFor(() => expect(f.printed).toHaveLength(1));
+      await waitFor(() => expect(document.activeElement).toBe(box));
+      fireEvent.keyDown(window, { key: 'p', altKey: true });
+      const d = within(await screen.findByRole('dialog'));
+      const option = await d.findByRole('option', { name: /C01-S000001/ });
+      expect(option.getAttribute('aria-selected')).toBe('true');
+      enter(d.getByLabelText(en.reprint.search));
+      await waitFor(() => expect(f.printed).toHaveLength(2));
+      expect(f.printed[1]!.reprint?.by).toBe('Asif Khan');
+      expect(f.printed[1]!.document).toEqual(f.docs[0]);
+      expect(f.printed[1]!.items['BRPD001']?.code).toBe('BRPD001');
+      expect(f.reprints).toEqual(['C01-S000001 u1']);
+      await waitFor(() => expect(notice()).toBe('Bill C01-S000001 reprinted'));
+    });
   });
 });

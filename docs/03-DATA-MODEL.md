@@ -332,6 +332,8 @@ SQLite WASM in a dedicated worker, on OPFS (`opfs-sahpool`), changed only by num
 
 **Built in W1-05 (local schema 4):** `open_bills`: `user_id` (primary key), `bill` (JSON: `{ version, bill, items }`, the domain bill and what each line shows), `updated_at`. The bill each person is building on this counter, saved after every change so a lock or a reload never loses it (POS spec §10). Never pushed; a stored bill this version can't read is set aside in `diagnostic_log`. W1-06 removes it in the finalize transaction.
 
+**Built in W1-06 (local schema 5):** `payment_methods`, `print_profiles` and `device` (this counter's own row), with exactly the pulled columns (sync spec §3, `CHECKOUT_COLUMNS` in `@erp/contracts`); `reprints`: `id` (UUIDv7), `document_id`, `number`, `user_id`, `at`, `pushed_at`, kept until push reports them to the audit log as `bill.reprinted` (W1-07); an index on `local_documents.created_at` for the reprint list. Finalizing writes `local_series`, `local_documents` and `outbox` and deletes the person's `open_bills` row in **one transaction** (POS spec §12); the outbox row's `signature` is added right after the commit.
+
 The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` in IndexedDB (`erp-pos-keys`), and the device token is kept only in memory.
 
 **Planned (later tasks):**
@@ -347,7 +349,8 @@ The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` i
 1. allocate the sequence number
 2. insert the document into `local_documents`
 3. insert the `outbox` row
-4. update the overlays
-5. commit
+4. delete the person's `open_bills` row (W1-06)
+5. update the overlays (from W1-08)
+6. commit
 
 **Then** print. If printing fails, the bill still exists and can be reprinted.

@@ -5,6 +5,7 @@ import {
   type Approval,
   type BillAmounts,
   type PendingApproval,
+  type SaleTotal,
 } from '@erp/domain';
 import {
   Alert,
@@ -16,33 +17,38 @@ import {
   Panel,
   type MoneyFormat,
 } from '@erp/ui';
-import type { KeyboardEvent, Ref } from 'react';
+import type { KeyboardEvent, ReactNode, Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatQty } from '../bill/bill-state';
 import type { OpenBill } from '../bill/open-bill';
 
 // The bill on the counter screen (POS spec §10, prototype layout): what the bill is priced at, the lines with their
-// list price, floor and chips, and the totals pinned at the bottom (the payment pad goes under them in W1-06).
+// list price, floor and chips, and the totals pinned at the bottom with the payment pad under them (POS spec §12).
 
 const chip = 'border-transparent font-semibold';
 
 export function BillPanel({
   openBill,
   amounts,
+  total,
   pending,
   tierName,
   selected,
   active,
   message,
+  notice,
   money,
   nameOf,
+  pad,
   panelRef,
   onSelect,
   onKeyDown,
 }: {
   openBill: OpenBill | null;
   amounts: BillAmounts | null;
+  /** The total rounded to the tenant's increment (POS-15); null until the checkout settings have loaded. */
+  total: SaleTotal | null;
   pending: readonly PendingApproval[];
   tierName: string;
   /** The selected line, when the lines have the keyboard. */
@@ -50,9 +56,13 @@ export function BillPanel({
   active: boolean;
   /** What the last key could not do (an i18n text). */
   message: string | null;
+  /** What the last bill came to (an i18n text), shown until the next one starts. */
+  notice: string | null;
   money: MoneyFormat;
   /** A person's name, for "Approved by". */
   nameOf: (userId: string) => string;
+  /** The payment pad, under the total. */
+  pad: ReactNode;
   panelRef: Ref<HTMLElement>;
   onSelect: (index: number) => void;
   onKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
@@ -90,6 +100,14 @@ export function BillPanel({
         <Alert variant="destructive" className="mx-3.5 mb-1 w-auto">
           <AlertDescription>{message}</AlertDescription>
         </Alert>
+      )}
+      {notice && (
+        <div
+          role="status"
+          className="mx-3.5 mb-1 rounded-lg border border-ok bg-ok-soft px-3 py-2 font-semibold text-ok"
+        >
+          {notice}
+        </div>
       )}
       {openBill === null ? (
         <p className="m-0 px-3.5 py-4 text-muted-foreground">{t('bill.loading')}</p>
@@ -200,6 +218,12 @@ export function BillPanel({
               <span>{m(negate(amounts.billDiscount))}</span>
             </div>
           )}
+          {total !== null && total.rounding !== 0 && (
+            <div className="flex justify-between gap-3 text-muted-foreground tabular-nums">
+              <span>{t('bill.rounding')}</span>
+              <span data-testid="bill-rounding">{m(total.rounding)}</span>
+            </div>
+          )}
           <div className="flex items-baseline justify-between gap-3">
             <span className="font-display text-lg font-semibold tracking-[.05em] uppercase">
               {t('bill.total')}
@@ -208,11 +232,12 @@ export function BillPanel({
               className="font-display text-[40px] leading-none font-bold tabular-nums"
               data-testid="bill-total"
             >
-              {m(amounts.total)}
+              {m(total?.total ?? amounts.total)}
             </span>
           </div>
         </div>
       )}
+      <div className="border-t border-line bg-surface-2 px-3.5 pb-3">{pad}</div>
     </Panel>
   );
 }

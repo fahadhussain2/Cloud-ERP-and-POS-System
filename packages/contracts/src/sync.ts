@@ -62,6 +62,35 @@ export type CatalogDataset = keyof typeof CATALOG_COLUMNS;
 /** In pull order: lookups before the items that point at them. */
 export const CATALOG_DATASETS = Object.keys(CATALOG_COLUMNS) as CatalogDataset[];
 
+/**
+ * What paying and printing need, and the only columns each may send (sync spec §3, W1-06). Never a payment method's
+ * `bank_account_id` (posting only) or a device's `public_key`; `device` is only the calling device's own row.
+ */
+export const CHECKOUT_COLUMNS = {
+  payment_methods: {
+    id: 'text',
+    code: 'text',
+    name: 'text',
+    is_cash: 'bool',
+    requires_reference: 'bool',
+    is_active: 'bool',
+    sort: 'int',
+  },
+  print_profiles: {
+    id: 'text',
+    name: 'text',
+    paper_format: 'text',
+    code_type: 'text',
+    copies: 'int',
+    template_options: 'json',
+    is_tenant_default: 'bool',
+  },
+  device: { id: 'text', code: 'text', print_profile_id: 'text', status: 'text' },
+} as const satisfies Record<string, Record<string, ColumnType>>;
+
+export type CheckoutDataset = keyof typeof CHECKOUT_COLUMNS;
+export const CHECKOUT_DATASETS = Object.keys(CHECKOUT_COLUMNS) as CheckoutDataset[];
+
 export const PULL_DATASETS = [
   'tenant',
   'branch',
@@ -69,8 +98,10 @@ export const PULL_DATASETS = [
   'roles',
   'user_roles',
   ...(Object.keys(CATALOG_COLUMNS) as CatalogDataset[]),
+  ...(Object.keys(CHECKOUT_COLUMNS) as CheckoutDataset[]),
 ] as const;
-export type PullDataset = 'tenant' | 'branch' | 'users' | 'roles' | 'user_roles' | CatalogDataset;
+export type PullDataset =
+  'tenant' | 'branch' | 'users' | 'roles' | 'user_roles' | CatalogDataset | CheckoutDataset;
 
 export const PULL_LIMIT_DEFAULT = 500;
 export const PULL_LIMIT_MAX = 1000;

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W1-02 (POS shell) and W1-03 (catalog and search, design pass) merged; W1-05 (bill building) built, in review |
+| **Status** | In progress: W1-02 (POS shell), W1-03 (catalog and search) and W1-05 (bill building) merged; W1-06 (finalize and print) built, in review |
 | **Requirements** | 17 (POS-01…POS-17) |
 | **Feature spec needed** | Yes: checkout screen and keyboard map; local DB and storage guardrails |
 
@@ -97,6 +97,21 @@ The screens talk only to the `Counter` interface (`counter.ts`), so they are tes
 | An approver's PIN, checked offline | `apps/pos/src/unlock/approve.ts` |
 | The bill panel, the dialogs (quantity, price, bill discount, tier, clear, approval), the key map | `apps/pos/src/screens/BillPanel.tsx`, `BillDialogs.tsx`, `CounterScreen.tsx` |
 | App updates wait while a bill has lines | `apps/pos/src/bill/bill-open.ts`, `main.tsx` |
+
+## Finalize and print (W1-06)
+
+[Plan](plans/W1-06-finalize-and-print.md), [spec §12–§13](spec.md), [sync spec §6.1](../sync/spec.md).
+
+| Part | Where |
+|---|---|
+| The tender rules, quick cash, the rounded total, document numbers, the bill code and the sale document (golden cases in `golden/tender*.json`, `sale-*.json`, `quick-cash.json`, `document-number.json`, `bill-code.json`) | `packages/domain/src/tender.ts`, `sale-document.ts` |
+| The sale document's wire schema | `SaleDocumentV1` in `packages/contracts/src/documents.ts` |
+| Code 39 bars as SVG | `packages/print/src/code39.ts` |
+| The checkout datasets (payment methods, print profiles, the device's own row) | `CHECKOUT_COLUMNS` in `packages/contracts/src/sync.ts`, `datasetSource` in `apps/api/src/sync/routes.ts` |
+| Local schema 5, the finalize transaction, recent bills, reprints | `apps/pos/src/db/checkout.ts`; signing after the commit in `counter-browser.ts` |
+| The payment pad and the Cash, method and Split popups | `apps/pos/src/screens/PaymentPad.tsx`, `PaymentDialogs.tsx` |
+| The printed bill and printing | `apps/pos/src/print/` (`BillPrint.tsx`, `print-bill.tsx`); print styles in `styles.css` |
+| Reprint (`Alt+P`) | `apps/pos/src/screens/ReprintDialog.tsx` |
 
 ## Work in this module
 

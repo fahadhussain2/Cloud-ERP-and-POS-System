@@ -4,6 +4,7 @@ import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 
 import type { OpenBill } from '../bill/open-bill';
 import { SearchIndex, type SearchOptions } from '../search/search-index';
+import * as checkout from './checkout';
 import { currentVersion, migrate } from './migrate';
 import * as repo from './repo';
 import { wrapOo1, type SqlDb } from './sql';
@@ -67,6 +68,14 @@ const ops = {
   loadOpenBill: (userId: string) => repo.loadOpenBill(open(), userId),
   saveOpenBill: (userId: string, bill: OpenBill) => repo.saveOpenBill(open(), userId, bill),
   clearOpenBill: (userId: string) => repo.clearOpenBill(open(), userId),
+  /** Paying, finalizing and reprinting (POS spec §12–§13). */
+  checkoutSettings: () => checkout.checkoutSettings(open()),
+  finalizeSale: (req: checkout.FinalizeRequest) => checkout.finalizeSale(open(), req),
+  setSignature: (documentId: string, signature: string) =>
+    checkout.setSignature(open(), documentId, signature),
+  recentDocuments: (since: string, filter: string) => checkout.recentDocuments(open(), since, filter),
+  loadDocument: (id: string) => checkout.loadDocument(open(), id),
+  recordReprint: (r: Omit<checkout.Reprint, 'id' | 'pushedAt'>) => checkout.recordReprint(open(), r),
   /** Items in the index, and whether a complete pull has loaded the catalog (POS spec §9). */
   catalogStatus: () => ({ items: index.size, ready: repo.getSync(open(), 'pull_complete_at') !== null }),
   listStaff: () => repo.listStaff(open()),
@@ -96,7 +105,9 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     const fn = ops[op] as (...a: unknown[]) => unknown;
     self.postMessage({ id, ok: true, result: await fn(...args) });
   } catch (err) {
-    const e = err as Error;
-    self.postMessage({ id, ok: false, error: { name: e.name, message: e.message } });
+    const e = err as Error & { code?: unknown };
+    // A broken checkout rule keeps its code, so the screen can say which (DomainError).
+    const code = typeof e.code === 'string' ? e.code : undefined;
+    self.postMessage({ id, ok: false, error: { name: e.name, message: e.message, code } });
   }
 };

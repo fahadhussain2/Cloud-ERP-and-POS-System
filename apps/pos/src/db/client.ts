@@ -1,7 +1,10 @@
+import { DomainError, type DomainErrorCode } from '@erp/domain';
+
 import type { DbOps } from './worker';
 
 // The UI's handle on the database worker (POS spec §1): each operation is a promise of its result. Errors come back
-// with their name, so the storage checks can tell "too new" from "unavailable".
+// with their name, so the storage checks can tell "too new" from "unavailable", and a broken checkout rule comes back
+// as a DomainError with its code.
 
 type Promisified<T> = {
   [K in keyof T]: T[K] extends (...a: infer A) => infer R ? (...a: A) => Promise<Awaited<R>> : never;
@@ -13,7 +16,7 @@ interface Reply {
   id: number;
   ok: boolean;
   result?: unknown;
-  error?: { name: string; message: string };
+  error?: { name: string; message: string; code?: string };
 }
 
 export function createDbClient(): DbClient {
@@ -26,6 +29,8 @@ export function createDbClient(): DbClient {
     if (!w) return;
     waiting.delete(id);
     if (ok) w.resolve(result);
+    else if (error?.name === 'DomainError' && error.code)
+      w.reject(new DomainError(error.code as DomainErrorCode, error.message));
     else
       w.reject(
         Object.assign(new Error(error?.message ?? 'database error'), { name: error?.name ?? 'Error' }),

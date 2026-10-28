@@ -418,3 +418,124 @@ describe('catalog pull (W1-03)', () => {
     expect(theirs['items']!.map((r) => r['code'])).toEqual(['OTHER001']);
   });
 });
+
+describe('checkout pull (W1-06)', () => {
+  // Sync spec §3, checkout datasets: payment methods, print profiles and the calling device's own row.
+  const CHECKOUT = 'payment_methods,print_profiles,device';
+  let first: { token: string; deviceId: string };
+  let second: { token: string; deviceId: string };
+  let a5 = '';
+  let a4 = '';
+
+  beforeAll(async () => {
+    const cookie = await login('boss');
+    first = await enrolledToken(cookie, branch, SHOP, tenant);
+    second = await enrolledToken(cookie, branch, SHOP, tenant);
+    await withTenant(pool, { tenantId: tenant }, async (_db, c) => {
+      const glAccount = await c.query<{ id: string }>(
+        `INSERT INTO erp.accounts (tenant_id, code, name, type, is_postable)
+         VALUES ($1, '1170', 'JazzCash', 'asset', true) RETURNING id`,
+        [tenant],
+      );
+      const wallet = await c.query<{ id: string }>(
+        `INSERT INTO erp.bank_accounts (tenant_id, code, name, kind, gl_account_id)
+         VALUES ($1, 'jazzcash', 'JazzCash', 'wallet', $2) RETURNING id`,
+        [tenant, glAccount.rows[0]!.id],
+      );
+      await c.query(
+        `INSERT INTO erp.payment_methods (tenant_id, code, name, is_cash, requires_reference, bank_account_id, sort)
+         VALUES ($1, 'cash', 'Cash', true, false, NULL, 1),
+                ($1, 'jazzcash', 'JazzCash', false, true, $2, 2),
+                ($1, 'on_account', 'On account', false, false, NULL, 3)`,
+        [tenant, wallet.rows[0]!.id],
+      );
+      const p = await c.query<{ id: string; paper_format: string }>(
+        `INSERT INTO erp.print_profiles (tenant_id, name, paper_format, code_type, copies, template_options,
+           is_tenant_default)
+         VALUES ($1, 'A5 landscape dot matrix', 'a5', 'barcode', 1,
+                 '{"headerLines": ["Shop 14, Auto Market"], "policyText": "Returns within 30 days."}', true),
+                ($1, 'A4 laser', 'a4', 'barcode', 2, '{}', false)
+         RETURNING id, paper_format`,
+        [tenant],
+      );
+      a5 = p.rows.find((r) => r.paper_format === 'a5')!.id;
+      a4 = p.rows.find((r) => r.paper_format === 'a4')!.id;
+      await c.query('UPDATE erp.devices SET print_profile_id = $1 WHERE id = $2', [a4, second.deviceId]);
+    });
+  });
+
+  const pullCheckout = async (deviceToken: string) => {
+    const res = await pull(deviceToken, `datasets=${CHECKOUT}`);
+    expect(res.statusCode, res.body).toBe(200);
+    return res.json<PullBody>().changes;
+  };
+
+  it('sends payment methods with only their listed columns: never the bank account', async () => {
+    const methods = (await pullCheckout(first.token))['payment_methods']!;
+    expect(methods.map((m) => m['code'])).toEqual(expect.arrayContaining(['cash', 'jazzcash', 'on_account']));
+    for (const m of methods)
+      expect(Object.keys(m).sort()).toEqual(
+        [
+          'code',
+          'deleted_at',
+          'id',
+          'is_active',
+          'is_cash',
+          'name',
+          'requires_reference',
+          'row_version',
+          'sort',
+        ].sort(),
+      );
+    expect(methods.find((m) => m['code'] === 'jazzcash')).toMatchObject({
+      requires_reference: true,
+      sort: 2,
+    });
+  });
+
+  it('sends print profiles with their template options', async () => {
+    const profiles = (await pullCheckout(first.token))['print_profiles']!;
+    for (const p of profiles)
+      expect(Object.keys(p).sort()).toEqual(
+        [
+          'code_type',
+          'copies',
+          'deleted_at',
+          'id',
+          'is_tenant_default',
+          'name',
+          'paper_format',
+          'row_version',
+          'template_options',
+        ].sort(),
+      );
+    expect(profiles.find((p) => p['id'] === a5)).toMatchObject({
+      paper_format: 'a5',
+      is_tenant_default: true,
+      template_options: { headerLines: ['Shop 14, Auto Market'], policyText: 'Returns within 30 days.' },
+    });
+  });
+
+  it("sends only the calling device's own row, with its print profile and never its public key", async () => {
+    const mine = (await pullCheckout(first.token))['device']!;
+    expect(mine).toEqual([
+      {
+        id: first.deviceId,
+        code: expect.stringMatching(/^C\d{2,}$/) as unknown,
+        print_profile_id: null,
+        status: 'active',
+        row_version: expect.any(String) as unknown,
+        deleted_at: null,
+      },
+    ]);
+    const theirs = (await pullCheckout(second.token))['device']!;
+    expect(theirs.map((d) => [d['id'], d['print_profile_id']])).toEqual([[second.deviceId, a4]]);
+  });
+
+  it("never sends another tenant's methods, profiles or devices", async () => {
+    const changes = await pullCheckout(otherToken);
+    expect(changes['payment_methods'] ?? []).toEqual([]);
+    expect(changes['print_profiles'] ?? []).toEqual([]);
+    expect(JSON.stringify(changes['device'])).not.toContain(first.deviceId);
+  });
+});

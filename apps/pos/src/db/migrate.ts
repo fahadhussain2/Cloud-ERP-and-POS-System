@@ -122,6 +122,33 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE TABLE open_bills (user_id TEXT PRIMARY KEY, bill TEXT NOT NULL, updated_at TEXT NOT NULL)',
     ],
   },
+  {
+    // Paying and printing (W1-06, POS spec §12–§13, sync spec §3): the pulled payment methods, print profiles and this
+    // device's own row, exactly the pulled columns; and the reprints, kept until push reports them (W1-07).
+    version: 5,
+    statements: [
+      `CREATE TABLE payment_methods (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, is_cash INTEGER NOT NULL,
+        requires_reference INTEGER NOT NULL, is_active INTEGER NOT NULL, sort INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE print_profiles (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, paper_format TEXT NOT NULL, code_type TEXT NOT NULL,
+        copies INTEGER NOT NULL, template_options TEXT NOT NULL, is_tenant_default INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE device (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, print_profile_id TEXT, status TEXT NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE reprints (
+        id TEXT PRIMARY KEY, document_id TEXT NOT NULL, number TEXT NOT NULL, user_id TEXT NOT NULL, at TEXT NOT NULL,
+        pushed_at TEXT
+      )`,
+      // The reprint list reads the last 30 days, newest first.
+      'CREATE INDEX local_documents_created ON local_documents (created_at)',
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;
