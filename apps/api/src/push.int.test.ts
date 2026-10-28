@@ -482,6 +482,21 @@ describe('push: acceptance (SYN-02, SYN-03)', () => {
     expect(d!.exception_count).toBe(1);
   });
 
+  it('accepts a bill paid by a method removed in the back office while the counter was offline (SYN-03)', async () => {
+    const raast = {
+      payments: [{ method: 'raast', amount: money(450000), reference: 'RST-1' }],
+      cashReceived: null,
+    };
+    const own = await enroll(await login('boss'), branch);
+    const doc = sale(own, 1, { tender: raast });
+    await q("UPDATE erp.payment_methods SET deleted_at = now() WHERE code = 'raast'");
+    try {
+      expect(statuses(await push(own, [await signed(own, doc)]))).toEqual(['accepted']);
+    } finally {
+      await q("UPDATE erp.payment_methods SET deleted_at = NULL WHERE code = 'raast'");
+    }
+  });
+
   it('stores the approval of a below-floor sale as an override', async () => {
     const doc = sale(c, 7, { price: 380000 });
     expect(statuses(await push(c, [await signed(c, doc)]))).toEqual(['accepted']);
