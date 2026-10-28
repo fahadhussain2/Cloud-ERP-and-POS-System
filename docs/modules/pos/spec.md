@@ -208,7 +208,7 @@ The **change** is cash received − the cash amount (0 when cash received is emp
 
 1. The counter signs the canonical payload with its device key (`signCanonical`, D-082) and stores the signature on the outbox row. If signing fails, the row stays unsigned and push signs it before sending (W1-07).
 2. The bill prints (§13).
-3. A message: *Bill C03-S000412 printed · bring Rs 4,320 to the cash desk, change Rs 680* (or *paid by Raast* without cash), and a new empty bill with the search focused.
+3. A message on the bill panel until the next bill starts: *Bill C03-S000412 printed · bring Rs 4,320 to the cash desk, change Rs 680* (or *paid by Raast* without cash), and a new empty bill with the search focused.
 4. The unsynced count in the status bar goes up; an app update may now activate (§8).
 
 ## 13. Printing and reprint (W1-06)
@@ -226,7 +226,7 @@ POS-09, POS-10, POS-16, architecture §4.5 and §8, D-048, D-055.
 | `copies` | 1, or 2 = a second page in the same print job |
 | `template_options` | `headerLines` (array of text), `policyText` |
 
-**What the bill shows** (POS-09, Q12, the prototype's layout): the shop name and header lines (`branch.receipt_header`, then the profile's `headerLines`), *SALE BILL*, the bill number, date and time (tenant locale), counter, salesman, customer (*Walk-in*); the lines (#, code, description, quantity, rate, amount); subtotal, discount and rounding when not zero, **TOTAL**; each payment with its reference; *Cash received* and **CHANGE** when there is cash; the policy line (`policyText`, default *Exchange or return within 30 days with this bill.*); the bill code, with its text under the bars. Black on white, no shading. Text through i18n keys, logical CSS properties (rule 10).
+**What the bill shows** (POS-09, Q12, the prototype's layout): the shop name and header lines (the branch's address and phone and `branch.receipt_header.lines`, then the profile's `headerLines`), *SALE BILL*, the bill number, date and time (tenant locale), counter, salesman, customer (*Walk-in*); the lines (#, code, description, quantity, rate, amount); subtotal, discount and rounding when not zero, **TOTAL**; each payment with its reference; *Cash received* and **CHANGE** when there is cash; the policy line (`policyText`, default *Exchange or return within 30 days with this bill.*); the bill code, with its text under the bars. Black on white, no shading. Text through i18n keys, logical CSS properties (rule 10).
 
 **Bill code** (`billCode`, `parseBillCode`): Code 39, no check character, `<bill number> <cash due in whole rupees>`, e.g. `C03-S000412 4320`, or `C03-S000413 0` for a bill paid without cash. A cash due with paisa is refused (it is always rounded at Delux; a tenant whose increment leaves paisa can't use the barcode profile). Parsing ignores spaces around the text and a trailing Enter, and refuses anything else. The bars come from `code39Svg` in `packages/print`.
 

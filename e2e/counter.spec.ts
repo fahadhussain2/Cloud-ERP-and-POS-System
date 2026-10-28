@@ -21,6 +21,7 @@ import {
 // offline and still unlock, lock after 5 wrong PINs. W1-03 plan scope 6: search by code, scan, OEM number, words in
 // any order, car and year, also offline. W1-04 plan scope 7: the owner adds people with roles, a manager unlocks a
 // locked salesman offline, a deactivated person leaves the counter, a manager's back office has the PIN action only.
+// W1-06 plan scope 6: pay by cash, Raast and split, refusals, numbering across a reload, offline printing, reprint.
 
 const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
 const POS = `http://localhost:${POS_PORT}`;
@@ -470,4 +471,143 @@ test('F5 does not reload; the bill waits for the same person after a lock, and a
   await unlockAs(page, SALESMAN.fullName, OWN_PIN);
   await expect(total(page)).toHaveText(/Rs\s3,975/);
   await expect(billPanel(page)).toContainText('Mechanic prices');
+});
+
+// W1-06 plan scope 6: paying and printing. window.print() is replaced by a recorder of what the print container shows
+// at that moment, as the counter's kiosk printing would send it to the printer.
+const recordPrints = (page: Page) =>
+  page.addInitScript(() => {
+    const w = window as unknown as { printed: string[] };
+    w.printed = [];
+    window.print = () => void w.printed.push(document.getElementById('print-root')?.innerText ?? '');
+  });
+const printed = (page: Page) => page.evaluate(() => (window as unknown as { printed: string[] }).printed);
+const notice = (page: Page) => billPanel(page).getByRole('status');
+const payDialog = (page: Page) => page.getByRole('dialog');
+
+test('pay is refused while a price waits for an approval; exact cash prints S000001 and waits to sync', async ({
+  page,
+}) => {
+  await recordPrints(page);
+  await page.goto(POS);
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  // The bill from the last flow still has a bill discount waiting for an approval.
+  await expect(billPanel(page)).toContainText(pos.bill.billNeedsApproval);
+  await page.keyboard.press('F9');
+  await expect(billPanel(page)).toContainText(pos.pay.approveFirst);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await page.keyboard.press('Alt+C');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: new RegExp(`^${pos.clear.action}`) })
+    .click();
+  await addToBill(page, 'brpd001');
+  await page.keyboard.press('F9');
+  await expect(payDialog(page).getByTestId('pay-total')).toHaveText(/Rs\s4,500/);
+  // Enter with the field empty: the exact amount.
+  await payDialog(page).getByLabel(pos.pay.cashReceived).press('Enter');
+  await expect(notice(page)).toHaveText(/^Bill C\d+-S000001 printed · bring Rs\s4,500 to the cash desk$/);
+  await expect(page.getByText(pos.bill.empty)).toBeVisible();
+  await expect(page.getByRole('combobox')).toBeFocused();
+  const [bill] = await printed(page);
+  expect(bill).toContain(pos.print.saleBill);
+  expect(bill).toContain('BRPD001');
+  expect(bill).toContain(SALESMAN.fullName);
+  expect(bill).toMatch(/C\d+-S000001 4500/);
+  await expect(page.getByText('1 bill waiting to sync')).toBeVisible();
+});
+
+test('cash with change, typed and by quick cash; less than the total is refused', async ({ page }) => {
+  await recordPrints(page);
+  await page.goto(POS);
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await addToBill(page, 'fnbl001');
+  await page.keyboard.press('F9');
+  await answer(page, pos.pay.cashReceived, '1000');
+  await expect(payDialog(page).getByRole('alert')).toHaveText(pos.pay.lessThanTotal);
+  await payDialog(page).getByLabel(pos.pay.cashReceived).fill('2000');
+  await expect(payDialog(page).getByTestId('pay-change')).toHaveText(/Rs\s700/);
+  await payDialog(page).getByLabel(pos.pay.cashReceived).press('Enter');
+  await expect(notice(page)).toHaveText(
+    /S000002 printed · bring Rs\s1,300 to the cash desk, change Rs\s700$/,
+  );
+
+  await addToBill(page, 'brpd001');
+  await page.keyboard.press('F9');
+  await payDialog(page)
+    .getByRole('group', { name: pos.pay.quickCash })
+    .getByRole('button', { name: /Rs\s5,000/ })
+    .click();
+  await expect(notice(page)).toHaveText(
+    /S000003 printed · bring Rs\s4,500 to the cash desk, change Rs\s500$/,
+  );
+  expect(await printed(page)).toHaveLength(2);
+  await expect(page.getByText('3 bills waiting to sync')).toBeVisible();
+});
+
+test('Raast needs its reference; a split pays cash and JazzCash with cash received', async ({ page }) => {
+  await recordPrints(page);
+  await page.goto(POS);
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await addToBill(page, 'brpd001');
+  await billPanel(page)
+    .getByRole('group', { name: pos.pay.pad })
+    .getByRole('button', { name: 'Raast' })
+    .click();
+  await payDialog(page).getByLabel(pos.pay.reference.raast).press('Enter');
+  await expect(payDialog(page).getByRole('alert')).toHaveText(pos.tender.reference_required);
+  await answer(page, pos.pay.reference.raast, 'RST-5512');
+  await expect(notice(page)).toHaveText(/S000004 printed · paid by Raast$/);
+  expect((await printed(page))[0]).toContain('Raast · RST-5512');
+
+  await addToBill(page, 'brpd001');
+  await page.keyboard.press('Shift+F9');
+  const split = payDialog(page);
+  await split.getByLabel('Cash amount', { exact: true }).fill('2000');
+  await expect(split.getByTestId('split-left')).toHaveText(/Rs\s2,500 still to cover/);
+  await split.getByLabel('JazzCash amount', { exact: true }).fill('2500');
+  await split.getByLabel(`JazzCash: ${pos.pay.reference.jazzcash}`).fill('JC-88123');
+  await split.getByLabel(pos.pay.cashReceived).fill('5000');
+  await expect(split.getByTestId('split-left')).toHaveText(pos.pay.covered);
+  await expect(split.getByTestId('pay-change')).toHaveText(/Rs\s3,000/);
+  await split.getByLabel(pos.pay.cashReceived).press('Enter');
+  await expect(notice(page)).toHaveText(
+    /S000005 printed · bring Rs\s2,000 to the cash desk, change Rs\s3,000$/,
+  );
+  const bill = (await printed(page))[1];
+  expect(bill).toContain('JazzCash · JC-88123');
+  expect(bill).toMatch(/C\d+-S000005 2000/);
+});
+
+test('offline, numbering goes on after a reload, the bill prints, and Alt+P reprints it marked REPRINT', async ({
+  page,
+  context,
+}) => {
+  await recordPrints(page);
+  await page.goto(POS);
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await context.setOffline(true);
+  await page.reload();
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await addToBill(page, 'fnbl001');
+  await page.keyboard.press('F9');
+  await payDialog(page).getByLabel(pos.pay.cashReceived).press('Enter');
+  await expect(notice(page)).toHaveText(/S000006 printed/);
+  await expect(page.getByText('6 bills waiting to sync')).toBeVisible();
+
+  await page.keyboard.press('Alt+P');
+  const reprint = page.getByRole('dialog', { name: pos.reprint.title });
+  await expect(reprint.getByRole('option').first()).toContainText('S000006');
+  await reprint.getByLabel(pos.reprint.search).fill('000002');
+  await expect(reprint.getByRole('option')).toHaveCount(1);
+  await reprint.getByLabel(pos.reprint.search).press('Enter');
+  await expect(notice(page)).toHaveText(/S000002 reprinted$/);
+  const copy = (await printed(page))[1];
+  expect(copy).toMatch(new RegExp(`REPRINT · .* · ${SALESMAN.fullName}`));
+  expect(copy).toContain('FAN BELT CULTUS');
+  expect(copy).toMatch(/C\d+-S000002 1300/);
+  await context.setOffline(false);
 });

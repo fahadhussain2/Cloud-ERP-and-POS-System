@@ -10,6 +10,8 @@
 | **Size** | about 1.5 days of build, plus one hour at the shop |
 | **Test-first** | Yes: the Code 39 encoder and the bill-code format |
 
+> **Changed by D-093 (2026-10-27):** W1-01 now follows W1-06. The bill layout, the Code 39 encoder and silent printing are built and tested in W1-06 (`packages/print`, `apps/pos/src/print/`), so there is no `/print-test` page: what is left is the **shop hour**, printing real bills from a staging counter on the HP LaserJet P1005, timed, and scanning them with the cash-desk scanner. The rest of this plan is kept as the original proposal.
+
 ## Goal
 
 **Prove, on the real printer, that a browser-printed bill is fast enough and its barcode scans**, before we build checkout around it (PRD §5: printed before the salesman reaches the cash counter, about 15 s). If it isn't, we switch to the fallback (a small local print helper sending plain text, architecture §8) now, while it's cheap.

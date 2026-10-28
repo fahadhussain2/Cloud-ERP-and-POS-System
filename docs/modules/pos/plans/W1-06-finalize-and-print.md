@@ -66,9 +66,17 @@
 - [x] **Pull datasets (integration):** each returns only its listed columns (no `bank_account_id`); `device` returns only the caller's row; RLS keeps another tenant's rows out.
 - [x] **Local schema 5:** a schema-4 database with open bills, PIN events and outbox rows upgrades in place with every row kept.
 - [x] **Finalize transaction:** takes the next number, writes the document and outbox row and deletes the open bill together; a failure inside rolls all of it back and the number is not used; a second finalize of the same open bill returns the first result; the next bill takes the next number (the series lives in `local_series`, so a reload continues it; the reload itself is checked in the E2E).
-- [ ] **Payment popups (jsdom, fake counter):** Enter on an empty field = exact; quick cash finalizes in one click; Esc cancels and the bill is untouched; split shows what is still to cover; Enter and the main button do the same.
-- [ ] **The bill print (jsdom):** shows number, salesman, lines, totals, rounding, payments with references, cash received, change, policy line and the barcode text; REPRINT on a reprint; only i18n keys.
-- [ ] **E2E:** the flows in scope item 6.
+- [x] **Payment popups (jsdom, fake counter):** Enter on an empty field = exact; quick cash finalizes in one click; Esc cancels and the bill is untouched; split shows what is still to cover; Enter and the main button do the same.
+- [x] **The bill print (jsdom):** shows number, salesman, lines, totals, rounding, payments with references, cash received, change, policy line and the barcode text; REPRINT on a reprint; only i18n keys.
+- [x] **E2E:** the flows in scope item 6.
+
+## Build notes (2026-10-28)
+
+- **Domain:** two golden cases were added while reaching 100% coverage: a rounding increment that isn't positive is refused, and on account (for W1-09) settles without a reference. `cashChange` and `cashDue` from scope 1 became `settleTender`, which returns both with the settled payments.
+- **Contracts:** the checkout columns are `CHECKOUT_COLUMNS`, shared by the API and the counter like the catalog's.
+- **After a bill:** the message is a status line on the bill panel, kept until the next item is added, instead of a toast; no new UI package was needed.
+- **Header lines:** `branch.receipt_header` is a JSON object (empty for Delux), so the bill prints the branch's address and phone, then `receipt_header.lines` if set, then the profile's `headerLines` (spec §13).
+- **Worker errors** now keep a `DomainError`'s code across the worker, so a refused finalize shows its own message.
 
 ## Verify
 
