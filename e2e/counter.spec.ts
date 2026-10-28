@@ -485,7 +485,7 @@ const printed = (page: Page) => page.evaluate(() => (window as unknown as { prin
 const notice = (page: Page) => billPanel(page).getByRole('status');
 const payDialog = (page: Page) => page.getByRole('dialog');
 
-test('pay is refused while a price waits for an approval; exact cash prints S000001 and waits to sync', async ({
+test('pay is refused while a price waits for an approval; exact cash prints S000001 and reaches the server', async ({
   page,
 }) => {
   await recordPrints(page);
@@ -515,7 +515,8 @@ test('pay is refused while a price waits for an approval; exact cash prints S000
   expect(bill).toContain('BRPD001');
   expect(bill).toContain(SALESMAN.fullName);
   expect(bill).toMatch(/C\d+-S000001 4500/);
-  await expect(page.getByText('1 bill waiting to sync')).toBeVisible();
+  // Online, a finalized bill is pushed at once (SYN-02, W1-07): nothing is left waiting within seconds.
+  await expect(page.getByText('0 bills waiting to sync')).toBeVisible({ timeout: 5000 });
 });
 
 test('cash with change, typed and by quick cash; less than the total is refused', async ({ page }) => {
@@ -543,7 +544,8 @@ test('cash with change, typed and by quick cash; less than the total is refused'
     /S000003 printed · bring Rs\s4,500 to the cash desk, change Rs\s500$/,
   );
   expect(await printed(page)).toHaveLength(2);
-  await expect(page.getByText('3 bills waiting to sync')).toBeVisible();
+  // Online, both bills reach the server at once (SYN-02, W1-07).
+  await expect(page.getByText('0 bills waiting to sync')).toBeVisible({ timeout: 5000 });
 });
 
 test('Raast needs its reference; a split pays cash and JazzCash with cash received', async ({ page }) => {
@@ -578,6 +580,8 @@ test('Raast needs its reference; a split pays cash and JazzCash with cash receiv
   const bill = (await printed(page))[1];
   expect(bill).toContain('JazzCash · JC-88123');
   expect(bill).toMatch(/C\d+-S000005 2000/);
+  // Both reach the server before the next flow takes the counter offline.
+  await expect(page.getByText('0 bills waiting to sync')).toBeVisible({ timeout: 5000 });
 });
 
 test('offline, numbering goes on after a reload, the bill prints, and Alt+P reprints it marked REPRINT', async ({
@@ -596,7 +600,8 @@ test('offline, numbering goes on after a reload, the bill prints, and Alt+P repr
   await page.keyboard.press('F9');
   await payDialog(page).getByLabel(pos.pay.cashReceived).press('Enter');
   await expect(notice(page)).toHaveText(/S000006 printed/);
-  await expect(page.getByText('6 bills waiting to sync')).toBeVisible();
+  // Offline it waits; the five bills before it reached the server while online (W1-07).
+  await expect(page.getByText('1 bill waiting to sync')).toBeVisible();
 
   await page.keyboard.press('Alt+P');
   const reprint = page.getByRole('dialog', { name: pos.reprint.title });

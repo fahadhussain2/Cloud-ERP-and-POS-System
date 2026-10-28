@@ -65,11 +65,11 @@
 - [x] **SSE (integration):** a stream opened with a device token gets `changes-available` after a change to `item_prices` in its tenant, not after one in another tenant; a revoked token is refused.
 - [x] **Counter push loop (unit, fake API):** batches of 100 in seq order; `accepted` and `duplicate` delete the outbox row and raise `pushed_through`; `rejected` quarantines and the loop carries on; offline and 5xx back off with growing delays and a finalize retries at once; an unsigned row is signed before sending; a 401 renews the token once; `series` with a lower `through` or missing ranges puts those documents back from `local_documents`, never older than 30 days.
 - [x] **Local schema 6:** a schema-5 database with open bills, outbox rows, PIN events and reprints upgrades in place with every row kept; pruning removes a 31-day-old document but never one still in the outbox.
-- [ ] **Offline warnings (jsdom; the levels at 8 and 48 hours and the tenant’s thresholds are already unit-tested in `sync/offline.test.ts` and `db/repo.test.ts`):** nothing before 8 h since the last contact; the warning at 8 h; the strong one at 48 h; the thresholds come from the tenant; the bill can still be finalized.
-- [ ] **Device health screen (jsdom, fake counter):** shows versions, storage, last push and pull, waiting and quarantined bills; *Try again* asks for a manager PIN; only i18n keys.
+- [x] **Offline warnings (jsdom; the levels at 8 and 48 hours and the tenant’s thresholds are already unit-tested in `sync/offline.test.ts` and `db/repo.test.ts`):** nothing before 8 h since the last contact; the warning at 8 h; the strong one at 48 h; the thresholds come from the tenant; the bill can still be finalized.
+- [x] **Device health screen (jsdom, fake counter):** shows versions, storage, last push and pull, waiting and quarantined bills; *Try again* asks for a manager PIN; only i18n keys.
 - [ ] **E2E:** the flows in scope item 8.
 
-The three left open (the banner, the health screen, the E2E) are written with the screens during the build, as in W1-06.
+The E2E flows of scope item 8 are written next; the existing flows were updated in the counter build (below).
 
 ## Build notes (2026-10-28)
 
@@ -80,6 +80,9 @@ The three left open (the banner, the health screen, the E2E) are written with th
 - **Clock skew** is recorded with the device's health, once per device and business day, not in each document's result.
 - **Audit events** use the existing entity names (`users`, `sales_documents`), with the counter's time as `at`.
 - **The change feed** (`createChangeFeed` in `packages/db`) opens its `LISTEN` connection with the first stream and reconnects after 5 s if it drops; the stream closes after 15 minutes, the token's life.
+- **The counter (2026-10-28):** the push scheduler lives in the app shell: a push at start-up (the handshake), after every finalize, on reconnect and with the minute timer, which also pulls (every 5 minutes instead while the SSE nudge is up). The health page is a dialog over any screen (the sync figures in the status bar, or `Alt+S`); *Try again* uses the approval PIN check with `admin.devices` (`checkManager`). A revoked counter shows its own stop screen with the bills it still holds; *Check again* reloads.
+- **The device token is fetched once for callers asking together:** pull, push and the SSE stream start at the same moment, and three challenges per start hit the 30-a-minute limit in the E2E run. A busy (429) or failing (5xx) token call is now treated like being offline (retried), not as a refusal.
+- **Existing E2E flows changed:** online bills now reach the server at once, so two assertions of *N bills waiting to sync* became *0* (within 5 s), the Raast and split flow waits for its bills too, and the offline flow now expects 1, its own bill. Not yet checked in a real browser: that `Alt+S` reaches the page in the installed app.
 
 ## Verify
 
