@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#52](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/52) |
 | **Module** | sync (the server re-check in `packages/domain`, the push contract in `packages/contracts`, the server side in `apps/api` and `packages/db`, the counter side in `apps/pos`, the health columns in `apps/backoffice`) |
-| **Status** | Accepted (2026-10-28), with the owner answers below |
+| **Status** | Done (2026-10-29): built in PR #81, merged to staging; verified below |
 | **Refs** | SYN-02, SYN-03, SYN-04 (nudge), SYN-05, SYN-06, PLT-09, POS-14; PRD §5 (0 lost bills, ≤ 2 min to sync a day), W15; architecture §4.2–§4.4, §4.6, §5, §11.2–§11.6; data model §5, §10, §12; sync spec §1, §4, §5, §6; POS spec §4, §7, §12, §13; platform spec §2–§4; CLAUDE.md rules 1–9; D-002, D-009, D-010, D-011, D-042, D-047, D-082, D-089, D-093 |
 | **Depends on** | W1-06 (the sale document, the outbox row and its signature), W1-04 (`pin_events`), W0-10 (device tokens, `signCanonical`) |
 | **Size** | about 4 days (tight: see Risks) |
@@ -92,6 +92,12 @@ Every test in this list is written and passing (build notes below).
 1. `pnpm check`, `pnpm test:integration` and `pnpm e2e`, output shown.
 2. **On your PC, with the real catalog** (local API, built POS in Edge): a bill online, timed from Enter to the row in `sales_documents` (target ≤ 5 s, architecture §4.6); **one day of bills offline** (200 generated bills through the worker), then online, timed until the outbox is empty (target ≤ 2 minutes, PRD §5); a price change in the back office seen on the counter through SSE, timed; a simulated restore (the device's sales rows deleted), then everything back. Results go into this plan.
 3. **On staging:** a bill from a staging counter appears on the server; the Counters screen shows the counter's health; SSE works through Caddy (the stream stays open past 60 s).
+
+**Results (2026-10-29):**
+
+- **1:** on PR #81: `pnpm check` (1,000 unit tests), `pnpm test:integration` (177), `pnpm e2e` (25 flows, run twice in Edge), and CI green on the final commit.
+- **2 and 3:** checked by the owner by hand on staging and on their PC: bills reach the server on their own online, offline bills sync when the network returns, changes reach the counter through SSE, the health page and the Counters columns, revoke and Re-enable. All working. **The timings were not measured** (Enter to the server ≤ 5 s, a day of bills ≤ 2 minutes); the E2E flows see a bill arrive within 5 s on a local server. Measure them in the pilot's first days.
+- The simulated restore was checked by the E2E flow only, not by hand.
 
 ## Risks
 
