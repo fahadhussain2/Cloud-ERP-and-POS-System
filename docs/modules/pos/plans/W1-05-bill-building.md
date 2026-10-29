@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#50](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/50) |
 | **Module** | pos (rules in `packages/domain`) |
-| **Status** | Accepted (2026-10-27), with the owner answers below |
+| **Status** | Done (2026-10-29): built in PR #74 (the E2E race fixed in #75), merged to staging; verified below |
 | **Refs** | POS-03, POS-04, PLT-07; PRD §4 (role limits), W1, W15; data model §5, §12; POS spec §5, §6, §8, §9; D-004, D-011, D-051, D-053, D-056, D-089, D-091; PRD Q2 (floor = cost + 5%) |
 | **Depends on** | W1-03 (catalog, prices, search, `packages/ui`), W1-04 (manager PIN check on the counter) |
 | **Size** | about 3 days |
@@ -96,6 +96,8 @@
 1. `pnpm check`, `pnpm test:integration` and `pnpm e2e`, output shown.
 2. **On your PC, with the real catalog** (local API, built POS in Edge): a 15-line bill from the keyboard only; key press to line added under 100 ms; a below-floor approval with a manager's PIN; lock, unlock, reload, and the bill is still there; offline the same. Timings go into this plan.
 3. **On staging:** the same bill on the seeded catalog, in Chrome.
+
+- **Staging (Verify 3):** checked by the owner by hand while testing W1-06 and W1-07. All working.
 
 ## Risks
 
