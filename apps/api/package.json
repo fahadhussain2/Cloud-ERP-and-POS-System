@@ -35,6 +35,7 @@
     "@erp/db": "workspace:*",
     "@erp/domain": "workspace:*",
     "@erp/observability": "workspace:*",
+    "@erp/posting": "workspace:*",
     "@types/pg": "catalog:",
     "tsup": "catalog:",
     "tsx": "catalog:",

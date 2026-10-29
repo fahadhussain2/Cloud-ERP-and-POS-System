@@ -22,6 +22,9 @@ export interface SetupReport {
   tenantId: string;
   /** What this run created, e.g. `account 1150`. Empty when nothing was missing. */
   created: string[];
+  /** Settings this run changed to match the spec: only a payment method's bank account (W1-08), e.g.
+   * `payment method raast bank account: hbl → soneri`. */
+  updated: string[];
   /** Spec values that differ from the database, which were left as they are. */
   drift: string[];
   /** Setup that's still incomplete, e.g. a payment method without an account. */
@@ -499,7 +502,7 @@ export async function setupTenant(
     const needsAttention = unmapped.rows.map((r) => `payment method ${r.code} has no account yet`);
 
     await c.query('COMMIT');
-    return { tenantId, created, drift, needsAttention };
+    return { tenantId, created, updated: [], drift, needsAttention };
   } catch (err) {
     await c.query('ROLLBACK').catch(() => undefined);
     throw err;
