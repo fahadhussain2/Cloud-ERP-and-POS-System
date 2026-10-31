@@ -112,6 +112,29 @@ export const CUSTOMER_COLUMNS = {
 export type CustomerDataset = keyof typeof CUSTOMER_COLUMNS;
 export const CUSTOMER_DATASETS = Object.keys(CUSTOMER_COLUMNS) as CustomerDataset[];
 
+/**
+ * The cash desk's live queue (sync spec §3, CSH-02, W1-10): the branch's bills with cash to take in or pay out,
+ * pulled only by cash desks. No lines, customer or payload.
+ */
+export const CASH_DESK_COLUMNS = {
+  cash_queue: {
+    id: 'text',
+    number: 'text',
+    device_id: 'text',
+    salesperson_user_id: 'text',
+    created_at_device: 'text',
+    business_date: 'text',
+    cash_due: 'money',
+    cash_received: 'money',
+    change_due: 'money',
+    handover_status: 'text',
+    status: 'text',
+  },
+} as const satisfies Record<string, Record<string, ColumnType>>;
+
+export type CashDeskDataset = keyof typeof CASH_DESK_COLUMNS;
+export const CASH_DESK_DATASETS = Object.keys(CASH_DESK_COLUMNS) as CashDeskDataset[];
+
 export const PULL_DATASETS = [
   'tenant',
   'branch',
@@ -121,9 +144,18 @@ export const PULL_DATASETS = [
   ...(Object.keys(CATALOG_COLUMNS) as CatalogDataset[]),
   ...(Object.keys(CHECKOUT_COLUMNS) as CheckoutDataset[]),
   ...(Object.keys(CUSTOMER_COLUMNS) as CustomerDataset[]),
+  ...(Object.keys(CASH_DESK_COLUMNS) as CashDeskDataset[]),
 ] as const;
 export type PullDataset =
-  'tenant' | 'branch' | 'users' | 'roles' | 'user_roles' | CatalogDataset | CheckoutDataset | CustomerDataset;
+  | 'tenant'
+  | 'branch'
+  | 'users'
+  | 'roles'
+  | 'user_roles'
+  | CatalogDataset
+  | CheckoutDataset
+  | CustomerDataset
+  | CashDeskDataset;
 
 export const PULL_LIMIT_DEFAULT = 500;
 export const PULL_LIMIT_MAX = 1000;

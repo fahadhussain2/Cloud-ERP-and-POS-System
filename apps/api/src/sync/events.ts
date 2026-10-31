@@ -1,10 +1,11 @@
 import { SYNC_EVENTS } from '@erp/contracts';
-import type { ChangeFeed } from '@erp/db';
+import { queueKey, type ChangeFeed } from '@erp/db';
 import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 
 // The SSE nudge (sync spec §8, SYN-04, W1-07): `GET /api/sync/events` with the device token streams
 // `changes-available` after any commit to a pulled table of the device's tenant; the counter then pulls. The stream
-// ends when the 15-minute device token would, and the counter reconnects with a new one. W1-10 adds `queue-changed`.
+// ends when the 15-minute device token would, and the counter reconnects with a new one. A cash desk also gets
+// `queue-changed` after a change to its branch's bills with cash to move, and pulls its queue (W1-10).
 
 interface Deps {
   feed: ChangeFeed;
@@ -37,15 +38,21 @@ export function registerEvents(scope: FastifyInstance, { feed, requireDevice }: 
     });
     // The opening comment tells the counter it is connected.
     res.write(': connected\n\n');
-    const unsubscribe = feed.subscribe(d.tenantId, () =>
-      res.write(`event: ${SYNC_EVENTS.changesAvailable}\ndata: {}\n\n`),
-    );
+    const unsubscribe = [
+      feed.subscribe(d.tenantId, () => res.write(`event: ${SYNC_EVENTS.changesAvailable}\ndata: {}\n\n`)),
+    ];
+    if (d.kind === 'cash_desk')
+      unsubscribe.push(
+        feed.subscribe(queueKey(d.tenantId, d.branchId), () =>
+          res.write(`event: ${SYNC_EVENTS.queueChanged}\ndata: {}\n\n`),
+        ),
+      );
     const keepAlive = setInterval(() => res.write(': keep-alive\n\n'), KEEP_ALIVE_MS);
     const end = () => {
       if (!open.delete(end)) return;
       clearInterval(keepAlive);
       clearTimeout(expiry);
-      unsubscribe();
+      for (const u of unsubscribe) u();
       res.end();
     };
     const expiry = setTimeout(end, STREAM_MS);

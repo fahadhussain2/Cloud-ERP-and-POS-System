@@ -1,4 +1,5 @@
 import {
+  CASH_DESK_COLUMNS,
   CATALOG_COLUMNS,
   CHECKOUT_COLUMNS,
   CounterPinChangeRequest,
@@ -9,6 +10,7 @@ import {
   PULL_LIMIT_MAX,
   TemporaryPinRequest,
   verifyPin,
+  type CashDeskDataset,
   type CatalogDataset,
   type CheckoutDataset,
   type CustomerDataset,
@@ -24,7 +26,8 @@ import { mayGivePin } from '../admin/users';
 import { requirePermission } from '../auth/routes';
 import { recordPull } from './push';
 
-// Counter sync (sync spec v1, W1-02, W1-03, W1-06, W1-09, D-089): pull with per-dataset column lists, and the counter PIN change.
+// Counter sync (sync spec v1, W1-02, W1-03, W1-06, W1-09, W1-10, D-089): pull with per-dataset column lists, and the
+// counter PIN change.
 
 interface Deps {
   pool: pg.Pool;
@@ -36,6 +39,10 @@ interface Deps {
 const isCatalog = (d: PullDataset): d is CatalogDataset => d in CATALOG_COLUMNS;
 const isCheckout = (d: PullDataset): d is CheckoutDataset => d in CHECKOUT_COLUMNS;
 const isCustomer = (d: PullDataset): d is CustomerDataset => d in CUSTOMER_COLUMNS;
+const isCashDesk = (d: PullDataset): d is CashDeskDataset => d in CASH_DESK_COLUMNS;
+
+/** How far back the queue sends bills already handed over (sync spec §3). */
+const CASH_QUEUE_DAYS = 7;
 
 /** Customers (W1-09): only parties with a live customer account, and only customer balances. */
 const CUSTOMER_SOURCES: Record<CustomerDataset, Omit<PullSource, 'columns'>> = {
@@ -68,6 +75,16 @@ function datasetSource(dataset: PullDataset, branchId: string, deviceId: string)
       columns: [...Object.keys(CUSTOMER_COLUMNS[dataset]), 'row_version', 'deleted_at'],
     };
   switch (dataset) {
+    // The cash desk's queue (W1-10): the branch's bills with cash to move, pending or of the last 7 days, so a received
+    // bill comes once more with its new status and the first pull stays small.
+    case 'cash_queue':
+      return {
+        table: 'sales_documents',
+        columns: [...Object.keys(CASH_DESK_COLUMNS.cash_queue), 'row_version', 'deleted_at'],
+        where: `branch_id = $4 AND cash_due <> 0
+                AND (handover_status = 'pending' OR received_at > now() - interval '${CASH_QUEUE_DAYS} days')`,
+        params: [branchId],
+      };
     case 'tenant':
       return {
         table: 'tenants',
@@ -176,6 +193,9 @@ export function registerSync(scope: FastifyInstance, { pool, now, requireAuth, r
       const datasets = (req.query.datasets ?? '').split(',').filter(Boolean);
       if (datasets.length === 0 || !datasets.every((x) => (PULL_DATASETS as readonly string[]).includes(x)))
         return reply.code(400).send({ error: 'unknown_dataset' });
+      // Bills with cash to move go only to the branch's cash desks (W1-10); a counter has no use for them.
+      if (d.kind !== 'cash_desk' && (datasets as PullDataset[]).some(isCashDesk))
+        return reply.code(403).send({ error: 'not_cash_desk' });
       const limit = req.query.limit === undefined ? PULL_LIMIT_DEFAULT : Number(req.query.limit);
       if (!Number.isInteger(limit) || limit < 1 || limit > PULL_LIMIT_MAX)
         return reply.code(400).send({ error: 'bad_limit' });

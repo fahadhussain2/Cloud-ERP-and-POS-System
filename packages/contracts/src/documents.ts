@@ -145,3 +145,71 @@ export const SaleDocumentV1 = z
     message: 'a walk-in phone only goes on a walk-in bill',
   });
 export type SaleDocumentV1 = z.infer<typeof SaleDocumentV1>;
+
+// The cash desk's documents (W1-10, cash desk spec): a handover or refund payout (family H) and a session's open or
+// close (family Z). What `buildHandoverDocument` and `buildSessionDocument` in `@erp/domain` make.
+const DESK_NUMBER = { H: /^[A-Z]\d{2,}-H\d{6,}$/, Z: /^[A-Z]\d{2,}-Z\d{6,}$/ } as const;
+const DeskNumber = (family: 'H' | 'Z') => z.string().regex(DESK_NUMBER[family]);
+const BillNumber = z.string().regex(/^[A-Z]\d{2,}-S\d{6,}$/);
+
+/** A cash handover in, or a refund paid out: its own document; the sale is never touched (rule 3). */
+export const CashHandoverV1 = z
+  .strictObject({
+    version: z.literal(1),
+    id: z.uuid(),
+    family: z.literal('H'),
+    seq: z.int().positive(),
+    number: DeskNumber('H'),
+    kind: z.enum(['in', 'payout']),
+    deviceId: z.uuid(),
+    branchId: z.uuid(),
+    sessionId: z.uuid(),
+    cashierId: z.uuid(),
+    billNumber: BillNumber,
+    /** null when the desk knew the bill only from its scanned code. */
+    saleDocumentId: z.uuid().nullable(),
+    /** The posted figure: the cash due, or the refund, as a positive amount. */
+    amount: z.int().positive(),
+    cashReceived: NonNegativeMoney.nullable(),
+    changeGiven: NonNegativeMoney.nullable(),
+    correctedFrom: NonNegativeMoney.nullable(),
+    method: z.enum(['queue', 'scan', 'auto']),
+    createdAt: Instant,
+    businessDate: z.iso.date(),
+    clientVersion: z.string().min(1),
+  })
+  .refine(
+    (d) => d.kind === 'in' || (d.cashReceived === null && d.changeGiven === null && d.correctedFrom === null),
+    {
+      message: 'a payout records no cash received, change or correction',
+    },
+  );
+export type CashHandoverV1 = z.infer<typeof CashHandoverV1>;
+
+/** A cash session's open (with its float) or close (with the expected cash, not a count, until W1-11). */
+export const CashSessionV1 = z
+  .strictObject({
+    version: z.literal(1),
+    id: z.uuid(),
+    family: z.literal('Z'),
+    seq: z.int().positive(),
+    number: DeskNumber('Z'),
+    event: z.enum(['open', 'close']),
+    sessionId: z.uuid(),
+    deviceId: z.uuid(),
+    branchId: z.uuid(),
+    userId: z.uuid(),
+    openingFloat: NonNegativeMoney.nullable(),
+    expectedCash: Money.nullable(),
+    createdAt: Instant,
+    businessDate: z.iso.date(),
+    clientVersion: z.string().min(1),
+  })
+  .refine(
+    (d) =>
+      d.event === 'open'
+        ? d.openingFloat !== null && d.expectedCash === null && d.sessionId === d.id
+        : d.openingFloat === null && d.expectedCash !== null && d.sessionId !== d.id,
+    { message: 'an open carries its float and is its own session; a close carries the expected cash' },
+  );
+export type CashSessionV1 = z.infer<typeof CashSessionV1>;

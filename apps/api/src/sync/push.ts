@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 
 import {
   canonicalJson,
+  CashHandoverV1,
+  CashSessionV1,
   fromBase64Url,
   PushRequestSchema,
   SaleDocumentV1,
@@ -22,9 +24,14 @@ import {
   money,
   onAccountAmount,
   reviewCredit,
+  reviewHandover,
   reviewSale,
+  type CashHandoverDocument,
+  type CashSessionDocument,
   type CreditAccount,
   type CreditFinding,
+  type DeviceKind,
+  type HandoverFinding,
   type PaymentMethodCode,
   type PaymentMethodInfo,
   type RoleGrant,
@@ -39,8 +46,10 @@ import type pg from 'pg';
 // Push (sync spec §6.2–§7, SYN-02, SYN-03, SYN-05, PLT-09, W1-07). Each document in its own transaction: claim its id
 // in sync_inbox → check it can be trusted and stored (else rejected, kept for a retry) → re-check the rules with
 // reviewSale (and a sale on account with reviewCredit, W1-09) and store it with its exceptions (never refused on
-// business rules, D-011) → the device's series and gaps. Then the audit events and the device's health. An accepted sale is posted in its own transaction (W1-08,
-// architecture §5.2 step 4); one that can't be posted is still accepted and flagged `posting_failed`.
+// business rules, D-011) → the device's series and gaps. Then the audit events and the device's health. An accepted
+// sale is posted in its own transaction (W1-08, architecture §5.2 step 4); one that can't be posted is still accepted
+// and flagged `posting_failed`. A cash desk also pushes its handovers (H) and its sessions' open and close (Z, W1-10):
+// a handover is linked to its bill by number, now or when the bill arrives, reviewed with reviewHandover and posted.
 
 interface Deps {
   pool: pg.Pool;
@@ -52,8 +61,15 @@ interface Device {
   tenantId: string;
   deviceId: string;
   code: string;
+  kind: DeviceKind;
   branchId: string;
 }
+
+/** A pushed document that can be trusted and stored, by family. */
+type Trusted =
+  | { family: 'S'; doc: SaleDocument }
+  | { family: 'H'; doc: CashHandoverDocument }
+  | { family: 'Z'; doc: CashSessionDocument };
 
 /** What every document of one push is checked against, read once per push. */
 interface Setting {
@@ -80,7 +96,10 @@ const SEVERITY: Partial<Record<ExceptionKind, 'low' | 'medium' | 'high'>> = {
   discount_over_limit: 'medium',
   credit_limit_exceeded: 'medium',
   offline_cap_exceeded: 'medium',
+  handover_amount_mismatch: 'medium',
+  duplicate_handover: 'medium',
   seq_gap: 'medium',
+  handover_not_permitted: 'low',
   clock_skew: 'low',
 };
 
@@ -98,7 +117,13 @@ export function registerPush(scope: FastifyInstance, { pool, now, requireDevice 
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
     const body = parsed.data;
     const d = req.device!;
-    const device: Device = { tenantId: d.tenantId, deviceId: d.deviceId, code: d.code, branchId: d.branchId };
+    const device: Device = {
+      tenantId: d.tenantId,
+      deviceId: d.deviceId,
+      code: d.code,
+      kind: d.kind,
+      branchId: d.branchId,
+    };
     const received = now();
     const ctx = { tenantId: d.tenantId, deviceId: d.deviceId, requestId: req.id };
     const setting = await withTenant(pool, ctx, (_db, c) => loadSetting(c, device));
@@ -235,16 +260,22 @@ async function pushOne(
   let posting: PostOutcome | null = null;
   let postingMs: number | null = null;
   try {
-    const document = await trusted(c, device, s, doc);
-    result = await accept(c, device, s, document, doc, received);
-    const started = performance.now();
-    posting = await postDocument(c, {
-      tenantId: device.tenantId,
-      type: 'sale',
-      id: document.id,
-      now: received,
-    });
-    postingMs = Math.round(performance.now() - started);
+    const t = await trusted(c, device, s, doc);
+    let post: 'sale' | 'cash_handover' | null = null;
+    if (t.family === 'S') {
+      result = await accept(c, device, s, t.doc, doc, received);
+      post = 'sale';
+    } else if (t.family === 'H') {
+      const stored = await acceptHandover(c, device, t.doc, doc, received);
+      result = stored.result;
+      // A duplicate is kept for review and never posted (it would count the cash twice).
+      if (!stored.duplicate) post = 'cash_handover';
+    } else result = await acceptSession(c, device, t.doc, doc);
+    if (post !== null) {
+      const started = performance.now();
+      posting = await postDocument(c, { tenantId: device.tenantId, type: post, id: doc.id, now: received });
+      postingMs = Math.round(performance.now() - started);
+    }
   } catch (err) {
     if (!(err instanceof Rejected)) throw err;
     const exceptions: ExceptionKind[] = err.code === 'bad_signature' ? ['bad_signature'] : [];
@@ -268,12 +299,7 @@ async function pushOne(
 }
 
 /** The reasons a document can't be trusted or stored (sync spec §6.2); anything else is accepted. */
-async function trusted(
-  c: pg.ClientBase,
-  device: Device,
-  s: Setting,
-  doc: PushDocument,
-): Promise<SaleDocument> {
+async function trusted(c: pg.ClientBase, device: Device, s: Setting, doc: PushDocument): Promise<Trusted> {
   if (doc.signature === null) throw new Rejected('unsigned');
   // A document is verified with the key of the device it names (platform spec §3). A device pushes only its own
   // (a re-enrolled PC carrying old ones is not built, owner answer 3), so one well signed by another is wrong_device.
@@ -289,6 +315,10 @@ async function trusted(
     throw new Rejected(genuine ? 'wrong_device' : 'bad_signature');
   }
   if (!(await verifyCanonical(s.publicKey, doc.payload, doc.signature))) throw new Rejected('bad_signature');
+  if (doc.family === 'H') return { family: 'H', doc: await trustedHandover(c, device, doc) };
+  if (doc.family === 'Z') return { family: 'Z', doc: await trustedSession(c, device, doc) };
+  // Collections (R) and cash movements (M) come with W1-11.
+  if (doc.family !== 'S') throw new Rejected('bad_schema');
   const parsed = SaleDocumentV1.safeParse(doc.payload);
   if (!parsed.success) throw new Rejected('bad_schema');
   const d = parsed.data as unknown as SaleDocument;
@@ -320,7 +350,63 @@ async function trusted(
     [device.deviceId, d.seq, d.id],
   );
   if (taken.rowCount !== 0) throw new Rejected('seq_conflict');
-  return d;
+  return { family: 'S', doc: d };
+}
+
+/** The same id, seq and family as its outbox row, from this device and branch: else refused like a sale. */
+function sameRow(
+  d: { id: string; seq: number; deviceId: string; branchId: string },
+  doc: PushDocument,
+  device: Device,
+) {
+  if (d.id !== doc.id || d.seq !== doc.seq) throw new Rejected('bad_schema');
+  // Only a cash desk keeps a drawer (W1-10); its documents name it and its branch.
+  if (device.kind !== 'cash_desk' || d.deviceId !== device.deviceId || d.branchId !== device.branchId)
+    throw new Rejected('wrong_device');
+}
+
+/** Another accepted document already holds this device's seq in the family. */
+async function seqTaken(c: pg.ClientBase, device: Device, doc: PushDocument) {
+  const taken = await c.query(
+    `SELECT 1 FROM erp.sync_inbox WHERE device_id = $1 AND family = $2 AND seq = $3 AND document_id <> $4
+       AND status = 'accepted'`,
+    [device.deviceId, doc.family, doc.seq, doc.id],
+  );
+  if (taken.rowCount !== 0) throw new Rejected('seq_conflict');
+}
+
+async function trustedHandover(c: pg.ClientBase, device: Device, doc: PushDocument) {
+  const parsed = CashHandoverV1.safeParse(doc.payload);
+  if (!parsed.success) throw new Rejected('bad_schema');
+  const h = parsed.data as unknown as CashHandoverDocument;
+  sameRow(h, doc, device);
+  // The bill it names, when the desk knew it, must be this tenant's (RLS keeps other tenants' out).
+  const known = await c.query<{ users: number; bill: number }>(
+    `SELECT (SELECT count(*)::int FROM erp.users WHERE id = $1) AS users,
+            (SELECT count(*)::int FROM erp.sales_documents WHERE id = $2) AS bill`,
+    [h.cashierId, h.saleDocumentId],
+  );
+  const k = known.rows[0]!;
+  if (k.users !== 1 || (h.saleDocumentId !== null && k.bill !== 1)) throw new Rejected('unknown_reference');
+  await seqTaken(c, device, doc);
+  return h;
+}
+
+async function trustedSession(c: pg.ClientBase, device: Device, doc: PushDocument) {
+  const parsed = CashSessionV1.safeParse(doc.payload);
+  if (!parsed.success) throw new Rejected('bad_schema');
+  const z = parsed.data as unknown as CashSessionDocument;
+  sameRow(z, doc, device);
+  const known = await c.query<{ users: number; session: number }>(
+    `SELECT (SELECT count(*)::int FROM erp.users WHERE id = $1) AS users,
+            (SELECT count(*)::int FROM erp.cash_sessions WHERE id = $2 AND device_id = $3) AS session`,
+    [z.userId, z.sessionId, device.deviceId],
+  );
+  const k = known.rows[0]!;
+  // A close names this desk's session; the desk pushes the open first (its outbox is in creation order).
+  if (k.users !== 1 || (z.event === 'close' && k.session !== 1)) throw new Rejected('unknown_reference');
+  await seqTaken(c, device, doc);
+  return z;
 }
 
 async function grantsOf(c: pg.ClientBase, userIds: string[]): Promise<Record<string, RoleGrant[]>> {
@@ -373,14 +459,15 @@ async function accept(
   for (const { kind, ...figures } of credit)
     exceptions.push({ kind, details: { ...figures, counter: d.credit ?? null } });
   if (whileRevoked) exceptions.push({ kind: 'revoked_device_doc', details: { revokedAt: s.lastRevokedAt } });
+  const cash = d.payments.find((p) => p.method === 'cash');
 
   await c.query(
     `INSERT INTO erp.sales_documents (id, tenant_id, branch_id, device_id, number, seq, kind, business_date,
        created_at_device, received_at, salesperson_user_id, customer_party_id, walkin_phone, price_tier_id, subtotal,
        line_discount_total, bill_discount, rounding, tax_total, total, cash_due, handover_status, payload, payload_hash,
-       signature, client_version, exception_count)
+       signature, client_version, exception_count, cash_received, change_due)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
-       $24, $25, $26, $27)`,
+       $24, $25, $26, $27, $28, $29)`,
     [
       d.id,
       device.tenantId,
@@ -409,6 +496,9 @@ async function accept(
       Buffer.from(fromBase64Url(doc.signature!)),
       d.clientVersion,
       exceptions.length,
+      // What the cash desk's queue shows (W1-10): the salesman's cash received and the change.
+      cash?.cashReceived ?? null,
+      cash?.changeDue ?? null,
     ],
   );
   // Each line says which tax code applied, at 0% for now (ACC-09): the item's own, or the tenant's default.
@@ -486,12 +576,208 @@ async function accept(
       businessDate: d.businessDate,
       details: e.details,
     });
+  await linkWaitingHandovers(c, device.tenantId, d);
   return {
     id: d.id,
     status: 'accepted',
     exceptions: [...new Set(exceptions.map((e) => e.kind))],
     error: null,
   };
+}
+
+/** The bill's new status once a handover of the right direction is linked to it (data model §5). */
+function settledStatus(h: { kind: 'in' | 'payout' }, cashDue: number): 'received' | 'paid_out' | null {
+  if (h.kind === 'in' && cashDue > 0) return 'received';
+  if (h.kind === 'payout' && cashDue < 0) return 'paid_out';
+  return null;
+}
+
+/**
+ * Handovers the desk recorded from the bill's code before the bill arrived (an offline scan, PRD W4): linked now, the
+ * bill marked received, and the amount compared (D-059). They were posted at their own arrival.
+ */
+async function linkWaitingHandovers(c: pg.ClientBase, tenantId: string, bill: SaleDocument) {
+  const { rows } = await c.query<{
+    id: string;
+    device_id: string;
+    payload: CashHandoverDocument;
+    duplicate_of_id: string | null;
+  }>(
+    `SELECT id, device_id, payload, duplicate_of_id FROM erp.cash_handovers
+     WHERE bill_number = $1 AND sales_document_id IS NULL ORDER BY received_at, id`,
+    [bill.number],
+  );
+  for (const h of rows) {
+    await c.query('UPDATE erp.cash_handovers SET sales_document_id = $2 WHERE id = $1', [h.id, bill.id]);
+    if (h.duplicate_of_id !== null) continue;
+    const status = settledStatus(h.payload, bill.cashDue);
+    if (status !== null)
+      await c.query(
+        `UPDATE erp.sales_documents SET handover_status = $2 WHERE id = $1 AND handover_status = 'pending'`,
+        [bill.id, status],
+      );
+    // Only the amount is new now: the permission was judged when the handover itself arrived.
+    const mismatch = reviewHandover(h.payload, {
+      bill: { id: bill.id, cashDue: money(bill.cashDue) },
+      existing: null,
+      grants: [],
+      branchId: bill.branchId,
+    }).filter((f) => f.kind === 'handover_amount_mismatch');
+    for (const f of mismatch)
+      await addHandoverException(c, { tenantId, deviceId: h.device_id }, h.payload, f);
+  }
+}
+
+/**
+ * Stores a pushed handover (data model §6) with its findings: linked to its bill when the bill is here (and the bill
+ * marked received or paid out), else waiting for it by number. A second one for the bill is kept as a duplicate.
+ */
+async function acceptHandover(
+  c: pg.ClientBase,
+  device: Device,
+  h: CashHandoverDocument,
+  doc: PushDocument,
+  received: Date,
+): Promise<{ result: PushResult; duplicate: boolean }> {
+  const bill = (
+    await c.query<{ id: string; cash_due: string }>(
+      'SELECT id, cash_due FROM erp.sales_documents WHERE number = $1 ORDER BY received_at, id LIMIT 1',
+      [h.billNumber],
+    )
+  ).rows[0];
+  // The row lock makes a second desk's handover of the bill wait for the first one's transaction.
+  const existing = (
+    await c.query<{ id: string; number: string }>(
+      `SELECT id, number FROM erp.cash_handovers
+       WHERE bill_number = $1 AND kind = $2 AND duplicate_of_id IS NULL AND id <> $3 FOR UPDATE`,
+      [h.billNumber, h.kind, h.id],
+    )
+  ).rows[0];
+  const grants = await grantsOf(c, [h.cashierId]);
+  const findings = reviewHandover(h, {
+    bill: bill ? { id: bill.id, cashDue: money(bill.cash_due) } : null,
+    existing: existing ?? null,
+    grants: grants[h.cashierId] ?? [],
+    branchId: h.branchId,
+  });
+  await c.query(
+    `INSERT INTO erp.cash_handovers (id, tenant_id, branch_id, device_id, number, seq, session_id, sales_document_id,
+       bill_number, kind, amount, received_amount, change_given, corrected_from, method, cashier_user_id, at_device,
+       business_date, received_at, duplicate_of_id, payload, payload_hash, signature, client_version, exception_count)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
+       $24, $25)`,
+    [
+      h.id,
+      device.tenantId,
+      h.branchId,
+      h.deviceId,
+      h.number,
+      h.seq,
+      h.sessionId,
+      bill?.id ?? null,
+      h.billNumber,
+      h.kind,
+      h.amount,
+      h.cashReceived,
+      h.changeGiven,
+      h.correctedFrom,
+      h.method,
+      h.cashierId,
+      h.createdAt,
+      h.businessDate,
+      received,
+      existing?.id ?? null,
+      JSON.stringify(doc.payload),
+      sha256(doc.payload),
+      Buffer.from(fromBase64Url(doc.signature!)),
+      h.clientVersion,
+      findings.length,
+    ],
+  );
+  const duplicate = existing !== undefined;
+  if (bill && !duplicate) {
+    const status = settledStatus(h, Number(bill.cash_due));
+    if (status !== null)
+      await c.query(
+        `UPDATE erp.sales_documents SET handover_status = $2 WHERE id = $1 AND handover_status = 'pending'`,
+        [bill.id, status],
+      );
+  }
+  for (const f of findings) await addHandoverException(c, device, h, f);
+  return {
+    result: {
+      id: h.id,
+      status: 'accepted',
+      exceptions: [...new Set(findings.map((f) => f.kind))],
+      error: null,
+    },
+    duplicate,
+  };
+}
+
+/** One exception on a handover, with its figures (sync spec §6.2). */
+async function addHandoverException(
+  c: pg.ClientBase,
+  device: Pick<Device, 'tenantId' | 'deviceId'>,
+  h: CashHandoverDocument,
+  f: HandoverFinding,
+) {
+  const { kind, ...details } = f;
+  await addException(c, device, {
+    kind,
+    documentType: 'cash_handover',
+    documentId: h.id,
+    userId: h.cashierId,
+    businessDate: h.businessDate,
+    details: { ...details, billNumber: h.billNumber, handoverNumber: h.number },
+  });
+}
+
+/** A session's open creates its row; its close sets the close fields (data model §6). Nothing posts (W1-10). */
+async function acceptSession(
+  c: pg.ClientBase,
+  device: Device,
+  z: CashSessionDocument,
+  doc: PushDocument,
+): Promise<PushResult> {
+  const signature = Buffer.from(fromBase64Url(doc.signature!));
+  if (z.event === 'open')
+    await c.query(
+      `INSERT INTO erp.cash_sessions (id, tenant_id, branch_id, device_id, number, cashier_user_id, opened_at,
+         business_date, opening_float, payload, signature, client_version)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        z.id,
+        device.tenantId,
+        z.branchId,
+        z.deviceId,
+        z.number,
+        z.userId,
+        z.createdAt,
+        z.businessDate,
+        z.openingFloat,
+        JSON.stringify(doc.payload),
+        signature,
+        z.clientVersion,
+      ],
+    );
+  else
+    await c.query(
+      `UPDATE erp.cash_sessions SET status = 'closed', closed_at = $2, closed_by_user_id = $3,
+         close_document_id = $4, close_number = $5, expected_cash = $6, close_payload = $7, close_signature = $8
+       WHERE id = $1 AND status = 'open'`,
+      [
+        z.sessionId,
+        z.createdAt,
+        z.userId,
+        z.id,
+        z.number,
+        z.expectedCash,
+        JSON.stringify(doc.payload),
+        signature,
+      ],
+    );
+  return { id: z.id, status: 'accepted', exceptions: [], error: null };
 }
 
 /**
@@ -551,9 +837,11 @@ const detailsOf = (f: SaleFinding) =>
 
 async function addException(
   c: pg.ClientBase,
-  device: Device,
+  device: Pick<Device, 'tenantId' | 'deviceId'>,
   e: {
     kind: ExceptionKind;
+    /** Defaults to a sale. */
+    documentType?: 'sales_document' | 'cash_handover';
     documentId: string | null;
     userId: string | null;
     businessDate: string;
@@ -568,7 +856,7 @@ async function addException(
       device.tenantId,
       e.kind,
       SEVERITY[e.kind] ?? 'medium',
-      e.documentId === null ? null : 'sales_document',
+      e.documentId === null ? null : (e.documentType ?? 'sales_document'),
       e.documentId,
       device.deviceId,
       e.userId,

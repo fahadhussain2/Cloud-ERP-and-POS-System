@@ -74,6 +74,11 @@
 - **A bill known only from its code** records no cash received or change unless the cashier types the figure; a payout records neither.
 - **Session documents** carry `userId` (who opened, or who closed) and `expectedCash` on a close; the float and the expected cash are `null` on the other event.
 - **The domain and posting tests came first** (commit `b6d98ad`); the push, pull and desk tests are written with their code, as in W1-09.
+- **`cash_sessions` keeps the signed open and close documents** (`payload`, `signature`, `close_payload`, `close_signature`), like every other pushed document; the close's fields are set by its document.
+- **Push refuses `H` and `Z` from a device that isn't a cash desk** (`wrong_device`), and a close naming a session the server doesn't have (`unknown_reference`: the desk always pushes the open first). `R` and `M` are `bad_schema` until W1-11.
+- **`queue-changed`** uses its own channel, `erp_queue` (`<tenant>:<branch>`), with a trigger on `sales_documents` for bills with cash due ≠ 0; `sales_documents` doesn't get the general `erp_sync` nudge, so counters aren't woken by every bill. The change feed subscribes by key (`queueKey`).
+- **The counter leaves `cash_queue` out of its pull** (the server answers `403 not_cash_desk`); the desk adds it with local schema 8.
+- **A late link** (the bill arrives after its offline scan) re-checks only the amount: the cashier's permission was judged when the handover arrived.
 
 ## Verify
 
