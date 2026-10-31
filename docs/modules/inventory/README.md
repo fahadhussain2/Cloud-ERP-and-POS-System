@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Not started (build on hold, D-068) |
+| **Status** | In progress: stock ledger, balances, average cost and negative-stock alerts built with the posting engine in W1-08 (in review, [accounting spec](../accounting/spec.md)) |
 | **Requirements** | 7 (INV-01…INV-07) |
 | **Feature spec needed** | No |
 

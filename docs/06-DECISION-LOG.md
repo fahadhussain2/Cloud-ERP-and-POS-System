@@ -778,3 +778,20 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - A restore must not lose the bills made after its point (SYN-05); the counters already hold them, so they put them back without anyone asking.
   - The owner and managers should see a sick counter before the day's reconciliation does.
 - **Status:** Accepted (with the W1-07 plan, owner answers 1–5)
+
+### D-095 Posting engine: posted in the accepting transaction, an order of record, suspense for bills that don't add up, Raast and bank transfer on HBL (2026-10-31)
+- **Decision:**
+  - **One pure engine** (`postSale` in `packages/posting`) posts live and in the rebuild; the database layer only loads and writes. Every accepted sale is posted **in the transaction that accepts it**, under a savepoint ([accounting spec](modules/accounting/spec.md)).
+  - **A sale that can't be posted is still accepted** (SYN-03), with one `posting_failed` exception; the worker's catch-up posts it every minute until it works. The push answer to the counter doesn't change.
+  - **Order of record:** a per-tenant lock (`posting_state`) runs a tenant's postings one at a time; `postings` keeps each one's sequence and **the settings it used** (accounts by role and by method, lock date, terms). The rebuild check replays that in memory from one snapshot; the rewrite is owner-only and refused on a locked period.
+  - **Raast and bank transfer post to HBL** (owner answer 1). The tenant setup now applies a payment method's bank account from the spec (audited), so moving to another bank is a spec edit and a re-run; bills already posted stay where they were.
+  - **An item sold before its cost is known posts at cost 0** and is flagged `no_cost` (owner answer 2).
+  - **A bill whose figures don't add up is posted, with the difference on 1190 *Posting suspense*** (`SUSPENSE` role, owner answer 3).
+  - **Negative stock** is flagged once, when a location's balance crosses below zero; never blocked (INV-03).
+  - **A line's cost lives on its stock movement**; `sales_lines.unit_cost` is dropped (rule 3). Lines record their tax code (the item's or the tenant's default, `tax_codes.is_default`).
+  - **No screens in W1-08** (owner answer 4): the check result and a trial balance are recorded in the plan; reports come with W1-18 and W1-20.
+- **Why:**
+  - Live and rebuilt ledgers can't disagree when they come from the same function and the same recorded settings.
+  - A completed sale is a fact: a configuration gap or a bug must hold back its posting, never the sale or the counter.
+  - Suspense keeps stock and cash right and leaves only the difference for the accountant; cost 0 matches how the migration treats items without a cost.
+- **Status:** Accepted (with the W1-08 plan, owner answers 1–4)

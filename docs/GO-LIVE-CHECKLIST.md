@@ -4,7 +4,8 @@ Open items that must be settled before, or soon after, go-live. Each line names 
 
 ## Before go-live
 
-- [ ] **Raast and bank-transfer payments:** pick the bank account each one posts to (W0-11 owner answer 2, D-083). The tenant setup lists both under "needs attention" until then.
+- [x] **Raast and bank-transfer payments:** both post to HBL for now (W1-08 owner answer 1, D-095). Changing the bank later is an edit to `infra/db/tenants/delux.json` and a setup re-run.
+- [ ] **Re-run the Delux setup on production** after W1-08 is released: it adds 1190 *Posting suspense*, marks the default tax code and maps Raast and bank transfer to HBL (`sudo erp-tenant setup prod delux`), then `sudo erp-tenant posting-check prod delux`.
 - [ ] **Credit limits:** migrated credit customers start with no limit (D-085). Set limits from the `parties/credit-customers.csv` report.
 - [ ] **Mechanic tier:** mark which customers are mechanics (`partyTiers` in `tools/legacy-import/mapping/delux.json`) and re-run the import (W0-13 owner review).
 - [ ] **Bill header:** the legacy database has only the shop name. Give the real address, phone and other header lines; until then the receipt uses placeholder lines (W0-13 owner review).
