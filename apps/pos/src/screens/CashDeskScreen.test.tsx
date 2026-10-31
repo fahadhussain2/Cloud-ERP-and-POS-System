@@ -279,6 +279,15 @@ describe('the cash desk screen', () => {
     expect(f.sessions).toEqual(['open 500000', 'close']);
   });
 
+  it("Alt+O opens the dialog at once, before the person's roles have loaded (CI caught it)", async () => {
+    const f = fakeDesk({ session: null });
+    f.counter.grants = () => new Promise(() => {});
+    show(f.counter);
+    await screen.findByText('C03-S000412');
+    fireEvent.keyDown(window, { key: 'o', altKey: true });
+    expect(await screen.findByRole('textbox', { name: 'Opening float (whole rupees)' })).toBeTruthy();
+  });
+
   it('offline, says the queue is not updating and to scan each bill', async () => {
     show(fakeDesk().counter, { offline: true });
     expect(await screen.findByText(/queue is not updating · scan each bill/)).toBeTruthy();
