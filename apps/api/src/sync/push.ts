@@ -28,13 +28,15 @@ import {
   type SaleDocument,
   type SaleFinding,
 } from '@erp/domain';
+import { postDocument, type PostOutcome } from '@erp/posting';
 import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import type pg from 'pg';
 
 // Push (sync spec §6.2–§7, SYN-02, SYN-03, SYN-05, PLT-09, W1-07). Each document in its own transaction: claim its id
 // in sync_inbox → check it can be trusted and stored (else rejected, kept for a retry) → re-check the rules with
 // reviewSale and store it with its exceptions (never refused on business rules, D-011) → the device's series and
-// gaps. Then the audit events and the device's health. Posting joins the document's transaction in W1-08.
+// gaps. Then the audit events and the device's health. An accepted sale is posted in its own transaction (W1-08,
+// architecture §5.2 step 4); one that can't be posted is still accepted and flagged `posting_failed`.
 
 interface Deps {
   pool: pg.Pool;
@@ -59,6 +61,8 @@ interface Setting {
   reenabledAt: Date | null;
   methods: (PaymentMethodInfo & { id: string })[];
   shopLocation: string | null;
+  /** For items without their own tax code (ACC-09). */
+  defaultTaxCode: string | null;
 }
 
 /** 5 minutes either way (architecture §4.4). */
@@ -96,8 +100,13 @@ export function registerPush(scope: FastifyInstance, { pool, now, requireDevice 
     const results: PushResult[] = [];
     for (const doc of body.documents) {
       const started = performance.now();
-      const result = await withTenant(pool, ctx, (_db, c) => pushOne(c, device, setting, doc, received));
+      const { result, posting } = await withTenant(pool, ctx, (_db, c) =>
+        pushOne(c, device, setting, doc, received),
+      );
       results.push(result);
+      // Posting errors must be 0 (architecture §11): each one is logged as an error and alerts.
+      if (posting?.status === 'failed')
+        req.log.error({ documentId: doc.id, code: posting.code }, 'posting.failed');
       // Every document's result against its id (architecture §11.2); never the payload or the signature.
       req.log.info(
         {
@@ -107,6 +116,7 @@ export function registerPush(scope: FastifyInstance, { pool, now, requireDevice 
           status: result.status,
           error: result.error,
           exceptions: result.exceptions,
+          posting: posting?.status ?? null,
           ms: Math.round(performance.now() - started),
         },
         'sync.push.document',
@@ -149,6 +159,9 @@ async function loadSetting(c: pg.ClientBase, device: Device): Promise<Setting> {
     is_cash: boolean;
     requires_reference: boolean;
   }>('SELECT id, code, is_cash, requires_reference FROM erp.payment_methods');
+  const tax = await c.query<{ id: string }>(
+    'SELECT id FROM erp.tax_codes WHERE is_default AND deleted_at IS NULL',
+  );
   const shop = await c.query<{ id: string }>(
     `SELECT id FROM erp.locations WHERE branch_id = $1 AND kind = 'shop' AND deleted_at IS NULL ORDER BY code LIMIT 1`,
     [device.branchId],
@@ -167,6 +180,7 @@ async function loadSetting(c: pg.ClientBase, device: Device): Promise<Setting> {
       requiresReference: r.requires_reference,
     })),
     shopLocation: shop.rows[0]?.id ?? null,
+    defaultTaxCode: tax.rows[0]?.id ?? null,
   };
 }
 
@@ -179,7 +193,7 @@ async function pushOne(
   s: Setting,
   doc: PushDocument,
   received: Date,
-): Promise<PushResult> {
+): Promise<{ result: PushResult; posting: PostOutcome | null }> {
   const hash = sha256(doc.payload);
   const claimed = await c.query(
     `INSERT INTO erp.sync_inbox (tenant_id, document_id, device_id, family, seq, status, result, payload_hash, received_at)
@@ -196,9 +210,12 @@ async function pushOne(
       )
     ).rows[0]!;
     if (prior.status === 'accepted')
-      return prior.payload_hash.equals(hash)
-        ? { ...prior.result, status: 'duplicate' }
-        : { id: doc.id, status: 'rejected', exceptions: [], error: 'id_conflict' };
+      return {
+        result: prior.payload_hash.equals(hash)
+          ? { ...prior.result, status: 'duplicate' }
+          : { id: doc.id, status: 'rejected', exceptions: [], error: 'id_conflict' },
+        posting: null,
+      };
     // A rejected document is checked again: it may come back fixed (signed, say).
     await c.query(
       'UPDATE erp.sync_inbox SET attempts = attempts + 1, payload_hash = $2, received_at = $3 WHERE document_id = $1',
@@ -207,9 +224,16 @@ async function pushOne(
   }
 
   let result: PushResult;
+  let posting: PostOutcome | null = null;
   try {
     const document = await trusted(c, device, s, doc);
     result = await accept(c, device, s, document, doc, received);
+    posting = await postDocument(c, {
+      tenantId: device.tenantId,
+      type: 'sale',
+      id: document.id,
+      now: received,
+    });
   } catch (err) {
     if (!(err instanceof Rejected)) throw err;
     const exceptions: ExceptionKind[] = err.code === 'bad_signature' ? ['bad_signature'] : [];
@@ -229,7 +253,7 @@ async function pushOne(
     JSON.stringify(result),
   ]);
   if (isNew) await advanceSeries(c, device, s, doc, received);
-  return result;
+  return { result, posting };
 }
 
 /** The reasons a document can't be trusted or stored (sync spec §6.2); anything else is accepted. */
@@ -364,12 +388,21 @@ async function accept(
       exceptions.length,
     ],
   );
+  // Each line says which tax code applied, at 0% for now (ACC-09): the item's own, or the tenant's default.
+  const taxCodes = new Map(
+    (
+      await c.query<{ id: string; tax_code_id: string | null }>(
+        'SELECT id, tax_code_id FROM erp.items WHERE id = ANY ($1)',
+        [d.lines.map((l) => l.itemId)],
+      )
+    ).rows.map((r) => [r.id, r.tax_code_id ?? s.defaultTaxCode]),
+  );
   const lineIds = new Map<number, string>();
   for (const l of d.lines) {
     const r = await c.query<{ id: string }>(
       `INSERT INTO erp.sales_lines (tenant_id, document_id, line_no, item_id, qty, list_price, unit_price, line_discount,
-         bill_share, line_total, floor_price_at_sale, location_id)
-       VALUES ($1, $2, $3, $4, $5::numeric / 1000, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+         bill_share, line_total, floor_price_at_sale, location_id, tax_code_id)
+       VALUES ($1, $2, $3, $4, $5::numeric / 1000, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
       [
         device.tenantId,
         d.id,
@@ -383,6 +416,7 @@ async function accept(
         l.lineTotal,
         l.floorPrice,
         s.shopLocation,
+        taxCodes.get(l.itemId) ?? null,
       ],
     );
     lineIds.set(l.lineNo, r.rows[0]!.id);

@@ -410,17 +410,19 @@ describe('posting inside push (ACC-02, INV-01, INV-03)', () => {
     const first = sale(c, [{ item: 'OIL001', qty: 1000, price: 120000 }]);
     const second = sale(c, [{ item: 'OIL001', qty: 1000, price: 120000 }]);
     const r = await push(c, [first, second]);
-    expect(r.results.map((x) => [x.status, x.exceptions])).toEqual([
-      ['accepted', ['negative_stock']],
-      ['accepted', []],
-    ]);
+    expect(r.results.map((x) => x.status)).toEqual(['accepted', 'accepted']);
+    expect((await exceptionsOf(post, first.id)).map((e) => e.kind)).toEqual(['negative_stock']);
+    expect(await exceptionsOf(post, second.id)).toEqual([]);
     expect(await journalOf(post, second.id)).toHaveLength(4);
   });
 
   it('posts an item with no cost yet at 0 and flags no_cost (owner answer 2)', async () => {
     const doc = sale(c, [{ item: 'NEW001', qty: 1000, price: 60000 }]);
-    const r = await push(c, [doc]);
-    expect(r.results[0]!.exceptions).toEqual(['negative_stock', 'no_cost']);
+    await push(c, [doc]);
+    expect((await exceptionsOf(post, doc.id)).map((e) => e.kind)).toEqual(['negative_stock', 'no_cost']);
+    expect(await q(post, 'SELECT exception_count FROM erp.sales_documents WHERE id = $1', [doc.id])).toEqual([
+      { exception_count: 2 },
+    ]);
     expect((await journalOf(post, doc.id)).map((l) => l.code)).toEqual(['1120', '4100']);
   });
 
@@ -574,9 +576,10 @@ describe('a bill that can’t be posted yet (SYN-03): accepted, flagged, posted 
 
   it('accepts a Raast bill while Raast has no account, with posting_failed and nothing half-posted', async () => {
     const r = await push(c, held);
+    // The answer to the counter is unchanged: posting is the server's business (and old counters know no new kinds).
     expect(r.results.map((x) => [x.status, x.exceptions])).toEqual([
-      ['accepted', ['posting_failed']],
-      ['accepted', ['posting_failed']],
+      ['accepted', []],
+      ['accepted', []],
     ]);
     for (const d of held) {
       expect(await exceptionsOf(post, d.id)).toEqual([
