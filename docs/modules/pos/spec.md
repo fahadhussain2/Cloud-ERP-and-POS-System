@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). The bill (§10) and the keyboard map (§11): with the W1-05 plan and owner answers (2026-10-27). Payment and finalize (§12), printing and reprint (§13): with the W1-06 plan and owner answers (2026-10-27). Push, offline warnings, the revoked counter and device health (§4, §7, §12, §14): with the W1-07 plan and owner answers (2026-10-28), D-094. Customers and credit (§15): with the W1-09 plan and owner answers (2026-10-31), D-096. |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). The bill (§10) and the keyboard map (§11): with the W1-05 plan and owner answers (2026-10-27). Payment and finalize (§12), printing and reprint (§13): with the W1-06 plan and owner answers (2026-10-27). Push, offline warnings, the revoked counter and device health (§4, §7, §12, §14): with the W1-07 plan and owner answers (2026-10-28), D-094. Customers and credit (§15): with the W1-09 plan and owner answers (2026-10-31), D-096. The cash desk device (§16): with the W1-10 plan and owner answers (2026-11-01), D-097. |
 | **Refs** | POS-01, POS-14, PLT-01, PLT-03, PLT-04; architecture §4.1–§4.4, §8; data model §12; sync spec; CLAUDE.md rules 6, 9, 10; D-009, D-010, D-039, D-082 |
 
 The PRD and architecture describe what the counter does. This spec fixes how its foundations behave, precisely enough to build and test. **v1** covers what W1-02 builds; checkout, the payment pad and the keyboard map come in later versions.
@@ -154,6 +154,7 @@ POS-03, D-053, from the prototype. The key bar always shows the keys of the curr
 | **Bill lines** (`Tab`) | `↑ ↓` line · `+ −` quantity · `Q` set quantity · `P` price · `D` bill discount · `Del` remove · `Esc` back to search; any other letter types into the search |
 | **Anywhere** | `F2` search · `F4` customer (W1-09) · `F7` price tier · `F9` cash · `Shift+F9` split payment · `Alt+P` reprint · `Alt+C` clear the bill · `Alt+L` lock · `Alt+S` counter health (W1-07, also on the staff list) |
 | **Dialogs** | `Enter` the main button · `Esc` cancel · `Tab` next field |
+| **Cash desk** (W1-10, cash desk spec) | `Enter` confirm · `E` correct the cash received · `↑ ↓` select · `Alt+O` open the session · `Alt+X` close it · `Alt+Q` to selling and back · `Alt+L` lock |
 | **Later tasks** (shown once built) | `F3` return (W1-13) · `F8` / `Shift+F8` hold and recall (W1-12) |
 
 `F1`, `F3`, `F5`, `F7` and `F9` never reach the browser on the counter (no help page, find bar, reload or caret browsing mid-bill). `F6` and `Alt+D` are not used: Chrome keeps them for the address bar.
@@ -296,3 +297,12 @@ Each result: code, name, city, the phone's **last four digits** (`•••• 4
 **On the document** (sync spec §6.1): `customerId`, or `walkinPhone` for a walk-in; each approval as an override `credit_limit` or `offline_cap`; and on a bill with an on-account payment, the `credit` block with what the counter saw: `offline`, `balance`, `balanceAsOf`, `unsynced`, `offlineToday`.
 
 **The printed bill** shows the customer's name and code instead of *Walk-in*, and *On account* as a payment row. No balance or limit is printed, and the walk-in phone isn't printed.
+
+## 16. The cash desk device (W1-10)
+
+CSH-01…CSH-04, D-097. A device of kind `cash_desk` runs this app and also sells (D-001); its Cash desk screen, session, queue, scanning and documents are in the [cash desk spec](../cash-desk/spec.md). What changes for the app itself:
+
+- **Pull** adds `cash_queue` on a desk only (sync spec §3); `queue-changed` pulls like `changes-available` (sync spec §8). The screen reads the queue again after every pull.
+- **Finalize** on a desk with an open session writes the bill's automatic handover (family `H`, method `auto`) in the same transaction as the bill (§12); `Finalized.handover` carries it, and it is signed after the commit like the bill.
+- **Local schema 8** (data model §12): `cash_queue`, `cash_sessions`; handovers and session documents in `local_documents` and the outbox (families `H`, `Z`). The reprint list (§13) shows bills only.
+- **Unlock** on a desk lands on the Cash desk screen for someone with `cash.handover.receive`, else on selling.

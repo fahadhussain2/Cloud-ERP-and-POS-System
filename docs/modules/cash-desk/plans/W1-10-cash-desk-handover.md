@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#55](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/55) |
 | **Module** | cash-desk (rules in `packages/domain`, the handover posting in `packages/posting`, the queue dataset and the handover push in `apps/api`, the desk screen in `apps/pos`) |
-| **Status** | Accepted (2026-11-01) with the owner answers below |
+| **Status** | Built (2026-11-01) on `w1-10-cash-desk`, in review; Verify 2 and 3 to do |
 | **Refs** | CSH-01, CSH-02, CSH-03, CSH-04, SYN-02, SYN-04; PRD W4, W7, W15; architecture §4.4, §4.5, §4.6, §4.7; data model §5, §6, §10, §12; posting rules §4.5; POS spec §12, §13; sync spec §3, §6, §8; accounting spec; CLAUDE.md rules 1, 2, 3, 4, 5, 6, 7, 8, 9, 10; D-001, D-024, D-047, D-049, D-055, D-056, D-059, D-093, D-094, D-095 |
 | **Depends on** | W1-07 (push, the SSE nudge), W1-08 (posting, `CASH_IN_TRANSIT`) |
 | **Size** | about 4 days |
@@ -86,6 +86,7 @@
 - **The automatic handover** is made by `finalizeSale` on a desk with an open session, for the session's cashier, with its own id; `Finalized.handover` carries it so it is signed too.
 - **`queue-changed` pulls like `changes-available`** on the desk: the queue is one of its datasets, and the screen reads it again after every pull.
 - **Keys on the Cash desk screen:** Enter confirms, `E` corrects, `↑ ↓` select, `Alt+O` opens and `Alt+X` closes the session, `Alt+Q` switches to selling and back, `Alt+L` locks. The scan field keeps the focus; a click on a row selects it.
+- **`cash_handover_mode = off` shows the queue anyway** for now (no *Handover confirmation is off* message): no tenant has Off before CSH-09 (Wave 2), and Delux is Required.
 - **Desk e2e** (`e2e/till.spec.ts`, a second browser profile as the desk PC) runs after the counter and sync flows: the queue then also holds their unhanded cash bills, so the flows pick their bill as a cashier would.
 
 ## Verify
@@ -93,6 +94,8 @@
 1. `pnpm check`, `pnpm test:integration` and `pnpm e2e`, output shown.
 2. **On your PC** (`erp_dev`, a counter and a desk as two Edge profiles): open a session; sell three cash bills by two salesmen and confirm them from the queue; correct one; scan one; cut the desk's network, sell on the counter (also offline), scan the bill at the desk; reconnect both and check on the server that every handover is linked, nothing is flagged and `CASH_IN_TRANSIT` is 0; time finalize to visible. Results go into this plan.
 3. **On staging:** the same with a counter and a desk enrolled on staging.
+
+**Results (2026-11-01, this PC):** `pnpm check` green (format, lint, typecheck, 1,248 tests with the coverage thresholds, every build); `pnpm test:integration` 240 passed (13 in `cash-desk.int.test.ts`); `pnpm e2e` 35 passed in Edge, the 7 desk flows in `till.spec.ts` among them (finalize to visible within the 5 s the flow allows). Once in a full `pnpm check` the status-bar test *shows offline as soon as the browser loses the network* missed its 1 s wait again (as in W1-09) and passed alone and on the re-run. **Not done:** Verify 2 (`erp_dev`) and Verify 3 (staging), and the owner's review.
 
 ## Risks
 

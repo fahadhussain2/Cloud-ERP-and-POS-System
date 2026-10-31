@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: accepted with the W1-03 plan (2026-10-26). Checkout datasets and the sale document (§6.1): with the W1-06 plan (2026-10-27). Push (§6.2), gaps and re-push (§7) and the SSE nudge (§8): with the W1-07 plan and owner answers (2026-10-28), D-094. Customer datasets, the customer on the sale document and the credit exceptions: with the W1-09 plan and owner answers (2026-10-31), D-096. |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: accepted with the W1-03 plan (2026-10-26). Checkout datasets and the sale document (§6.1): with the W1-06 plan (2026-10-27). Push (§6.2), gaps and re-push (§7) and the SSE nudge (§8): with the W1-07 plan and owner answers (2026-10-28), D-094. Customer datasets, the customer on the sale document and the credit exceptions: with the W1-09 plan and owner answers (2026-10-31), D-096. The cash queue, handovers and sessions in push and `queue-changed`: with the W1-10 plan and owner answers (2026-11-01), D-097. |
 | **Refs** | SYN-01…SYN-06; architecture §4.1, §5; data model §10, §12; CLAUDE.md rules 6–9; D-009, D-011, D-042, D-047 |
 
 The architecture (§5) sets the principles. This spec fixes the contracts precisely enough to build and test them. **v1 covers pull**, which W1-02 (users and settings for unlock) and W1-03 (the catalog) need. The **sale document** a counter writes to its outbox is fixed with W1-06 (§6.1); **push**, server acceptance and exceptions (§6.2), gaps and re-push after a restore (§7) and the SSE nudge (§8) with W1-07.
@@ -74,6 +74,14 @@ Each dataset lists its columns explicitly. **A column not listed never leaves th
 
 A party that gets its customer account after its own row was pulled (a supplier who starts buying) is sent again: a trigger on `customer_accounts` (insert, or a removed account restored) touches its `parties` row. A removed account arrives as a tombstone, and the counter stops listing the party.
 
+**Cash desk dataset (W1-10):** pulled **only by a cash desk**; a counter that asks for it is answered `403 { error: 'not_cash_desk' }`, so a counter leaves it out of its pull.
+
+| Dataset | Table | Scope | Columns |
+|---|---|---|---|
+| `cash_queue` | `sales_documents`, **the device's branch, `cash_due ≠ 0`, `handover_status = 'pending'` or received in the last 7 days** | the branch | `id, number, device_id, salesperson_user_id, created_at_device, business_date, cash_due, cash_received, change_due, handover_status, status, row_version, deleted_at`. **No lines, customer, payload or signature.** |
+
+`cash_received` and `change_due` are the cash payment's figures, set once by push (migration 0011). A bill handed over comes once more with its new status (a new `txid`, rule 8), so every desk drops it from its queue.
+
 Stock balances and the 90-day bills (W1-13) are added by their tasks with the same rules.
 
 **Bootstrap:** the first pull simply starts from the beginning, in full pages of 1,000 rows (about 125k catalog rows for Delux). An interrupted first load resumes from the last committed page. Measured in W1-03 on the real catalog: **31 seconds** from setup to search, under the 60-second rule, so there is no snapshot download. Revisit if a tenant's catalog is much larger.
@@ -143,7 +151,7 @@ POST /api/sync/push   (device token, body up to 5 MB)
 
 **The request.**
 
-- `documents`: at most **100**, unique ids, in ascending `seq` within each family (`S`, `H`, `R`, `M`, `Z`). Each is an outbox row: the document's UUIDv7 (the idempotency key, rule 7), its family and seq, the payload exactly as the device stored it, and its `signature` (base64url P1363 over `canonicalJson(payload)`, D-082), or `null` when the counter couldn't sign it.
+- `documents`: at most **100**, unique ids, in ascending `seq` within each family (`S`, `H`, `R`, `M`, `Z`). A cash desk also sends its handovers (`H`, `CashHandoverV1`) and its sessions' open and close (`Z`, `CashSessionV1`, W1-10); `R` and `M` are refused as `bad_schema` until W1-11. Each is an outbox row: the document's UUIDv7 (the idempotency key, rule 7), its family and seq, the payload exactly as the device stored it, and its `signature` (base64url P1363 over `canonicalJson(payload)`, D-082), or `null` when the counter couldn't sign it.
 - `events`: at most 500 audit events (§5, POS spec §13): `pin.locked` `{ id, at, userId }`, `pin.unlocked_by_manager` `{ id, at, userId, byUserId }`, `bill.reprinted` `{ id, at, userId, documentId, number }`.
 - `health` (PLT-09): `outboxCount` (refused bills included), `oldestUnsyncedAt`, `quarantinedCount`, `storagePersisted`, `storageUsage`, `storageQuota`, `lastPullAt`.
 - **An empty push is the handshake:** no documents, no events. The counter sends one at start-up, so a restored server is noticed even when nothing is waiting (§7).
@@ -160,8 +168,8 @@ POST /api/sync/push   (device token, body up to 5 MB)
 | `unsigned` | `signature` is null |
 | `bad_signature` | it doesn't verify with the key of the device the payload names. Also written as a `bad_signature` exception (severity high). Well signed by **another** device → `wrong_device` |
 | `bad_schema` | the payload fails `SaleDocumentV1` (an unknown `version` included), or its `id`, `seq` or family differ from the row's |
-| `wrong_device` | another device's document (a counter pushes only its own, owner answer 3 to W1-07), or another branch's |
-| `unknown_reference` | a seller, approver, requester, tier, item, payment method or customer that isn't this tenant's |
+| `wrong_device` | another device's document (a counter pushes only its own, owner answer 3 to W1-07), or another branch's; an `H` or `Z` from a device that isn't a cash desk |
+| `unknown_reference` | a seller, approver, requester, tier, item, payment method or customer that isn't this tenant's; a handover's cashier; a session close naming a session the server doesn't have (the desk pushes the open first). **A handover's bill is never checked:** it is linked by number, now or when the bill arrives |
 | `seq_conflict` | another id already holds this device's seq |
 
 4. **Re-check the rules** with `reviewSale` (`packages/domain`, the counter's own functions, rule 2), and for a bill with an on-account payment `reviewCredit` against the customer's account, its balance, read under the tenant's posting order lock (`holdPostingOrder`, D-017), so no other posting moves it before this sale is posted, and the device's offline on-account total for that customer and business date. Neither refuses: their findings become exceptions (below).
@@ -185,6 +193,11 @@ An unexpected error rolls back that document and answers `500`; the documents be
 | `seq_gap` | medium | a seq above the next expected one (§7) |
 | `clock_skew` | low | `serverTime − deviceClock` over 5 minutes either way; once per device and business day, with the health, not on a document |
 | `bad_signature` | high | on the refusal above |
+| `handover_amount_mismatch` | medium | a handover whose amount, or direction, differs from its bill's cash due, once both are on the server (D-059; `details`: `amount`, `billCashDue`, `handoverKind`) |
+| `duplicate_handover` | medium | a second handover of a bill and kind: stored with `duplicate_of_id`, never posted, the bill unchanged |
+| `handover_not_permitted` | low | the server says the cashier lacks `cash.handover.receive` (or `cash.refund.pay` for a payout) |
+
+**Handovers (W1-10, cash desk spec §9):** stored in `cash_handovers`, linked to their bill by number and the bill marked `received` or `paid_out`; one whose bill hasn't arrived waits and is linked when the bill is accepted, its amount compared then. A bill with cash and a handover of it take a **per-bill lock** first (`pg_advisory_xact_lock`), before the posting order lock, because a scan and its bill often arrive in overlapping transactions. Each handover that isn't a duplicate is posted in the same transaction. A session's open creates its `cash_sessions` row and its close sets the close fields; neither posts.
 
 Prices and floors are judged on the **document's own snapshot**: a price changed in the back office during an outage is expected and not flagged (architecture §4.7). Approvals are judged against the roles the server holds now.
 
@@ -233,4 +246,4 @@ data: {}
 - The stream opens with a `: connected` comment, writes `: keep-alive` every 25 s, and **ends after 15 minutes**, the device token's life.
 - **On the counter** (`apps/pos/src/sync/events.ts`): read with `fetch`, because `EventSource` can't send the device token. Each `changes-available` pulls at once. A stream that ends after running its course reconnects at once with a new token; one that fails or drops within a minute backs off like push. While the stream is up, the minute timer pulls only every 5 minutes as a safety net (§4).
 - **Caddy** serves `/api/sync/events` on its own route, flushed at once and never compressed (`infra/edge/caddy/Caddyfile`).
-- W1-10 adds `queue-changed` for the cash desk on the same stream.
+- **`queue-changed` (W1-10):** a change to a bill with cash due ≠ 0 notifies its own channel, `erp_queue`, with `<tenant>:<branch>` (migration 0011); the API sends `event: queue-changed` only to that branch's **cash desk** streams, throttled like `changes-available`. `sales_documents` has no `erp_sync` trigger, so counters aren't woken by every bill. The desk pulls on it as on `changes-available`.
