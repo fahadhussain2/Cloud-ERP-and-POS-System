@@ -380,14 +380,11 @@ async function trustedHandover(c: pg.ClientBase, device: Device, doc: PushDocume
   if (!parsed.success) throw new Rejected('bad_schema');
   const h = parsed.data as unknown as CashHandoverDocument;
   sameRow(h, doc, device);
-  // The bill it names, when the desk knew it, must be this tenant's (RLS keeps other tenants' out).
-  const known = await c.query<{ users: number; bill: number }>(
-    `SELECT (SELECT count(*)::int FROM erp.users WHERE id = $1) AS users,
-            (SELECT count(*)::int FROM erp.sales_documents WHERE id = $2) AS bill`,
-    [h.cashierId, h.saleDocumentId],
-  );
-  const k = known.rows[0]!;
-  if (k.users !== 1 || (h.saleDocumentId !== null && k.bill !== 1)) throw new Rejected('unknown_reference');
+  // The bill isn't checked: a handover is linked by its bill's number (data model §6), now or when the bill arrives,
+  // and the desk's own sale is pushed after its automatic handover (the outbox goes by family). Only the cashier must
+  // be this tenant's (RLS keeps other tenants' out).
+  const known = await c.query('SELECT 1 FROM erp.users WHERE id = $1', [h.cashierId]);
+  if (known.rowCount !== 1) throw new Rejected('unknown_reference');
   await seqTaken(c, device, doc);
   return h;
 }
