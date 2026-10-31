@@ -74,6 +74,7 @@ Every test in this list is written and fails on its typed stub (2026-10-29): 37 
 - **Catch-up order fixed:** bills of one push share their receive time, and ordering ties by id (random within a millisecond) could post a counter's bills out of sequence. Caught by the catch-up integration test failing on a run; it now orders by receive time, device and seq (test locked during the fix).
 - **The migration is safe for a rollback** (D-075): the W1-07 code never reads `sales_lines.unit_cost` (always empty) and inserts lines by column list; the widened checks and new tables don't affect it.
 - **Review fixes:** the journal builder adds with `@erp/domain`'s checked `add`; the rebuild formats quantities with integer arithmetic; the push log line carries `postingMs` and an internal error's message.
+- **PR #84 review fixes (tests first, locked during the fix):** the savepoint now comes before the posting lock, so a lock timeout or any error there leaves the sale accepted and flagged instead of failing the push; the catch-up pages through every pending bill (500 at a time, by arrival), so bills that never post can't starve the ones behind them; `posting-rebuild` is documented as after shop hours, since bills wait to post while it holds the lock.
 - **The end-to-end restore simulation** deletes a counter's documents and exceptions but not their postings, so there the re-pushed bills answer `already_posted` without new exceptions. A real restore rolls the ledgers back with the documents; the simulation was left as is.
 
 ## Verify

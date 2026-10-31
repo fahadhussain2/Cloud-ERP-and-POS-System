@@ -13,7 +13,8 @@
 #   sudo erp-tenant posting-check <env> <shop>           replays every posting from its document and lists any
 #                                                        difference with the stored ledgers (W1-08); writes nothing
 #   sudo erp-tenant posting-rebuild <env> <shop>         rewrites the shop's ledgers from the replay, then checks;
-#                                                        refused when a posting is on or before the lock date
+#                                                        refused when a posting is on or before the lock date;
+#                                                        bills wait to post while it runs: after shop hours only
 #   sudo erp-tenant list                                 the specs on this server
 #
 # <env> is prod or staging. Re-running setup is safe: it creates only what's missing, applies a payment method's
@@ -113,7 +114,7 @@ case $cmd in
     find "$SPECS" -maxdepth 1 -name '*.json' -printf '%f\n' 2>/dev/null | sed 's/\.json$//' | sort
     ;;
   *)
-    sed -n '4,18p' "$0" >&2
+    sed -n '4,19p' "$0" >&2
     exit 2
     ;;
 esac
