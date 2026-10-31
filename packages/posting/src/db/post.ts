@@ -124,7 +124,7 @@ export async function postDocument(
 export async function postPending(
   pool: pg.Pool,
   tenantId: string,
-  opts: { now: () => Date },
+  opts: { now: () => Date; pageSize?: number },
 ): Promise<{ posted: number; failed: number }> {
   const pending = await withTenant(
     pool,
@@ -134,7 +134,8 @@ export async function postPending(
         await c.query<{ id: string }>(
           `SELECT d.id FROM erp.sales_documents d
          WHERE NOT EXISTS (SELECT 1 FROM erp.postings p WHERE p.source_type = 'sale' AND p.source_id = d.id)
-         ORDER BY d.received_at, d.device_id, d.seq LIMIT 500`,
+         ORDER BY d.received_at, d.device_id, d.seq LIMIT $1`,
+          [opts.pageSize ?? 500],
         )
       ).rows,
   );

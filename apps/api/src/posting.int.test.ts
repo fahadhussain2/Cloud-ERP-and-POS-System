@@ -626,6 +626,60 @@ describe('a bill that can’t be posted yet (SYN-03): accepted, flagged, posted 
   });
 });
 
+describe('bills that never post (PR #84 review)', () => {
+  let c: Counter;
+  const stuck: SaleDocument[] = [];
+
+  /** A sale on account with no customer: accepted, and posting refuses it every time. */
+  const onAccountWithoutCustomer = () => {
+    const d = sale(c, [{ item: 'OIL001', qty: 1000, price: 120000 }]);
+    return {
+      ...d,
+      cashDue: money(0),
+      handoverStatus: 'not_applicable' as const,
+      payments: [
+        {
+          method: 'on_account' as const,
+          amount: money(120000),
+          cashReceived: null,
+          changeDue: null,
+          reference: null,
+        },
+      ],
+    };
+  };
+
+  beforeAll(async () => {
+    c = await enroll(post);
+    stuck.push(onAccountWithoutCustomer(), onAccountWithoutCustomer());
+    await push(c, stuck);
+  });
+
+  it('stays accepted and flagged when the posting can’t even start (the lock times out)', async () => {
+    const holder = new pg.Client({ connectionString: db.ownerUrl });
+    await holder.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query("SELECT set_config('app.tenant_id', $1, true)", [post.tenantId]);
+      await holder.query('SELECT 1 FROM erp.posting_state FOR UPDATE');
+      const outcome = await withTenant(pool, { tenantId: post.tenantId }, async (_db, cl) => {
+        await cl.query("SET LOCAL lock_timeout = '200ms'");
+        return postDocument(cl, { tenantId: post.tenantId, type: 'sale', id: stuck[0]!.id, now: new Date() });
+      });
+      expect(outcome).toMatchObject({ status: 'failed', code: 'internal_error' });
+    } finally {
+      await holder.query('ROLLBACK');
+      await holder.end();
+    }
+  });
+
+  it('reaches every pending bill in one run, however many never post', async () => {
+    const r = await postPending(pool, post.tenantId, { now: () => new Date(), pageSize: 1 });
+    expect(r.failed).toBeGreaterThanOrEqual(2);
+    expect(r.posted).toBe(0);
+  });
+});
+
 describe('the rebuild check (ACC-02, rule 4)', () => {
   let c: Counter;
   let d: Counter;
