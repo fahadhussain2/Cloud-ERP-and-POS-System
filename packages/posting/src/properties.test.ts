@@ -113,7 +113,7 @@ describe('posting properties', () => {
       fc.property(sale(1), state, (s, st) => {
         const r = postSale(s, CONTEXT, st);
         if (!r.ok) throw new Error(r.error.code);
-        const value = -r.posting.movements.reduce((t, m) => t + m.valueDelta, 0);
+        const value = 0 - r.posting.movements.reduce((t, m) => t + m.valueDelta, 0);
         const cogs = r.posting.journal.lines.filter((l) => l.accountId === '5100');
         const inventory = r.posting.journal.lines.filter((l) => l.accountId === '1300');
         expect(cogs.reduce((t, l) => t + l.debit, 0)).toBe(value);
