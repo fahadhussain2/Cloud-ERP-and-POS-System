@@ -9,7 +9,7 @@ import {
   type PushResponse,
 } from '@erp/contracts';
 import { withTenant } from '@erp/db';
-import { createTenant, createTestDatabase, seedCatalog, type TestDatabase } from '@erp/db/testing';
+import { createTenant, createTestDatabase, seedCatalog, seedChart, type TestDatabase } from '@erp/db/testing';
 import {
   buildSaleDocument,
   money,
@@ -275,10 +275,13 @@ beforeAll(async () => {
         [tenant, branch],
       )
     ).rows[0]!.id;
+    // Pushed sales are posted (W1-08), so the shop has a chart and Raast has a bank.
+    const { bankId } = await seedChart(c, tenant);
     const methods = await c.query<{ id: string; code: string }>(
-      `INSERT INTO erp.payment_methods (tenant_id, code, name, is_cash, requires_reference, sort)
-       VALUES ($1, 'cash', 'Cash', true, false, 1), ($1, 'raast', 'Raast', false, true, 2) RETURNING id, code`,
-      [tenant],
+      `INSERT INTO erp.payment_methods (tenant_id, code, name, is_cash, requires_reference, bank_account_id, sort)
+       VALUES ($1, 'cash', 'Cash', true, false, NULL, 1), ($1, 'raast', 'Raast', false, true, $2, 2)
+       RETURNING id, code`,
+      [tenant, bankId],
     );
     cashMethod = methods.rows.find((m) => m.code === 'cash')!.id;
     const ids = await seedCatalog(c, tenant, [
@@ -291,6 +294,15 @@ beforeAll(async () => {
       },
     ]);
     pads = ids['BRPD001']!;
+    // A cost and plenty on the shelf, so posting adds no no_cost or negative_stock exceptions here (W1-08).
+    await c.query(
+      'INSERT INTO erp.item_costs (tenant_id, item_id, avg_cost, on_hand) VALUES ($1, $2, 310000, 1000)',
+      [tenant, pads],
+    );
+    await c.query(
+      'INSERT INTO erp.stock_balances (tenant_id, item_id, location_id, qty) VALUES ($1, $2, $3, 1000)',
+      [tenant, pads, shopLocation],
+    );
     retail = (await c.query<{ id: string }>("SELECT id FROM erp.price_tiers WHERE code = 'RETAIL'")).rows[0]!
       .id;
   });
@@ -367,7 +379,6 @@ describe('push: acceptance (SYN-02, SYN-03)', () => {
         line_total: '450000',
         floor_price_at_sale: '400000',
         location_id: shopLocation,
-        unit_cost: null,
       }),
     ]);
     const payments = await q('SELECT * FROM erp.sales_payments WHERE document_id = $1', [doc.id]);

@@ -42,6 +42,14 @@
       "systemRole": null
     },
     {
+      "code": "1190",
+      "name": "Posting suspense",
+      "type": "asset",
+      "parentCode": "1000",
+      "isPostable": true,
+      "systemRole": "SUSPENSE"
+    },
+    {
       "code": "1200",
       "name": "Accounts receivable (customers)",
       "type": "asset",

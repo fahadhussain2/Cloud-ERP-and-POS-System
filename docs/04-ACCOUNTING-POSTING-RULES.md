@@ -16,6 +16,7 @@
 5. **Immutable:** corrections are reversal entries (void, return, or a reversing journal), never edits.
 6. **Period lock:** nothing posts on or before `tenants.lock_date`. A late-synced offline document dated inside a locked period posts on the first open date, with its original business date kept on the document, and raises an exception.
 7. **Money** is integer minor units. Allocations (e.g. a bill discount spread across lines) use largest-remainder rounding, so line amounts always sum exactly to the total.
+8. **A document that can't be posted is still accepted** (SYN-03): it gets a `posting_failed` exception and posts by itself once the cause is fixed (e.g. a payment method mapped to a bank). How the engine posts, records its order and proves the ledgers is in the [accounting spec](modules/accounting/spec.md) (W1-08, D-095).
 
 ## 2. Default chart of accounts (retail template)
 
@@ -33,6 +34,7 @@ New tenants get this tree. Delux's legacy accounts are mapped into it ([migratio
 | 1170 | Wallet: JazzCash | asset | (bank_accounts) |
 | 1171 | Wallet: Easypaisa | asset | (bank_accounts) |
 | 1180 | Card settlement clearing | asset | (bank_accounts) |
+| 1190 | Posting suspense (differences of bills that don't add up, cleared by journal voucher) | asset | `SUSPENSE` |
 | 1200 | Accounts receivable (customers) | asset | `AR_CONTROL` |
 | 1300 | Inventory | asset | `INVENTORY` |
 | **2000** | **Liabilities** | liability | |
@@ -78,6 +80,9 @@ Note: the legacy "Purchases" account sat under Liabilities. Purchases now go **i
 | On account | `Dr AR_CONTROL (party)`: remainder put on the customer's account; party ledger due date = date + terms |
 | Cost | `Dr COGS / Cr INVENTORY`: Σ qty × avg cost (stock movement out of SHOP) |
 | Tax (future) | `Cr TAX_PAYABLE`: tax_total |
+| Difference | `Dr/Cr SUSPENSE`: whatever still doesn't balance, on a bill whose figures don't add up (a counter bug, D-094). Its stock and cash still post (W1-08 owner answer 3). |
+
+An item sold before its cost is known (not received, not in the opening stock) posts at cost 0 and is flagged `no_cost` (W1-08 owner answer 2). The cost of each line is kept on its stock movement.
 
 Line price concessions (negotiated below list) are **not** separate GL entries. Sales are recorded at the price actually charged. Concessions are a management report (RPT-03).
 

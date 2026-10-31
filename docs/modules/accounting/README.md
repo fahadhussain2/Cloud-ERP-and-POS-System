@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Not started (build on hold, D-068) |
+| **Status** | In progress: the posting engine for sales built in W1-08 (in review); [spec](spec.md) v1 accepted |
 | **Requirements** | 9 (ACC-01…ACC-09) |
-| **Feature spec needed** | Yes: posting engine design and rebuild |
+| **Feature spec needed** | Yes: posting engine design and rebuild ([spec.md](spec.md)) |
 
 ## Scope
 

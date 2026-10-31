@@ -10,11 +10,17 @@
 #                                                        also lifts a lockout and ends the user's sessions
 #   sudo erp-tenant seed-catalog staging <shop> [items]  a generated test catalog (default 20,000 items) on a staging
 #                                                        shop with no items yet (W1-21); never on prod
+#   sudo erp-tenant posting-check <env> <shop>           replays every posting from its document and lists any
+#                                                        difference with the stored ledgers (W1-08); writes nothing
+#   sudo erp-tenant posting-rebuild <env> <shop>         rewrites the shop's ledgers from the replay, then checks;
+#                                                        refused when a posting is on or before the lock date;
+#                                                        bills wait to post while it runs: after shop hours only
 #   sudo erp-tenant list                                 the specs on this server
 #
-# <env> is prod or staging. Re-running setup is safe: it creates only what's missing and reports any value that
-# differs from the spec without changing it. It runs the API image of the environment's current release in a
-# one-off container on the database network, with the owner role's URL (migrate.env), like the migrate step.
+# <env> is prod or staging. Re-running setup is safe: it creates only what's missing, applies a payment method's
+# bank account from the spec (W1-08), and reports any other value that differs from the spec without changing it.
+# It runs the API image of the environment's current release in a one-off container on the database network, with
+# the owner role's URL (migrate.env), like the migrate step.
 set -euo pipefail
 
 ROOT=/srv/erp
@@ -99,11 +105,16 @@ case $cmd in
     printf '{"action":"seed-catalog","environment":"staging","tenantCode":"%s","items":%d}' "$3" "$items" |
       run_admin staging || die "seed failed; nothing was changed"
     ;;
+  posting-check | posting-rebuild)
+    check_env "${2:-}"
+    [[ ${3:-} =~ ^[a-z0-9][a-z0-9-]{1,31}$ ]] || die "usage: erp-tenant $cmd <env> <shop>"
+    printf '{"action":"%s","tenantCode":"%s"}' "$cmd" "$3" | run_admin "$2" || die "$cmd: see the lines above"
+    ;;
   list)
     find "$SPECS" -maxdepth 1 -name '*.json' -printf '%f\n' 2>/dev/null | sed 's/\.json$//' | sort
     ;;
   *)
-    sed -n '4,14p' "$0" >&2
+    sed -n '4,19p' "$0" >&2
     exit 2
     ;;
 esac

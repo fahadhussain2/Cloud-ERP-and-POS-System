@@ -1,0 +1,159 @@
+{
+  "description": "The average cost after a receipt (posting rules §5.1, D-017)",
+  "notes": "(on hand × avg + qty × net unit cost) / (on hand + qty), rounded half away from zero, or the receipt's cost when nothing was on hand or no cost was known. Money in paisa, quantities in thousandths.",
+  "cases": [
+    {
+      "name": "10 at Rs 3,000 plus 5 at Rs 3,300: Rs 3,100",
+      "input": {
+        "state": {
+          "avgCost": 300000,
+          "onHand": 10000
+        },
+        "receipt": {
+          "qty": 5000,
+          "netUnitCost": 330000
+        }
+      },
+      "expected": {
+        "avgCost": 310000,
+        "onHand": 15000
+      }
+    },
+    {
+      "name": "a quarter paisa rounds down: Rs 1,000.0025 → Rs 1,000.00",
+      "input": {
+        "state": {
+          "avgCost": 100000,
+          "onHand": 3000
+        },
+        "receipt": {
+          "qty": 1000,
+          "netUnitCost": 100001
+        }
+      },
+      "expected": {
+        "avgCost": 100000,
+        "onHand": 4000
+      }
+    },
+    {
+      "name": "half a paisa rounds away from zero: Rs 1,000.005 → Rs 1,000.01",
+      "input": {
+        "state": {
+          "avgCost": 100000,
+          "onHand": 1000
+        },
+        "receipt": {
+          "qty": 1000,
+          "netUnitCost": 100001
+        }
+      },
+      "expected": {
+        "avgCost": 100001,
+        "onHand": 2000
+      }
+    },
+    {
+      "name": "nothing on hand: the receipt's cost",
+      "input": {
+        "state": {
+          "avgCost": 300000,
+          "onHand": 0
+        },
+        "receipt": {
+          "qty": 2000,
+          "netUnitCost": 320000
+        }
+      },
+      "expected": {
+        "avgCost": 320000,
+        "onHand": 2000
+      }
+    },
+    {
+      "name": "3 below zero (sold before it arrived): the receipt's cost, and 2 left",
+      "input": {
+        "state": {
+          "avgCost": 300000,
+          "onHand": -3000
+        },
+        "receipt": {
+          "qty": 5000,
+          "netUnitCost": 320000
+        }
+      },
+      "expected": {
+        "avgCost": 320000,
+        "onHand": 2000
+      }
+    },
+    {
+      "name": "no cost known and nothing on hand: the receipt's cost",
+      "input": {
+        "state": {
+          "avgCost": null,
+          "onHand": 0
+        },
+        "receipt": {
+          "qty": 1000,
+          "netUnitCost": 50000
+        }
+      },
+      "expected": {
+        "avgCost": 50000,
+        "onHand": 1000
+      }
+    },
+    {
+      "name": "no cost known but stock on hand (opening stock without a cost): the receipt's cost",
+      "input": {
+        "state": {
+          "avgCost": null,
+          "onHand": 2000
+        },
+        "receipt": {
+          "qty": 1000,
+          "netUnitCost": 50000
+        }
+      },
+      "expected": {
+        "avgCost": 50000,
+        "onHand": 3000
+      }
+    },
+    {
+      "name": "2.5 m at Rs 133.33 plus 1.5 m at Rs 140: Rs 135.83125 → Rs 135.83",
+      "input": {
+        "state": {
+          "avgCost": 13333,
+          "onHand": 2500
+        },
+        "receipt": {
+          "qty": 1500,
+          "netUnitCost": 14000
+        }
+      },
+      "expected": {
+        "avgCost": 13583,
+        "onHand": 4000
+      }
+    },
+    {
+      "name": "a free receipt (cost 0) pulls the average down",
+      "input": {
+        "state": {
+          "avgCost": 300000,
+          "onHand": 3000
+        },
+        "receipt": {
+          "qty": 1000,
+          "netUnitCost": 0
+        }
+      },
+      "expected": {
+        "avgCost": 225000,
+        "onHand": 4000
+      }
+    }
+  ]
+}

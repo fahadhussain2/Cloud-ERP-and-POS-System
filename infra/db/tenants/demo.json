@@ -79,12 +79,12 @@
     {
       "code": "bank_transfer",
       "name": "Bank transfer",
-      "bankAccount": null
+      "bankAccount": "hbl"
     },
     {
       "code": "raast",
       "name": "Raast",
-      "bankAccount": null
+      "bankAccount": "hbl"
     },
     {
       "code": "jazzcash",

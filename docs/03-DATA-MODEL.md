@@ -124,11 +124,11 @@ Built in migration `0006` (W0-13). Every catalog table has `legacy jsonb`: the o
 
 **item_prices:** `item_id, tier_id, price`. Unique `(tenant_id, item_id, tier_id)`.
 
-**item_costs**†: `item_id, avg_cost, last_cost, last_supplier_id, last_receipt_at`
+**item_costs**†: `item_id, avg_cost (null = no cost known yet), on_hand (tenant-wide), last_cost, last_supplier_id, last_receipt_at` (built in W1-08)
 
 **price_history:** `item_id, target (tier_id | 'floor'), old_value, new_value, source (manual|repricing|import), source_id, user_id, at`
 
-**tax_codes:** `code, name, rate_bp` (Delux: one code at 0 bp)
+**tax_codes:** `code, name, rate_bp, is_default` (Delux: one code at 0 bp, the default; an item without its own code uses it, and each sale line records the code that applied, ACC-09)
 
 ---
 
@@ -141,7 +141,7 @@ A **single document type** covers sales, returns and exchanges:
 
 This keeps the one-screen exchange (D-006) to one document, one number, one receipt and one cash movement.
 
-**Built in W1-07 (migration 0008):** `sales_documents`, `sales_lines`, `sales_payments` and `overrides` as below, filled by push (sync spec §6.2). Also on the document: the signed `payload` (jsonb) exactly as the device sent it, its `payload_hash`, the `signature`, and `exception_count`; on each line its `bill_share` of the bill discount; on each payment its `line_no` (the order on the bill). `id` is the device-made UUIDv7 (rule 7); `(device_id, seq)` is unique, the number is only indexed (one that doesn't follow from them is accepted and flagged). The app role never updates or deletes lines, payments or overrides (rule 3). The void and return fields come with W1-12 and W1-13, `unit_cost` with posting (W1-08).
+**Built in W1-07 (migration 0008):** `sales_documents`, `sales_lines`, `sales_payments` and `overrides` as below, filled by push (sync spec §6.2). Also on the document: the signed `payload` (jsonb) exactly as the device sent it, its `payload_hash`, the `signature`, and `exception_count`; on each line its `bill_share` of the bill discount; on each payment its `line_no` (the order on the bill). `id` is the device-made UUIDv7 (rule 7); `(device_id, seq)` is unique, the number is only indexed (one that doesn't follow from them is accepted and flagged). The app role never updates or deletes lines, payments or overrides (rule 3). The void and return fields come with W1-12 and W1-13. Lines get their `tax_code_id` on push; **a line's cost is on its stock movement**, not on the line (W1-08, D-095): finalized lines are never updated.
 
 **sales_documents**
 | Field | Notes |
@@ -173,7 +173,7 @@ This keeps the one-screen exchange (D-006) to one document, one number, one rece
 | `return_reason_code, return_condition (resellable|defective)` | for returned lines |
 | `location_id` | SHOP for sales; SHOP or DAMAGED for returns, by condition |
 | `override_id` | if a below-list/floor price was approved |
-| `unit_cost`† | set at posting (avg cost for sales; the original line's cost for returns) |
+| (cost) | on the line's stock movement (`stock_movements.source_line_id`): the average for a sale; for a return, the original line's cost (W1-13) |
 
 **sales_payments:** `document_id, method_id, amount (negative for refunds), cash_received (cash; optional, entered by the salesman; null = exact amount), change_due (cash; printed on the bill), reference`
 
@@ -214,7 +214,9 @@ Held bills are **device-local only** and never sent to the server.
 
 ## 7. Inventory
 
-**stock_movements**† (append-only ledger): `item_id, location_id, qty_delta, unit_cost, value_delta, avg_cost_after, source_type, source_id, source_line_id, business_date, posted_at`
+**Built in W1-08 (migration 0009):** the ledgers below, written only by `packages/posting` ([accounting spec](modules/accounting/spec.md)). Every row has the `posting_seq` of its posting.
+
+**stock_movements**† (append-only ledger): `item_id, location_id, qty_delta, unit_cost, value_delta, avg_cost_after, source_type, source_id, source_line_id, business_date (the entry date), posted_at`
 
 **stock_balances**†: `item_id, location_id, qty`. PK `(tenant_id, item_id, location_id)`. Synced to devices.
 
@@ -265,13 +267,19 @@ System roles: `CASH_DRAWER, CASH_IN_TRANSIT, AR_CONTROL, AP_CONTROL, INVENTORY, 
 
 Journal vouchers written by the accountant are stored as `journal_entries` with `source_type = 'manual'`.
 
+**Built in W1-08 (migration 0009):** `journal_entries` (with `posting_seq`; `number` J000001… per tenant) and `journal_lines` (with `line_no`); system role `SUSPENSE` (1190 *Posting suspense*, D-095), plus:
+
+- **postings**: the order of record, append-only: `seq, source_type, source_id (unique), entry_date, posted_at, context` (the accounts by role and method, the lock date and the customer's terms the posting used). A rebuild replays in this order with these settings.
+- **posting_state**: one row per tenant, `last_seq, last_journal_no`, locked by every posting so a tenant's postings run one at a time.
+- The app role may add to `postings`, `journal_entries`, `journal_lines`, `stock_movements` and `party_ledger_entries`, never update or delete them; `stock_balances`, `party_balances` and `item_costs` are kept in place by the engine.
+
 ---
 
 ## 10. Sync and control
 
 **sync_inbox:** `tenant_id, document_id (PK together), device_id, family, seq, status (accepted|rejected), result jsonb, payload_hash, received_at, attempts`. A `duplicate` is an answer, not a stored state; a rejected row is checked again when the document comes back (sync spec §6.2).
 
-**exceptions:** `kind (below_floor_no_override|discount_over_limit|document_inconsistent|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature), severity (low|medium|high), document_type, document_id, device_id, user_id, business_date, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`. Clock skew is unique per device and business date.
+**exceptions:** `kind (below_floor_no_override|discount_over_limit|document_inconsistent|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature|no_cost|posting_failed|posted_after_lock), severity (low|medium|high), document_type, document_id, device_id, user_id, business_date, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`. Clock skew is unique per device and business date; `posting_failed` is one per document (W1-08).
 
 **Built in W1-07** with the two above (migration 0008, sync spec §6.2–§8):
 

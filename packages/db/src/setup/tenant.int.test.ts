@@ -74,6 +74,14 @@ describe('setting up Delux', () => {
       expect(rows.find((r) => r.system_role === role)?.n, role).toBe(1);
   });
 
+  it('has a Posting suspense account for bills that do not add up (owner answer 3 to W1-08)', async () => {
+    expect(
+      await q(
+        "SELECT code, name, type, is_postable FROM erp.accounts WHERE tenant_id = :tenant AND system_role = 'SUSPENSE'",
+      ),
+    ).toEqual([{ code: '1190', name: 'Posting suspense', type: 'asset', is_postable: true }]);
+  });
+
   it('creates the banks and wallets, and maps the non-cash payment methods to them', async () => {
     const rows = await q<{
       code: string;
@@ -85,21 +93,18 @@ describe('setting up Delux', () => {
        LEFT JOIN erp.bank_accounts b ON b.id = pm.bank_account_id WHERE pm.tenant_id = :tenant ORDER BY pm.code`,
     );
     expect(rows).toEqual([
-      { code: 'bank_transfer', bank: null, requires_reference: true, is_cash: false },
+      { code: 'bank_transfer', bank: 'hbl', requires_reference: true, is_cash: false },
       { code: 'card', bank: 'card', requires_reference: true, is_cash: false },
       { code: 'cash', bank: null, requires_reference: false, is_cash: true },
       { code: 'easypaisa', bank: 'easypaisa', requires_reference: true, is_cash: false },
       { code: 'jazzcash', bank: 'jazzcash', requires_reference: true, is_cash: false },
       { code: 'on_account', bank: null, requires_reference: false, is_cash: false },
-      { code: 'raast', bank: null, requires_reference: true, is_cash: false },
+      { code: 'raast', bank: 'hbl', requires_reference: true, is_cash: false },
     ]);
   });
 
-  it('reports Raast and bank transfer as needing an account', () => {
-    expect(first.needsAttention).toEqual([
-      'payment method bank_transfer has no account yet',
-      'payment method raast has no account yet',
-    ]);
+  it('has nothing left needing attention: Raast and bank transfer go to HBL (owner answer 1 to W1-08)', () => {
+    expect(first.needsAttention).toEqual([]);
   });
 
   it('creates the tiers (Retail by default), the 0% tax code, the roles, the print profile and the owner', async () => {
@@ -110,8 +115,8 @@ describe('setting up Delux', () => {
       { code: 'MECHANIC', is_default: false },
       { code: 'WHOLESALE', is_default: false },
     ]);
-    expect(await q('SELECT code, rate_bp FROM erp.tax_codes WHERE tenant_id = :tenant')).toEqual([
-      { code: 'ZERO', rate_bp: 0 },
+    expect(await q('SELECT code, rate_bp, is_default FROM erp.tax_codes WHERE tenant_id = :tenant')).toEqual([
+      { code: 'ZERO', rate_bp: 0, is_default: true },
     ]);
     expect(
       (
@@ -151,6 +156,7 @@ describe('running it again', () => {
     });
     expect(again.tenantId).toBe(tenantId);
     expect(again.created).toEqual([]);
+    expect(again.updated).toEqual([]);
     expect(again.drift).toEqual([]);
     const after = await q<{ n: number }>(
       'SELECT count(*)::int AS n FROM erp.audit_log WHERE tenant_id = :tenant',
@@ -180,6 +186,61 @@ describe('running it again', () => {
     expect(await q('SELECT closing_time FROM erp.tenants WHERE id = :tenant')).toEqual([
       { closing_time: '20:00:00' },
     ]);
+  });
+});
+
+describe('moving a payment method to another bank (ACC-08, owner answer 1 to W1-08)', () => {
+  const withRaast = (bankAccount: string | null) =>
+    TenantSpec.parse({
+      ...deluxSpec,
+      paymentMethods: deluxSpec.paymentMethods.map((m) => (m.code === 'raast' ? { ...m, bankAccount } : m)),
+    });
+  const raastBank = async () =>
+    (
+      await q<{ bank: string | null }>(
+        `SELECT b.code AS bank FROM erp.payment_methods pm LEFT JOIN erp.bank_accounts b ON b.id = pm.bank_account_id
+         WHERE pm.tenant_id = :tenant AND pm.code = 'raast'`,
+      )
+    )[0]!.bank;
+  const audits = () =>
+    q<{ before: { bank_account_id: string | null }; after: { bank_account_id: string | null } }>(
+      `SELECT before, after FROM erp.audit_log
+       WHERE tenant_id = :tenant AND entity = 'payment_methods' AND action = 'update' ORDER BY at, id`,
+    );
+
+  it('applies the new bank from the spec, says so, and writes it to the audit log', async () => {
+    const report = await setupTenant(db.ownerUrl, withRaast('soneri'), {
+      ownerPasswordHash: 'x',
+      mustChangePassword: true,
+    });
+    expect(report.updated).toEqual(['payment method raast bank account: hbl → soneri']);
+    expect(report.drift).toEqual([]);
+    expect(await raastBank()).toBe('soneri');
+    expect(await audits()).toHaveLength(1);
+  });
+
+  it('changes nothing when the spec already says so', async () => {
+    const report = await setupTenant(db.ownerUrl, withRaast('soneri'), {
+      ownerPasswordHash: 'x',
+      mustChangePassword: true,
+    });
+    expect(report.updated).toEqual([]);
+    expect(await audits()).toHaveLength(1);
+  });
+
+  it('can take a method off its bank again, which then needs attention', async () => {
+    const report = await setupTenant(db.ownerUrl, withRaast(null), {
+      ownerPasswordHash: 'x',
+      mustChangePassword: true,
+    });
+    expect(report.updated).toEqual(['payment method raast bank account: soneri → none']);
+    expect(report.needsAttention).toEqual(['payment method raast has no account yet']);
+    expect(await raastBank()).toBeNull();
+  });
+
+  it('puts it back on HBL', async () => {
+    await setupTenant(db.ownerUrl, spec, { ownerPasswordHash: 'x', mustChangePassword: true });
+    expect(await raastBank()).toBe('hbl');
   });
 });
 

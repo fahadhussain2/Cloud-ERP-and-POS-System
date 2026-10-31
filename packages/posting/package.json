@@ -9,7 +9,14 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@erp/db": "workspace:*",
+    "@erp/domain": "workspace:*",
+    "pg": "catalog:"
+  },
   "devDependencies": {
+    "@types/pg": "catalog:",
+    "fast-check": "catalog:",
     "typescript": "catalog:"
   }
 }

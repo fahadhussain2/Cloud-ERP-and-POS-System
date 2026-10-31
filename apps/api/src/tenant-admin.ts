@@ -1,9 +1,12 @@
-// Tenant setup, the support password reset (PLT-11, D-083) and a generated test catalog on staging (W1-21), run by `erp-tenant` on the server in a one-off
+// Tenant setup, the support password reset (PLT-11, D-083), a generated test catalog on staging (W1-21) and the
+// posting rebuild check and apply (ACC-02, W1-08), run by `erp-tenant` on the server in a one-off
 // container with the owner role's URL (migrate.env), like the migrate step. The input arrives as JSON on stdin
 // so the password never appears in a command line or the environment; nothing secret is printed.
 import { TenantSpec } from '@erp/contracts';
 import { resetUserPassword, setupTenant } from '@erp/db';
 import { seedGeneratedCatalog } from '@erp/db/testing';
+import { applyRebuild, checkRebuild } from '@erp/posting';
+import pg from 'pg';
 import { z } from 'zod';
 
 import { hashPassword, passwordProblem } from './auth/password';
@@ -27,6 +30,9 @@ const Input = z.discriminatedUnion('action', [
     tenantCode: z.string(),
     items: z.number().int().min(1).max(50_000),
   }),
+  // Compare-only by default; `apply` rewrites the ledgers and is refused on a locked period (architecture §7).
+  z.object({ action: z.literal('posting-check'), tenantCode: z.string() }),
+  z.object({ action: z.literal('posting-rebuild'), tenantCode: z.string() }),
 ]);
 
 const fail = (message: string): never => {
@@ -62,9 +68,32 @@ try {
       console.log(items.length ? `${title}:\n${items.map((i) => `  ${i}`).join('\n')}` : `${title}: none`);
     console.log(`tenant ${input.spec.code} (${report.tenantId})`);
     list('created', report.created);
+    list('updated', report.updated);
     list('drift (not applied)', report.drift);
     list('needs attention', report.needsAttention);
-    if (report.created.length === 0 && report.drift.length === 0) console.log('no changes');
+    if (report.created.length === 0 && report.updated.length === 0 && report.drift.length === 0)
+      console.log('no changes');
+  } else if (input.action === 'posting-check' || input.action === 'posting-rebuild') {
+    const pool = new pg.Pool({ connectionString: url, max: 1 });
+    try {
+      const found = await pool.query<{ tenant_id: string }>(
+        'SELECT tenant_id FROM erp.tenant_directory WHERE code = $1',
+        [input.tenantCode],
+      );
+      const tenantId = found.rows[0]?.tenant_id ?? fail(`no shop ${input.tenantCode}`);
+      if (input.action === 'posting-rebuild') {
+        const r = await applyRebuild(url, tenantId, { userId: null, now: new Date() });
+        console.log(`${input.tenantCode}: ${r.postings} postings rewritten from their documents`);
+      }
+      const { differences } = await checkRebuild(pool, tenantId);
+      if (differences.length > 0) {
+        console.log(`${input.tenantCode}: ${differences.length} differences`);
+        for (const d of differences) console.log(`  ${d}`);
+        process.exitCode = 1;
+      } else console.log(`${input.tenantCode}: the ledgers match their documents`);
+    } finally {
+      await pool.end();
+    }
   } else if (input.action === 'seed-catalog') {
     // Refuses production itself too, not only erp-tenant (W1-21).
     const r = await seedGeneratedCatalog(url, input);
