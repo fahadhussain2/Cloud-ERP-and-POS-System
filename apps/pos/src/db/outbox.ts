@@ -91,10 +91,11 @@ export function ackPush(db: SqlDb, results: readonly PushResult[], at: string): 
         );
         continue;
       }
-      db.exec('UPDATE local_documents SET signature = coalesce(?, signature) WHERE id = ?', [
-        text(row['signature']),
-        r.id,
-      ]);
+      // When the server took it: the bill counts as unsynced credit until a later complete pull (POS spec §15).
+      db.exec(
+        'UPDATE local_documents SET signature = coalesce(?, signature), accepted_at = coalesce(accepted_at, ?) WHERE id = ?',
+        [text(row['signature']), at, r.id],
+      );
       db.exec('DELETE FROM outbox WHERE id = ?', [r.id]);
       const family = String(row['family']);
       acked.set(family, Math.max(acked.get(family) ?? 0, Number(row['seq'])));

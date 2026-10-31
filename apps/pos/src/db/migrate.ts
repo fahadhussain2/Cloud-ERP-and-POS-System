@@ -158,6 +158,28 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE INDEX local_documents_series ON local_documents (family, seq)',
     ],
   },
+  {
+    // Customers and credit (W1-09, POS spec §15, sync spec §3): the pulled customers, accounts and balances, exactly
+    // the pulled columns (a balance is keyed by its party); and when the server accepted each document, so a bill
+    // stops counting as unsynced once a complete pull that started after it has brought the balance.
+    version: 7,
+    statements: [
+      `CREATE TABLE customers (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, phones TEXT NOT NULL, city TEXT,
+        status TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE customer_accounts (
+        id TEXT PRIMARY KEY, party_id TEXT NOT NULL, price_tier_id TEXT NOT NULL, credit_allowed INTEGER NOT NULL,
+        credit_limit INTEGER, offline_daily_cap INTEGER NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX customer_accounts_party ON customer_accounts (party_id)',
+      `CREATE TABLE customer_balances (
+        party_id TEXT PRIMARY KEY, balance INTEGER NOT NULL, updated_at TEXT NOT NULL, row_version TEXT NOT NULL,
+        deleted_at TEXT
+      )`,
+      'ALTER TABLE local_documents ADD COLUMN accepted_at TEXT',
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

@@ -4,13 +4,15 @@ import { useTranslation } from 'react-i18next';
 import type { PaymentMethodRow } from '../db/checkout';
 
 // The payment pad under the total (POS spec §12, POS-17): it never moves. Cash first and largest, then the tenant's
-// other active methods in their order, On account (from W1-09) and Split payment.
+// other active methods in their order, On account (for a credit customer, POS spec §15) and Split payment.
 
 export function PaymentPad({
   methods,
   disabled,
   onCash,
   onMethod,
+  onAccount: onAccountClick,
+  onAccountBlocked,
   onSplit,
 }: {
   methods: readonly PaymentMethodRow[];
@@ -18,6 +20,9 @@ export function PaymentPad({
   disabled: boolean;
   onCash: () => void;
   onMethod: (method: PaymentMethodRow) => void;
+  onAccount: () => void;
+  /** Why On account can't be used on this bill (an i18n text), or null when it can. */
+  onAccountBlocked: string | null;
   onSplit: () => void;
 }) {
   const { t } = useTranslation();
@@ -51,8 +56,14 @@ export function PaymentPad({
         </Button>
       ))}
       {onAccount && (
-        // A credit customer can be chosen from W1-09.
-        <Button type="button" variant="outline" className="h-12 flex-1" disabled>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-12 flex-1"
+          disabled={disabled || onAccountBlocked !== null}
+          title={onAccountBlocked ?? undefined}
+          onClick={onAccountClick}
+        >
           {onAccount.name}
         </Button>
       )}

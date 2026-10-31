@@ -24,6 +24,18 @@ export async function checkApprover(opts: {
   });
 }
 
+/** Going over a customer's credit limit or the offline cap (POS spec §15, D-013): `pos.credit.over_limit` here. */
+export function checkCreditApprover(opts: {
+  approver: StaffUser;
+  approverState: PinState;
+  approverGrants: readonly RoleGrant[];
+  branchId: string | null;
+  pin: string;
+  verify: (verifier: string, pin: string) => Promise<boolean>;
+}): Promise<{ result: ApproverResult; approverState: PinState }> {
+  return checkStaffPin({ ...opts, allowed: (grants) => can(grants, 'pos.credit.over_limit', opts.branchId) });
+}
+
 /** A manager's *Try again* on a refused bill (POS spec §14, owner answer 4 to W1-07): `admin.devices` here. */
 export function checkManager(opts: {
   approver: StaffUser;

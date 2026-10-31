@@ -62,10 +62,10 @@
 - [x] **Pull datasets (integration):** each returns only its listed columns; `customers` returns only parties with a live customer account; a supplier given a customer account is returned on the next pull; a removed account arrives as a tombstone; `customer_balances` returns only customer rows; RLS keeps another tenant's rows out; the nudge fires on a change to each table.
 - [x] **Credit in push (integration):** a credit sale within the limit → accepted, no exception, the balance moves (W1-08); over the limit without approval → accepted with `credit_limit_exceeded`; with a valid approval → none; two counters' bills that together pass the limit → the second flagged; an offline bill over the cap → `offline_cap_exceeded`; an unknown `customerId` → `unknown_reference`.
 - [x] **Credit terms from the mapping (importer):** a party with a limit, one with a cap of 0 and one with credit not allowed load as given; a party without an entry gets the defaults; a limit in paisa or below 0 is refused by the mapping check; a changed entry updates the account on re-run.
-- [ ] **Local schema 7:** a schema-6 database with open bills, outbox and quarantined rows upgrades in place with every row kept; an open bill from before reads as walk-in.
-- [ ] **Counter credit figures (worker):** a pending bill counts; a refused bill counts; an acked bill counts until a complete pull that started after its ack, then stops; another customer's bills don't count; offline today counts only offline bills of this business date.
-- [ ] **Customer dialog (jsdom, fake counter):** search by name words, by code, by 4+ phone digits; the phone shown masked; Enter picks and the tier changes; back to walk-in returns to the default tier; inactive customers aren't listed; the walk-in phone is validated.
-- [ ] **On account (jsdom):** disabled for walk-in, for a customer without credit and for a seller without `pos.credit.sell`; over the limit asks for an approval; Esc leaves the bill as it was.
+- [x] **Local schema 7:** a schema-6 database with open bills, outbox and quarantined rows upgrades in place with every row kept; an open bill from before reads as walk-in.
+- [x] **Counter credit figures (worker):** a pending bill counts; a refused bill counts; an acked bill counts until a complete pull that started after its ack, then stops; another customer's bills don't count; offline today counts only offline bills of this business date.
+- [x] **Customer dialog (jsdom, fake counter):** search by name words, by code, by 4+ phone digits; the phone shown masked; Enter picks and the tier changes; back to walk-in returns to the default tier; inactive customers aren't listed; the walk-in phone is validated.
+- [x] **On account (jsdom):** disabled for walk-in, for a customer without credit and for a seller without `pos.credit.sell`; over the limit asks for an approval; Esc leaves the bill as it was.
 - [ ] **E2E:** the flows in scope item 6.
 
 ## Verify

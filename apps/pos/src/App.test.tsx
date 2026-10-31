@@ -10,6 +10,7 @@ import type { BillItem, SearchResult } from './search/search-index';
 import { App } from './App';
 import type { Counter, CounterHealth } from './counter';
 import type { CheckoutSettings, PaymentMethodRow } from './db/checkout';
+import type { CounterCustomer } from './db/customers';
 import type { DeviceInfo } from './db/repo';
 import { i18n } from './i18n';
 import type { PrintJob } from './print/print-job';
@@ -17,6 +18,7 @@ import en from './locales/en.json';
 import {
   buildSaleDocument,
   ROLE_TEMPLATES,
+  type CreditView,
   type Money,
   type RoleGrant,
   type SaleDocument,
@@ -145,6 +147,8 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
     bill: () => Promise.resolve(null),
     recordReprint: () => Promise.reject(new Error('no bill')),
     print: () => {},
+    customers: () => Promise.resolve([]),
+    creditFigures: () => Promise.reject(new Error('no customer')),
     ...over,
   };
   return { counter, calls, pushes, setDevice: (d: DeviceInfo | null) => (device = d) };
@@ -897,9 +901,38 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
       receiptHeader: [],
     };
 
+    /** A credit customer on the Mechanic tier (POS spec §15): Rs 100,000 limit, Rs 4,500 owed. */
+    const KHAN: CounterCustomer = {
+      id: 'p1',
+      code: 'C0042',
+      name: 'Khan Motors',
+      phones: ['0300-1234567'],
+      city: 'Karachi',
+      account: {
+        tierId: 't-mech',
+        creditAllowed: true,
+        creditLimit: 10000000 as Money,
+        offlineDailyCap: 2500000 as Money,
+      },
+      balance: 450000 as Money,
+    };
+
     /** The bill counter, with a finalize that builds the real document from the saved open bill. */
     const payCounter = (over: Partial<Counter> = {}) => {
-      const f = billCounter({ checkout: () => Promise.resolve(SETTINGS), ...over });
+      let credit: CreditView = {
+        account: KHAN.account,
+        balance: KHAN.balance,
+        balanceAsOf: '2026-11-02T09:00:00.000Z',
+        unsynced: 0 as Money,
+        offline: false,
+        offlineToday: 0 as Money,
+      };
+      const f = billCounter({
+        checkout: () => Promise.resolve(SETTINGS),
+        customers: () => Promise.resolve([KHAN]),
+        creditFigures: (_id, offline) => Promise.resolve({ ...credit, offline }),
+        ...over,
+      });
       const docs: SaleDocument[] = [];
       const printed: PrintJob[] = [];
       const reprints: string[] = [];
@@ -914,7 +947,9 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
             tender: req.tender,
             methods: METHODS,
             sellerMaxDiscountBp: 10000,
-            hasCreditCustomer: false,
+            customer: { id: ob.customer?.id ?? null, walkinPhone: ob.walkinPhone ?? null },
+            credit: ob.customer ? { ...credit, offline: req.offline } : null,
+            creditApproval: req.creditApproval,
             context: {
               id: req.id,
               seq: docs.length + 1,
@@ -951,7 +986,10 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
         reprints.push(`${r.number} ${r.userId}`);
         return Promise.resolve({ ...r, id: 'r1', pushedAt: null });
       };
-      return { ...f, docs, printed, reprints, finalized };
+      const setCredit = (c: Partial<CreditView>) => {
+        credit = { ...credit, ...c };
+      };
+      return { ...f, docs, printed, reprints, finalized, setCredit };
     };
 
     const dialog = () => screen.getByRole('dialog');
@@ -1045,8 +1083,10 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
       const f = payCounter();
       await sold(f.counter);
       const pad = within(screen.getByRole('group', { name: en.pay.pad }));
-      // On account waits for a credit customer (W1-09).
-      expect(pad.getByRole<HTMLButtonElement>('button', { name: 'On account' }).disabled).toBe(true);
+      // On account waits for a credit customer (POS spec §15).
+      const onAccount = pad.getByRole<HTMLButtonElement>('button', { name: 'On account' });
+      expect(onAccount.disabled).toBe(true);
+      expect(onAccount.title).toBe(en.credit.needsCustomer);
       fireEvent.click(pad.getByRole('button', { name: 'Raast' }));
       const reference = await within(await screen.findByRole('dialog')).findByLabelText(
         en.pay.reference.raast,
@@ -1123,6 +1163,135 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
       fireEvent.keyDown(window, { key: 'F9' });
       await act(() => Promise.resolve());
       expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    describe('customers and credit (W1-09, POS spec §15)', () => {
+      const strip = () =>
+        plain(screen.getByRole('region', { name: en.bill.title }).querySelector('span')?.textContent);
+      const pickKhan = async (by = '4567') => {
+        fireEvent.keyDown(window, { key: 'F4' });
+        const d = within(await screen.findByRole('dialog'));
+        fireEvent.change(d.getByLabelText(en.customer.search), { target: { value: by } });
+        const option = await d.findByRole('option', { name: /Khan Motors/ });
+        expect(plain(option.textContent)).toContain('•••• 4567');
+        expect(plain(option.textContent)).not.toContain('1234567');
+        fireEvent.keyDown(d.getByLabelText(en.customer.search), { key: 'ArrowDown' });
+        enter(d.getByLabelText(en.customer.search));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      };
+
+      it('F4 finds a customer by phone and their tier sets the prices; back to walk-in returns to Retail', async () => {
+        const f = payCounter();
+        await sold(f.counter);
+        await pickKhan();
+        await waitFor(() => expect(total()).toBe('Rs 4,275'));
+        expect(strip()).toContain('Khan Motors (C0042)');
+        expect(strip()).toContain('Available Rs 95,500');
+        expect(f.bills.get('u1')!.customer).toEqual({ id: 'p1', code: 'C0042', name: 'Khan Motors' });
+
+        // With a customer on the bill, F4 opens on them: ↓ and Enter go back to walk-in.
+        fireEvent.keyDown(window, { key: 'F4' });
+        const d = within(await screen.findByRole('dialog'));
+        expect(d.getAllByRole('option')[0]!.textContent).toContain('Khan Motors');
+        fireEvent.keyDown(d.getByLabelText(en.customer.search), { key: 'ArrowDown' });
+        enter(d.getByLabelText(en.customer.search));
+        await waitFor(() => expect(total()).toBe('Rs 4,500'));
+        expect(f.bills.get('u1')!.customer).toBeNull();
+      });
+
+      it('On account within the limit: the popup shows the figures, Enter finalizes with no cash', async () => {
+        const f = payCounter();
+        await sold(f.counter);
+        await pickKhan('C0042');
+        const pad = within(screen.getByRole('group', { name: en.pay.pad }));
+        await waitFor(() =>
+          expect(pad.getByRole<HTMLButtonElement>('button', { name: 'On account' }).disabled).toBe(false),
+        );
+        fireEvent.click(pad.getByRole('button', { name: 'On account' }));
+        const d = within(await screen.findByRole('dialog'));
+        expect(plain(d.getByTestId('credit-facts').textContent)).toContain('Rs 8,775');
+        fireEvent.click(d.getByRole('button', { name: new RegExp(`^${en.pay.finalize}`) }));
+        await waitFor(() => expect(f.docs).toHaveLength(1));
+        expect(f.docs[0]).toMatchObject({
+          customerId: 'p1',
+          payments: [{ method: 'on_account', amount: 427500 }],
+          cashDue: 0,
+          overrides: [],
+          credit: { offline: false, balance: 450000 },
+        });
+        await waitFor(() => expect(notice()).toBe('Bill C01-S000001 printed · paid by On account'));
+        expect(f.printed[0]!.customer).toEqual({ code: 'C0042', name: 'Khan Motors' });
+      });
+
+      it('over the limit, a manager approves with their own PIN and a credit reason', async () => {
+        const f = payCounter();
+        f.setCredit({ balance: 9800000 as Money });
+        await sold(f.counter);
+        await pickKhan('khan');
+        fireEvent.click(
+          within(screen.getByRole('group', { name: en.pay.pad })).getByRole('button', { name: 'On account' }),
+        );
+        const d = within(await screen.findByRole('dialog'));
+        expect(d.getByText(i18n.t('credit.overLimit', { amount: 'Rs 2,275' }))).toBeDefined();
+        fireEvent.click(d.getByRole('button', { name: new RegExp(`^${en.pay.finalize}`) }));
+        expect(await screen.findByText(en.approval.credit_limit)).toBeDefined();
+        expect(f.docs).toHaveLength(0);
+        // The manager (short code 41) approves with their own PIN; the credit reasons are offered.
+        fireEvent.change(screen.getByLabelText(en.unlock.shortCode), { target: { value: '41' } });
+        expect(screen.getByLabelText(en.override.reason.pay_soon)).toBeDefined();
+        fireEvent.change(screen.getByLabelText(en.approval.pin), { target: { value: '4321' } });
+        fireEvent.submit(screen.getByLabelText(en.approval.pin).closest('form')!);
+        await waitFor(() => expect(f.docs).toHaveLength(1));
+        expect(f.docs[0]!.overrides).toMatchObject([
+          { kind: 'credit_limit', requestedBy: 'u1', approvedBy: 'm1', reason: 'pay_soon' },
+        ]);
+      });
+
+      it('On account stays off for a customer without credit, and for a seller without pos.credit.sell', async () => {
+        const button = () =>
+          within(screen.getByRole('group', { name: en.pay.pad })).getByRole<HTMLButtonElement>('button', {
+            name: 'On account',
+          });
+        const noCredit = payCounter({
+          customers: () => Promise.resolve([{ ...KHAN, account: { ...KHAN.account, creditAllowed: false } }]),
+        });
+        await sold(noCredit.counter);
+        await pickKhan();
+        await waitFor(() => expect(strip()).toContain('Khan Motors'));
+        expect([button().disabled, button().title]).toEqual([true, en.credit.needsCustomer]);
+        cleanup();
+
+        const seller = payCounter({
+          grants: (id) =>
+            Promise.resolve(
+              id === 'm1'
+                ? [role('manager')]
+                : [{ ...role('salesman'), permissions: ['pos.sale.create', 'pos.sale.hold'] }],
+            ),
+        });
+        await sold(seller.counter);
+        await pickKhan();
+        await waitFor(() => expect(button().title).toBe(en.credit.notPermitted));
+        expect(button().disabled).toBe(true);
+      });
+
+      it('a walk-in may leave a phone: shown by its last four digits, stored normalized', async () => {
+        const f = payCounter();
+        await sold(f.counter);
+        fireEvent.keyDown(window, { key: 'F4' });
+        const d = within(await screen.findByRole('dialog'));
+        const phone = d.getByLabelText(en.customer.walkinPhone);
+        fireEvent.change(phone, { target: { value: '12' } });
+        enter(phone);
+        expect(await d.findByText(en.customer.badPhone)).toBeDefined();
+        fireEvent.change(phone, { target: { value: '+92 300 1234567' } });
+        enter(phone);
+        await waitFor(() => expect(strip()).toContain('Walk-in · •••• 4567'));
+        fireEvent.keyDown(window, { key: 'F9' });
+        enter(await within(await screen.findByRole('dialog')).findByLabelText(en.pay.cashReceived));
+        await waitFor(() => expect(f.docs).toHaveLength(1));
+        expect(f.docs[0]).toMatchObject({ customerId: null, walkinPhone: '03001234567' });
+      });
     });
 
     it('Alt+P reprints a bill of this counter, marked REPRINT and kept for the audit log', async () => {

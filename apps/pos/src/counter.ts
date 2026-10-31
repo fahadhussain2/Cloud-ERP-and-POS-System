@@ -1,8 +1,9 @@
 import type { CounterPinChangeRequest } from '@erp/contracts';
-import type { Money, PinState, RoleGrant, SaleDocument } from '@erp/domain';
+import type { CreditView, Money, PinState, RoleGrant, SaleDocument } from '@erp/domain';
 
 import type { OpenBill } from './bill/open-bill';
 import type { CheckoutSettings, DocumentSummary, FinalizeRequest, Finalized, Reprint } from './db/checkout';
+import type { CounterCustomer } from './db/customers';
 import type { LocalHealth, QuarantinedRow } from './db/outbox';
 import type { DeviceInfo, PinEvent, TenantSettings } from './db/repo';
 import type { EnrollResult } from './device/session';
@@ -90,6 +91,10 @@ export interface Counter {
   recentBills(since: string, filter: string): Promise<DocumentSummary[]>;
   bill(id: string): Promise<SaleDocument | null>;
   recordReprint(r: Omit<Reprint, 'id' | 'pushedAt'>): Promise<Reprint>;
+  /** The customers the F4 dialog can pick, with their accounts and pulled balances (POS spec §15). */
+  customers(): Promise<CounterCustomer[]>;
+  /** A customer's credit figures now, as finalize will read them (POS spec §15). */
+  creditFigures(customerId: string, offline: boolean): Promise<CreditView>;
   /** Prints a bill on the default printer (`window.print()` under `--kiosk-printing`, POS spec §13). */
   print(job: PrintJob): void;
 }

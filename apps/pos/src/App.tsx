@@ -399,6 +399,7 @@ export function App({ counter }: { counter: Counter }) {
           staff={staff}
           branchId={device?.branchId ?? null}
           shopName={settings?.name ?? ''}
+          offline={connection.state !== 'online'}
           onLock={() => setPhase({ name: 'locked' })}
           onSaved={() => {
             void refresh();

@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 
 import { formatQty } from '../bill/bill-state';
 import type { OpenBill } from '../bill/open-bill';
+import { maskPhone } from '../search/customer-search';
 
 // The bill on the counter screen (POS spec §10, prototype layout): what the bill is priced at, the lines with their
 // list price, floor and chips, and the totals pinned at the bottom with the payment pad under them (POS spec §12).
@@ -34,6 +35,8 @@ export function BillPanel({
   total,
   pending,
   tierName,
+  customerText,
+  walkinPhone,
   selected,
   active,
   message,
@@ -51,6 +54,10 @@ export function BillPanel({
   total: SaleTotal | null;
   pending: readonly PendingApproval[];
   tierName: string;
+  /** The customer and their credit (POS spec §15); null for a walk-in. */
+  customerText: string | null;
+  /** A walk-in's phone, shown by its last four digits. */
+  walkinPhone: string | null;
   /** The selected line, when the lines have the keyboard. */
   selected: number;
   active: boolean;
@@ -92,8 +99,9 @@ export function BillPanel({
           {t('bill.title')}
         </h2>
         <span className="text-sm">
-          {t('bill.walkIn')} ·{' '}
-          <span className="font-semibold">{t('bill.tierPrices', { tier: tierName })}</span>
+          {customerText ??
+            (walkinPhone ? t('bill.walkInPhone', { phone: maskPhone(walkinPhone) }) : t('bill.walkIn'))}{' '}
+          · <span className="font-semibold">{t('bill.tierPrices', { tier: tierName })}</span>
         </span>
       </div>
       {message && (

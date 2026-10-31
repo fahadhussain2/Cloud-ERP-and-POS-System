@@ -11,11 +11,22 @@ export interface LineItem {
   spec: string | null;
 }
 
+/** Who the bill is for, as the customer dialog picked them (POS spec §15). */
+export interface BillCustomer {
+  id: string;
+  code: string;
+  name: string;
+}
+
 export interface OpenBill {
   version: 1;
   bill: Bill;
   /** By item id. */
   items: Record<string, LineItem>;
+  /** A customer's bill (W1-09); absent or null = a walk-in. Bills saved before W1-09 have neither field. */
+  customer?: BillCustomer | null;
+  /** A walk-in's phone as typed, only without a customer. */
+  walkinPhone?: string | null;
 }
 
 /** A stored open bill, or null for one this version doesn't know (another version, or not JSON at all). */

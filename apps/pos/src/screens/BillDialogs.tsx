@@ -1,4 +1,4 @@
-import { OVERRIDE_REASONS, PIN_MAX_FAILURES, type OverrideReason, type PendingApproval } from '@erp/domain';
+import { OVERRIDE_REASONS, PIN_MAX_FAILURES } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -217,34 +217,39 @@ export function ConfirmDialog({
   );
 }
 
-export type ApprovalAttempt = (
+export type ApprovalAttempt<R extends string = string> = (
   approver: StaffUser,
   pin: string,
-  reason: OverrideReason,
+  reason: R,
   note: string | null,
 ) => Promise<{ result: ApproverResult; failures: number }>;
 
 /**
- * An approval on the same screen (POS spec §10, PLT-07): the approver picks their name (or types their short code),
- * enters their own PIN and a reason. The PIN is checked by `onApprove`; a refusal says why and stays open.
+ * An approval on the same screen (POS spec §10, §15, PLT-07): the approver picks their name (or types their short
+ * code), enters their own PIN and a reason. The PIN is checked by `onApprove`; a refusal says why and stays open.
+ * A price takes the price reasons; going over a credit limit takes the credit reasons (owner answer 2 to W1-09).
  */
-export function ApprovalDialog({
-  pending,
+export function ApprovalDialog<R extends string>({
+  description,
   facts,
   staff,
+  reasons = OVERRIDE_REASONS as unknown as readonly R[],
   onApprove,
   onClose,
 }: {
-  pending: PendingApproval;
+  /** What needs the approval, already in words. */
+  description: string;
   facts: readonly (readonly [string, ReactNode])[];
   staff: StaffUser[];
-  onApprove: ApprovalAttempt;
+  /** The reasons to choose from, shown as `override.reason.<r>`; the first is preselected. */
+  reasons?: readonly R[];
+  onApprove: ApprovalAttempt<R>;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const [approver, setApprover] = useState<StaffUser | null>(null);
   const [pin, setPin] = useState('');
-  const [reason, setReason] = useState<OverrideReason>('customer_bargain');
+  const [reason, setReason] = useState<R>(reasons[0]!);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -270,7 +275,7 @@ export function ApprovalDialog({
   return (
     <FormDialog
       title={t('approval.title')}
-      description={t(`approval.${pending.need}`)}
+      description={description}
       actionLabel={busy ? t('approval.checking') : t('approval.action')}
       busy={busy || approver === null}
       onClose={onClose}
@@ -313,7 +318,7 @@ export function ApprovalDialog({
           />
           <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
             <legend className={`${LABEL_CLASS} mb-1`}>{t('approval.reason')}</legend>
-            {OVERRIDE_REASONS.map((r) => (
+            {reasons.map((r) => (
               <label key={r} className="flex cursor-pointer items-center gap-2">
                 <input
                   type="radio"

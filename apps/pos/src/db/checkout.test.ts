@@ -15,11 +15,13 @@ import {
   setSignature,
   type FinalizeRequest,
 } from './checkout';
+import { creditFigures, listCustomers } from './customers';
 import { migrate } from './migrate';
+import { ackPush } from './outbox';
 import { applyPull, loadOpenBill, saveOpenBill, setDevice } from './repo';
 import { wrapOo1, type SqlDb } from './sql';
 
-// Paying, finalizing and reprinting on the counter (POS spec §12–§13, data model §12, rule 6), on real SQLite.
+// Paying, finalizing and reprinting on the counter (POS spec §12–§13, §15, data model §12, rule 6), on real SQLite.
 
 let sqlite3: Awaited<ReturnType<typeof sqlite3InitModule>>;
 let db: SqlDb;
@@ -170,6 +172,8 @@ const request = (n: number, tender: Tender = cash(145000)): FinalizeRequest => (
   createdAtMs: T0 + n * 60_000,
   clientVersion: '0.6.0',
   tender,
+  offline: false,
+  creditApproval: null,
 });
 
 const count = (table: string) => Number(db.selectValue(`SELECT count(*) FROM ${table}`));
@@ -379,5 +383,183 @@ describe('after finalizing', () => {
     expect(r.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(listReprints(db)).toEqual([r]);
     expect(db.selectValue("SELECT count(*) FROM diagnostic_log WHERE kind = 'bill.reprinted'")).toBe(1);
+  });
+});
+
+describe('customers and credit on the counter (POS spec §15, W1-09)', () => {
+  const KHAN = ID('f9');
+  const onAccount = (amount = 145000): Tender => ({
+    payments: [{ method: 'on_account', amount: money(amount), reference: null }],
+    cashReceived: null,
+  });
+  const forKhan = (unitPrice = 145000): OpenBill => ({
+    ...openBill(unitPrice),
+    customer: { id: KHAN, code: 'C0042', name: 'Khan Motors' },
+  });
+  const sell = (n: number, tender: Tender, over: Partial<FinalizeRequest> = {}) => {
+    saveOpenBill(db, SARA, forKhan());
+    return finalizeSale(db, { ...request(n, tender), ...over });
+  };
+  const balance = (amount: number) =>
+    pull({
+      customer_balances: [
+        row({ party_id: KHAN, balance: String(amount), updated_at: '2026-11-02T09:00:00Z' }),
+      ],
+    });
+  const figures = (offline = false) => creditFigures(db, KHAN, offline, '2026-11-02');
+
+  beforeEach(() => {
+    ready();
+    pull({
+      payment_methods: [
+        row({
+          id: ID('m7'),
+          code: 'on_account',
+          name: 'On account',
+          is_cash: false,
+          requires_reference: false,
+          is_active: true,
+          sort: 7,
+        }),
+      ],
+      customers: [
+        row({
+          id: KHAN,
+          code: 'C0042',
+          name: 'Khan Motors',
+          phones: ['0300-1234567'],
+          city: 'Karachi',
+          status: 'active',
+        }),
+        row({
+          id: ID('f8'),
+          code: 'C0043',
+          name: 'Gone Traders',
+          phones: [],
+          city: null,
+          status: 'inactive',
+        }),
+        row({ id: ID('f7'), code: 'S0007', name: 'A Supplier', phones: [], city: null, status: 'active' }),
+      ],
+      customer_accounts: [
+        row({
+          id: ID('a1'),
+          party_id: KHAN,
+          price_tier_id: ID('b2'),
+          credit_allowed: true,
+          credit_limit: '1000000',
+          offline_daily_cap: '200000',
+        }),
+        row({
+          id: ID('a2'),
+          party_id: ID('f8'),
+          price_tier_id: ID('b1'),
+          credit_allowed: true,
+          credit_limit: null,
+          offline_daily_cap: '0',
+        }),
+      ],
+    });
+    balance(450000);
+  });
+
+  it('lists active customers with a live account, with their terms and pulled balance', () => {
+    expect(listCustomers(db)).toEqual([
+      {
+        id: KHAN,
+        code: 'C0042',
+        name: 'Khan Motors',
+        phones: ['0300-1234567'],
+        city: 'Karachi',
+        account: { tierId: ID('b2'), creditAllowed: true, creditLimit: 1000000, offlineDailyCap: 200000 },
+        balance: 450000,
+      },
+    ]);
+    // A removed account takes the customer off the list (sync spec §3).
+    pull({ customer_accounts: [row({ id: ID('a1'), deleted_at: '2026-11-02T11:00:00Z' })] });
+    expect(listCustomers(db)).toEqual([]);
+  });
+
+  it('finalizes a sale on account for the customer, with the credit view the counter decided on', () => {
+    const { document } = sell(1, onAccount());
+    expect(document).toMatchObject({
+      customerId: KHAN,
+      walkinPhone: null,
+      cashDue: 0,
+      handoverStatus: 'not_applicable',
+      overrides: [],
+      credit: { offline: false, balance: 450000, balanceAsOf: null, unsynced: 0, offlineToday: 0 },
+    });
+    expect(SaleDocumentV1.safeParse(document).error).toBeUndefined();
+  });
+
+  it('counts a bill as unsynced until a complete pull that started after the server took it', () => {
+    const { document } = sell(1, onAccount());
+    expect(figures().unsynced).toBe(145000);
+    ackPush(
+      db,
+      [{ id: document.id, status: 'accepted', exceptions: [], error: null }],
+      '2026-11-02T10:20:00.000Z',
+    );
+    expect(count('outbox')).toBe(0);
+    expect(figures().unsynced).toBe(145000);
+    // A pull that began before the bill was accepted may not have it.
+    applyPull(db, {}, 'c2', true, '2026-11-02T10:19:00.000Z');
+    expect(figures().unsynced).toBe(145000);
+    applyPull(db, {}, 'c3', true, '2026-11-02T10:21:00.000Z');
+    expect(figures()).toMatchObject({ unsynced: 0, balanceAsOf: '2026-11-02T10:21:00.000Z' });
+  });
+
+  it('keeps counting a bill the server refused', () => {
+    const { document } = sell(1, onAccount());
+    ackPush(
+      db,
+      [{ id: document.id, status: 'rejected', exceptions: [], error: 'bad_schema' }],
+      '2026-11-02T10:20:00Z',
+    );
+    applyPull(db, {}, 'c2', true, '2026-11-02T10:21:00.000Z');
+    expect(figures().unsynced).toBe(145000);
+  });
+
+  it('refuses a bill over the limit without an approval, and records the approval when given', () => {
+    balance(900000);
+    expect(() => sell(1, onAccount())).toThrow(expect.objectContaining({ code: 'credit_approval_pending' }));
+    expect(count('outbox')).toBe(0);
+    const approval = {
+      requestedBy: SARA,
+      approvedBy: ID('a9'),
+      reason: 'pay_soon' as const,
+      note: null,
+      at: '2026-11-02T10:16:00Z',
+    };
+    const { document } = sell(2, onAccount(), { creditApproval: approval });
+    expect(document.overrides).toEqual([
+      {
+        kind: 'credit_limit',
+        lineNo: null,
+        ...approval,
+        values: { limit: 1000000, balance: 900000, unsynced: 0, amount: 145000 },
+      },
+    ]);
+  });
+
+  it('holds offline bills to the day’s cap; online bills don’t count towards it', () => {
+    sell(1, onAccount());
+    sell(2, onAccount(), { offline: true });
+    expect(figures(true)).toMatchObject({ offline: true, offlineToday: 145000, unsynced: 290000 });
+    expect(() => sell(3, onAccount(), { offline: true })).toThrow(
+      expect.objectContaining({ code: 'credit_approval_pending' }),
+    );
+    // Online, the cap doesn't apply.
+    expect(sell(4, onAccount()).document.overrides).toEqual([]);
+  });
+
+  it('stores a walk-in’s phone normalized, and refuses on account for a walk-in', () => {
+    saveOpenBill(db, SARA, { ...openBill(), walkinPhone: '+92 300 1234567' });
+    expect(finalizeSale(db, request(1)).document.walkinPhone).toBe('03001234567');
+    saveOpenBill(db, SARA, openBill());
+    expect(() => finalizeSale(db, request(2, onAccount()))).toThrow(
+      expect.objectContaining({ code: 'invalid_tender' }),
+    );
   });
 });

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { CATALOG_COLUMNS, CATALOG_DATASETS } from '@erp/contracts';
+import { CATALOG_COLUMNS, CATALOG_DATASETS, CUSTOMER_COLUMNS } from '@erp/contracts';
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -222,6 +222,29 @@ describe('migrations', () => {
     expect(db.selectValue('SELECT signature FROM local_documents')).toBeNull();
     const indexes = db.selectObjects('PRAGMA index_list(local_documents)').map((r) => String(r['name']));
     expect(indexes).toContain('local_documents_series');
+  });
+
+  it("schema 7 adds customers, accounts and balances (W1-09) and keeps a W1-07 counter's rows", () => {
+    const db = fresh();
+    migrate(db, MIGRATIONS.slice(0, 6));
+    db.exec("INSERT INTO open_bills (user_id, bill, updated_at) VALUES ('sara', '{}', 'now')");
+    db.exec(
+      `INSERT INTO local_documents (id, family, seq, number, kind, business_date, payload, created_at, signature)
+       VALUES ('d1', 'S', 1, 'C03-S000001', 'sale', '2026-11-02', '{}', 'now', 'sig')`,
+    );
+    db.exec(
+      "INSERT INTO outbox (id, family, seq, payload, signature, status, attempts, created_at) VALUES ('d1', 'S', 1, '{}', 'sig', 'quarantined', 1, 'now')",
+    );
+    migrate(db);
+    expect(LATEST_VERSION).toBeGreaterThanOrEqual(7);
+    for (const table of ['open_bills', 'local_documents', 'outbox'])
+      expect(db.selectValue(`SELECT count(*) FROM ${table}`)).toBe(1);
+    expect(db.selectValue('SELECT status FROM outbox')).toBe('quarantined');
+    expect(db.selectValue('SELECT accepted_at FROM local_documents')).toBeNull();
+    const columns = (table: string) =>
+      db.selectObjects(`PRAGMA table_info(${table})`).map((r) => String(r['name']));
+    for (const [table, list] of Object.entries(CUSTOMER_COLUMNS))
+      expect(columns(table)).toEqual([...Object.keys(list), 'row_version', 'deleted_at']);
   });
 
   it('roll back a migration that fails and leave the previous schema', () => {

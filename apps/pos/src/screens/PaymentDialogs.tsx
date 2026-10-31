@@ -1,4 +1,6 @@
 import {
+  add,
+  checkCredit,
   checkTender,
   DomainError,
   money as toMoney,
@@ -7,6 +9,7 @@ import {
   quickCash,
   sub,
   sum,
+  type CreditView,
   type Money,
   type Tender,
   type TenderLine,
@@ -28,7 +31,7 @@ import { useTranslation } from 'react-i18next';
 import type { CheckoutSettings, PaymentMethodRow } from '../db/checkout';
 import { FormDialog } from './BillDialogs';
 
-// Paying a bill (POS spec §12, POS-06, POS-17, D-053): the Cash, method and Split popups. Each ends with Cancel (Esc)
+// Paying a bill (POS spec §12, §15, POS-06, POS-07, POS-17, D-053): the Cash, method, On account and Split popups. Each ends with Cancel (Esc)
 // and Finalize & print (Enter); Esc leaves the bill as it was. The rules are checkTender's; `onPay` finalizes and
 // answers with the i18n key of what went wrong, or null.
 
@@ -38,6 +41,8 @@ interface PayProps {
   settings: CheckoutSettings;
   total: Money;
   money: { locale: string; currency: string; minorUnits: number };
+  /** The bill's customer may buy on account and the seller may sell on account (POS spec §15). */
+  creditCustomer?: boolean;
   onPay: Pay;
   onClose: () => void;
 }
@@ -103,8 +108,14 @@ function Big({ label, children, tone }: { label: string; children: ReactNode; to
   );
 }
 
-const check = (s: CheckoutSettings, total: Money, tender: Tender) =>
-  checkTender({ total, increment: s.increment, methods: s.methods, tender, hasCreditCustomer: false });
+const check = (s: CheckoutSettings, total: Money, tender: Tender, creditCustomer = false) =>
+  checkTender({
+    total,
+    increment: s.increment,
+    methods: s.methods,
+    tender,
+    hasCreditCustomer: creditCustomer,
+  });
 
 /** Cash (`F9`): Enter with the field empty is the exact amount; the quick-cash buttons finalize in one click. */
 export function CashDialog({ settings, total, money, onPay, onClose }: PayProps) {
@@ -243,15 +254,15 @@ export function MethodDialog({
 }
 
 /** Split payment (`Shift+F9`): one row per method, cash first and prefilled with the total; cash received on its row. */
-export function SplitDialog({ settings, total, money, onPay, onClose }: PayProps) {
+export function SplitDialog({ settings, total, money, creditCustomer = false, onPay, onClose }: PayProps) {
   const { t } = useTranslation();
   const m = (minor: number) => formatMoney(minor, money);
   const referenceLabel = useReferenceLabel();
   const { read } = useAmounts(money.minorUnits);
   const { busy, error, setError, pay } = usePaying(onPay);
-  // On account needs a credit customer (W1-09).
+  // On account only for a credit customer (POS spec §15); its part is checked against the limit when finalizing.
   const rows = settings.methods
-    .filter((x) => x.code !== 'on_account')
+    .filter((x) => x.code !== 'on_account' || creditCustomer)
     .sort((a, b) => Number(b.isCash) - Number(a.isCash));
   const first = rows[0]?.code;
   const [amounts, setAmounts] = useState<Record<string, string>>(
@@ -280,7 +291,7 @@ export function SplitDialog({ settings, total, money, onPay, onClose }: PayProps
         : [],
     );
     const tender: Tender = { payments, cashReceived: received.kind === 'ok' ? received.value : null };
-    const problem = check(settings, total, tender);
+    const problem = check(settings, total, tender, creditCustomer);
     if (problem) return setError(`tender.${problem}`);
     void pay(tender);
   };
@@ -332,6 +343,8 @@ export function SplitDialog({ settings, total, money, onPay, onClose }: PayProps
                   setError(null);
                 }}
               />
+            ) : row.code === 'on_account' ? (
+              <span />
             ) : (
               <Input
                 aria-label={t('pay.referenceOf', { method: row.name, label: referenceLabel(row) })}
@@ -357,6 +370,92 @@ export function SplitDialog({ settings, total, money, onPay, onClose }: PayProps
           <span data-testid="pay-change">{m(change)}</span>
         </Big>
       )}
+      <Problem text={error} />
+    </FormDialog>
+  );
+}
+
+/**
+ * On account (POS spec §15, PRD W2): the whole bill on the customer's account. Shows the balance and when it was
+ * pulled, this counter's bills the server hasn't counted yet, the balance after this bill, the limit and, offline,
+ * today's cap. Over either, Finalize asks for an approval (the screen opens it); no cash moves.
+ */
+export function OnAccountDialog({
+  total,
+  money,
+  customerName,
+  figures,
+  timeZone,
+  onPay,
+  onClose,
+}: {
+  total: Money;
+  money: { locale: string; currency: string; minorUnits: number };
+  customerName: string;
+  figures: CreditView;
+  timeZone: string;
+  onPay: Pay;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const m = (minor: number) => formatMoney(minor, money);
+  const { busy, error, pay } = usePaying(onPay);
+  const c = checkCredit({ ...figures, amount: total });
+  const asOf =
+    figures.balanceAsOf === null
+      ? t('credit.notPulled')
+      : new Intl.DateTimeFormat(money.locale, { timeStyle: 'short', timeZone }).format(
+          new Date(figures.balanceAsOf),
+        );
+  const facts: [string, ReactNode][] = [
+    [t('credit.balance', { time: asOf }), m(figures.balance)],
+    [t('credit.unsynced'), m(figures.unsynced)],
+    [t('credit.after'), m(add(add(figures.balance, figures.unsynced), total))],
+    [
+      t('credit.limit'),
+      figures.account?.creditLimit === null || figures.account === null
+        ? t('credit.noLimit')
+        : m(figures.account.creditLimit),
+    ],
+  ];
+  if (figures.offline && figures.account)
+    facts.push([
+      t('credit.capToday'),
+      t('credit.capUsed', { used: m(figures.offlineToday), cap: m(figures.account.offlineDailyCap) }),
+    ]);
+  const warnings = c.allowed
+    ? [
+        c.overLimitBy > 0 ? t('credit.overLimit', { amount: m(c.overLimitBy) }) : null,
+        c.overCapBy > 0 ? t('credit.overCap', { amount: m(c.overCapBy) }) : null,
+      ].filter((x): x is string => x !== null)
+    : [t('tender.on_account_needs_customer')];
+
+  return (
+    <FormDialog
+      title={t('credit.title', { name: customerName })}
+      actionLabel={busy ? t('pay.saving') : t('pay.finalize')}
+      busy={busy || !c.allowed}
+      onClose={onClose}
+      onSubmit={() =>
+        void pay({ payments: [{ method: 'on_account', amount: total, reference: null }], cashReceived: null })
+      }
+    >
+      <Big label={t('pay.total')} tone="good">
+        <span data-testid="pay-total">{m(total)}</span>
+      </Big>
+      <dl className="m-0 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1" data-testid="credit-facts">
+        {facts.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="m-0 text-end font-semibold tabular-nums">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {warnings.map((w) => (
+        <Alert key={w} variant="destructive">
+          <AlertDescription>{w}</AlertDescription>
+        </Alert>
+      ))}
       <Problem text={error} />
     </FormDialog>
   );

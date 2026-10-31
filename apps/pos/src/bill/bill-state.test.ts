@@ -2,7 +2,15 @@ import { money, qty, removeLine, setBillDiscount } from '@erp/domain';
 import { describe, expect, it } from 'vitest';
 
 import type { BillItem } from '../search/search-index';
-import { addItem, formatQty, newOpenBill, parseQuantity, quantityPrefix, tryEdit } from './bill-state';
+import {
+  addItem,
+  formatQty,
+  newOpenBill,
+  parseQuantity,
+  quantityPrefix,
+  setCustomer,
+  tryEdit,
+} from './bill-state';
 
 // The counter's side of the bill (POS spec §10–§11): the rules themselves are golden-tested in packages/domain.
 
@@ -92,5 +100,42 @@ describe('typed quantities', () => {
     expect(formatQty(qty(1005), 'en-PK')).toBe('1.005');
     expect(formatQty(qty(9999000), 'en-PK')).toBe('9,999');
     expect(formatQty(qty(-1500), 'en-PK')).toBe('-1.5');
+  });
+});
+
+describe('the customer on the bill (POS spec §15)', () => {
+  const khan = { id: 'p1', code: 'C0042', name: 'Khan Motors' };
+  const withPads = () => {
+    const r = addItem(newOpenBill('s1', 't-retail'), pads, qty(1000), 'l1');
+    if (!r.ok) throw new Error(r.error);
+    return r.bill;
+  };
+
+  it("takes the customer's tier: a line at list moves to its price", () => {
+    const r = setCustomer(withPads(), { customer: khan, walkinPhone: null }, 't-mech', { i1: money(427500) });
+    expect(r.ok && r.bill.customer).toEqual(khan);
+    expect(r.ok && r.bill.bill.tierId).toBe('t-mech');
+    expect(r.ok && r.bill.bill.lines[0]!.unitPrice).toBe(427500);
+  });
+
+  it('drops a walk-in phone once there is a customer, and keeps it for a walk-in', () => {
+    const r = setCustomer(withPads(), { customer: khan, walkinPhone: '0300' }, 't-retail', {});
+    expect(r.ok && r.bill.walkinPhone).toBeNull();
+    const w = setCustomer(withPads(), { customer: null, walkinPhone: '03001234567' }, 't-retail', {});
+    expect(w.ok && [w.bill.customer, w.bill.walkinPhone]).toEqual([null, '03001234567']);
+  });
+
+  it('back to walk-in returns to the default tier (owner answer 3)', () => {
+    const mech = setCustomer(withPads(), { customer: khan, walkinPhone: null }, 't-mech', {
+      i1: money(427500),
+    });
+    if (!mech.ok) throw new Error(mech.error);
+    const back = setCustomer(mech.bill, { customer: null, walkinPhone: null }, 't-retail', {
+      i1: money(450000),
+    });
+    expect(back.ok && [back.bill.bill.tierId, back.bill.bill.lines[0]!.unitPrice]).toEqual([
+      't-retail',
+      450000,
+    ]);
   });
 });
