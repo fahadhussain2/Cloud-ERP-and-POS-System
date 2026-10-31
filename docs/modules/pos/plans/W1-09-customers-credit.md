@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#54](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/54) |
 | **Module** | pos (rules in `packages/domain`, the pull datasets in `packages/contracts` and `apps/api`, the server's credit re-check in push) |
-| **Status** | Accepted (2026-10-31), with the owner answers below |
+| **Status** | Built (2026-10-31), in review; verified below |
 | **Refs** | POS-05, POS-07, SYN-01 (customers), CAT-04 (a customer's tier), ACC-03; PRD W1 step 3, W2, Q6; architecture §4.7 and the multi-counter credit row (§5); data model §3, §5, §10, §12; POS spec §10, §11, §12, §13; sync spec §3, §6; CLAUDE.md rules 1, 2, 5, 7, 8, 9, 10; D-011, D-013, D-085, D-092, D-093, D-094, D-095 |
 | **Depends on** | W1-07 (push, exceptions), W1-08 (`party_balances`, the AR posting of an on-account sale) |
 | **Size** | about 2.5 days: the server's credit re-check stays in this task (owner answer 6) |
@@ -66,13 +66,26 @@
 - [x] **Counter credit figures (worker):** a pending bill counts; a refused bill counts; an acked bill counts until a complete pull that started after its ack, then stops; another customer's bills don't count; offline today counts only offline bills of this business date.
 - [x] **Customer dialog (jsdom, fake counter):** search by name words, by code, by 4+ phone digits; the phone shown masked; Enter picks and the tier changes; back to walk-in returns to the default tier; inactive customers aren't listed; the walk-in phone is validated.
 - [x] **On account (jsdom):** disabled for walk-in, for a customer without credit and for a seller without `pos.credit.sell`; over the limit asks for an approval; Esc leaves the bill as it was.
-- [ ] **E2E:** the flows in scope item 6.
+- [x] **E2E:** the flows in scope item 6.
+
+## Build notes (2026-10-31)
+
+- **The customer lives on the counter's open bill** (`OpenBill.customer`, `walkinPhone`), not on the domain `Bill`: `buildSaleDocument` takes `customer`, the counter's `credit` view and a `creditApproval` instead of `hasCreditCustomer`. Adding fields to `Bill` would have rewritten about 50 bill golden cases for nothing the rules use.
+- **The server's lock:** push takes the tenant's posting order lock (`holdPostingOrder`, now shared with `postDocument`) before reading the balance, instead of `FOR UPDATE` on the balance row. The catch-up takes the posting lock first and then writes the balance, so locking the balance first could deadlock with it.
+- **Causes:** the credit exceptions use `no_approval` for a missing approval, like `below_floor_no_override`.
+- **`reviewSale` skips credit overrides:** a new golden case caught one being read as a bill-discount approval (it has no line, like the bill discount's).
+- **The approval dialog takes its reasons:** the price reasons by default, the credit reasons (owner answer 2) for credit; the approver needs `pos.credit.over_limit` (`checkCreditApprover`).
+- **Customer search** runs on the screen over the pulled list (`searchCustomers`), not in the worker: a shop has a few hundred customers at most.
+- **Pull and push tests were written with the code**, not before it, for the API side (scope 4); the domain, contract and importer tests came first.
+- **A bill can be counted twice for a few seconds** when a pull that began before its acceptance already read its posted balance: the conservative side (an approval asked for too early); the next pull, at once with the nudge, corrects it.
 
 ## Verify
 
 1. `pnpm check`, `pnpm test:integration` and `pnpm e2e`, output shown.
 2. **On your PC, with the real customers** (`erp_dev`: 131 customers, no limits, cap Rs 25,000): find three customers by name, phone and code; a Mechanic customer's prices; set a limit on one through the mapping file and an importer re-run, sell within it and over it with a manager's PIN; go offline (network off) and pass the cap; back online, the bills sync and the balance updates on the counter within seconds; the exceptions table shows what the server flagged. Results go into this plan.
 3. **On staging:** the same on the generated catalog with test customers.
+
+**Results (2026-10-31, this PC):** `pnpm check` green (format, lint, typecheck, 1,136 tests with the coverage thresholds, every build); `pnpm test:integration` 227 passed; `pnpm e2e` 28 passed in Edge, the three W1-09 flows among them. Once in the full `pnpm check`, the existing status-bar test *shows offline as soon as the browser loses the network* timed out (1,060 ms against its 1 s wait) and passed on the re-run and alone: timing under load, not this change. **Not done yet:** Verify 2 (the real customers in `erp_dev`) and Verify 3 (staging).
 
 ## Risks
 

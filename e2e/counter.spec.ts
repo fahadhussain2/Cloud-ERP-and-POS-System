@@ -22,6 +22,7 @@ import {
 // any order, car and year, also offline. W1-04 plan scope 7: the owner adds people with roles, a manager unlocks a
 // locked salesman offline, a deactivated person leaves the counter, a manager's back office has the PIN action only.
 // W1-06 plan scope 6: pay by cash, Raast and split, refusals, numbering across a reload, offline printing, reprint.
+// W1-09 plan scope 6: customers by phone and their tier, on account, the limit and the offline cap, a walk-in phone.
 
 const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
 const POS = `http://localhost:${POS_PORT}`;
@@ -615,4 +616,134 @@ test('offline, numbering goes on after a reload, the bill prints, and Alt+P repr
   expect(copy).toContain('FAN BELT CULTUS');
   expect(copy).toMatch(/C\d+-S000002 1300/);
   await context.setOffline(false);
+});
+
+// W1-09 plan scope 6: customers and credit. F4 by phone and the customer's tier, part cash and part on account, on
+// account within the limit, over it with the manager's own PIN, and offline the day's cap; a walk-in's phone.
+const pickCustomer = async (page: Page, text: string) => {
+  await page.keyboard.press('F4');
+  const dialog = page.getByRole('dialog', { name: pos.customer.title });
+  await dialog.getByLabel(pos.customer.search).fill(text);
+  await expect(dialog.getByRole('option').nth(1)).toBeVisible();
+  await dialog.getByLabel(pos.customer.search).press('ArrowDown');
+  await dialog.getByLabel(pos.customer.search).press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+};
+const onAccount = (page: Page) =>
+  billPanel(page).getByRole('group', { name: pos.pay.pad }).getByRole('button', { name: 'On account' });
+
+test('F4 finds a customer by phone: their prices, part cash and part on account, then on account within the limit', async ({
+  page,
+}) => {
+  await recordPrints(page);
+  await page.goto(POS);
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await addToBill(page, 'brpd001');
+  await expect(onAccount(page)).toBeDisabled();
+  await pickCustomer(page, '4567');
+  await expect(billPanel(page)).toContainText('Khan Motors (C0042)');
+  await expect(billPanel(page)).toContainText('Mechanic prices');
+  await expect(total(page)).toHaveText(/Rs\s4,275/);
+
+  await page.keyboard.press('Shift+F9');
+  const split = payDialog(page);
+  await split.getByLabel('Cash amount', { exact: true }).fill('2000');
+  await split.getByLabel('On account amount', { exact: true }).fill('2275');
+  await expect(split.getByTestId('split-left')).toHaveText(pos.pay.covered);
+  await split.getByLabel(pos.pay.cashReceived).press('Enter');
+  await expect(notice(page)).toHaveText(/printed · bring Rs\s2,000 to the cash desk$/);
+  const bill = (await printed(page))[0];
+  expect(bill).toContain('Khan Motors (C0042)');
+  expect(bill).toContain('On account');
+  expect(bill).not.toContain('1234567');
+
+  // The next bill starts as a walk-in again.
+  await addToBill(page, 'brpd001');
+  await expect(total(page)).toHaveText(/Rs\s4,500/);
+  await pickCustomer(page, 'khan');
+  await onAccount(page).click();
+  await expect(payDialog(page).getByTestId('pay-total')).toHaveText(/Rs\s4,275/);
+  await payDialog(page)
+    .getByRole('button', { name: new RegExp(`^${pos.pay.finalize}`) })
+    .click();
+  await expect(notice(page)).toHaveText(/printed · paid by On account$/);
+  await expect(page.getByText('0 bills waiting to sync')).toBeVisible({ timeout: 5000 });
+});
+
+test('over the limit, On account needs the manager’s own PIN and a reason', async ({ page }) => {
+  await recordPrints(page);
+  await page.goto(POS);
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await addToBill(page, 'brpd001');
+  await pickCustomer(page, 'C0042');
+  await onAccount(page).click();
+  // Rs 6,550 already on account (both bills before) and Rs 4,275 more: Rs 825 over the Rs 10,000 limit.
+  await expect(payDialog(page)).toContainText(/Over the credit limit by Rs\s825/);
+  await payDialog(page)
+    .getByRole('button', { name: new RegExp(`^${pos.pay.finalize}`) })
+    .click();
+  const approval = page.getByRole('dialog', { name: pos.approval.title });
+  await expect(approval).toContainText(pos.approval.credit_limit);
+  // The salesman can't approve credit over the limit; the manager can, with a credit reason.
+  await approval.getByRole('button', { name: new RegExp(SALESMAN.fullName) }).click();
+  await answer(page, pos.approval.pin, OWN_PIN);
+  await expect(approval.getByRole('alert')).toHaveText(pos.approval.notAllowed);
+  await approval.getByRole('button', { name: pos.approval.back }).click();
+  await approval.getByLabel(pos.unlock.shortCode).fill(MANAGER.shortCode);
+  await approval.getByLabel(pos.override.reason.regular_customer).check();
+  await answer(page, pos.approval.pin, MANAGER.pin);
+  await expect(notice(page)).toHaveText(/printed · paid by On account$/);
+  await expect(page.getByText('0 bills waiting to sync')).toBeVisible({ timeout: 5000 });
+});
+
+test('offline, a customer buys on account up to the day’s cap without a PIN; past it needs one; a walk-in leaves a phone', async ({
+  page,
+  context,
+}) => {
+  await recordPrints(page);
+  await page.goto(POS);
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await context.setOffline(true);
+  await page.reload();
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await addToBill(page, 'fnbl001');
+  await pickCustomer(page, 'rehman');
+  await onAccount(page).click();
+  await expect(payDialog(page)).toContainText(pos.credit.capToday);
+  await payDialog(page)
+    .getByRole('button', { name: new RegExp(`^${pos.pay.finalize}`) })
+    .click();
+  await expect(notice(page)).toHaveText(/printed · paid by On account$/);
+
+  // Rs 1,300 already today offline, Rs 1,300 more: Rs 600 past the Rs 2,000 cap.
+  await addToBill(page, 'fnbl001');
+  await pickCustomer(page, 'rehman');
+  await onAccount(page).click();
+  await expect(payDialog(page)).toContainText(/Over today’s offline cap by Rs\s600/);
+  await payDialog(page)
+    .getByRole('button', { name: new RegExp(`^${pos.pay.finalize}`) })
+    .click();
+  await expect(page.getByRole('dialog', { name: pos.approval.title })).toContainText(
+    pos.approval.offline_cap,
+  );
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(total(page)).toHaveText(/Rs\s1,300/);
+
+  // Back to walk-in, with a phone: shown by its last four digits only, never printed.
+  await page.keyboard.press('F4');
+  const dialog = page.getByRole('dialog', { name: pos.customer.title });
+  await dialog.getByLabel(pos.customer.search).press('ArrowDown');
+  await dialog.getByLabel(pos.customer.walkinPhone).fill('0300 111 2222');
+  await dialog.getByLabel(pos.customer.walkinPhone).press('Enter');
+  await expect(billPanel(page)).toContainText('Walk-in · •••• 2222');
+  await page.keyboard.press('F9');
+  await payDialog(page).getByLabel(pos.pay.cashReceived).press('Enter');
+  await expect(notice(page)).toHaveText(/printed · bring Rs\s1,300 to the cash desk$/);
+  expect((await printed(page))[1]).not.toContain('2222');
+  await expect(page.getByText('2 bills waiting to sync')).toBeVisible();
+  await context.setOffline(false);
+  await expect(page.getByText('0 bills waiting to sync')).toBeVisible({ timeout: 15000 });
 });

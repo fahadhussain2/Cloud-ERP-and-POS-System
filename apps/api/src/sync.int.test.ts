@@ -655,19 +655,22 @@ describe('customer pull (W1-09)', () => {
       c.query('UPDATE erp.customer_accounts SET deleted_at = now() WHERE party_id = $1', [supplier]),
     );
     const removed = await pullCustomers(token, later.cursor);
-    expect(removed.changes['customer_accounts']!.map((a) => [a['party_id'], a['deleted_at'] !== null])).toEqual([
-      [supplier, true],
-    ]);
+    expect(
+      removed.changes['customer_accounts']!.map((a) => [a['party_id'], a['deleted_at'] !== null]),
+    ).toEqual([[supplier, true]]);
   });
 
   it('the touch that re-sends a party writes nothing to the audit log', async () => {
-    const audit = await withTenant(pool, { tenantId: tenant }, async (_db, c) =>
-      (
-        await c.query<{ n: number }>(
-          "SELECT count(*)::int AS n FROM erp.audit_log WHERE entity = 'parties' AND entity_id = $1 AND action = 'update'",
-          [supplier],
-        )
-      ).rows[0]!.n,
+    const audit = await withTenant(
+      pool,
+      { tenantId: tenant },
+      async (_db, c) =>
+        (
+          await c.query<{ n: number }>(
+            "SELECT count(*)::int AS n FROM erp.audit_log WHERE entity = 'parties' AND entity_id = $1 AND action = 'update'",
+            [supplier],
+          )
+        ).rows[0]!.n,
     );
     expect(audit).toBe(0);
   });

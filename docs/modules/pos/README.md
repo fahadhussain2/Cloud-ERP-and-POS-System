@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W1-02 (POS shell), W1-03 (catalog and search) and W1-05 (bill building) merged; W1-06 (finalize and print) built, in review |
+| **Status** | In progress: W1-02 (POS shell), W1-03 (catalog and search), W1-05 (bill building) and W1-06 (finalize and print) merged; W1-09 (customers and credit) built, in review |
 | **Requirements** | 17 (POS-01…POS-17) |
 | **Feature spec needed** | Yes: checkout screen and keyboard map; local DB and storage guardrails |
 
