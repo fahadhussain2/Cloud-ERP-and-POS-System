@@ -21,7 +21,7 @@ export function createChangeFeed(
   const subscribers = new Map<string, Set<() => void>>();
   const lastSent = new Map<string, number>();
   const pending = new Map<string, NodeJS.Timeout>();
-  let client: pg.PoolClient | null = null;
+  let client: { connection: pg.PoolClient; release: (err?: Error) => void } | null = null;
   let connecting: Promise<void> | null = null;
   let retryTimer: NodeJS.Timeout | null = null;
   let closed = false;
@@ -47,21 +47,32 @@ export function createChangeFeed(
     connecting ??= (async () => {
       try {
         const c = await pool.connect();
-        c.on('notification', (n) => {
+        const onNotification = (n: pg.Notification) => {
           if (n.channel === SYNC_CHANNEL && n.payload) notify(n.payload);
-        });
-        c.on('error', (err) => {
-          opts.onError?.(err);
+        };
+        // Once handed back, the connection is the pool's: the listeners go with the release, and it happens once.
+        let released = false;
+        const release = (err?: Error) => {
+          if (released) return;
+          released = true;
+          c.off('notification', onNotification);
+          c.off('error', onError);
           c.release(err);
-          client = null;
+        };
+        const onError = (err: Error) => {
+          opts.onError?.(err);
+          release(err);
+          if (client?.connection === c) client = null;
           reconnect();
-        });
+        };
+        c.on('notification', onNotification);
+        c.on('error', onError);
         await c.query(`LISTEN ${SYNC_CHANNEL}`);
         if (closed) {
-          c.release();
+          release();
           return;
         }
-        client = c;
+        client = { connection: c, release };
       } catch (err) {
         opts.onError?.(err);
         reconnect();
@@ -101,7 +112,7 @@ export function createChangeFeed(
       if (client) {
         const c = client;
         client = null;
-        await c.query(`UNLISTEN ${SYNC_CHANNEL}`).catch(() => undefined);
+        await c.connection.query(`UNLISTEN ${SYNC_CHANNEL}`).catch(() => undefined);
         c.release();
       }
     },
