@@ -2808,6 +2808,85 @@
           "cause": "no_approval"
         }
       ]
+    },
+    {
+      "name": "a sale on account with a credit approval (W1-09): the credit override is not a price approval, no findings",
+      "input": {
+        "document": {
+          "version": 1,
+          "id": "019a3f6e-7b10-7c3a-9d2e-5b8f1a2c3d4e",
+          "family": "S",
+          "seq": 412,
+          "number": "C03-S000412",
+          "kind": "sale",
+          "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "createdAt": "2026-11-02T10:15:30.000Z",
+          "businessDate": "2026-11-02",
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "customerId": "019a0000-0000-7000-8000-0000000000f1",
+          "walkinPhone": null,
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "listPrice": 100000,
+              "floorPrice": 80000,
+              "unitPrice": 100000,
+              "lineDiscount": 0,
+              "billShare": 0,
+              "lineTotal": 100000
+            }
+          ],
+          "amounts": {
+            "subtotal": 100000,
+            "lineDiscountTotal": 0,
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0,
+            "total": 100000
+          },
+          "payments": [
+            {
+              "method": "on_account",
+              "amount": 100000,
+              "cashReceived": null,
+              "changeDue": null,
+              "reference": null
+            }
+          ],
+          "cashDue": 0,
+          "handoverStatus": "not_applicable",
+          "overrides": [
+            {
+              "kind": "credit_limit",
+              "lineNo": null,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "pay_soon",
+              "note": null,
+              "at": "2026-11-02T10:15:20.000Z",
+              "values": {
+                "limit": 10000000,
+                "balance": 9950000,
+                "unsynced": 0,
+                "amount": 100000
+              }
+            }
+          ],
+          "clientVersion": "0.7.0",
+          "credit": {
+            "offline": false,
+            "balance": 9950000,
+            "balanceAsOf": "2026-11-02T10:10:00.000Z",
+            "unsynced": 0,
+            "offlineToday": 0
+          }
+        }
+      },
+      "expected": []
     }
   ]
 }

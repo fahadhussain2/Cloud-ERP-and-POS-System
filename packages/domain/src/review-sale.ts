@@ -5,6 +5,7 @@ import {
   pendingApprovals,
   type Bill,
   type LineApprovalValues,
+  type OverrideReason,
   type PendingApproval,
 } from './bill';
 import { businessDate } from './business-date';
@@ -186,11 +187,14 @@ function reviewPrices(d: SaleDocument, context: ReviewContext, fits: boolean): S
   };
   const approved: Bill = { ...bare, lines: bare.lines.map((l) => ({ ...l })) };
   for (const o of d.overrides) {
+    // Credit approvals (W1-09) are judged by reviewCredit, not here.
+    if (o.kind === 'credit_limit' || o.kind === 'offline_cap') continue;
     const base = {
       kind: o.kind,
       requestedBy: o.requestedBy,
       approvedBy: o.approvedBy,
-      reason: o.reason,
+      // SaleDocumentV1 allows only the price reasons on a price override.
+      reason: o.reason as OverrideReason,
       note: o.note,
       at: o.at,
     };

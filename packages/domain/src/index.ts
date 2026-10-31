@@ -46,6 +46,22 @@ export {
 } from './bill';
 export { businessDate } from './business-date';
 export {
+  checkCredit,
+  CREDIT_REASONS,
+  onAccountAmount,
+  reviewCredit,
+  type CreditAccount,
+  type CreditApproval,
+  type CreditCause,
+  type CreditCheck,
+  type CreditFinding,
+  type CreditInput,
+  type CreditNeed,
+  type CreditReason,
+  type CreditReviewContext,
+  type CreditView,
+} from './credit';
+export {
   nextDeviceCode,
   nextPinState,
   PIN_MAX_FAILURES,
@@ -76,6 +92,7 @@ export {
   type RoleTemplateKey,
   type VoidWindow,
 } from './permissions';
+export { normalizePhone } from './phone';
 export { parseQty, qty, QTY_SCALE, type Qty } from './quantity';
 export { roundCash, type CashRounding } from './rounding';
 export {
@@ -94,7 +111,9 @@ export {
   type BillCode,
   type DocumentFamily,
   type SaleContext,
+  type SaleCustomer,
   type SaleDocument,
+  type SaleDocumentCredit,
   type SaleDocumentLine,
   type SaleDocumentOverride,
   type SaleTotal,

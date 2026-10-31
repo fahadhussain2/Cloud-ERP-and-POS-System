@@ -1,5 +1,5 @@
 {
-  "description": "The server's credit re-check of a synced sale (sync spec §6.2, POS-07, D-011, D-096): findings, never a refusal. Each case changes a base document (credit-review.test.ts: a Rs 20,000 bill fully on account to customer …f1, sold by …a1 in branch …e1) and gives what the server holds: the customer's account (a Rs 100,000 limit and a Rs 25,000 cap unless a case says otherwise), its balance before this bill (every counter's sales) and this device's offline on-account total for the customer on that business date, before this bill. Staff: …a1 a salesman (pos.credit.sell); …a2 a manager (pos.credit.sell, pos.credit.over_limit); …a4 no credit rights.",
+  "description": "The server's credit re-check of a synced sale (sync spec §6.2, POS-07, D-011, D-096): findings, never a refusal. Each case changes a base document (credit-review.test.ts: a Rs 20,000 bill fully on account to customer …f1, sold by …a1 in branch …e1) and gives what the server holds: the customer's account (a Rs 100,000 limit and a Rs 25,000 cap unless a case says otherwise), its balance before this bill (every counter's sales) and this device's offline on-account total for the customer on that business date, before this bill. Staff: …a1 a salesman (pos.credit.sell); …a2 a manager (pos.credit.sell, pos.credit.over_limit); …a4 no credit rights; …a9 is unknown.",
   "cases": [
     {
       "name": "a cash sale to a customer: nothing to check",
@@ -403,6 +403,49 @@
         }
       },
       "expected": []
+    },
+    {
+      "name": "over the limit, approved by someone the server doesn’t know",
+      "input": {
+        "document": {
+          "overrides": [
+            {
+              "kind": "credit_limit",
+              "lineNo": null,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a9",
+              "reason": "pay_soon",
+              "note": null,
+              "at": "2026-11-02T10:15:20.000Z",
+              "values": {
+                "limit": 10000000,
+                "balance": 9000000,
+                "unsynced": 0,
+                "amount": 2000000
+              }
+            }
+          ]
+        },
+        "context": {
+          "account": {
+            "creditAllowed": true,
+            "creditLimit": 10000000,
+            "offlineDailyCap": 2500000
+          },
+          "balanceBefore": 9000000,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": [
+        {
+          "kind": "credit_limit_exceeded",
+          "cause": "not_permitted",
+          "amount": 2000000,
+          "balance": 9000000,
+          "limit": 10000000,
+          "overBy": 1000000
+        }
+      ]
     }
   ]
 }

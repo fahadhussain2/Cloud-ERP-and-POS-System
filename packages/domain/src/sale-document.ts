@@ -7,9 +7,18 @@ import {
   type OverrideReason,
 } from './bill';
 import { businessDate } from './business-date';
+import {
+  checkCredit,
+  onAccountAmount,
+  type CreditApproval,
+  type CreditNeed,
+  type CreditReason,
+  type CreditView,
+} from './credit';
 import { DomainError } from './errors';
 import { toSafeNumber } from './exact';
 import { money, sub, type Money } from './money';
+import { normalizePhone } from './phone';
 import type { Qty } from './quantity';
 import { roundCash } from './rounding';
 import { settleTender, type PaymentMethodInfo, type SettledPayment, type Tender } from './tender';
@@ -50,17 +59,28 @@ export interface SaleDocumentLine {
 }
 
 export interface SaleDocumentOverride {
-  kind: ApprovalKind;
-  /** null for the bill discount. */
+  kind: ApprovalKind | CreditNeed;
+  /** null for the bill discount and for credit. */
   lineNo: number | null;
   requestedBy: string;
   approvedBy: string;
-  reason: OverrideReason;
+  reason: OverrideReason | CreditReason;
   note: string | null;
   at: string;
   values:
     | { list: Money | null; floor: Money | null; price: Money }
-    | { billDiscount: Money; lines: { lineNo: number; qty: Qty; unitPrice: Money }[] };
+    | { billDiscount: Money; lines: { lineNo: number; qty: Qty; unitPrice: Money }[] }
+    | { limit: Money | null; balance: Money; unsynced: Money; amount: Money }
+    | { cap: Money; offlineToday: Money; amount: Money };
+}
+
+/** What the counter saw when it sold on account (POS spec §15); only on a bill with an on-account payment. */
+export interface SaleDocumentCredit {
+  offline: boolean;
+  balance: Money;
+  balanceAsOf: string | null;
+  unsynced: Money;
+  offlineToday: Money;
 }
 
 /** `SaleDocumentV1` in `@erp/contracts` is its wire schema (sync spec §6.1). */
@@ -92,6 +112,8 @@ export interface SaleDocument {
   cashDue: Money;
   handoverStatus: 'pending' | 'not_applicable';
   overrides: SaleDocumentOverride[];
+  /** W1-09: absent on a bill without an on-account payment, and on every bill written before. */
+  credit?: SaleDocumentCredit;
   clientVersion: string;
 }
 
@@ -147,27 +169,51 @@ export function parseBillCode(scanned: string, unit: Money): BillCode {
   return { number: m[1]!, cashDue: toSafeNumber(BigInt(m[2]!) * BigInt(unit)) as Money };
 }
 
-/** The finalized sale. Refuses an empty bill, a pending approval or a tender `checkTender` refuses. */
+/** Who the bill is for (POS spec §15): a customer's party id, or a walk-in with an optional phone. */
+export interface SaleCustomer {
+  id: string | null;
+  walkinPhone: string | null;
+}
+
+/**
+ * The finalized sale. Refuses an empty bill, a pending price approval, a tender `checkTender` refuses, a walk-in
+ * phone that isn't one (or on a customer's bill), and an on-account part over the limit or the cap without a credit
+ * approval.
+ */
 export function buildSaleDocument(input: {
   bill: Bill;
   tender: Tender;
   methods: readonly PaymentMethodInfo[];
   sellerMaxDiscountBp: number;
-  hasCreditCustomer: boolean;
+  customer: SaleCustomer;
+  /** The counter's credit figures; needed for an on-account payment. */
+  credit: CreditView | null;
+  creditApproval: CreditApproval | null;
   context: SaleContext;
 }): SaleDocument {
-  const { bill, context: c } = input;
+  const { bill, customer, credit, context: c } = input;
   if (bill.lines.length === 0) throw new DomainError('empty_bill', 'a bill needs at least one line');
   if (pendingApprovals(bill, input.sellerMaxDiscountBp).length > 0)
     throw new DomainError('approval_pending', 'a price on this bill still needs an approval');
+  let walkinPhone: string | null = null;
+  if (customer.walkinPhone !== null) {
+    if (customer.id !== null)
+      throw new DomainError('invalid_customer', "a customer's bill doesn't take a walk-in phone");
+    walkinPhone = normalizePhone(customer.walkinPhone);
+    if (walkinPhone === null)
+      throw new DomainError('invalid_phone', `not a phone number: "${customer.walkinPhone}"`);
+  }
   const total = saleTotal(bill, c.increment);
   const settlement = settleTender({
     total: total.total,
     increment: c.increment,
     methods: input.methods,
     tender: input.tender,
-    hasCreditCustomer: input.hasCreditCustomer,
+    hasCreditCustomer: customer.id !== null && credit?.account?.creditAllowed === true,
   });
+  const onAccount = onAccountAmount(settlement.payments);
+  // settleTender has refused on account without a credit customer, so the view is there when it's needed.
+  const creditOverrides = onAccount > 0 ? creditOverridesOf(onAccount, credit!, input.creditApproval) : [];
   const amounts = billAmounts(bill);
   const lineNo = new Map(bill.lines.map((l, i) => [l.id, i + 1]));
   const overrides: SaleDocumentOverride[] = [];
@@ -199,9 +245,8 @@ export function buildSaleDocument(input: {
     businessDate: businessDate(c.createdAtMs, c.timeZone, c.cutoffHour),
     sellerId: bill.sellerId,
     tierId: bill.tierId,
-    // A customer and a walk-in phone come with W1-09.
-    customerId: null,
-    walkinPhone: null,
+    customerId: customer.id,
+    walkinPhone,
     lines: bill.lines.map((l, i) => {
       const a = amounts.lines[i]!;
       return {
@@ -227,9 +272,50 @@ export function buildSaleDocument(input: {
     payments: settlement.payments,
     cashDue: settlement.cashDue,
     handoverStatus: settlement.cashDue > 0 ? 'pending' : 'not_applicable',
-    overrides,
+    overrides: [...overrides, ...creditOverrides],
+    ...(onAccount > 0 ? { credit: creditBlock(credit!) } : {}),
     clientVersion: c.clientVersion,
   };
+}
+
+const creditBlock = (v: CreditView): SaleDocumentCredit => ({
+  offline: v.offline,
+  balance: v.balance,
+  balanceAsOf: v.balanceAsOf,
+  unsynced: v.unsynced,
+  offlineToday: v.offlineToday,
+});
+
+/** The approvals an on-account part needs, as overrides (the limit first); refused when the approval is missing. */
+function creditOverridesOf(
+  amount: Money,
+  credit: CreditView,
+  approval: CreditApproval | null,
+): SaleDocumentOverride[] {
+  const check = checkCredit({ ...credit, amount });
+  if (!check.allowed || check.needs.length === 0) return [];
+  if (approval === null)
+    throw new DomainError(
+      'credit_approval_pending',
+      `this sale needs a credit approval: ${check.needs.join(', ')}`,
+    );
+  if (approval.reason === 'other' && (approval.note === null || approval.note.trim() === ''))
+    throw new DomainError('note_required', 'the reason "other" needs a note');
+  const account = credit.account!;
+  const base = { lineNo: null, ...approval };
+  return check.needs.map((kind): SaleDocumentOverride =>
+    kind === 'credit_limit'
+      ? {
+          ...base,
+          kind,
+          values: { limit: account.creditLimit, balance: credit.balance, unsynced: credit.unsynced, amount },
+        }
+      : {
+          ...base,
+          kind,
+          values: { cap: account.offlineDailyCap, offlineToday: credit.offlineToday, amount },
+        },
+  );
 }
 
 const overrideOf = (a: Approval<unknown>) => ({
