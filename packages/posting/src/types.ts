@@ -3,8 +3,8 @@ import type { Money, PaymentMethodCode, Qty, SystemRole } from '@erp/domain';
 // What the posting engine reads and writes (posting rules §1–§4, data model §3, §7, §9, W1-08). Pure data: the
 // database layer loads it, the engine computes the ledger rows, the database layer writes them.
 
-/** The roles a posting can need; `SUSPENSE` takes the difference of a bill that doesn't add up (D-095). */
-export type PostingRole = SystemRole | 'SUSPENSE';
+/** The roles a posting can need (posting rules §2); `SUSPENSE` takes the difference of a bill that doesn't add up. */
+export type PostingRole = SystemRole;
 
 /** A finalized sale as posting needs it: the stored document, with each line's id, location and tax. */
 export interface PostingSale {

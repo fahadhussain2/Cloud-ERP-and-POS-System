@@ -62,9 +62,11 @@ try {
       console.log(items.length ? `${title}:\n${items.map((i) => `  ${i}`).join('\n')}` : `${title}: none`);
     console.log(`tenant ${input.spec.code} (${report.tenantId})`);
     list('created', report.created);
+    list('updated', report.updated);
     list('drift (not applied)', report.drift);
     list('needs attention', report.needsAttention);
-    if (report.created.length === 0 && report.drift.length === 0) console.log('no changes');
+    if (report.created.length === 0 && report.updated.length === 0 && report.drift.length === 0)
+      console.log('no changes');
   } else if (input.action === 'seed-catalog') {
     // Refuses production itself too, not only erp-tenant (W1-21).
     const r = await seedGeneratedCatalog(url, input);

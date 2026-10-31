@@ -19,6 +19,8 @@ export const SYSTEM_ROLES = [
   'RETAINED_EARNINGS',
   'TAX_PAYABLE',
   'TAX_RECOVERABLE',
+  // The difference of a bill that doesn't add up, until the accountant clears it (owner answer 3 to W1-08).
+  'SUSPENSE',
 ] as const;
 
 export type SystemRole = (typeof SYSTEM_ROLES)[number];

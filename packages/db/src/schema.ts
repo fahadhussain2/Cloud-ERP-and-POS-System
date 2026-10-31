@@ -286,6 +286,8 @@ export const taxCodes = erp.table('tax_codes', {
   code: text('code').notNull(),
   name: text('name').notNull(),
   rateBp: integer('rate_bp').notNull(),
+  /** Used by items without their own code (ACC-09); one per tenant. */
+  isDefault: boolean('is_default').notNull(),
   ...syncColumns,
   ...auditColumns,
 });
@@ -525,8 +527,6 @@ export const salesLines = erp.table('sales_lines', {
   taxCodeId: uuid('tax_code_id'),
   taxAmount: bigint('tax_amount', { mode: 'number' }).notNull(),
   locationId: uuid('location_id'),
-  /** Set by posting (W1-08). */
-  unitCost: bigint('unit_cost', { mode: 'number' }),
   ...syncColumns,
   ...auditColumns,
 });
@@ -645,4 +645,115 @@ export const deviceStatus = erp.table('device_status', {
   storageUsage: bigint('storage_usage', { mode: 'number' }),
   storageQuota: bigint('storage_quota', { mode: 'number' }),
   clockSkewMs: integer('clock_skew_ms'),
+});
+
+// Ledgers (migration 0009, W1-08): written only by packages/posting (rule 4).
+
+const role = (name: string) => text(name, { enum: ['customer', 'supplier'] });
+
+/** One row per tenant, locked by every posting: the last posting seq and journal number. */
+export const postingState = erp.table('posting_state', {
+  tenantId: uuid('tenant_id').primaryKey(),
+  lastSeq: bigint('last_seq', { mode: 'number' }).notNull(),
+  lastJournalNo: bigint('last_journal_no', { mode: 'number' }).notNull(),
+});
+
+/** The order of record, with the settings each posting used. */
+export const postings = erp.table('postings', {
+  tenantId: uuid('tenant_id').notNull(),
+  seq: bigint('seq', { mode: 'number' }).notNull(),
+  sourceType: text('source_type', { enum: ['sale'] }).notNull(),
+  sourceId: uuid('source_id').notNull(),
+  entryDate: date('entry_date').notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }).notNull(),
+  context: jsonb('context').notNull(),
+});
+
+export const journalEntries = erp.table('journal_entries', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number').notNull(),
+  entryDate: date('entry_date').notNull(),
+  sourceType: text('source_type').notNull(),
+  sourceId: uuid('source_id').notNull(),
+  memo: text('memo'),
+  reversalOfId: uuid('reversal_of_id'),
+  postingSeq: bigint('posting_seq', { mode: 'number' }).notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }).notNull(),
+  createdByUserId: uuid('created_by_user_id'),
+});
+
+export const journalLines = erp.table('journal_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  entryId: uuid('entry_id').notNull(),
+  lineNo: smallint('line_no').notNull(),
+  accountId: uuid('account_id').notNull(),
+  partyId: uuid('party_id'),
+  branchId: uuid('branch_id').notNull(),
+  debit: bigint('debit', { mode: 'number' }).notNull(),
+  credit: bigint('credit', { mode: 'number' }).notNull(),
+  memo: text('memo'),
+});
+
+export const stockMovements = erp.table('stock_movements', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  postingSeq: bigint('posting_seq', { mode: 'number' }).notNull(),
+  itemId: uuid('item_id').notNull(),
+  locationId: uuid('location_id').notNull(),
+  qtyDelta: numeric('qty_delta', { precision: 14, scale: 3 }).notNull(),
+  unitCost: bigint('unit_cost', { mode: 'number' }).notNull(),
+  valueDelta: bigint('value_delta', { mode: 'number' }).notNull(),
+  avgCostAfter: bigint('avg_cost_after', { mode: 'number' }),
+  sourceType: text('source_type').notNull(),
+  sourceId: uuid('source_id').notNull(),
+  sourceLineId: uuid('source_line_id'),
+  businessDate: date('business_date').notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }).notNull(),
+});
+
+export const stockBalances = erp.table('stock_balances', {
+  tenantId: uuid('tenant_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  locationId: uuid('location_id').notNull(),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  ...syncColumns,
+});
+
+/** One weighted average per item, tenant-wide (D-017); `avgCost` null = no cost known yet. */
+export const itemCosts = erp.table('item_costs', {
+  tenantId: uuid('tenant_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  avgCost: bigint('avg_cost', { mode: 'number' }),
+  onHand: numeric('on_hand', { precision: 14, scale: 3 }).notNull(),
+  lastCost: bigint('last_cost', { mode: 'number' }),
+  lastSupplierId: uuid('last_supplier_id'),
+  lastReceiptAt: timestamp('last_receipt_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+export const partyLedgerEntries = erp.table('party_ledger_entries', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  postingSeq: bigint('posting_seq', { mode: 'number' }).notNull(),
+  partyId: uuid('party_id').notNull(),
+  role: role('role').notNull(),
+  entryDate: date('entry_date').notNull(),
+  dueDate: date('due_date').notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  sourceType: text('source_type').notNull(),
+  sourceId: uuid('source_id').notNull(),
+  memo: text('memo'),
+  postedAt: timestamp('posted_at', { withTimezone: true }).notNull(),
+});
+
+export const partyBalances = erp.table('party_balances', {
+  tenantId: uuid('tenant_id').notNull(),
+  partyId: uuid('party_id').notNull(),
+  role: role('role').notNull(),
+  balance: bigint('balance', { mode: 'number' }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  ...syncColumns,
 });
