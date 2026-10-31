@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#53](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/53) |
 | **Module** | accounting and inventory (the engine in `packages/posting`, the ledger tables in `packages/db`, the call from push in `apps/api`, the catch-up job in `apps/worker`) |
-| **Status** | Accepted (2026-10-29), with the owner answers below |
+| **Status** | Built (2026-10-31), in review; verified below |
 | **Refs** | INV-01, INV-02, INV-03, ACC-01 (roles), ACC-02, ACC-03, ACC-08, ACC-09, SYN-03; posting rules §1, §2, §3, §4.1, §5.1 (average); architecture §5.2, §7, §11; data model §3, §5, §7, §9, §10; CLAUDE.md rules 1, 3, 4, 5, 7; D-011, D-015, D-017, D-022, D-023, D-057, D-079, D-083, D-094 |
 | **Depends on** | W1-07 (accepted sales in `sales_documents`, the per-document push transaction, `exceptions`), W0-11 (chart of accounts with roles, bank accounts, payment methods, tax codes) |
 | **Size** | about 4 days |
@@ -81,6 +81,12 @@ Every test in this list is written and fails on its typed stub (2026-10-29): 37 
 1. `pnpm check` and `pnpm test:integration`, output shown. `pnpm e2e` still green (push now posts).
 2. **On your PC with the real catalog** (`erp_dev`): 200 generated bills pushed; posting time per bill from the spans (target: under 50 ms on top of push); `posting:check delux` reports no difference; a trial-balance query (in the plan's results) shows debits = credits, `CASH_IN_TRANSIT` = the cash bills, `INVENTORY` = −Σ cost.
 3. **On staging:** after deploy, the catch-up posts the bills already there; `posting:check` is clean; a new bill from a staging counter is posted within its push.
+
+**Results (2026-10-31):**
+
+- **1:** `pnpm check` (format, lint, typecheck, 1,044 unit tests with the posting engine held at 100% coverage, build), `pnpm test:integration` (211) and `pnpm e2e` (25 flows in Edge), all green on the final commit. CI runs them again on the PR.
+- **2 (partly):** run on a copy of the end-to-end database rather than `erp_dev` (its bills come from the real counter flows; the copy's ledgers were cleared and its 11 bills re-posted by `postPending`): **27 ms a bill**, each in its own transaction, under the 50 ms target; `checkRebuild` found **no difference**; the trial balance has debits = credits (Rs 29,500), `CASH_IN_TRANSIT` = the bills' cash payments (Rs 22,500) and the Raast payment on HBL. Its items have no cost yet, so COGS and inventory are proven by the integration tests instead (the worked example, two counters at once, the rebuild of 31 bills). The 200-bill run on the real catalog is not done.
+- **3:** after the merge to staging: re-run the staging tenant setups (1190, the default tax code, Raast and bank transfer on HBL), watch the worker post the bills already there, then `erp-tenant posting-check staging <shop>`.
 
 ## Risks
 
