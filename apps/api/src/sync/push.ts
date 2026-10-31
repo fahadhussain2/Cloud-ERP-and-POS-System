@@ -436,6 +436,8 @@ async function accept(
   doc: PushDocument,
   received: Date,
 ): Promise<PushResult> {
+  // First, before the posting order lock a sale on account takes: the same order as a handover's push.
+  if (d.cashDue !== 0) await holdBill(c, d.number);
   const grants = await grantsOf(c, [d.sellerId, ...d.overrides.map((o) => o.approvedBy)]);
   const findings = reviewSale(d, {
     deviceCode: device.code,
@@ -585,6 +587,18 @@ async function accept(
   };
 }
 
+/**
+ * A bill's cash and its handovers are judged one transaction at a time: a desk's scan and the counter's bill often
+ * arrive together (both reconnect), and each looks for the other. Held until the transaction ends; the tenant is in
+ * the key because a bill number is unique only within a tenant. Taken before any other lock, by both paths.
+ */
+async function holdBill(c: pg.ClientBase, billNumber: string) {
+  await c.query(
+    `SELECT pg_advisory_xact_lock(hashtextextended('erp.bill:' || current_setting('app.tenant_id') || ':' || $1, 0))`,
+    [billNumber],
+  );
+}
+
 /** The bill's new status once a handover of the right direction is linked to it (data model §5). */
 function settledStatus(h: { kind: 'in' | 'payout' }, cashDue: number): 'received' | 'paid_out' | null {
   if (h.kind === 'in' && cashDue > 0) return 'received';
@@ -639,6 +653,7 @@ async function acceptHandover(
   doc: PushDocument,
   received: Date,
 ): Promise<{ result: PushResult; duplicate: boolean }> {
+  await holdBill(c, h.billNumber);
   const bill = (
     await c.query<{ id: string; cash_due: string }>(
       'SELECT id, cash_due FROM erp.sales_documents WHERE number = $1 ORDER BY received_at, id LIMIT 1',
