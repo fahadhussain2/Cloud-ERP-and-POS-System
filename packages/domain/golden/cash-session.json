@@ -1,0 +1,293 @@
+{
+  "description": "Cash sessions on the desk (CSH-01, cash desk spec, owner answer 1 to W1-10): the expected cash (float + handovers in − payouts), and the open and close documents (CashSessionV1, family Z). Desk D01 (…d9) in branch …e1, Asia/Karachi with the 04:00 cutoff, document id …81, unit Rs 1 = 100. Opening needs cash.handover.receive; closing needs cash.session.close, by anyone who holds it. Staff: …a5 a cashier; …a2 a manager (cash.session.close, not cash.handover.receive); …a1 a salesman. Amounts in paisa.",
+  "cases": [
+    {
+      "name": "expected cash: float, two handovers and a payout",
+      "input": {
+        "expected": {
+          "openingFloat": 500000,
+          "handovers": [
+            { "kind": "in", "amount": 432000 },
+            { "kind": "in", "amount": 125000 },
+            { "kind": "payout", "amount": 45000 }
+          ]
+        }
+      },
+      "expected": 1012000
+    },
+    {
+      "name": "expected cash with nothing handed over is the float",
+      "input": { "expected": { "openingFloat": 500000, "handovers": [] } },
+      "expected": 500000
+    },
+    {
+      "name": "open with a Rs 5,000 float",
+      "input": {
+        "open": {
+          "current": null,
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "openingFloat": 500000,
+          "seq": 3,
+          "createdAt": "2026-11-02T05:02:00.000Z"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a6000-0000-7000-8000-000000000081",
+        "family": "Z",
+        "seq": 3,
+        "number": "D01-Z000003",
+        "event": "open",
+        "sessionId": "019a6000-0000-7000-8000-000000000081",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "userId": "019a0000-0000-7000-8000-0000000000a5",
+        "openingFloat": 500000,
+        "expectedCash": null,
+        "createdAt": "2026-11-02T05:02:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "open with no float",
+      "input": {
+        "open": {
+          "current": null,
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "openingFloat": 0,
+          "seq": 1,
+          "createdAt": "2026-11-02T05:02:00.000Z"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a6000-0000-7000-8000-000000000081",
+        "family": "Z",
+        "seq": 1,
+        "number": "D01-Z000001",
+        "event": "open",
+        "sessionId": "019a6000-0000-7000-8000-000000000081",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "userId": "019a0000-0000-7000-8000-0000000000a5",
+        "openingFloat": 0,
+        "expectedCash": null,
+        "createdAt": "2026-11-02T05:02:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "open while a session is open on the desk is refused",
+      "input": {
+        "open": {
+          "current": {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+            "openingFloat": 500000,
+            "status": "open"
+          },
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "openingFloat": 500000,
+          "seq": 4,
+          "createdAt": "2026-11-02T05:02:00.000Z"
+        }
+      },
+      "error": "session_open"
+    },
+    {
+      "name": "open after the last session closed",
+      "input": {
+        "open": {
+          "current": {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+            "openingFloat": 500000,
+            "status": "closed"
+          },
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "openingFloat": 300000,
+          "seq": 5,
+          "createdAt": "2026-11-02T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a6000-0000-7000-8000-000000000081",
+        "family": "Z",
+        "seq": 5,
+        "number": "D01-Z000005",
+        "event": "open",
+        "sessionId": "019a6000-0000-7000-8000-000000000081",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "userId": "019a0000-0000-7000-8000-0000000000a5",
+        "openingFloat": 300000,
+        "expectedCash": null,
+        "createdAt": "2026-11-02T10:00:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "a salesman can't open a session",
+      "input": {
+        "open": {
+          "current": null,
+          "userId": "019a0000-0000-7000-8000-0000000000a1",
+          "openingFloat": 0,
+          "seq": 1,
+          "createdAt": "2026-11-02T05:02:00.000Z"
+        }
+      },
+      "error": "not_permitted"
+    },
+    {
+      "name": "a negative float is refused",
+      "input": {
+        "open": {
+          "current": null,
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "openingFloat": -100,
+          "seq": 1,
+          "createdAt": "2026-11-02T05:02:00.000Z"
+        }
+      },
+      "error": "invalid_float"
+    },
+    {
+      "name": "a float with paisa is refused",
+      "input": {
+        "open": {
+          "current": null,
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "openingFloat": 500050,
+          "seq": 1,
+          "createdAt": "2026-11-02T05:02:00.000Z"
+        }
+      },
+      "error": "invalid_float"
+    },
+    {
+      "name": "close by its cashier: the expected cash is recorded",
+      "input": {
+        "close": {
+          "current": {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+            "openingFloat": 500000,
+            "status": "open"
+          },
+          "handovers": [
+            { "kind": "in", "amount": 432000 },
+            { "kind": "payout", "amount": 45000 }
+          ],
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "seq": 4,
+          "createdAt": "2026-11-02T10:00:00.000Z"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a6000-0000-7000-8000-000000000081",
+        "family": "Z",
+        "seq": 4,
+        "number": "D01-Z000004",
+        "event": "close",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "userId": "019a0000-0000-7000-8000-0000000000a5",
+        "openingFloat": null,
+        "expectedCash": 887000,
+        "createdAt": "2026-11-02T10:00:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "close by a manager: anyone with cash.session.close (owner answer 1)",
+      "input": {
+        "close": {
+          "current": {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+            "openingFloat": 500000,
+            "status": "open"
+          },
+          "handovers": [],
+          "userId": "019a0000-0000-7000-8000-0000000000a2",
+          "seq": 4,
+          "createdAt": "2026-11-02T15:00:00.000Z"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a6000-0000-7000-8000-000000000081",
+        "family": "Z",
+        "seq": 4,
+        "number": "D01-Z000004",
+        "event": "close",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "userId": "019a0000-0000-7000-8000-0000000000a2",
+        "openingFloat": null,
+        "expectedCash": 500000,
+        "createdAt": "2026-11-02T15:00:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "a salesman can't close a session",
+      "input": {
+        "close": {
+          "current": {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+            "openingFloat": 500000,
+            "status": "open"
+          },
+          "handovers": [],
+          "userId": "019a0000-0000-7000-8000-0000000000a1",
+          "seq": 4,
+          "createdAt": "2026-11-02T15:00:00.000Z"
+        }
+      },
+      "error": "not_permitted"
+    },
+    {
+      "name": "close with no open session is refused",
+      "input": {
+        "close": {
+          "current": null,
+          "handovers": [],
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "seq": 4,
+          "createdAt": "2026-11-02T15:00:00.000Z"
+        }
+      },
+      "error": "no_session"
+    },
+    {
+      "name": "closing an already closed session is refused",
+      "input": {
+        "close": {
+          "current": {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+            "openingFloat": 500000,
+            "status": "closed"
+          },
+          "handovers": [],
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "seq": 4,
+          "createdAt": "2026-11-02T15:00:00.000Z"
+        }
+      },
+      "error": "no_session"
+    }
+  ]
+}

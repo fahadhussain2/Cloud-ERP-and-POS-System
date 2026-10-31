@@ -1,0 +1,261 @@
+{
+  "description": "The handover document a cash desk writes to its outbox (cash desk spec, CashHandoverV1, data model §6): built from the handover check, refused with the check's problem. Desk D01 (…d9) in branch …e1, Asia/Karachi with the 04:00 cutoff; session …51 open for cashier …a5; document id …71 unless a case says otherwise. Unit Rs 1 = 100, amounts in paisa.",
+  "cases": [
+    {
+      "name": "confirmed from the queue",
+      "input": {
+        "seq": 1,
+        "createdAt": "2026-11-02T10:16:02.000Z",
+        "method": "queue",
+        "target": {
+          "number": "C03-S000412",
+          "cashDue": 432000,
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000412",
+          "cashReceived": 500000,
+          "handoverStatus": "pending"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a7000-0000-7000-8000-000000000071",
+        "family": "H",
+        "seq": 1,
+        "number": "D01-H000001",
+        "kind": "in",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+        "billNumber": "C03-S000412",
+        "saleDocumentId": "019a5000-0000-7000-8000-000000000412",
+        "amount": 432000,
+        "cashReceived": 500000,
+        "changeGiven": 68000,
+        "correctedFrom": null,
+        "method": "queue",
+        "createdAt": "2026-11-02T10:16:02.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "a scan of a queued bill, with a correction",
+      "input": {
+        "seq": 31,
+        "createdAt": "2026-11-02T10:16:02.000Z",
+        "method": "scan",
+        "cashReceived": 1000000,
+        "target": {
+          "number": "C03-S000412",
+          "cashDue": 432000,
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000412",
+          "cashReceived": 500000,
+          "handoverStatus": "pending"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a7000-0000-7000-8000-000000000071",
+        "family": "H",
+        "seq": 31,
+        "number": "D01-H000031",
+        "kind": "in",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+        "billNumber": "C03-S000412",
+        "saleDocumentId": "019a5000-0000-7000-8000-000000000412",
+        "amount": 432000,
+        "cashReceived": 1000000,
+        "changeGiven": 568000,
+        "correctedFrom": 500000,
+        "method": "scan",
+        "createdAt": "2026-11-02T10:16:02.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "an offline scan of a bill the desk doesn't know: the code's number and amount, no sale id",
+      "input": {
+        "seq": 32,
+        "createdAt": "2026-11-02T11:40:00.000Z",
+        "method": "scan",
+        "target": {
+          "number": "C04-S000077",
+          "cashDue": 125000,
+          "saleDocumentId": null,
+          "cashReceived": null,
+          "handoverStatus": "pending"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a7000-0000-7000-8000-000000000071",
+        "family": "H",
+        "seq": 32,
+        "number": "D01-H000032",
+        "kind": "in",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+        "billNumber": "C04-S000077",
+        "saleDocumentId": null,
+        "amount": 125000,
+        "cashReceived": null,
+        "changeGiven": null,
+        "correctedFrom": null,
+        "method": "scan",
+        "createdAt": "2026-11-02T11:40:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "automatic, for a cash sale on the desk itself",
+      "input": {
+        "seq": 33,
+        "createdAt": "2026-11-02T12:05:00.000Z",
+        "method": "auto",
+        "target": {
+          "number": "D01-S000009",
+          "cashDue": 80000,
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000909",
+          "cashReceived": 100000,
+          "handoverStatus": "pending"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a7000-0000-7000-8000-000000000071",
+        "family": "H",
+        "seq": 33,
+        "number": "D01-H000033",
+        "kind": "in",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+        "billNumber": "D01-S000009",
+        "saleDocumentId": "019a5000-0000-7000-8000-000000000909",
+        "amount": 80000,
+        "cashReceived": 100000,
+        "changeGiven": 20000,
+        "correctedFrom": null,
+        "method": "auto",
+        "createdAt": "2026-11-02T12:05:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "a refund paid out",
+      "input": {
+        "seq": 34,
+        "createdAt": "2026-11-02T13:00:00.000Z",
+        "method": "queue",
+        "target": {
+          "number": "C03-S000415",
+          "cashDue": -45000,
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000415",
+          "cashReceived": null,
+          "handoverStatus": "pending"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a7000-0000-7000-8000-000000000071",
+        "family": "H",
+        "seq": 34,
+        "number": "D01-H000034",
+        "kind": "payout",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+        "billNumber": "C03-S000415",
+        "saleDocumentId": "019a5000-0000-7000-8000-000000000415",
+        "amount": 45000,
+        "cashReceived": null,
+        "changeGiven": null,
+        "correctedFrom": null,
+        "method": "queue",
+        "createdAt": "2026-11-02T13:00:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "after midnight, before the 04:00 cutoff: the previous business day (D-056)",
+      "input": {
+        "seq": 35,
+        "createdAt": "2026-11-02T22:30:00.000Z",
+        "method": "queue",
+        "target": {
+          "number": "C03-S000420",
+          "cashDue": 150000,
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000420",
+          "cashReceived": null,
+          "handoverStatus": "pending"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a7000-0000-7000-8000-000000000071",
+        "family": "H",
+        "seq": 35,
+        "number": "D01-H000035",
+        "kind": "in",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+        "billNumber": "C03-S000420",
+        "saleDocumentId": "019a5000-0000-7000-8000-000000000420",
+        "amount": 150000,
+        "cashReceived": 150000,
+        "changeGiven": 0,
+        "correctedFrom": null,
+        "method": "queue",
+        "createdAt": "2026-11-02T22:30:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "refused without a session",
+      "input": {
+        "seq": 36,
+        "createdAt": "2026-11-02T10:16:02.000Z",
+        "method": "queue",
+        "session": null,
+        "target": {
+          "number": "C03-S000412",
+          "cashDue": 432000,
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000412",
+          "cashReceived": null,
+          "handoverStatus": "pending"
+        }
+      },
+      "error": "no_session"
+    },
+    {
+      "name": "refused when already handed over",
+      "input": {
+        "seq": 36,
+        "createdAt": "2026-11-02T10:20:00.000Z",
+        "method": "scan",
+        "target": {
+          "number": "C03-S000412",
+          "cashDue": 432000,
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000412",
+          "cashReceived": null,
+          "handoverStatus": "received"
+        }
+      },
+      "error": "already_handed_over"
+    }
+  ]
+}
