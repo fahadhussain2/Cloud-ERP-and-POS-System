@@ -458,13 +458,25 @@ importers:
       '@sentry/node':
         specifier: 'catalog:'
         version: 10.76.2(@opentelemetry/core@2.12.0(@opentelemetry/api@1.10.0))(@opentelemetry/exporter-trace-otlp-http@0.223.0(@opentelemetry/api@1.10.0))
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
       pino:
         specifier: 'catalog:'
         version: 10.4.0
     devDependencies:
+      '@erp/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@erp/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@erp/posting':
+        specifier: workspace:*
+        version: link:../../packages/posting
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
       tsup:
         specifier: 'catalog:'
         version: 9.0.0(jiti@2.7.0)(postcss@8.5.31)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.1)

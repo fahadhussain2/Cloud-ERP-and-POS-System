@@ -11,10 +11,14 @@
   },
   "dependencies": {
     "@sentry/node": "catalog:",
+    "pg": "catalog:",
     "pino": "catalog:"
   },
   "devDependencies": {
+    "@erp/db": "workspace:*",
     "@erp/observability": "workspace:*",
+    "@erp/posting": "workspace:*",
+    "@types/pg": "catalog:",
     "tsup": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:"
