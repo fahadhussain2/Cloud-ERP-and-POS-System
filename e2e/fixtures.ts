@@ -102,3 +102,28 @@ export const CATALOG: TestItem[] = [
     prices: { RETAIL: 20000 },
   },
 ];
+
+/**
+ * Credit customers (W1-09): Khan Motors on the Mechanic tier with a Rs 10,000 limit and a Rs 5,000 offline cap;
+ * Rehman Autos on Retail with no limit and a Rs 2,000 offline cap. Money in paisa.
+ */
+export const CUSTOMERS = [
+  {
+    code: 'C0042',
+    name: 'Khan Motors',
+    phones: ['0300-1234567'],
+    city: 'Karachi',
+    tier: 'MECHANIC',
+    creditLimit: 1_000_000,
+    offlineDailyCap: 500_000,
+  },
+  {
+    code: 'C0077',
+    name: 'Rehman Autos',
+    phones: ['0321-7654321'],
+    city: 'Karachi',
+    tier: 'RETAIL',
+    creditLimit: null,
+    offlineDailyCap: 200_000,
+  },
+];

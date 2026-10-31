@@ -27,7 +27,11 @@ export type DomainErrorCode =
   | 'approval_pending'
   | 'invalid_sequence'
   | 'invalid_device_code'
-  | 'invalid_bill_code';
+  | 'invalid_bill_code'
+  // Customers and credit (POS spec §15, W1-09)
+  | 'invalid_customer'
+  | 'invalid_phone'
+  | 'credit_approval_pending';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

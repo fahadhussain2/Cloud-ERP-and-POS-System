@@ -18,7 +18,9 @@ const PaymentMethod = z.enum([
   'card',
   'on_account',
 ]);
-const OverrideReason = z.enum(['customer_bargain', 'old_stock', 'market_price', 'regular_customer', 'other']);
+const PriceReason = z.enum(['customer_bargain', 'old_stock', 'market_price', 'regular_customer', 'other']);
+/** Going over a credit limit or the offline cap (W1-09, owner answer 2). */
+const CreditReason = z.enum(['pay_soon', 'regular_customer', 'owner_instruction', 'other']);
 
 const SaleLine = z.strictObject({
   lineNo: z.int().positive(),
@@ -40,15 +42,19 @@ const Payment = z.strictObject({
   reference: z.string().min(1).max(40).nullable(),
 });
 
-const Override = z
+const approvalFields = {
+  requestedBy: z.uuid(),
+  approvedBy: z.uuid(),
+  note: z.string().nullable(),
+  at: Instant,
+};
+
+const PriceOverride = z
   .strictObject({
     kind: z.enum(['below_list', 'below_floor']),
     lineNo: z.int().positive().nullable(),
-    requestedBy: z.uuid(),
-    approvedBy: z.uuid(),
-    reason: OverrideReason,
-    note: z.string().nullable(),
-    at: Instant,
+    reason: PriceReason,
+    ...approvalFields,
     values: z.union([
       z.strictObject({
         list: NonNegativeMoney.nullable(),
@@ -66,38 +72,76 @@ const Override = z
     message: 'the values must match the override: a line price, or the bill discount',
   });
 
+// Credit approvals (W1-09, POS spec §15): for the bill, never a line, with the figures they approved.
+const CreditLimitOverride = z.strictObject({
+  kind: z.literal('credit_limit'),
+  lineNo: z.null(),
+  reason: CreditReason,
+  ...approvalFields,
+  values: z.strictObject({
+    limit: NonNegativeMoney.nullable(),
+    balance: Money,
+    unsynced: NonNegativeMoney,
+    amount: NonNegativeMoney,
+  }),
+});
+const OfflineCapOverride = z.strictObject({
+  kind: z.literal('offline_cap'),
+  lineNo: z.null(),
+  reason: CreditReason,
+  ...approvalFields,
+  values: z.strictObject({ cap: NonNegativeMoney, offlineToday: NonNegativeMoney, amount: NonNegativeMoney }),
+});
+
+const Override = z.union([PriceOverride, CreditLimitOverride, OfflineCapOverride]);
+
+/** What the counter saw when it sold on account (W1-09); only on a bill with an on-account payment. */
+const Credit = z.strictObject({
+  offline: z.boolean(),
+  balance: Money,
+  balanceAsOf: Instant.nullable(),
+  unsynced: NonNegativeMoney,
+  offlineToday: NonNegativeMoney,
+});
+
 /**
  * A finalized sale, version 1 (sync spec §6.1, W1-06): what `buildSaleDocument` in `@erp/domain` makes and what the
- * server accepts in W1-07. Money is whole minor units, quantities thousandths. Unknown fields are refused.
+ * server accepts in W1-07. Money is whole minor units, quantities thousandths. Unknown fields are refused. W1-09's
+ * fields are additive and optional, so every bill written before still parses (D-096).
  */
-export const SaleDocumentV1 = z.strictObject({
-  version: z.literal(1),
-  id: z.uuid(),
-  family: z.literal('S'),
-  seq: z.int().positive(),
-  number: z.string().regex(/^[A-Z]\d{2,}-S\d{6,}$/),
-  kind: z.literal('sale'),
-  deviceId: z.uuid(),
-  branchId: z.uuid(),
-  createdAt: Instant,
-  businessDate: z.iso.date(),
-  sellerId: z.uuid(),
-  tierId: z.uuid(),
-  customerId: z.uuid().nullable(),
-  walkinPhone: z.string().nullable(),
-  lines: z.array(SaleLine).min(1),
-  amounts: z.strictObject({
-    subtotal: NonNegativeMoney,
-    lineDiscountTotal: Money,
-    billDiscount: NonNegativeMoney,
-    rounding: Money,
-    taxTotal: NonNegativeMoney,
-    total: NonNegativeMoney,
-  }),
-  payments: z.array(Payment).min(1),
-  cashDue: NonNegativeMoney,
-  handoverStatus: z.enum(['pending', 'not_applicable']),
-  overrides: z.array(Override),
-  clientVersion: z.string().min(1),
-});
+export const SaleDocumentV1 = z
+  .strictObject({
+    version: z.literal(1),
+    id: z.uuid(),
+    family: z.literal('S'),
+    seq: z.int().positive(),
+    number: z.string().regex(/^[A-Z]\d{2,}-S\d{6,}$/),
+    kind: z.literal('sale'),
+    deviceId: z.uuid(),
+    branchId: z.uuid(),
+    createdAt: Instant,
+    businessDate: z.iso.date(),
+    sellerId: z.uuid(),
+    tierId: z.uuid(),
+    customerId: z.uuid().nullable(),
+    walkinPhone: z.string().nullable(),
+    lines: z.array(SaleLine).min(1),
+    amounts: z.strictObject({
+      subtotal: NonNegativeMoney,
+      lineDiscountTotal: Money,
+      billDiscount: NonNegativeMoney,
+      rounding: Money,
+      taxTotal: NonNegativeMoney,
+      total: NonNegativeMoney,
+    }),
+    payments: z.array(Payment).min(1),
+    cashDue: NonNegativeMoney,
+    handoverStatus: z.enum(['pending', 'not_applicable']),
+    overrides: z.array(Override),
+    credit: Credit.optional(),
+    clientVersion: z.string().min(1),
+  })
+  .refine((d) => d.customerId === null || d.walkinPhone === null, {
+    message: 'a walk-in phone only goes on a walk-in bill',
+  });
 export type SaleDocumentV1 = z.infer<typeof SaleDocumentV1>;

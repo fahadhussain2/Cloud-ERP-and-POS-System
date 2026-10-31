@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). The bill (§10) and the keyboard map (§11): with the W1-05 plan and owner answers (2026-10-27). Payment and finalize (§12), printing and reprint (§13): with the W1-06 plan and owner answers (2026-10-27). Push, offline warnings, the revoked counter and device health (§4, §7, §12, §14): with the W1-07 plan and owner answers (2026-10-28), D-094. |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). The bill (§10) and the keyboard map (§11): with the W1-05 plan and owner answers (2026-10-27). Payment and finalize (§12), printing and reprint (§13): with the W1-06 plan and owner answers (2026-10-27). Push, offline warnings, the revoked counter and device health (§4, §7, §12, §14): with the W1-07 plan and owner answers (2026-10-28), D-094. Customers and credit (§15): with the W1-09 plan and owner answers (2026-10-31), D-096. |
 | **Refs** | POS-01, POS-14, PLT-01, PLT-03, PLT-04; architecture §4.1–§4.4, §8; data model §12; sync spec; CLAUDE.md rules 6, 9, 10; D-009, D-010, D-039, D-082 |
 
 The PRD and architecture describe what the counter does. This spec fixes how its foundations behave, precisely enough to build and test. **v1** covers what W1-02 builds; checkout, the payment pad and the keyboard map come in later versions.
@@ -138,11 +138,11 @@ POS-04, PLT-07, D-004. The rules are pure functions in `packages/domain` (`bill.
 
 **An approval is kept on the bill** with its kind, the line (or the bill, for a bill discount), who asked, who approved, the reason, the note, the time and what it approved (a line's list, floor and price; or the bill discount and the lines it covered). It holds while the line's price stays at or above the approved price; lowering it or changing the tier asks again. A bill-discount approval holds while the discount stays at or below the approved one and the lines are unchanged. W1-06 writes the approvals as `overrides` with the document.
 
-**Price tier:** the bill starts on the default tier (Retail); `F7` picks another. Lines still at list move to the new tier's price; bargained lines keep their price and are checked again. From W1-09, choosing a customer sets their tier.
+**Price tier:** the bill starts on the default tier (Retail); `F7` picks another. Lines still at list move to the new tier's price; bargained lines keep their price and are checked again. Choosing a customer sets their tier the same way, and back to walk-in returns to the default tier (§15).
 
 **The open bill is kept on the counter** (`open_bills`, one per person, never pushed) and saved after every change. When the counter locks or the page reloads, it waits for the same person's next unlock; another person starts with their own. `Alt+C` clears it after a confirm. An app update waits while someone is unlocked with lines on their bill (§8).
 
-**The bill panel:** a context strip (*Walk-in · Retail prices*), the lines (number, name, code, list, floor, quantity, price, amount; chips *Bargained −Rs 150*, *Above list*, *Approved by Tariq · Customer bargain*, *Needs approval*), and the totals pinned at the bottom (items, subtotal, discount, **Total** in large figures). The payment pad goes under the total (§12).
+**The bill panel:** a context strip (*Walk-in · Retail prices*, or the customer and their credit, §15), the lines (number, name, code, list, floor, quantity, price, amount; chips *Bargained −Rs 150*, *Above list*, *Approved by Tariq · Customer bargain*, *Needs approval*), and the totals pinned at the bottom (items, subtotal, discount, **Total** in large figures). The payment pad goes under the total (§12).
 
 ## 11. Keyboard map (W1-05)
 
@@ -152,9 +152,9 @@ POS-03, D-053, from the prototype. The key bar always shows the keys of the curr
 |---|---|
 | **Search** (`F2`) | `↑ ↓` result · `Enter` add · `2*` or `1.5*` before the text sets the quantity · `Esc` clear · `Tab` to the bill lines |
 | **Bill lines** (`Tab`) | `↑ ↓` line · `+ −` quantity · `Q` set quantity · `P` price · `D` bill discount · `Del` remove · `Esc` back to search; any other letter types into the search |
-| **Anywhere** | `F2` search · `F7` price tier · `F9` cash · `Shift+F9` split payment · `Alt+P` reprint · `Alt+C` clear the bill · `Alt+L` lock · `Alt+S` counter health (W1-07, also on the staff list) |
+| **Anywhere** | `F2` search · `F4` customer (W1-09) · `F7` price tier · `F9` cash · `Shift+F9` split payment · `Alt+P` reprint · `Alt+C` clear the bill · `Alt+L` lock · `Alt+S` counter health (W1-07, also on the staff list) |
 | **Dialogs** | `Enter` the main button · `Esc` cancel · `Tab` next field |
-| **Later tasks** (shown once built) | `F3` return (W1-13) · `F4` customer (W1-09) · `F8` / `Shift+F8` hold and recall (W1-12) |
+| **Later tasks** (shown once built) | `F3` return (W1-13) · `F8` / `Shift+F8` hold and recall (W1-12) |
 
 `F1`, `F3`, `F5`, `F7` and `F9` never reach the browser on the counter (no help page, find bar, reload or caret browsing mid-bill). `F6` and `Alt+D` are not used: Chrome keeps them for the address bar.
 
@@ -168,7 +168,7 @@ POS-06, POS-13, POS-15, POS-17, PRD W1 and W3, D-047, D-053. The rules are in `p
 
 - All buttons are disabled while the bill is empty.
 - **Pay is refused while any approval is pending** (§10): *Approve the prices first*.
-- *On account* stays disabled until a credit customer can be chosen (W1-09).
+- *On account* is enabled for a credit customer when the seller holds `pos.credit.sell` (§15); otherwise it is disabled with its reason as a hint.
 
 **Cash popup** (`F9` or the button): the total in large green figures, *Cash received* (optional, whole rupees), the quick-cash buttons and the change in large figures.
 
@@ -187,7 +187,7 @@ Every popup ends with *Cancel (Esc)* and *Finalize & print (Enter)* (D-053). Esc
 |---|---|
 | `no_payment` | no payment rows |
 | `unknown_method` | a method that isn't an active pulled method |
-| `on_account_needs_customer` | on account without a credit customer (always, until W1-09) |
+| `on_account_needs_customer` | on account without a customer whose account allows credit |
 | `duplicate_method` | the same method twice |
 | `amount_not_positive` | an amount ≤ 0 |
 | `amount_not_rounded` | an amount that isn't a multiple of the rounding increment |
@@ -231,7 +231,7 @@ POS-09, POS-10, POS-16, architecture §4.5 and §8, D-048, D-055.
 | `copies` | 1, or 2 = a second page in the same print job |
 | `template_options` | `headerLines` (array of text), `policyText` |
 
-**What the bill shows** (POS-09, Q12, the prototype's layout): the shop name and header lines (the branch's address and phone and `branch.receipt_header.lines`, then the profile's `headerLines`), *SALE BILL*, the bill number, date and time (tenant locale), counter, salesman, customer (*Walk-in*); the lines (#, code, description, quantity, rate, amount); subtotal, discount and rounding when not zero, **TOTAL**; each payment with its reference; *Cash received* and **CHANGE** when there is cash; the policy line (`policyText`, default *Exchange or return within 30 days with this bill.*); the bill code, with its text under the bars. Black on white, no shading. Text through i18n keys, logical CSS properties (rule 10).
+**What the bill shows** (POS-09, Q12, the prototype's layout): the shop name and header lines (the branch's address and phone and `branch.receipt_header.lines`, then the profile's `headerLines`), *SALE BILL*, the bill number, date and time (tenant locale), counter, salesman, customer (*Walk-in*, or the customer's name and code, §15); the lines (#, code, description, quantity, rate, amount); subtotal, discount and rounding when not zero, **TOTAL**; each payment with its reference; *Cash received* and **CHANGE** when there is cash; the policy line (`policyText`, default *Exchange or return within 30 days with this bill.*); the bill code, with its text under the bars. Black on white, no shading. Text through i18n keys, logical CSS properties (rule 10).
 
 **Bill code** (`billCode`, `parseBillCode`): Code 39, no check character, `<bill number> <cash due in whole rupees>`, e.g. `C03-S000412 4320`, or `C03-S000413 0` for a bill paid without cash. A cash due with paisa is refused (it is always rounded at Delux; a tenant whose increment leaves paisa can't use the barcode profile). Parsing ignores spaces around the text and a trailing Enter, and refuses anything else. The bars come from `code39Svg` in `packages/print`.
 
@@ -258,3 +258,41 @@ PLT-09, architecture §11.3, owner answer 4 to W1-07. `HealthDialog` over any sc
 **Try again** (a manager): pick the manager, their own PIN, checked offline like an approval (`checkManager`: `admin.devices` for this branch; a wrong PIN counts towards the manager's own lock, §10). The bill goes back to the queue and is pushed at once; *Bill … will be sent again* shows. Use it once the cause is fixed (the [needs-attention runbook](../../runbooks/bill-needs-attention.md)).
 
 The same figures reach the server with every push and show on the back office's **Counters** list for every counter (sync spec §6.2): last seen, waiting (amber after 10 minutes, red after 4 hours), refused, app version, clock (red over 5 minutes), storage, missing bills.
+
+## 15. Customers and credit (W1-09)
+
+POS-05, POS-07, PRD W1 step 3 and W2, D-013, D-085, D-096. The rules are `checkCredit`, `reviewCredit` and `normalizePhone` in `packages/domain`; the counter and the server use the same functions.
+
+**What the counter holds** (sync spec §3): customers (parties with a live customer account: code, name, phones, city, status), their accounts (tier, credit allowed, limit, offline daily cap) and their balances (positive = owes, negative = an advance; none = 0). Inactive customers and parties without a live account aren't listed. **Names and phones are never written to `diagnostic_log`**; only the party id is.
+
+**`F4` *Customer* dialog** (POS-05): one search box over the local customers, the same online and offline:
+
+| Match | Example |
+|---|---|
+| a code equal to, or starting with, the text | `C0042`, `C004` |
+| 4 or more digits found anywhere in one of the customer's phones (both sides through `normalizePhone`) | `4567`, `0300 123` |
+| every word starts a word of the name or the city | `khan mot`, `ali karachi` |
+
+Each result: code, name, city, the phone's **last four digits** (`•••• 4567`, owner answer 4), the tier, and for a credit customer *Balance · Limit · Available* (*No limit* when the limit is empty). **Walk-in** is the first row, with an optional *Walk-in phone* field. `↑ ↓` select, Enter picks, Esc cancels and leaves the bill as it was. `F4` on a bill with a customer opens on them, with *Back to walk-in*.
+
+**Phone rule** (`normalizePhone`): keep the digits; a leading `+92`, `0092` or `92` before 10 digits becomes `0`; valid = 7 to 15 digits. `0300-1234567`, `+92 300 1234567` and `923001234567` are all `03001234567`. The walk-in phone is stored normalized; one that isn't valid is refused in the dialog.
+
+**The bill and the customer:** the open bill keeps `customerId` and `walkinPhone` (both empty = walk-in; an open bill from before W1-09 is a walk-in bill). **Picking a customer sets the bill's tier to theirs**, as `F7` does (§10); **back to walk-in returns to the default tier** (owner answer 3). `F7` still works afterwards. The context strip shows *Khan Motors (C0042) · Mechanic prices · Balance Rs 45,000 · Available Rs 55,000*, or *Walk-in · •••• 4567*.
+
+**On account** (PRD W2): enabled when the bill's customer has `credit_allowed` and the seller holds `pos.credit.sell`; otherwise disabled with the reason as a hint (*Choose a credit customer*, *Your role can't sell on account*). *Split payment* may include an on-account row; only its amount is checked. The **On account popup** shows the total, the balance and when it was pulled (*as of 14:32*), this counter's unsynced on-account amount, the balance after this bill, the limit, and while offline what is used of today's cap. A bill fully on account has cash due 0 (`not_applicable`).
+
+**The checks** (`checkCredit`), with `amount` = the bill's on-account part:
+
+| Check | Over when | Notes |
+|---|---|---|
+| **Limit** | `balance + unsynced + amount > credit_limit` | Exactly at the limit is fine. No limit (empty) is never over (D-085). |
+| **Offline cap** | offline **and** `offlineToday + amount > offline_daily_cap` | A cap of 0: every offline on-account sale needs an approval. |
+
+- **`balance`** is the pulled balance; **`unsynced`** the on-account parts of this counter's bills for the customer that the pulled balance can't include yet: still in the outbox (pending or refused), or accepted by the server (`local_documents.accepted_at`) after the start of the last pull that ran to `hasMore = false`.
+- **Offline** is what the status bar shows at finalize (§7). **`offlineToday`** is the on-account parts of this counter's bills for the customer **made while offline on the same business date** (their `credit.offline`, owner answer 1).
+
+**Over either:** the popup says which and by how much, and *Finalize & print* opens the approval on the same screen, as for a price (§10): an approver with **`pos.credit.over_limit`** for this branch, their own PIN (checked offline; wrong PINs count towards their own lock), and a reason: *Customer will pay soon, Regular customer, Owner's instruction*, or *Other* with a note (owner answer 2). The seller may approve themselves if they hold the permission. Both checks over at once need one approval that names both. The approval is for this bill and amount; it isn't kept on the open bill, and Esc leaves the bill unpaid.
+
+**On the document** (sync spec §6.1): `customerId`, or `walkinPhone` for a walk-in; each approval as an override `credit_limit` or `offline_cap`; and on a bill with an on-account payment, the `credit` block with what the counter saw: `offline`, `balance`, `balanceAsOf`, `unsynced`, `offlineToday`.
+
+**The printed bill** shows the customer's name and code instead of *Walk-in*, and *On account* as a payment row. No balance or limit is printed, and the walk-in phone isn't printed.

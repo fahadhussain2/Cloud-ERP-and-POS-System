@@ -146,7 +146,8 @@
     "billNeedsApproval": "Bill discount needs approval",
     "saveFailed": "This bill can’t be saved on this counter. Don’t lock or reload: finish it, and call the manager.",
     "aboveListTotal": "Above list",
-    "rounding": "Rounding"
+    "rounding": "Rounding",
+    "walkInPhone": "Walk-in · {{phone}}"
   },
   "keys": {
     "counter": "Counter",
@@ -167,7 +168,8 @@
     "clearBill": "Clear bill",
     "toLines": "Edit lines",
     "pay": "Pay cash",
-    "reprint": "Reprint"
+    "reprint": "Reprint",
+    "customer": "Customer"
   },
   "dialog": {
     "cancel": "Cancel"
@@ -221,7 +223,12 @@
     "wrong_other": "Wrong PIN. {{count}} tries left before this person is locked on this counter.",
     "locked": "This person is locked on this counter. Ask another approver.",
     "notAllowed": "This person can’t approve this. Ask a manager.",
-    "noteRequired": "Write a note for “Other”."
+    "noteRequired": "Write a note for “Other”.",
+    "credit_limit": "Over this customer’s credit limit: someone who may approve credit over the limit approves.",
+    "offline_cap": "Over today’s offline credit for this customer on this counter: someone who may approve credit over the limit approves.",
+    "customer": "Customer",
+    "overLimit": "Over the limit by",
+    "overCap": "Over today’s offline cap by"
   },
   "override": {
     "reason": {
@@ -229,7 +236,9 @@
       "old_stock": "Old or slow stock",
       "market_price": "Matching a market price",
       "regular_customer": "Regular customer",
-      "other": "Other"
+      "other": "Other",
+      "pay_soon": "Customer will pay soon",
+      "owner_instruction": "Owner’s instruction"
     }
   },
   "error": {
@@ -249,7 +258,10 @@
     "invalid_tender": "These payments don't pay the bill.",
     "empty_bill": "The bill is empty.",
     "approval_pending": "Approve the prices first.",
-    "other": "That can’t be done."
+    "other": "That can’t be done.",
+    "invalid_customer": "A customer’s bill doesn’t take a walk-in phone.",
+    "invalid_phone": "That isn’t a phone number: 7 to 15 digits.",
+    "credit_approval_pending": "This bill goes over the customer’s credit: it needs an approval."
   },
   "pay": {
     "pad": "Payment",
@@ -392,5 +404,35 @@
     "body_other": "It was removed in the back office. {{count}} bills on it have not reached the server: do not clear this PC, call the manager.",
     "help": "A manager can re-enable it under Counters in the back office; its bills then sync.",
     "retry": "Check again"
+  },
+  "customer": {
+    "title": "Customer",
+    "help": "Search by name, phone or code. Walk-in is the first row; a walk-in may leave a phone so the bill can be found later.",
+    "search": "Name, phone or code",
+    "action": "Choose",
+    "walkIn": "Walk-in",
+    "walkinPhone": "Walk-in phone (optional)",
+    "badPhone": "That isn’t a phone number: 7 to 15 digits.",
+    "none": "No customer matches “{{text}}”.",
+    "noCredit": "No credit",
+    "balance": "Balance {{amount}}",
+    "noLimit": "No limit",
+    "available": "Available {{amount}} of {{limit}}",
+    "availableShort": "Available {{amount}}"
+  },
+  "credit": {
+    "title": "On account · {{name}}",
+    "notPulled": "not yet pulled",
+    "balance": "Balance (as of {{time}})",
+    "unsynced": "This counter, not yet synced",
+    "after": "Balance after this bill",
+    "limit": "Credit limit",
+    "noLimit": "No limit",
+    "capToday": "Offline today on this counter",
+    "capUsed": "{{used}} of {{cap}}",
+    "overLimit": "Over the credit limit by {{amount}}: a manager approves when you finalize.",
+    "overCap": "Over today’s offline cap by {{amount}}: a manager approves when you finalize.",
+    "needsCustomer": "Choose a credit customer (F4)",
+    "notPermitted": "Your role can’t sell on account"
   }
 }

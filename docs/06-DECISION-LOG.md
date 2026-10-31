@@ -795,3 +795,19 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - A completed sale is a fact: a configuration gap or a bug must hold back its posting, never the sale or the counter.
   - Suspense keeps stock and cash right and leaves only the difference for the accountant; cost 0 matches how the migration treats items without a cost.
 - **Status:** Accepted (with the W1-08 plan, owner answers 1–4)
+
+### D-096 Customers and credit on the counter: three pulled datasets, the limit against balance plus unsynced, a per-counter offline cap, flagged on the server (2026-10-31)
+- **Decision:**
+  - **The counter pulls `customers`, `customer_accounts` and `customer_balances`** with only the columns selling needs (name, code, phones, city, tier, credit terms, balance); addresses, tax numbers, notes and payment terms stay on the server. A party that gets a customer account later is re-sent (a trigger touches its row). Phones are shown by their last four digits (owner answer 4) and never logged.
+  - **Choosing a customer sets the bill's tier**; back to walk-in returns to the default tier (owner answer 3). A walk-in may leave a phone, stored normalized (`normalizePhone`).
+  - **The limit** is checked against the pulled balance plus this counter's on-account bills the balance can't include yet (in the outbox, or accepted after the last complete pull started). Exactly at the limit is allowed; no limit (null, D-085) is never over.
+  - **The offline daily cap** counts this counter's on-account sales to the customer **made while offline on the business day**, plus the bill (owner answer 1). Online, only the limit applies.
+  - **Over either needs an approver's own PIN** with `pos.credit.over_limit` and a reason (*Customer will pay soon, Regular customer, Owner's instruction, Other*, owner answer 2), taken at finalize for that amount and recorded as a `credit_limit` or `offline_cap` override.
+  - **The sale document stays v1** with additive, optional fields: the customer, the walk-in phone, the credit overrides and a `credit` block with the counter's view. Bills already in outboxes still parse.
+  - **The server re-checks every on-account sale** with `reviewCredit` and its own balance (all counters), and flags `credit_limit_exceeded` or `offline_cap_exceeded`; it never refuses one (D-011, owner answer 6).
+  - **Credit terms come from the legacy mapping file** (`partyCredit`) and the importer re-run until a back-office customer screen exists (owner answer 5).
+- **Why:**
+  - Credit sales must work offline (D-013) without letting one customer run up a debt no one approved.
+  - Counters can't see each other offline, so the cap is per counter and the server, which sees all of them, is where a combined breach is found.
+  - A customer's contacts are personal data: the counter keeps only what it needs to find them.
+- **Status:** Accepted (with the W1-09 plan, owner answers 1–6)

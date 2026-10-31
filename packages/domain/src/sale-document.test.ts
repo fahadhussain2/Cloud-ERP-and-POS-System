@@ -3,6 +3,7 @@ import numberCases from '../golden/document-number.json';
 import saleDocumentCases from '../golden/sale-document.json';
 import saleTotalCases from '../golden/sale-total.json';
 import type { Bill } from './bill';
+import type { CreditApproval, CreditView } from './credit';
 import { money } from './money';
 import {
   billCode,
@@ -52,14 +53,20 @@ runGolden(
     tender: Tender;
     sellerMaxDiscountBp: number;
     context: { id: string; seq: number; createdAtMs: number };
+    customer?: { id: string | null; walkinPhone: string | null };
+    credit?: CreditView | null;
+    creditApproval?: CreditApproval | null;
   }>,
+  // Cases from before W1-09 are walk-in bills with no phone.
   (i) =>
     buildSaleDocument({
       bill: i.bill,
       tender: i.tender,
       methods: DELUX_METHODS,
       sellerMaxDiscountBp: i.sellerMaxDiscountBp,
-      hasCreditCustomer: false,
+      customer: i.customer ?? { id: null, walkinPhone: null },
+      credit: i.credit ?? null,
+      creditApproval: i.creditApproval ?? null,
       context: { ...COUNTER, ...i.context },
     }),
 );

@@ -3,9 +3,12 @@ import {
   CATALOG_DATASETS,
   CHECKOUT_COLUMNS,
   CHECKOUT_DATASETS,
+  CUSTOMER_COLUMNS,
+  CUSTOMER_DATASETS,
   uuidv7,
   type CatalogDataset,
   type CheckoutDataset,
+  type CustomerDataset,
   type ColumnType,
   type PullResponse,
 } from '@erp/contracts';
@@ -97,24 +100,32 @@ function fromSql(type: ColumnType, v: unknown): unknown {
 
 const catalogColumns = (d: CatalogDataset) => Object.entries(CATALOG_COLUMNS[d]) as [string, ColumnType][];
 
-/** Pulled datasets stored with exactly their typed columns: the catalog (W1-03) and checkout (W1-06). */
-const TYPED_COLUMNS: Record<CatalogDataset | CheckoutDataset, Record<string, ColumnType>> = {
+type TypedDataset = CatalogDataset | CheckoutDataset | CustomerDataset;
+
+/**
+ * Pulled datasets stored with exactly their typed columns: the catalog (W1-03), checkout (W1-06) and customers
+ * (W1-09).
+ */
+const TYPED_COLUMNS: Record<TypedDataset, Record<string, ColumnType>> = {
   ...CATALOG_COLUMNS,
   ...CHECKOUT_COLUMNS,
+  ...CUSTOMER_COLUMNS,
 };
-const TYPED_DATASETS = [...CATALOG_DATASETS, ...CHECKOUT_DATASETS];
+const TYPED_DATASETS: TypedDataset[] = [...CATALOG_DATASETS, ...CHECKOUT_DATASETS, ...CUSTOMER_DATASETS];
+/** Each row's key: `id`, except a customer's balance, one per party. */
+const keyOf = (d: TypedDataset) => (d === 'customer_balances' ? 'party_id' : 'id');
 
 const UPSERT = Object.fromEntries(
   TYPED_DATASETS.map((d) => {
     const names = [...Object.keys(TYPED_COLUMNS[d]), 'row_version'];
-    const updates = names.filter((n) => n !== 'id').map((n) => `${n} = excluded.${n}`);
+    const updates = names.filter((n) => n !== keyOf(d)).map((n) => `${n} = excluded.${n}`);
     return [
       d,
       `INSERT INTO ${d} (${names.join(', ')}) VALUES (${names.map(() => '?').join(', ')})
-       ON CONFLICT (id) DO UPDATE SET ${updates.join(', ')}`,
+       ON CONFLICT (${keyOf(d)}) DO UPDATE SET ${updates.join(', ')}`,
     ];
   }),
-) as Record<CatalogDataset | CheckoutDataset, string>;
+) as Record<TypedDataset, string>;
 
 /** The typed rows of a page: upserted with their types; removed rows are deleted. */
 function applyTyped(db: SqlDb, changes: PullResponse['changes']): void {
@@ -122,7 +133,7 @@ function applyTyped(db: SqlDb, changes: PullResponse['changes']): void {
     const columns = Object.entries(TYPED_COLUMNS[d]);
     for (const r of changes[d] ?? []) {
       if (r['deleted_at'] !== null && r['deleted_at'] !== undefined) {
-        db.exec(`DELETE FROM ${d} WHERE id = ?`, [required(r, 'id')]);
+        db.exec(`DELETE FROM ${d} WHERE ${keyOf(d)} = ?`, [required(r, keyOf(d))]);
         continue;
       }
       db.exec(UPSERT[d], [
@@ -153,9 +164,17 @@ export function loadCatalog(db: SqlDb): Record<CatalogDataset, Record<string, un
 
 /**
  * One pulled page and its cursor, in one transaction: a crash never leaves the cursor ahead of the data. `done` marks
- * the last page of a complete pull, so the counter knows its first catalog load has finished (POS spec §9).
+ * the last page of a complete pull, so the counter knows its first catalog load has finished (POS spec §9); with
+ * `startedAt`, when that pull began: the customer balances now include every bill the server accepted before it
+ * (POS spec §15).
  */
-export function applyPull(db: SqlDb, changes: PullResponse['changes'], cursor: string, done = false): void {
+export function applyPull(
+  db: SqlDb,
+  changes: PullResponse['changes'],
+  cursor: string,
+  done = false,
+  startedAt: string | null = null,
+): void {
   db.transaction(() => {
     applyTyped(db, changes);
     for (const r of changes.users ?? []) {
@@ -234,6 +253,7 @@ export function applyPull(db: SqlDb, changes: PullResponse['changes'], cursor: s
     // What the offline warnings count from (SYN-06): any successful push or pull.
     setSync(db, 'last_contact_at', at);
     if (done) setSync(db, 'pull_complete_at', now());
+    if (done && startedAt !== null) setSync(db, 'complete_pull_started_at', startedAt);
   });
 }
 

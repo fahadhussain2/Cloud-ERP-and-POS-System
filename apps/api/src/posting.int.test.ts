@@ -64,6 +64,7 @@ const METHODS: PaymentMethodInfo[] = [
   { code: 'cash', isCash: true, requiresReference: false },
   { code: 'raast', isCash: false, requiresReference: true },
   { code: 'jazzcash', isCash: false, requiresReference: true },
+  { code: 'on_account', isCash: false, requiresReference: false },
 ];
 const ITEMS = [
   {
@@ -218,7 +219,9 @@ function sale(counter: Counter, lines: Line[], payments?: [PaymentMethodCode, nu
     },
     methods: METHODS,
     sellerMaxDiscountBp: 0,
-    hasCreditCustomer: false,
+    customer: { id: null, walkinPhone: null },
+    credit: null,
+    creditApproval: null,
     context: {
       id: uuidv7(),
       seq: counter.seq,
@@ -562,6 +565,212 @@ describe('posting inside push (ACC-02, INV-01, INV-03)', () => {
   });
 });
 
+describe('credit in push (W1-09, POS-07, D-011)', () => {
+  // Each case has its own customer, so balances don't mix: a Rs 10,000 limit and a Rs 5,000 offline cap.
+  let c1: Counter;
+  let c2: Counter;
+  let manager = '';
+  let n = 0;
+
+  beforeAll(async () => {
+    c1 = await enroll(post);
+    c2 = await enroll(post);
+    manager = await withTenant(pool, { tenantId: post.tenantId }, async (_db, c) => {
+      const user = (
+        await c.query<{ id: string }>(
+          `INSERT INTO erp.users (tenant_id, username, full_name, email, password_hash)
+           VALUES ($1, 'tariq', 'Tariq', 'tariq@example.test', 'x') RETURNING id`,
+          [post.tenantId],
+        )
+      ).rows[0]!.id;
+      await c.query(
+        `INSERT INTO erp.user_roles (tenant_id, user_id, role_id, branch_id)
+         SELECT $1, $2, id, NULL FROM erp.roles WHERE template_key = 'manager'`,
+        [post.tenantId, user],
+      );
+      return user;
+    });
+  });
+
+  const customer = async (limit: number | null = 1000000, cap = 500000) => {
+    n += 1;
+    return withTenant(pool, { tenantId: post.tenantId }, async (_db, c) => {
+      const party = (
+        await c.query<{ id: string }>(
+          'INSERT INTO erp.parties (tenant_id, code, name) VALUES ($1, $2, $3) RETURNING id',
+          [post.tenantId, `CR${n}`, `Credit customer ${n}`],
+        )
+      ).rows[0]!.id;
+      await c.query(
+        `INSERT INTO erp.customer_accounts (tenant_id, party_id, price_tier_id, credit_allowed, credit_limit,
+           offline_daily_cap) VALUES ($1, $2, $3, true, $4, $5)`,
+        [post.tenantId, party, post.retail, limit, cap],
+      );
+      return party;
+    });
+  };
+
+  /** A Rs 4,500 bill on account, as the counter built it from what it saw (`seen`), with an approval if given. */
+  const onAccount = (
+    counter: Counter,
+    party: string | null,
+    seen: {
+      limit?: number;
+      balance?: number;
+      offline?: boolean;
+      offlineToday?: number;
+      approvedBy?: string;
+    } = {},
+  ) => {
+    counter.seq += 1;
+    return buildSaleDocument({
+      bill: {
+        version: 1,
+        sellerId: post.seller,
+        tierId: post.retail,
+        lines: [
+          {
+            id: 'l1',
+            itemId: post.items['OIL001']!,
+            qty: 1000 as Qty,
+            allowsFraction: false,
+            list: money(450000),
+            floor: null,
+            unitPrice: money(450000),
+            approval: null,
+          },
+        ],
+        billDiscount: money(0),
+        billApproval: null,
+      },
+      tender: {
+        payments: [{ method: 'on_account', amount: money(450000), reference: null }],
+        cashReceived: null,
+      },
+      methods: METHODS,
+      sellerMaxDiscountBp: 0,
+      customer: { id: party, walkinPhone: null },
+      credit: {
+        account: {
+          creditAllowed: true,
+          creditLimit: money(seen.limit ?? 1000000),
+          offlineDailyCap: money(500000),
+        },
+        balance: money(seen.balance ?? 0),
+        balanceAsOf: new Date().toISOString(),
+        unsynced: money(0),
+        offline: seen.offline ?? false,
+        offlineToday: money(seen.offlineToday ?? 0),
+      },
+      creditApproval: seen.approvedBy
+        ? {
+            requestedBy: post.seller,
+            approvedBy: seen.approvedBy,
+            reason: 'pay_soon',
+            note: null,
+            at: new Date().toISOString(),
+          }
+        : null,
+      context: {
+        id: uuidv7(),
+        seq: counter.seq,
+        deviceId: counter.deviceId,
+        deviceCode: counter.code,
+        branchId: counter.shop.branchId,
+        createdAtMs: Date.now() - 1000,
+        timeZone: 'Asia/Karachi',
+        cutoffHour: 4,
+        increment: money(100),
+        clientVersion: '0.7.0',
+      },
+    });
+  };
+
+  const balanceOf = async (party: string) =>
+    (
+      await q<{ balance: number }>(
+        post,
+        "SELECT balance::int AS balance FROM erp.party_balances WHERE party_id = $1 AND role = 'customer'",
+        [party],
+      )
+    )[0]?.balance ?? 0;
+
+  it('accepts a sale within the limit without an exception, and the balance moves (W1-08 posting)', async () => {
+    const party = await customer();
+    const doc = onAccount(c1, party);
+    const r = await push(c1, [doc]);
+    expect(r.results[0]).toMatchObject({ status: 'accepted', exceptions: [] });
+    expect(await balanceOf(party)).toBe(450000);
+  });
+
+  it('flags a sale the server finds over the limit, with its figures and the counter’s, and still accepts it', async () => {
+    const party = await customer(800000);
+    await push(c1, [onAccount(c1, party)]);
+    // The counter hadn't pulled the first bill's balance: it saw room, the server sees Rs 9,000 against Rs 8,000.
+    const doc = onAccount(c1, party, { balance: 0 });
+    const r = await push(c1, [doc]);
+    expect(r.results[0]).toMatchObject({
+      status: 'accepted',
+      exceptions: ['credit_limit_exceeded'],
+    });
+    expect(await exceptionsOf(post, doc.id)).toEqual([
+      {
+        kind: 'credit_limit_exceeded',
+        status: 'open',
+        details: {
+          cause: 'no_approval',
+          amount: 450000,
+          balance: 450000,
+          limit: 800000,
+          overBy: 100000,
+          counter: doc.credit,
+        },
+      },
+    ]);
+  });
+
+  it('doesn’t flag a sale over the limit that a manager approved', async () => {
+    const party = await customer(500000);
+    await push(c1, [onAccount(c1, party)]);
+    const doc = onAccount(c1, party, { limit: 500000, balance: 450000, approvedBy: manager });
+    expect(doc.overrides.map((o) => o.kind)).toEqual(['credit_limit']);
+    const r = await push(c1, [doc]);
+    expect(r.results[0]).toMatchObject({ status: 'accepted', exceptions: [] });
+    expect(await balanceOf(party)).toBe(900000);
+  });
+
+  it('flags the second of two counters’ bills that together pass the limit', async () => {
+    const party = await customer(800000);
+    const [a, b] = [onAccount(c1, party), onAccount(c2, party)];
+    expect((await push(c1, [a])).results[0]!.exceptions).toEqual([]);
+    expect((await push(c2, [b])).results[0]!.exceptions).toEqual(['credit_limit_exceeded']);
+  });
+
+  it('flags an offline bill that takes the counter past the day’s cap', async () => {
+    const party = await customer(null, 500000);
+    const first = onAccount(c1, party, { offline: true });
+    const second = onAccount(c1, party, { offline: true, offlineToday: 0 });
+    expect((await push(c1, [first])).results[0]!.exceptions).toEqual([]);
+    expect((await push(c1, [second])).results[0]!.exceptions).toEqual(['offline_cap_exceeded']);
+    expect((await exceptionsOf(post, second.id))[0]!.details).toMatchObject({
+      cause: 'no_approval',
+      offlineToday: 450000,
+      cap: 500000,
+      overBy: 400000,
+    });
+    // Another counter's offline sales are its own day's cap.
+    const other = onAccount(c2, party, { offline: true });
+    expect((await push(c2, [other])).results[0]!.exceptions).toEqual([]);
+  });
+
+  it('refuses a bill for a customer that isn’t the tenant’s (unknown_reference)', async () => {
+    const doc = onAccount(c1, '019a0000-0000-7000-8000-00000000ffff');
+    expect((await push(c1, [doc])).results[0]).toMatchObject({
+      status: 'rejected',
+      error: 'unknown_reference',
+    });
+  });
+});
 describe('a bill that can’t be posted yet (SYN-03): accepted, flagged, posted by the catch-up', () => {
   let c: Counter;
   let held: SaleDocument[];

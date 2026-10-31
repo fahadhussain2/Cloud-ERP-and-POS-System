@@ -354,6 +354,8 @@ SQLite WASM in a dedicated worker, on OPFS (`opfs-sahpool`), changed only by num
 
 **Built in W1-07 (local schema 6):** `local_documents.signature`, copied from the outbox row when the server acks it, so a document can be pushed again after a server restore; an index on `local_documents (family, seq)` for the re-queue. `sync_state` keys `pushed_through:<family>`, `last_push_at`, `last_contact_at` (the last successful push or pull) and `server_clock_offset_ms`. An acked row leaves the outbox; a refused one stays `quarantined` with its error (sync spec §6.2, POS spec §14). Documents older than 30 days are pruned at start-up, never one still in the outbox (rule 9).
 
+**Built in W1-09 (local schema 7):** `customers`, `customer_accounts` and `customer_balances` (keyed by `party_id`), with exactly the pulled columns (sync spec §3, `CUSTOMER_COLUMNS` in `@erp/contracts`); `local_documents.accepted_at`, set when push acks a bill. `sync_state.complete_pull_started_at` is when the last complete pull began: a bill on account counts as unsynced credit while it is in the outbox, or was accepted after that time (POS spec §15). `open_bills.bill` gains `customer` (`id`, `code`, `name`) and `walkinPhone`; a bill saved before reads as a walk-in.
+
 The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` in IndexedDB (`erp-pos-keys`), and the device token is kept only in memory.
 
 **Planned (later tasks):**

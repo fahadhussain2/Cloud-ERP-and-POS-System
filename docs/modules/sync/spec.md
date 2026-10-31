@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: accepted with the W1-03 plan (2026-10-26). Checkout datasets and the sale document (§6.1): with the W1-06 plan (2026-10-27). Push (§6.2), gaps and re-push (§7) and the SSE nudge (§8): with the W1-07 plan and owner answers (2026-10-28), D-094. |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: accepted with the W1-03 plan (2026-10-26). Checkout datasets and the sale document (§6.1): with the W1-06 plan (2026-10-27). Push (§6.2), gaps and re-push (§7) and the SSE nudge (§8): with the W1-07 plan and owner answers (2026-10-28), D-094. Customer datasets, the customer on the sale document and the credit exceptions: with the W1-09 plan and owner answers (2026-10-31), D-096. |
 | **Refs** | SYN-01…SYN-06; architecture §4.1, §5; data model §10, §12; CLAUDE.md rules 6–9; D-009, D-011, D-042, D-047 |
 
 The architecture (§5) sets the principles. This spec fixes the contracts precisely enough to build and test them. **v1 covers pull**, which W1-02 (users and settings for unlock) and W1-03 (the catalog) need. The **sale document** a counter writes to its outbox is fixed with W1-06 (§6.1); **push**, server acceptance and exceptions (§6.2), gaps and re-push after a restore (§7) and the SSE nudge (§8) with W1-07.
@@ -64,7 +64,17 @@ Each dataset lists its columns explicitly. **A column not listed never leaves th
 | `print_profiles` | `print_profiles` | the tenant | `id, name, paper_format, code_type, copies, template_options, is_tenant_default, row_version, deleted_at` |
 | `device` | `devices` | **only the calling device's own row** | `id, code, print_profile_id, status, row_version, deleted_at`. **Never `public_key`** or who enrolled or revoked it. |
 
-Customers (W1-09), stock balances (W1-08) and the 90-day bills (W1-13) are added by their tasks with the same rules.
+**Customer datasets (W1-09):** all scoped to the tenant. Names and phones are personal data: only these columns leave the server, and none is logged.
+
+| Dataset | Table | Columns |
+|---|---|---|
+| `customers` | `parties`, **only parties with a live customer account** | `id, code, name, phones, city, status, row_version, deleted_at`. **Never `email`, `address`, `contact_person`, `tax_id`, `notes`, `label_abbr`, `country`, `legacy`.** |
+| `customer_accounts` | `customer_accounts` | `id, party_id, price_tier_id, credit_allowed, credit_limit, offline_daily_cap, row_version, deleted_at`. **Never `payment_terms_days`, `legacy`.** |
+| `customer_balances` | `party_balances`, **`role = 'customer'` only** | `party_id, balance, updated_at, row_version, deleted_at` (keyed by `party_id` on the counter; no row = 0) |
+
+A party that gets its customer account after its own row was pulled (a supplier who starts buying) is sent again: a trigger on `customer_accounts` (insert, or a removed account restored) touches its `parties` row. A removed account arrives as a tombstone, and the counter stops listing the party.
+
+Stock balances and the 90-day bills (W1-13) are added by their tasks with the same rules.
 
 **Bootstrap:** the first pull simply starts from the beginning, in full pages of 1,000 rows (about 125k catalog rows for Delux). An interrupted first load resumes from the last committed page. Measured in W1-03 on the real catalog: **31 seconds** from setup to search, under the 60-second rule, so there is no snapshot download. Revisit if a tenant's catalog is much larger.
 
@@ -109,15 +119,16 @@ What a counter writes to `local_documents` and the `outbox` when a bill is final
 | `deviceId`, `branchId` | from `meta` |
 | `createdAt`, `businessDate` | the counter's clock at finalize; `YYYY-MM-DD` with the tenant's cutoff (D-056) |
 | `sellerId`, `tierId` | who was unlocked; the bill's tier |
-| `customerId`, `walkinPhone` | `null` (W1-09) |
+| `customerId`, `walkinPhone` | the customer's party id, or `null` for a walk-in; the walk-in's phone through `normalizePhone`, only without a customer, else `null` (W1-09) |
 | `lines[]` | `lineNo` (1…), `itemId`, `qty`, `listPrice` (null without one), `floorPrice` (null = unknown), `unitPrice`, `lineDiscount` (list amount − amount; negative above list), `billShare` (its part of the bill discount), `lineTotal` (amount − bill share) |
 | `amounts` | `subtotal` (sum of list amounts), `lineDiscountTotal`, `billDiscount`, `rounding`, `taxTotal` (0), `total`. Always `subtotal − lineDiscountTotal − billDiscount + rounding = total` |
 | `payments[]` | `method` (payment method code), `amount`, `cashReceived` and `changeDue` (cash only, else null), `reference` (null when none). Amounts add up to `total` |
 | `cashDue`, `handoverStatus` | the cash amount (0 without cash); `'pending'` when above 0, else `'not_applicable'` |
-| `overrides[]` | each approval on the bill (POS spec §10): `kind` (`below_list` \| `below_floor`), `lineNo` (null for the bill discount), `requestedBy`, `approvedBy`, `reason`, `note`, `at`, `values` (a line: `list`, `floor`, `price`; the bill: `billDiscount` and `lines` as `lineNo`, `qty`, `unitPrice`) |
+| `overrides[]` | each approval on the bill (POS spec §10, §15): `kind` (`below_list` \| `below_floor` \| `credit_limit` \| `offline_cap`), `lineNo` (null for the bill discount and for credit), `requestedBy`, `approvedBy`, `reason`, `note`, `at`, `values` (a line: `list`, `floor`, `price`; the bill: `billDiscount` and `lines` as `lineNo`, `qty`, `unitPrice`; `credit_limit`: `limit`, `balance`, `unsynced`, `amount`; `offline_cap`: `cap`, `offlineToday`, `amount`) |
+| `credit` | optional, only on a bill with an on-account payment (W1-09): `offline`, `balance`, `balanceAsOf`, `unsynced`, `offlineToday`, what the counter saw when it decided (POS spec §15) |
 | `clientVersion` | the app version |
 
-The outbox row's `signature` is the device's ECDSA signature over `canonicalJson(document)` (D-082), added right after the commit. A later version of the document adds a new schema next to v1; the server keeps accepting v1 (architecture §4.2).
+The outbox row's `signature` is the device's ECDSA signature over `canonicalJson(document)` (D-082), added right after the commit. A later version of the document adds a new schema next to v1; the server keeps accepting v1 (architecture §4.2). W1-09's fields are additive and optional, so every v1 bill written before still parses (D-096).
 
 ### 6.2 Push (W1-07)
 
@@ -150,10 +161,10 @@ POST /api/sync/push   (device token, body up to 5 MB)
 | `bad_signature` | it doesn't verify with the key of the device the payload names. Also written as a `bad_signature` exception (severity high). Well signed by **another** device → `wrong_device` |
 | `bad_schema` | the payload fails `SaleDocumentV1` (an unknown `version` included), or its `id`, `seq` or family differ from the row's |
 | `wrong_device` | another device's document (a counter pushes only its own, owner answer 3 to W1-07), or another branch's |
-| `unknown_reference` | a seller, approver, requester, tier, item or payment method that isn't this tenant's |
+| `unknown_reference` | a seller, approver, requester, tier, item, payment method or customer that isn't this tenant's |
 | `seq_conflict` | another id already holds this device's seq |
 
-4. **Re-check the rules** with `reviewSale` (`packages/domain`, the counter's own functions, rule 2). It never refuses: its findings become exceptions (below).
+4. **Re-check the rules** with `reviewSale` (`packages/domain`, the counter's own functions, rule 2), and for a bill with an on-account payment `reviewCredit` against the customer's account, its balance, read under the tenant's posting order lock (`holdPostingOrder`, D-017), so no other posting moves it before this sale is posted, and the device's offline on-account total for that customer and business date. Neither refuses: their findings become exceptions (below).
 5. **Store** `sales_documents` (with the payload, its hash and the signature), `sales_lines` (with the branch's SHOP location), `sales_payments`, `overrides` and the exceptions; `exception_count` on the document.
 6. **Record** the result in `sync_inbox` and update the device's series (§7). Posting joins this transaction in W1-08.
 
@@ -168,6 +179,8 @@ An unexpected error rolls back that document and answers `500`; the documents be
 | `below_floor_no_override` | medium | a line below its floor, or without a list price, with no approval that covers it from someone holding `pos.price.below_floor` (`details.cause`: `no_approval`, `not_covered`, `not_permitted`) |
 | `discount_over_limit` | medium | a line or the bill discount past the seller's limit, with no covering approval from someone whose `pos.override.approve` limit reaches it |
 | `document_inconsistent` | high | figures that don't add up (`details.code`: `number`, `business_date`, `line_numbers`, `line_amounts`, `amounts`, `rounding`, `tender`, `payments`, `cash_due`, `handover_status`). Accepted and flagged (owner answer 2 to W1-07) |
+| `credit_limit_exceeded` | medium | an on-account amount that takes the server's balance (every counter's sales) over the limit without a covering `credit_limit` approval from someone holding `pos.credit.over_limit` (`details.cause`: `no_approval`, `not_permitted`, `credit_not_allowed`, `seller_not_permitted`; with the server's and the counter's figures) |
+| `offline_cap_exceeded` | medium | an offline bill that takes the device's offline on-account total for the customer on that business date over the cap without a covering `offline_cap` approval |
 | `revoked_device_doc` | high | made between the device's revocation and its Re-enable (§1) |
 | `seq_gap` | medium | a seq above the next expected one (§7) |
 | `clock_skew` | low | `serverTime − deviceClock` over 5 minutes either way; once per device and business day, with the health, not on a document |

@@ -3,7 +3,10 @@ import {
   add,
   approve,
   billAmounts,
+  can,
   changeTier,
+  checkCredit,
+  CREDIT_REASONS,
   DomainError,
   effectiveLimits,
   hasListPrice,
@@ -15,11 +18,18 @@ import {
   setBillDiscount,
   setQty,
   setUnitPrice,
+  onAccountAmount,
   type ApprovalTarget,
+  type CreditApproval,
+  type CreditNeed,
+  type CreditReason,
+  type CreditView,
   type DomainErrorCode,
+  type OverrideReason,
   type Money,
   type PendingApproval,
   type Qty,
+  type RoleGrant,
   type SaleDocument,
   type Tender,
 } from '@erp/domain';
@@ -43,22 +53,24 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { useTranslation } from 'react-i18next';
 
 import { setBillOpen } from '../bill/bill-open';
-import { addItem, formatQty, parseQuantity, quantityPrefix, tryEdit } from '../bill/bill-state';
+import { addItem, formatQty, parseQuantity, quantityPrefix, setCustomer, tryEdit } from '../bill/bill-state';
 import { useOpenBill, type BillCounter } from '../bill/use-open-bill';
 import type { Counter } from '../counter';
 import type { CheckoutSettings, DocumentSummary, PaymentMethodRow } from '../db/checkout';
+import type { CounterCustomer } from '../db/customers';
 import type { PrintJob } from '../print/print-job';
 import type { BillItem, SearchResult, Vehicle } from '../search/search-index';
-import { checkApprover } from '../unlock/approve';
+import { checkApprover, checkCreditApprover } from '../unlock/approve';
 import type { StaffUser } from '../unlock/unlock';
 import { ApprovalDialog, ConfirmDialog, EntryDialog, TierDialog, type ApprovalAttempt } from './BillDialogs';
 import { BillPanel } from './BillPanel';
-import { CashDialog, MethodDialog, SplitDialog } from './PaymentDialogs';
+import { CustomerDialog, customerStrip, type CustomerChoice } from './CustomerDialog';
+import { CashDialog, MethodDialog, OnAccountDialog, SplitDialog } from './PaymentDialogs';
 import { PaymentPad } from './PaymentPad';
 import { CLIENT_VERSION } from '../version';
 import { ReprintDialog } from './ReprintDialog';
 
-// The counter screen (POS spec §9–§11, POS-02, POS-03, POS-04, PLT-07): search on the left, the bill on the right,
+// The counter screen (POS spec §9–§11, §15, POS-02, POS-03, POS-04, POS-05, POS-07, PLT-07): search on the left, the bill on the right,
 // the key bar along the bottom. Every key press searches the local catalog; an older answer never replaces a newer
 // one. Enter (or a scan) adds the selected item; Tab moves to the bill lines, where single keys change a line.
 
@@ -79,7 +91,10 @@ type DialogState =
   | { kind: 'cash' }
   | { kind: 'method'; method: PaymentMethodRow }
   | { kind: 'split' }
-  | { kind: 'reprint' };
+  | { kind: 'reprint' }
+  | { kind: 'customer' }
+  | { kind: 'onAccount'; figures: CreditView }
+  | { kind: 'creditApproval'; tender: Tender; needs: CreditNeed[]; overLimitBy: Money; overCapBy: Money };
 
 export type CounterScreenCounter = BillCounter &
   Pick<
@@ -99,6 +114,8 @@ export type CounterScreenCounter = BillCounter &
     | 'bill'
     | 'recordReprint'
     | 'print'
+    | 'customers'
+    | 'creditFigures'
   >;
 
 const sameTarget = (a: ApprovalTarget, b: ApprovalTarget) =>
@@ -111,6 +128,7 @@ export function CounterScreen({
   staff,
   branchId,
   shopName,
+  offline,
   onLock,
   onSaved,
 }: {
@@ -123,6 +141,8 @@ export function CounterScreen({
   branchId: string | null;
   /** Printed at the top of every bill. */
   shopName: string;
+  /** What the status bar shows: while offline, the offline daily cap applies (POS spec §15). */
+  offline: boolean;
   onLock: () => void;
   /** A bill was saved: the unsynced count goes up (POS spec §7). */
   onSaved?: () => void;
@@ -153,6 +173,9 @@ export function CounterScreen({
   const [settings, setSettings] = useState<CheckoutSettings | null>(null);
   /** The seller's discount limit; null until their roles have loaded, and no approval is judged before then. */
   const [maxDiscountBp, setMaxDiscountBp] = useState<number | null>(null);
+  const [sellerGrants, setSellerGrants] = useState<RoleGrant[]>([]);
+  /** This counter's customers (POS spec §15), refreshed whenever the customer dialog opens. */
+  const [customers, setCustomers] = useState<CounterCustomer[]>([]);
 
   const lines = openBill?.bill.lines ?? [];
   const tierId = openBill?.bill.tierId;
@@ -174,12 +197,34 @@ export function CounterScreen({
   useEffect(() => {
     let stop = false;
     void counter.grants(user.id).then((g) => {
-      if (!stop) setMaxDiscountBp(effectiveLimits(g, branchId).maxDiscountBp);
+      if (stop) return;
+      setMaxDiscountBp(effectiveLimits(g, branchId).maxDiscountBp);
+      setSellerGrants(g);
     });
     return () => {
       stop = true;
     };
   }, [counter, user.id, branchId]);
+
+  useEffect(() => {
+    let stop = false;
+    void counter.customers().then((list) => {
+      if (!stop) setCustomers(list);
+    });
+    return () => {
+      stop = true;
+    };
+  }, [counter]);
+
+  // Who the bill is for, and whether it may go on account (POS spec §15).
+  const billCustomer = openBill?.customer ?? null;
+  const customerRow = billCustomer ? customers.find((c) => c.id === billCustomer.id) : undefined;
+  const maySellCredit = can(sellerGrants, 'pos.credit.sell', branchId);
+  const onAccountBlocked = !customerRow?.account.creditAllowed
+    ? t('credit.needsCustomer')
+    : !maySellCredit
+      ? t('credit.notPermitted')
+      : null;
 
   // An app update waits while this bill has lines (POS spec §8).
   const hasLines = lines.length > 0;
@@ -401,9 +446,12 @@ export function CounterScreen({
 
   /** Sends a bill to the printer; a print that fails changes nothing, and Alt+P prints it again (POS spec §13). */
   const printDocument = (document: SaleDocument, items: PrintJob['items'], reprint: PrintJob['reprint']) => {
+    const c = document.customerId === null ? undefined : customers.find((x) => x.id === document.customerId);
     try {
       counter.print({
         document,
+        customer:
+          document.customerId === null ? null : { code: c?.code ?? '', name: c?.name ?? document.customerId },
         profile: settings?.printProfile ?? null,
         shopName,
         headerLines: [...(settings?.receiptHeader ?? []), ...(settings?.printProfile?.headerLines ?? [])],
@@ -431,9 +479,32 @@ export function CounterScreen({
     return t('pay.done', { number: d.number, cash: m(d.cashDue) });
   };
 
-  /** Finalize & print (POS spec §12): saved first, in one local transaction; printed only after the commit. */
-  const pay = async (tender: Tender): Promise<string | null> => {
+  /**
+   * Finalize & print (POS spec §12): saved first, in one local transaction; printed only after the commit. An
+   * on-account part over the customer's limit or the offline cap first asks for an approval (POS spec §15).
+   */
+  const pay = async (
+    tender: Tender,
+    creditApproval: CreditApproval | null = null,
+  ): Promise<string | null> => {
     const ob = get();
+    const customerId = ob?.customer?.id ?? null;
+    const amount = onAccountAmount(tender.payments);
+    if (amount > 0 && creditApproval === null) {
+      if (customerId === null) return 'tender.on_account_needs_customer';
+      const c = checkCredit({ ...(await counter.creditFigures(customerId, offline)), amount });
+      if (!c.allowed) return 'tender.on_account_needs_customer';
+      if (c.needs.length > 0) {
+        setDialog({
+          kind: 'creditApproval',
+          tender,
+          needs: c.needs,
+          overLimitBy: c.overLimitBy,
+          overCapBy: c.overCapBy,
+        });
+        return null;
+      }
+    }
     let saved;
     try {
       saved = await counter.finalize({
@@ -442,6 +513,8 @@ export function CounterScreen({
         createdAtMs: nowMs(),
         clientVersion: CLIENT_VERSION,
         tender,
+        offline,
+        creditApproval,
       });
     } catch (err) {
       if (err instanceof DomainError) return errorKey(err.code);
@@ -460,6 +533,8 @@ export function CounterScreen({
         ),
         null,
       );
+    // The balances on screen stay as pulled; the next pull brings this bill into them.
+    void counter.customers().then(setCustomers);
     setNotice(describe(document));
     onSaved?.();
     focusSearch();
@@ -487,12 +562,52 @@ export function CounterScreen({
   };
 
   const openTier = () => tiers.length > 0 && setDialog({ kind: 'tier' });
+  const openCustomer = async () => {
+    setCustomers(await counter.customers());
+    setDialog({ kind: 'customer' });
+  };
+  /** Picks the bill's customer (or walk-in) and their tier, as F7 would change it (POS spec §15). */
+  const chooseCustomer = async (choice: CustomerChoice) => {
+    const ob = get();
+    if (!ob) return;
+    const fallback = tiers.find((x) => x.isDefault)?.id ?? ob.bill.tierId;
+    const theirs = choice.customer?.account.tierId;
+    const tier =
+      theirs !== undefined ? (tiers.some((x) => x.id === theirs) ? theirs : ob.bill.tierId) : fallback;
+    const prices = await counter.tierPrices([...new Set(ob.bill.lines.map((l) => l.itemId))], tier);
+    const c = choice.customer;
+    const err = change((x) =>
+      setCustomer(
+        x,
+        { customer: c && { id: c.id, code: c.code, name: c.name }, walkinPhone: choice.walkinPhone },
+        tier,
+        prices,
+      ),
+    );
+    if (err) return show(err);
+    setDialog(null);
+    setMessage(null);
+    type(text, tier);
+    focusSearch();
+  };
+  const openOnAccount = async () => {
+    const ob = get();
+    const id = ob?.customer?.id;
+    if (!ob || !id || ob.bill.lines.length === 0 || maxDiscountBp === null || onAccountBlocked !== null)
+      return;
+    if (pendingApprovals(ob.bill, maxDiscountBp).length > 0) return setMessage(t('pay.approveFirst'));
+    const s = await counter.checkout();
+    setSettings(s);
+    if (!s) return setMessage(t('pay.notReady'));
+    setDialog({ kind: 'onAccount', figures: await counter.creditFigures(id, offline) });
+  };
   const openClear = () => (get()?.bill.lines.length ?? 0) > 0 && setDialog({ kind: 'clear' });
   const ignore = () => {};
   // F1, F3, F5 never reach the browser on the counter (no help page, find bar or reload mid-bill).
   useShortcuts(
     {
       F2: focusSearch,
+      F4: () => void openCustomer(),
       F7: openTier,
       'Alt+C': openClear,
       'Alt+L': onLock,
@@ -512,7 +627,7 @@ export function CounterScreen({
   const lineOf = (id: string) => openBill?.bill.lines.find((l) => l.id === id);
 
   const attempt =
-    (p: PendingApproval): ApprovalAttempt =>
+    (p: PendingApproval): ApprovalAttempt<OverrideReason> =>
     async (approver, pin, reason, note) => {
       const [before, grants] = await Promise.all([
         counter.getPinState(approver.id),
@@ -557,6 +672,52 @@ export function CounterScreen({
       return { result: r.result, failures: r.approverState.failures };
     };
 
+  /** The credit approval (POS spec §15): an approver with pos.credit.over_limit, then the bill is finalized. */
+  const approveCredit = async (
+    approver: StaffUser,
+    pin: string,
+    reason: CreditReason,
+    note: string | null,
+  ) => {
+    if (dialog?.kind !== 'creditApproval') return { result: 'not_allowed' as const, failures: 0 };
+    const { tender } = dialog;
+    const [before, grants] = await Promise.all([
+      counter.getPinState(approver.id),
+      counter.grants(approver.id),
+    ]);
+    const r = await checkCreditApprover({
+      approver,
+      approverState: before,
+      approverGrants: grants,
+      branchId,
+      pin,
+      verify: (v, x) => counter.verifyPin(v, x),
+    });
+    await counter.setPinState(approver.id, r.approverState);
+    if (!before.locked && r.approverState.locked)
+      await counter.recordPinEvent({
+        kind: 'locked',
+        userId: approver.id,
+        byUserId: null,
+        at: new Date().toISOString(),
+      });
+    await counter.log(`approval.credit.${r.result}`, { sellerId: user.id, approverId: approver.id });
+    if (r.result === 'approved') {
+      const problem = await pay(tender, {
+        requestedBy: user.id,
+        approvedBy: approver.id,
+        reason,
+        note,
+        at: new Date().toISOString(),
+      });
+      if (problem) {
+        setDialog(null);
+        setMessage(t(problem));
+      }
+    }
+    return { result: r.result, failures: r.approverState.failures };
+  };
+
   const approvalFacts = (p: PendingApproval): [string, ReactNode][] => {
     if (p.target === 'bill')
       return [
@@ -596,6 +757,7 @@ export function CounterScreen({
 
   const common: KeyHint[] = [
     { keys: 'F9', label: t('keys.pay'), run: () => void openPay('cash') },
+    { keys: 'F4', label: t('keys.customer'), run: () => void openCustomer() },
     { keys: 'F7', label: t('keys.tier'), run: openTier },
     { keys: 'Alt+C', label: t('keys.clearBill'), run: openClear },
     { keys: 'Alt+P', label: t('keys.reprint'), run: () => setDialog({ kind: 'reprint' }) },
@@ -737,6 +899,14 @@ export function CounterScreen({
           total={total}
           pending={pending}
           tierName={tiers.find((x) => x.id === tierId)?.name ?? ''}
+          customerText={
+            customerRow
+              ? customerStrip(customerRow, t, m)
+              : billCustomer
+                ? `${billCustomer.name} (${billCustomer.code})`
+                : null
+          }
+          walkinPhone={openBill?.walkinPhone ?? null}
           selected={lineSel}
           active={zone === 'bill'}
           message={saveFailed ? t('bill.saveFailed') : message}
@@ -749,6 +919,8 @@ export function CounterScreen({
               disabled={lines.length === 0}
               onCash={() => void openPay('cash')}
               onMethod={(method) => void openPay(method)}
+              onAccount={() => void openOnAccount()}
+              onAccountBlocked={onAccountBlocked}
               onSplit={() => void openPay('split')}
             />
           }
@@ -898,6 +1070,7 @@ export function CounterScreen({
           settings={settings}
           total={total.total}
           money={money}
+          creditCustomer={onAccountBlocked === null}
           onPay={pay}
           onClose={() => setDialog(null)}
         />
@@ -913,10 +1086,51 @@ export function CounterScreen({
       )}
       {dialog?.kind === 'approval' && (
         <ApprovalDialog
-          pending={dialog.pending}
+          description={t(`approval.${dialog.pending.need}`)}
           facts={approvalFacts(dialog.pending)}
           staff={staff}
           onApprove={attempt(dialog.pending)}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'customer' && (
+        <CustomerDialog
+          customers={customers}
+          tiers={tiers}
+          current={billCustomer}
+          walkinPhone={openBill?.walkinPhone ?? null}
+          money={money}
+          onChoose={(choice) => void chooseCustomer(choice)}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'onAccount' && total && billCustomer && (
+        <OnAccountDialog
+          total={total.total}
+          money={money}
+          customerName={billCustomer.name}
+          figures={dialog.figures}
+          timeZone={tenantZone()}
+          onPay={pay}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'creditApproval' && (
+        <ApprovalDialog
+          description={dialog.needs.map((n) => t(`approval.${n}`)).join(' ')}
+          facts={[
+            [t('approval.customer'), billCustomer?.name ?? ''],
+            ...(dialog.overLimitBy > 0
+              ? [[t('approval.overLimit'), m(dialog.overLimitBy)] as [string, ReactNode]]
+              : []),
+            ...(dialog.overCapBy > 0
+              ? [[t('approval.overCap'), m(dialog.overCapBy)] as [string, ReactNode]]
+              : []),
+            [t('approval.seller'), user.fullName],
+          ]}
+          staff={staff}
+          reasons={CREDIT_REASONS}
+          onApprove={approveCredit}
           onClose={() => setDialog(null)}
         />
       )}

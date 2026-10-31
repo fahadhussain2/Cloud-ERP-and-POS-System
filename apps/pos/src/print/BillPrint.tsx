@@ -75,7 +75,7 @@ function BillPage({ job }: { job: PrintJob }) {
         </div>
         <div>
           <dt>{t('print.customer')}</dt>
-          <dd>{t('print.walkIn')}</dd>
+          <dd>{job.customer ? `${job.customer.name} (${job.customer.code})` : t('print.walkIn')}</dd>
         </div>
       </dl>
       <table className="bill-lines">

@@ -55,7 +55,7 @@ export function browserCounter(): Counter {
       api,
       tokens,
       cursor: () => db.getSync('pull_cursor'),
-      apply: (changes, cursor, done) => db.applyPull(changes, cursor, done),
+      apply: (changes, cursor, done, startedAt) => db.applyPull(changes, cursor, done, startedAt),
       onPage: () => listeners.forEach((l) => l()),
     });
     await db.log('sync.pull', { ...r, ms: Date.now() - started });
@@ -180,6 +180,8 @@ export function browserCounter(): Counter {
     recentBills: (since, filter) => db.recentDocuments(since, filter),
     bill: (id) => db.loadDocument(id),
     recordReprint: (r) => db.recordReprint(r),
+    customers: () => db.customers(),
+    creditFigures: (customerId, offline) => db.creditFigures(customerId, offline),
     print: (job) => printBill(job),
   };
 }

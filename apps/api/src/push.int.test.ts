@@ -181,7 +181,9 @@ function sale(counter: Counter, seq: number, o: SaleOptions = {}): SaleDocument 
     },
     methods: METHODS,
     sellerMaxDiscountBp: 10000,
-    hasCreditCustomer: false,
+    customer: { id: null, walkinPhone: null },
+    credit: null,
+    creditApproval: null,
     context: {
       id: o.id ?? uuidv7(),
       seq,

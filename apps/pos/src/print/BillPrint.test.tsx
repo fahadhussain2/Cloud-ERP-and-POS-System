@@ -60,7 +60,9 @@ const document = buildSaleDocument({
   },
   methods: METHODS,
   sellerMaxDiscountBp: 0,
-  hasCreditCustomer: false,
+  customer: { id: null, walkinPhone: null },
+  credit: null,
+  creditApproval: null,
   context: {
     id: '019a3f6e-7b10-7c3a-9d2e-5b8f1a2c3d4e',
     seq: 412,
@@ -95,6 +97,7 @@ const job = (over: Partial<PrintJob> = {}): PrintJob => ({
     'i-hose': { code: 'HOSE001', name: 'FUEL HOSE' },
   },
   sellerName: 'Sara',
+  customer: null,
   methodNames: { cash: 'Cash', jazzcash: 'JazzCash' },
   money: { locale: 'en-PK', currency: 'PKR', minorUnits: 2 },
   timeZone: 'Asia/Karachi',
@@ -159,6 +162,13 @@ describe('the printed bill', () => {
     const text = container.textContent ?? '';
     expect(text).not.toContain(en.print.discount);
     expect(text).not.toMatch(/print\.\w/);
+  });
+
+  it("prints a customer's name and code instead of Walk-in, never their phone or balance (W1-09)", () => {
+    const { container } = show(job({ customer: { code: 'C0042', name: 'Khan Motors' } }));
+    const text = plain(container.textContent);
+    expect(text).toContain('Khan Motors (C0042)');
+    expect(text).not.toContain(en.print.walkIn);
   });
 
   it('a reprint carries the REPRINT band with when and who', () => {

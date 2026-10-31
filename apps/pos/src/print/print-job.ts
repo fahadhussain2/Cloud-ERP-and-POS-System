@@ -16,6 +16,8 @@ export interface PrintJob {
   /** Code and name of each item on the bill, by item id. */
   items: Record<string, { code: string; name: string }>;
   sellerName: string;
+  /** The customer's code and name (POS spec §15); null for a walk-in. Never their balance or phone. */
+  customer: { code: string; name: string } | null;
   /** Payment methods as the tenant names them, by code. */
   methodNames: Record<string, string>;
   money: MoneyFormat;

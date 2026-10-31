@@ -1,5 +1,6 @@
 import {
   addLine,
+  changeTier,
   DomainError,
   emptyBill,
   parseQty,
@@ -11,7 +12,7 @@ import {
 } from '@erp/domain';
 
 import type { BillItem } from '../search/search-index';
-import type { LineItem, OpenBill } from './open-bill';
+import type { BillCustomer, LineItem, OpenBill } from './open-bill';
 
 // The counter's side of the bill (POS spec §10): the domain rules do the work; this keeps the items' display details
 // next to the bill and turns typed text into what the rules take.
@@ -47,6 +48,24 @@ export function addItem(ob: OpenBill, item: BillItem, qty: Qty, lineId: string, 
   return tryEdit({ ...ob, items: { ...ob.items, [itemId]: shown } }, (b) =>
     addLine(b, item, qty, lineId, unitPrice),
   );
+}
+
+/**
+ * Who the bill is for (POS spec §15): a customer and their tier, or a walk-in (with an optional phone) and the
+ * default tier. The tier changes as `F7` would change it: lines at list move, bargained lines are checked again.
+ */
+export function setCustomer(
+  ob: OpenBill,
+  who: { customer: BillCustomer | null; walkinPhone: string | null },
+  tierId: string,
+  prices: Readonly<Record<string, Money | null>>,
+) {
+  const r = tryEdit(ob, (b) => (b.tierId === tierId ? b : changeTier(b, tierId, prices)));
+  if (!r.ok) return r;
+  return {
+    ok: true as const,
+    bill: { ...r.bill, customer: who.customer, walkinPhone: who.customer ? null : who.walkinPhone },
+  };
 }
 
 const PREFIX = /^\s*(\d+(?:\.\d+)?)\s*\*\s*(.*)$/s;

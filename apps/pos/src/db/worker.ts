@@ -1,10 +1,12 @@
 /// <reference lib="webworker" />
 import { verifyPin, type PushResult, type SeriesState } from '@erp/contracts';
+import { businessDate } from '@erp/domain';
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 
 import type { OpenBill } from '../bill/open-bill';
 import { SearchIndex, type SearchOptions } from '../search/search-index';
 import * as checkout from './checkout';
+import * as customers from './customers';
 import { currentVersion, migrate } from './migrate';
 import * as outbox from './outbox';
 import * as repo from './repo';
@@ -77,6 +79,15 @@ const ops = {
   recentDocuments: (since: string, filter: string) => checkout.recentDocuments(open(), since, filter),
   loadDocument: (id: string) => checkout.loadDocument(open(), id),
   recordReprint: (r: Omit<checkout.Reprint, 'id' | 'pushedAt'>) => checkout.recordReprint(open(), r),
+  /** Customers and credit (POS spec §15, W1-09). */
+  customers: () => customers.listCustomers(open()),
+  /** The figures the On account popup shows, for today's business date: the same ones finalize uses. */
+  creditFigures: (customerId: string, offline: boolean) => {
+    const s = checkout.checkoutSettings(open());
+    if (s === null) throw new Error('this counter is not set up yet');
+    const today = businessDate(Date.now(), s.timeZone, s.cutoffHour);
+    return customers.creditFigures(open(), customerId, offline, today);
+  },
   /** Push (sync spec §6.2–§7, W1-07): the outbox, the answer, re-queue after a restore, audit events, health. */
   outboxBatch: () => outbox.outboxBatch(open()),
   ackPush: (results: PushResult[], at: string) => outbox.ackPush(open(), results, at),

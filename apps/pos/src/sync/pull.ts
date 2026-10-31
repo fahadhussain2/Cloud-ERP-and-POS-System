@@ -11,7 +11,13 @@ export interface PullDeps {
   api: Api;
   tokens: TokenSource;
   cursor: () => Promise<string | null>;
-  apply: (changes: PullResponse['changes'], cursor: string, done: boolean) => Promise<unknown>;
+  /** `startedAt`: when this pull began (the customer balances' "as of", POS spec §15). */
+  apply: (
+    changes: PullResponse['changes'],
+    cursor: string,
+    done: boolean,
+    startedAt: string,
+  ) => Promise<unknown>;
   /** After each applied page: the screens refresh (the staff list arrives long before a first catalog load ends). */
   onPage?: () => void;
 }
@@ -22,6 +28,7 @@ export type PullResult =
 export async function pullAll(deps: PullDeps): Promise<PullResult> {
   let rows = 0;
   let retried = false;
+  const startedAt = new Date().toISOString();
   for (;;) {
     const cursor = await deps.cursor();
     const query = new URLSearchParams({ datasets: PULL_DATASETS.join(','), limit: String(PULL_LIMIT_MAX) });
@@ -45,7 +52,7 @@ export async function pullAll(deps: PullDeps): Promise<PullResult> {
     if (res.status === 401) return { ok: false, reason: 'refused' };
     if (res.status !== 200) return { ok: false, reason: 'server' };
     const page = res.body as PullResponse;
-    await deps.apply(page.changes, page.cursor, !page.hasMore);
+    await deps.apply(page.changes, page.cursor, !page.hasMore, startedAt);
     deps.onPage?.();
     rows += Object.values(page.changes).reduce((n, list) => n + list.length, 0);
     if (!page.hasMore) return { ok: true, rows };

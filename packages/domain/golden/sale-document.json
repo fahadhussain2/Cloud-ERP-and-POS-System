@@ -1,5 +1,5 @@
 {
-  "description": "The finalized sale (sync spec §6.1, POS spec §12): lines with their list, floor, discount and share of the bill discount; amounts with rounding; settled payments; cash due; the approvals as overrides. Every case runs on counter C03 (device 019a…d1, branch 019a…e1) in Asia/Karachi with the 04:00 cutoff, Rs 1 rounding, Delux's payment methods and app version 0.6.0.",
+  "description": "The finalized sale (sync spec §6.1, POS spec §12): lines with their list, floor, discount and share of the bill discount; amounts with rounding; settled payments; cash due; the approvals as overrides. Every case runs on counter C03 (device 019a…d1, branch 019a…e1) in Asia/Karachi with the 04:00 cutoff, Rs 1 rounding, Delux's payment methods and app version 0.6.0. From W1-09 a case may give the customer (party id, or a walk-in phone), the counter’s credit view (the account, the pulled balance and when, this counter’s unsynced on-account total, offline or not, today’s offline on-account total) and a credit approval; cases without them are walk-in bills with no phone.",
   "cases": [
     {
       "name": "three lines, a bill discount, a below-floor approval and a split cash + JazzCash payment",
@@ -406,6 +406,820 @@
         }
       },
       "error": "empty_bill"
+    },
+    {
+      "name": "on account within the limit (W1-09): the customer, the counter’s credit view, nothing for the cash desk",
+      "input": {
+        "sellerMaxDiscountBp": 1000,
+        "context": {
+          "id": "019a5000-0000-7000-8000-000000000101",
+          "seq": 501,
+          "createdAtMs": 1793614530000
+        },
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 2000000,
+              "floor": 1600000,
+              "unitPrice": 2000000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "tender": {
+          "payments": [
+            {
+              "method": "on_account",
+              "amount": 2000000,
+              "reference": null
+            }
+          ],
+          "cashReceived": null
+        },
+        "customer": {
+          "id": "019a0000-0000-7000-8000-0000000000f1",
+          "walkinPhone": null
+        },
+        "credit": {
+          "account": {
+            "creditAllowed": true,
+            "creditLimit": 10000000,
+            "offlineDailyCap": 2500000
+          },
+          "balance": 4500000,
+          "balanceAsOf": "2026-11-02T10:10:00.000Z",
+          "unsynced": 0,
+          "offline": false,
+          "offlineToday": 0
+        },
+        "creditApproval": null
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a5000-0000-7000-8000-000000000101",
+        "family": "S",
+        "seq": 501,
+        "number": "C03-S000501",
+        "kind": "sale",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "createdAt": "2026-11-02T10:15:30.000Z",
+        "businessDate": "2026-11-02",
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "tierId": "019a0000-0000-7000-8000-0000000000b1",
+        "customerId": "019a0000-0000-7000-8000-0000000000f1",
+        "walkinPhone": null,
+        "lines": [
+          {
+            "lineNo": 1,
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "listPrice": 2000000,
+            "floorPrice": 1600000,
+            "unitPrice": 2000000,
+            "lineDiscount": 0,
+            "billShare": 0,
+            "lineTotal": 2000000
+          }
+        ],
+        "amounts": {
+          "subtotal": 2000000,
+          "lineDiscountTotal": 0,
+          "billDiscount": 0,
+          "rounding": 0,
+          "taxTotal": 0,
+          "total": 2000000
+        },
+        "overrides": [],
+        "clientVersion": "0.6.0",
+        "payments": [
+          {
+            "method": "on_account",
+            "amount": 2000000,
+            "cashReceived": null,
+            "changeDue": null,
+            "reference": null
+          }
+        ],
+        "cashDue": 0,
+        "handoverStatus": "not_applicable",
+        "credit": {
+          "offline": false,
+          "balance": 4500000,
+          "balanceAsOf": "2026-11-02T10:10:00.000Z",
+          "unsynced": 0,
+          "offlineToday": 0
+        }
+      }
+    },
+    {
+      "name": "on account over the limit, approved: a credit_limit override with the figures it approved",
+      "input": {
+        "sellerMaxDiscountBp": 1000,
+        "context": {
+          "id": "019a5000-0000-7000-8000-000000000102",
+          "seq": 502,
+          "createdAtMs": 1793614530000
+        },
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 2000000,
+              "floor": 1600000,
+              "unitPrice": 2000000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "tender": {
+          "payments": [
+            {
+              "method": "on_account",
+              "amount": 2000000,
+              "reference": null
+            }
+          ],
+          "cashReceived": null
+        },
+        "customer": {
+          "id": "019a0000-0000-7000-8000-0000000000f1",
+          "walkinPhone": null
+        },
+        "credit": {
+          "account": {
+            "creditAllowed": true,
+            "creditLimit": 10000000,
+            "offlineDailyCap": 2500000
+          },
+          "balance": 9000000,
+          "balanceAsOf": "2026-11-02T10:10:00.000Z",
+          "unsynced": 0,
+          "offline": false,
+          "offlineToday": 0
+        },
+        "creditApproval": {
+          "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+          "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+          "reason": "pay_soon",
+          "note": null,
+          "at": "2026-11-02T10:15:20.000Z"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a5000-0000-7000-8000-000000000102",
+        "family": "S",
+        "seq": 502,
+        "number": "C03-S000502",
+        "kind": "sale",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "createdAt": "2026-11-02T10:15:30.000Z",
+        "businessDate": "2026-11-02",
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "tierId": "019a0000-0000-7000-8000-0000000000b1",
+        "customerId": "019a0000-0000-7000-8000-0000000000f1",
+        "walkinPhone": null,
+        "lines": [
+          {
+            "lineNo": 1,
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "listPrice": 2000000,
+            "floorPrice": 1600000,
+            "unitPrice": 2000000,
+            "lineDiscount": 0,
+            "billShare": 0,
+            "lineTotal": 2000000
+          }
+        ],
+        "amounts": {
+          "subtotal": 2000000,
+          "lineDiscountTotal": 0,
+          "billDiscount": 0,
+          "rounding": 0,
+          "taxTotal": 0,
+          "total": 2000000
+        },
+        "overrides": [
+          {
+            "kind": "credit_limit",
+            "lineNo": null,
+            "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+            "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+            "reason": "pay_soon",
+            "note": null,
+            "at": "2026-11-02T10:15:20.000Z",
+            "values": {
+              "limit": 10000000,
+              "balance": 9000000,
+              "unsynced": 0,
+              "amount": 2000000
+            }
+          }
+        ],
+        "clientVersion": "0.6.0",
+        "payments": [
+          {
+            "method": "on_account",
+            "amount": 2000000,
+            "cashReceived": null,
+            "changeDue": null,
+            "reference": null
+          }
+        ],
+        "cashDue": 0,
+        "handoverStatus": "not_applicable",
+        "credit": {
+          "offline": false,
+          "balance": 9000000,
+          "balanceAsOf": "2026-11-02T10:10:00.000Z",
+          "unsynced": 0,
+          "offlineToday": 0
+        }
+      }
+    },
+    {
+      "name": "offline, part cash and part on account over the day’s cap, approved: an offline_cap override on the on-account part",
+      "input": {
+        "sellerMaxDiscountBp": 1000,
+        "context": {
+          "id": "019a5000-0000-7000-8000-000000000103",
+          "seq": 503,
+          "createdAtMs": 1793614530000
+        },
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 2000000,
+              "floor": 1600000,
+              "unitPrice": 2000000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "tender": {
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 1500000,
+              "reference": null
+            },
+            {
+              "method": "on_account",
+              "amount": 500000,
+              "reference": null
+            }
+          ],
+          "cashReceived": null
+        },
+        "customer": {
+          "id": "019a0000-0000-7000-8000-0000000000f1",
+          "walkinPhone": null
+        },
+        "credit": {
+          "account": {
+            "creditAllowed": true,
+            "creditLimit": 10000000,
+            "offlineDailyCap": 2500000
+          },
+          "balance": 3000000,
+          "balanceAsOf": "2026-11-02T06:00:00.000Z",
+          "unsynced": 2200000,
+          "offline": true,
+          "offlineToday": 2200000
+        },
+        "creditApproval": {
+          "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+          "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+          "reason": "owner_instruction",
+          "note": null,
+          "at": "2026-11-02T10:15:10.000Z"
+        }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a5000-0000-7000-8000-000000000103",
+        "family": "S",
+        "seq": 503,
+        "number": "C03-S000503",
+        "kind": "sale",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "createdAt": "2026-11-02T10:15:30.000Z",
+        "businessDate": "2026-11-02",
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "tierId": "019a0000-0000-7000-8000-0000000000b1",
+        "customerId": "019a0000-0000-7000-8000-0000000000f1",
+        "walkinPhone": null,
+        "lines": [
+          {
+            "lineNo": 1,
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "listPrice": 2000000,
+            "floorPrice": 1600000,
+            "unitPrice": 2000000,
+            "lineDiscount": 0,
+            "billShare": 0,
+            "lineTotal": 2000000
+          }
+        ],
+        "amounts": {
+          "subtotal": 2000000,
+          "lineDiscountTotal": 0,
+          "billDiscount": 0,
+          "rounding": 0,
+          "taxTotal": 0,
+          "total": 2000000
+        },
+        "overrides": [
+          {
+            "kind": "offline_cap",
+            "lineNo": null,
+            "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+            "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+            "reason": "owner_instruction",
+            "note": null,
+            "at": "2026-11-02T10:15:10.000Z",
+            "values": {
+              "cap": 2500000,
+              "offlineToday": 2200000,
+              "amount": 500000
+            }
+          }
+        ],
+        "clientVersion": "0.6.0",
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 1500000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "reference": null
+          },
+          {
+            "method": "on_account",
+            "amount": 500000,
+            "cashReceived": null,
+            "changeDue": null,
+            "reference": null
+          }
+        ],
+        "cashDue": 1500000,
+        "handoverStatus": "pending",
+        "credit": {
+          "offline": true,
+          "balance": 3000000,
+          "balanceAsOf": "2026-11-02T06:00:00.000Z",
+          "unsynced": 2200000,
+          "offlineToday": 2200000
+        }
+      }
+    },
+    {
+      "name": "a walk-in who leaves a phone: stored normalized, no credit block",
+      "input": {
+        "sellerMaxDiscountBp": 1000,
+        "context": {
+          "id": "019a5000-0000-7000-8000-000000000104",
+          "seq": 504,
+          "createdAtMs": 1793614530000
+        },
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 2000000,
+              "floor": 1600000,
+              "unitPrice": 2000000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "tender": {
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 2000000,
+              "reference": null
+            }
+          ],
+          "cashReceived": null
+        },
+        "customer": {
+          "id": null,
+          "walkinPhone": "+92 300 1234567"
+        },
+        "credit": null,
+        "creditApproval": null
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a5000-0000-7000-8000-000000000104",
+        "family": "S",
+        "seq": 504,
+        "number": "C03-S000504",
+        "kind": "sale",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "createdAt": "2026-11-02T10:15:30.000Z",
+        "businessDate": "2026-11-02",
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "tierId": "019a0000-0000-7000-8000-0000000000b1",
+        "customerId": null,
+        "walkinPhone": "03001234567",
+        "lines": [
+          {
+            "lineNo": 1,
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "listPrice": 2000000,
+            "floorPrice": 1600000,
+            "unitPrice": 2000000,
+            "lineDiscount": 0,
+            "billShare": 0,
+            "lineTotal": 2000000
+          }
+        ],
+        "amounts": {
+          "subtotal": 2000000,
+          "lineDiscountTotal": 0,
+          "billDiscount": 0,
+          "rounding": 0,
+          "taxTotal": 0,
+          "total": 2000000
+        },
+        "overrides": [],
+        "clientVersion": "0.6.0",
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 2000000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "reference": null
+          }
+        ],
+        "cashDue": 2000000,
+        "handoverStatus": "pending"
+      }
+    },
+    {
+      "name": "over the limit without an approval is refused",
+      "input": {
+        "sellerMaxDiscountBp": 1000,
+        "context": {
+          "id": "019a5000-0000-7000-8000-000000000105",
+          "seq": 505,
+          "createdAtMs": 1793614530000
+        },
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 2000000,
+              "floor": 1600000,
+              "unitPrice": 2000000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "tender": {
+          "payments": [
+            {
+              "method": "on_account",
+              "amount": 2000000,
+              "reference": null
+            }
+          ],
+          "cashReceived": null
+        },
+        "customer": {
+          "id": "019a0000-0000-7000-8000-0000000000f1",
+          "walkinPhone": null
+        },
+        "credit": {
+          "account": {
+            "creditAllowed": true,
+            "creditLimit": 10000000,
+            "offlineDailyCap": 2500000
+          },
+          "balance": 9000000,
+          "balanceAsOf": "2026-11-02T10:10:00.000Z",
+          "unsynced": 0,
+          "offline": false,
+          "offlineToday": 0
+        },
+        "creditApproval": null
+      },
+      "error": "credit_approval_pending"
+    },
+    {
+      "name": "a credit approval for another reason needs a note",
+      "input": {
+        "sellerMaxDiscountBp": 1000,
+        "context": {
+          "id": "019a5000-0000-7000-8000-000000000106",
+          "seq": 506,
+          "createdAtMs": 1793614530000
+        },
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 2000000,
+              "floor": 1600000,
+              "unitPrice": 2000000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "tender": {
+          "payments": [
+            {
+              "method": "on_account",
+              "amount": 2000000,
+              "reference": null
+            }
+          ],
+          "cashReceived": null
+        },
+        "customer": {
+          "id": "019a0000-0000-7000-8000-0000000000f1",
+          "walkinPhone": null
+        },
+        "credit": {
+          "account": {
+            "creditAllowed": true,
+            "creditLimit": 10000000,
+            "offlineDailyCap": 2500000
+          },
+          "balance": 9000000,
+          "balanceAsOf": "2026-11-02T10:10:00.000Z",
+          "unsynced": 0,
+          "offline": false,
+          "offlineToday": 0
+        },
+        "creditApproval": {
+          "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+          "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+          "reason": "other",
+          "note": "  ",
+          "at": "2026-11-02T10:15:20.000Z"
+        }
+      },
+      "error": "note_required"
+    },
+    {
+      "name": "on account for a customer whose account doesn’t allow credit is refused",
+      "input": {
+        "sellerMaxDiscountBp": 1000,
+        "context": {
+          "id": "019a5000-0000-7000-8000-000000000107",
+          "seq": 507,
+          "createdAtMs": 1793614530000
+        },
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 2000000,
+              "floor": 1600000,
+              "unitPrice": 2000000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "tender": {
+          "payments": [
+            {
+              "method": "on_account",
+              "amount": 2000000,
+              "reference": null
+            }
+          ],
+          "cashReceived": null
+        },
+        "customer": {
+          "id": "019a0000-0000-7000-8000-0000000000f1",
+          "walkinPhone": null
+        },
+        "credit": {
+          "account": {
+            "creditAllowed": false,
+            "creditLimit": 10000000,
+            "offlineDailyCap": 2500000
+          },
+          "balance": 0,
+          "balanceAsOf": null,
+          "unsynced": 0,
+          "offline": false,
+          "offlineToday": 0
+        },
+        "creditApproval": null
+      },
+      "error": "invalid_tender"
+    },
+    {
+      "name": "on account without the counter’s credit view is refused",
+      "input": {
+        "sellerMaxDiscountBp": 1000,
+        "context": {
+          "id": "019a5000-0000-7000-8000-000000000108",
+          "seq": 508,
+          "createdAtMs": 1793614530000
+        },
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 2000000,
+              "floor": 1600000,
+              "unitPrice": 2000000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "tender": {
+          "payments": [
+            {
+              "method": "on_account",
+              "amount": 2000000,
+              "reference": null
+            }
+          ],
+          "cashReceived": null
+        },
+        "customer": {
+          "id": "019a0000-0000-7000-8000-0000000000f1",
+          "walkinPhone": null
+        },
+        "credit": null,
+        "creditApproval": null
+      },
+      "error": "invalid_tender"
+    },
+    {
+      "name": "a walk-in phone on a customer’s bill is refused",
+      "input": {
+        "sellerMaxDiscountBp": 1000,
+        "context": {
+          "id": "019a5000-0000-7000-8000-000000000109",
+          "seq": 509,
+          "createdAtMs": 1793614530000
+        },
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 2000000,
+              "floor": 1600000,
+              "unitPrice": 2000000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "tender": {
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 2000000,
+              "reference": null
+            }
+          ],
+          "cashReceived": null
+        },
+        "customer": {
+          "id": "019a0000-0000-7000-8000-0000000000f1",
+          "walkinPhone": "03001234567"
+        },
+        "credit": null,
+        "creditApproval": null
+      },
+      "error": "invalid_customer"
+    },
+    {
+      "name": "a walk-in phone that isn’t a phone number is refused",
+      "input": {
+        "sellerMaxDiscountBp": 1000,
+        "context": {
+          "id": "019a5000-0000-7000-8000-000000000110",
+          "seq": 510,
+          "createdAtMs": 1793614530000
+        },
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 2000000,
+              "floor": 1600000,
+              "unitPrice": 2000000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "tender": {
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 2000000,
+              "reference": null
+            }
+          ],
+          "cashReceived": null
+        },
+        "customer": {
+          "id": null,
+          "walkinPhone": "12"
+        },
+        "credit": null,
+        "creditApproval": null
+      },
+      "error": "invalid_phone"
     }
   ]
 }

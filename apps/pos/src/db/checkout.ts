@@ -1,9 +1,11 @@
 import { uuidv7 } from '@erp/contracts';
 import {
   buildSaleDocument,
+  businessDate,
   DomainError,
   effectiveLimits,
   money,
+  type CreditApproval,
   type Money,
   type PaymentMethodCode,
   type PaymentMethodInfo,
@@ -12,6 +14,7 @@ import {
 } from '@erp/domain';
 
 import { parseOpenBill } from '../bill/open-bill';
+import { creditFigures } from './customers';
 import { getDevice, grantsFor, log } from './repo';
 import type { SqlDb } from './sql';
 
@@ -56,6 +59,10 @@ export interface FinalizeRequest {
   createdAtMs: number;
   clientVersion: string;
   tender: Tender;
+  /** What the status bar shows: the offline cap applies (POS spec §15). */
+  offline: boolean;
+  /** An approval to go over the customer's limit or the offline cap, given in the payment popup. */
+  creditApproval: CreditApproval | null;
 }
 
 export interface Finalized {
@@ -187,13 +194,17 @@ export function finalizeSale(db: SqlDb, req: FinalizeRequest): Finalized {
        ON CONFLICT (family) DO UPDATE SET next_seq = excluded.next_seq`,
       [seq + 1],
     );
+    const customerId = open.customer?.id ?? null;
+    const today = businessDate(req.createdAtMs, settings.timeZone, settings.cutoffHour);
     const document = buildSaleDocument({
       bill: open.bill,
       tender: req.tender,
       methods: settings.methods,
       sellerMaxDiscountBp,
-      // A credit customer can be chosen from W1-09.
-      hasCreditCustomer: false,
+      customer: { id: customerId, walkinPhone: open.walkinPhone ?? null },
+      // Read in this transaction, so two bills for one customer can't both use the same room (POS spec §15).
+      credit: customerId === null ? null : creditFigures(db, customerId, req.offline, today),
+      creditApproval: req.creditApproval,
       context: {
         id: req.id,
         seq,

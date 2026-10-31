@@ -1,5 +1,5 @@
 // The E2E API: a fresh erp_e2e database for each run (the migrations, a test tenant made from the Delux spec, one
-// salesman without a PIN, a small catalog), then the API itself on it, as the app role. Needs DATABASE_URL (a PostgreSQL 17+
+// salesman without a PIN, a small catalog, two credit customers), then the API itself on it, as the app role. Needs DATABASE_URL (a PostgreSQL 17+
 // superuser; locally `pnpm db:up`).
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -11,7 +11,7 @@ import { createTestDatabase, seedCatalog } from '@erp/db/testing';
 import pg from 'pg';
 
 import { hashPassword } from '../apps/api/src/auth/password';
-import { API_PORT, CATALOG, OWNER, OWNER_FIRST_PASSWORD, SALESMAN, SHOP } from './fixtures';
+import { API_PORT, CATALOG, CUSTOMERS, OWNER, OWNER_FIRST_PASSWORD, SALESMAN, SHOP } from './fixtures';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const NAME = 'erp_e2e';
@@ -42,6 +42,18 @@ await withTenant(pool, { tenantId: dir.rows[0]!.tenant_id }, async (_db, c) => {
     [dir.rows[0]!.tenant_id, user.rows[0]!.id],
   );
   await seedCatalog(c, dir.rows[0]!.tenant_id, CATALOG);
+  for (const x of CUSTOMERS) {
+    const party = await c.query<{ id: string }>(
+      'INSERT INTO erp.parties (tenant_id, code, name, phones, city) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [dir.rows[0]!.tenant_id, x.code, x.name, x.phones, x.city],
+    );
+    await c.query(
+      `INSERT INTO erp.customer_accounts (tenant_id, party_id, price_tier_id, credit_allowed, credit_limit,
+         offline_daily_cap)
+       SELECT $1, $2, id, true, $4, $5 FROM erp.price_tiers WHERE code = $3`,
+      [dir.rows[0]!.tenant_id, party.rows[0]!.id, x.tier, x.creditLimit, x.offlineDailyCap],
+    );
+  }
 });
 await pool.end();
 console.info(`${NAME}: tenant ${SHOP} ready`);

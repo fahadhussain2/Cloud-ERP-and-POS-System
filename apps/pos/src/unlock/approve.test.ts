@@ -1,7 +1,7 @@
 import { ROLE_TEMPLATES, type RoleGrant, type RoleTemplateKey } from '@erp/domain';
 import { describe, expect, it } from 'vitest';
 
-import { checkApprover, checkManager } from './approve';
+import { checkApprover, checkCreditApprover, checkManager } from './approve';
 import type { StaffUser } from './unlock';
 
 // An approver's PIN on the same screen (POS spec §10, PLT-07), checked offline like the manager unlock (§5).
@@ -115,5 +115,29 @@ describe("a manager's Try again on a refused bill (POS spec §14, W1-07)", () =>
       result: 'wrong',
       approverState: { failures: 1, locked: false },
     });
+  });
+});
+
+describe('going over a credit limit or the offline cap (POS spec §15, W1-09)', () => {
+  const credit = (over: Partial<Parameters<typeof checkCreditApprover>[0]> = {}) =>
+    checkCreditApprover({
+      approver: person(),
+      approverState: open,
+      approverGrants: [role('manager')],
+      branchId: 'b1',
+      pin: '4321',
+      verify,
+      ...over,
+    });
+
+  it('a manager (pos.credit.over_limit) may; a salesman or a cashier may not', async () => {
+    expect((await credit()).result).toBe('approved');
+    expect((await credit({ approverGrants: [role('salesman')] })).result).toBe('not_allowed');
+    expect((await credit({ approverGrants: [role('cashier')] })).result).toBe('not_allowed');
+    expect((await credit({ approverGrants: [role('manager', 'b2')] })).result).toBe('not_allowed');
+  });
+
+  it('a wrong PIN counts towards the approver’s own lock', async () => {
+    expect((await credit({ pin: '0000' })).approverState).toEqual({ failures: 1, locked: false });
   });
 });
