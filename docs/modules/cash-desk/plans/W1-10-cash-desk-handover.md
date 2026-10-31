@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#55](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/55) |
 | **Module** | cash-desk (rules in `packages/domain`, the handover posting in `packages/posting`, the queue dataset and the handover push in `apps/api`, the desk screen in `apps/pos`) |
-| **Status** | Accepted (2026-11-01) with the owner answers below |
+| **Status** | Built (2026-11-01) on `w1-10-cash-desk`, in review; Verify 2 and 3 to do |
 | **Refs** | CSH-01, CSH-02, CSH-03, CSH-04, SYN-02, SYN-04; PRD W4, W7, W15; architecture §4.4, §4.5, §4.6, §4.7; data model §5, §6, §10, §12; posting rules §4.5; POS spec §12, §13; sync spec §3, §6, §8; accounting spec; CLAUDE.md rules 1, 2, 3, 4, 5, 6, 7, 8, 9, 10; D-001, D-024, D-047, D-049, D-055, D-056, D-059, D-093, D-094, D-095 |
 | **Depends on** | W1-07 (push, the SSE nudge), W1-08 (posting, `CASH_IN_TRANSIT`) |
 | **Size** | about 4 days |
@@ -67,11 +67,35 @@
 - [ ] **Cash desk screen (jsdom, fake desk):** no session → open dialog; Enter confirms the selected bill; `E` corrects; a scan of a queued bill selects it; a scan of an unknown bill asks before recording; a second scan refused; another person's session blocks confirming; offline banner.
 - [ ] **E2E:** the flows in scope item 7.
 
+## Build notes
+
+- **The bill code already printed and read refunds** (`C03-S000414 -1250`, since W1-06). W1-10 only refuses `-0`; `--450` and `+4320` were already refused and stay as guards.
+- **`checkHandover`'s order of problems:** nothing to collect, no session, another cashier's session, not permitted, already handed over (this desk first, then the server's status), a correction with paisa, a correction below the amount due. `buildHandoverDocument` throws the problem as its `DomainError` code.
+- **A bill known only from its code** records no cash received or change unless the cashier types the figure; a payout records neither.
+- **Session documents** carry `userId` (who opened, or who closed) and `expectedCash` on a close; the float and the expected cash are `null` on the other event.
+- **The domain and posting tests came first** (commit `b6d98ad`); the push, pull and desk tests are written with their code, as in W1-09.
+- **`cash_sessions` keeps the signed open and close documents** (`payload`, `signature`, `close_payload`, `close_signature`), like every other pushed document; the close's fields are set by its document.
+- **Push refuses `H` and `Z` from a device that isn't a cash desk** (`wrong_device`), and a close naming a session the server doesn't have (`unknown_reference`: the desk always pushes the open first). `R` and `M` are `bad_schema` until W1-11.
+- **`queue-changed`** uses its own channel, `erp_queue` (`<tenant>:<branch>`), with a trigger on `sales_documents` for bills with cash due ≠ 0; `sales_documents` doesn't get the general `erp_sync` nudge, so counters aren't woken by every bill. The change feed subscribes by key (`queueKey`).
+- **The counter leaves `cash_queue` out of its pull** (the server answers `403 not_cash_desk`); the desk adds it with local schema 8.
+- **A late link** (the bill arrives after its offline scan) re-checks only the amount: the cashier's permission was judged when the handover arrived.
+- **Two server bugs the desk e2e caught**, each fixed with its failing test committed first (bug-fix rule):
+  - a scan and its bill arriving in overlapping transactions never linked (each looked for the other before either committed): both pushes now take a **per-bill advisory lock** first, before the posting order lock (`2570816`, `23303a1`);
+  - a handover naming a sale the server didn't have yet was refused as `unknown_reference`; the desk's outbox goes by family, so its own sale is pushed after the automatic handover. The bill isn't checked any more: it is linked by number, now or later (`H` checks only the cashier).
+- **On the desk:** `deskState` reads the session (with handed in, paid out and expected), every pulled queue row and the desk's own handovers of 7 days; `openSession`, `closeSession` and `confirmHandover` each write the document and its outbox row in one transaction, signed after the commit. The reprint list shows bills only.
+- **The automatic handover** is made by `finalizeSale` on a desk with an open session, for the session's cashier, with its own id; `Finalized.handover` carries it so it is signed too.
+- **`queue-changed` pulls like `changes-available`** on the desk: the queue is one of its datasets, and the screen reads it again after every pull.
+- **Keys on the Cash desk screen:** Enter confirms, `E` corrects, `↑ ↓` select, `Alt+O` opens and `Alt+X` closes the session, `Alt+Q` switches to selling and back, `Alt+L` locks. The scan field keeps the focus; a click on a row selects it.
+- **`cash_handover_mode = off` shows the queue anyway** for now (no *Handover confirmation is off* message): no tenant has Off before CSH-09 (Wave 2), and Delux is Required.
+- **Desk e2e** (`e2e/till.spec.ts`, a second browser profile as the desk PC) runs after the counter and sync flows: the queue then also holds their unhanded cash bills, so the flows pick their bill as a cashier would.
+
 ## Verify
 
 1. `pnpm check`, `pnpm test:integration` and `pnpm e2e`, output shown.
 2. **On your PC** (`erp_dev`, a counter and a desk as two Edge profiles): open a session; sell three cash bills by two salesmen and confirm them from the queue; correct one; scan one; cut the desk's network, sell on the counter (also offline), scan the bill at the desk; reconnect both and check on the server that every handover is linked, nothing is flagged and `CASH_IN_TRANSIT` is 0; time finalize to visible. Results go into this plan.
 3. **On staging:** the same with a counter and a desk enrolled on staging.
+
+**Results (2026-11-01, this PC):** `pnpm check` green (format, lint, typecheck, 1,248 tests with the coverage thresholds, every build); `pnpm test:integration` 240 passed (13 in `cash-desk.int.test.ts`); `pnpm e2e` 35 passed in Edge, the 7 desk flows in `till.spec.ts` among them (finalize to visible within the 5 s the flow allows). Once in a full `pnpm check` the status-bar test *shows offline as soon as the browser loses the network* missed its 1 s wait again (as in W1-09) and passed alone and on the re-run. **Not done:** Verify 2 (`erp_dev`) and Verify 3 (staging), and the owner's review.
 
 ## Risks
 

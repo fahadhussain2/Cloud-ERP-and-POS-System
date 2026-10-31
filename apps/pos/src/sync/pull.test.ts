@@ -8,7 +8,8 @@ import { pullAll, type PullDeps } from './pull';
 // The counter's pull loop (sync spec §2, §4): page by page from the stored cursor, each page applied with its cursor;
 // the last page of a complete pull says so (the first catalog load, W1-03).
 
-const DATASETS = encodeURIComponent(PULL_DATASETS.join(','));
+// Every dataset but the cash desk's queue, which only a cash desk may pull (W1-10).
+const DATASETS = encodeURIComponent(PULL_DATASETS.filter((d) => d !== 'cash_queue').join(','));
 
 const page = (n: number, hasMore: boolean): PullResponse => ({
   changes: { users: [{ id: `u${n}` }] },
@@ -47,12 +48,13 @@ const setup = (replies: (() => Promise<{ status: number; body: unknown }>)[]) =>
 const ok = (body: unknown) => () => Promise.resolve({ status: 200, body });
 
 describe('pull', () => {
-  it('pulls every dataset, a full page at a time, from the stored cursor and applies each page with its cursor', async () => {
+  it("pulls every counter's dataset, a full page at a time, from the stored cursor and applies each page with its cursor", async () => {
     const s = setup([ok(page(1, true)), ok(page(2, false))]);
     expect(await pullAll(s.deps)).toEqual({ ok: true, rows: 2 });
     expect(PULL_DATASETS).toEqual(
-      expect.arrayContaining(['users', 'items', 'item_identifiers', 'item_prices']),
+      expect.arrayContaining(['users', 'items', 'item_identifiers', 'item_prices', 'cash_queue']),
     );
+    expect(decodeURIComponent(DATASETS)).not.toContain('cash_queue');
     expect(s.paths).toEqual([
       `/api/sync/pull?datasets=${DATASETS}&limit=1000&cursor=c0`,
       `/api/sync/pull?datasets=${DATASETS}&limit=1000&cursor=c1`,

@@ -192,11 +192,13 @@ Held bills are **device-local only** and never sent to the server.
 ## 6. Cash management
 
 **cash_sessions:** `branch_id, device_id, number, cashier_user_id, opened_at, opening_float, closed_at, expected_cash†, counted_cash, variance, denominations jsonb ({"5000":3,"1000":12,…}), variance_reason_code, acknowledged_by_user_id, status (open|closed)`
+- **Built in W1-10 (migration 0011):** `id` (the open document's id), `branch_id, device_id, number, cashier_user_id, opened_at, business_date, opening_float, closed_at, closed_by_user_id, close_document_id, close_number, expected_cash` (the desk's figure at close), `status`, and the open and close documents as signed (`payload, signature, close_payload, close_signature`, `client_version`). The count, variance and acknowledgement columns come with W1-11.
 
 **cash_handovers:** `session_id, sales_document_id, bill_number, kind (in|payout), amount (cash due or refund; the posted figure), received_amount (cash actually handed over, as confirmed by the cashier), change_given, corrected_from (the salesman's cash received, if the cashier changed it), method (queue|scan|auto), cashier_user_id, device_id, at_device`
 - This is a POS document created by the cash desk (own outbox and series). The sale document itself is never modified.
 - Unique `(tenant_id, bill_number, kind)`, so a second confirmation of the same bill (queue + scan, or a re-scan) is reported as a duplicate. The key is the bill number rather than the document ID, so it works for offline scans too.
 - An offline scan of a bill that hasn't synced yet is stored with `bill_number` and `amount` from the code. `sales_document_id` is linked when the sale arrives.
+- **Built in W1-10 (migration 0011):** also `id` (the desk's UUIDv7), `branch_id, number, seq, business_date, received_at, duplicate_of_id`, the signed `payload, payload_hash, signature`, `client_version, exception_count`. `session_id` has no foreign key (a handover is never refused for it, rule 7). The unique index is partial: `WHERE duplicate_of_id IS NULL`; a duplicate is kept and never posted. Only the link (`sales_document_id`) ever changes. `sales_documents` gains `cash_received` and `change_due` (the cash payment's, for the queue).
 - A sale created on the cash desk device itself gets an automatic `in` handover (`method = auto`). With `cash_handover_mode = off`, the server creates an automatic handover for **every** cash bill and refund on acceptance.
 
 **payments** (party money movements): `number, direction (in = customer collection | out = supplier payment), party_id, method_id, amount, reference, business_date, session_id (if at the cash desk), bank_account_id (if via bank), device_id, created_by_user_id`
@@ -279,7 +281,7 @@ Journal vouchers written by the accountant are stored as `journal_entries` with 
 
 **sync_inbox:** `tenant_id, document_id (PK together), device_id, family, seq, status (accepted|rejected), result jsonb, payload_hash, received_at, attempts`. A `duplicate` is an answer, not a stored state; a rejected row is checked again when the document comes back (sync spec §6.2).
 
-**exceptions:** `kind (below_floor_no_override|discount_over_limit|document_inconsistent|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature|no_cost|posting_failed|posted_after_lock), severity (low|medium|high), document_type, document_id, device_id, user_id, business_date, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`. Clock skew is unique per device and business date; `posting_failed` is one per document (W1-08).
+**exceptions:** `kind (below_floor_no_override|discount_over_limit|document_inconsistent|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature|no_cost|posting_failed|posted_after_lock|duplicate_handover|handover_not_permitted), severity (low|medium|high), document_type, document_id, device_id, user_id, business_date, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`. Clock skew is unique per device and business date; `posting_failed` is one per document (W1-08).
 
 **Built in W1-07** with the two above (migration 0008, sync spec §6.2–§8):
 
@@ -356,6 +358,8 @@ SQLite WASM in a dedicated worker, on OPFS (`opfs-sahpool`), changed only by num
 
 **Built in W1-09 (local schema 7):** `customers`, `customer_accounts` and `customer_balances` (keyed by `party_id`), with exactly the pulled columns (sync spec §3, `CUSTOMER_COLUMNS` in `@erp/contracts`); `local_documents.accepted_at`, set when push acks a bill. `sync_state.complete_pull_started_at` is when the last complete pull began: a bill on account counts as unsynced credit while it is in the outbox, or was accepted after that time (POS spec §15). `open_bills.bill` gains `customer` (`id`, `code`, `name`) and `walkinPhone`; a bill saved before reads as a walk-in.
 
+**Built in W1-10 (local schema 8):** `cash_queue` with exactly the pulled columns (`CASH_DESK_COLUMNS`), pulled on a cash desk only; `cash_sessions` (`id, number, cashier_user_id, opened_at, opening_float, closed_at, closed_by_user_id, status`), this desk's sessions; handovers (`H`) and session documents (`Z`) in `local_documents` and the outbox like bills, with an index on the handover's bill number. A counter has the tables and leaves them empty (cash desk spec).
+
 The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` in IndexedDB (`erp-pos-keys`), and the device token is kept only in memory.
 
 **Planned (later tasks):**
@@ -363,7 +367,6 @@ The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` i
 | Table | Purpose |
 |---|---|
 | `held_bills` | Parked bills (expire at day close) |
-| `local_cash_session` | Open session state (cash desk) |
 | `pending_overlays` | Derived: local unsynced effects on stock and customer balances, overlaid on the server snapshots |
 | Stock snapshots | Stock balances per item and location (W1-08) |
 

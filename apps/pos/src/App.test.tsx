@@ -149,6 +149,10 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
     print: () => {},
     customers: () => Promise.resolve([]),
     creditFigures: () => Promise.reject(new Error('no customer')),
+    deskState: () => Promise.resolve({ session: null, queue: [], local: [] }),
+    openSession: () => Promise.reject(new Error('not a cash desk')),
+    closeSession: () => Promise.reject(new Error('not a cash desk')),
+    confirmHandover: () => Promise.reject(new Error('not a cash desk')),
     ...over,
   };
   return { counter, calls, pushes, setDevice: (d: DeviceInfo | null) => (device = d) };
@@ -940,7 +944,7 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
       f.counter.finalize = (req) => {
         finalized.push(req.tender);
         const ob = f.bills.get(req.userId);
-        if (!ob) return Promise.resolve({ document: docs.at(-1)!, repeated: true });
+        if (!ob) return Promise.resolve({ document: docs.at(-1)!, repeated: true, handover: null });
         try {
           const document = buildSaleDocument({
             bill: ob.bill,
@@ -965,7 +969,7 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
           });
           f.bills.delete(req.userId);
           docs.push(document);
-          return Promise.resolve({ document, repeated: false });
+          return Promise.resolve({ document, repeated: false, handover: null });
         } catch (err) {
           return Promise.reject(err instanceof Error ? err : new Error(String(err)));
         }

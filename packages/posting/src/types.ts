@@ -19,6 +19,19 @@ export interface PostingSale {
   payments: { method: PaymentMethodCode; amount: Money }[];
 }
 
+/** A stored cash handover or refund payout as posting needs it (posting rules §4.5, W1-10). */
+export interface PostingHandover {
+  id: string;
+  /** The handover's own number, e.g. `D01-H000031`. */
+  number: string;
+  billNumber: string;
+  branchId: string;
+  businessDate: string;
+  kind: 'in' | 'payout';
+  /** Positive: the cash due, or the refund. Never the cash received or the change. */
+  amount: Money;
+}
+
 export interface PostingSaleLine {
   id: string;
   lineNo: number;

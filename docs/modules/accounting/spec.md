@@ -70,6 +70,12 @@ Every table has `tenant_id` and forced RLS. The app role may insert into the app
 
 The ledgers come only from postings: costs set any other way (a test, a manual fix) show up as differences. Opening stock (W1-14) is a posting like any other.
 
+## 5a. A handover (posting rules §4.5, W1-10)
+
+`postHandover(handover, context)` (`packages/posting/src/handover.ts`): an `in` posts `Dr CASH_DRAWER / Cr CASH_IN_TRANSIT`, a `payout` the reverse, for the handover's own `amount`, dated its business date (or the day after the lock date, `posted_after_lock`), memo `<handover number> <bill number>`. No stock, no party. A chart without either role is `role_unmapped`. Source type `cash_handover` in `postings`; a **duplicate is never posted** (`loadHandover` returns none for it). Push posts it in the accepting transaction, the catch-up posts what push couldn't, and the rebuild check replays it with its recorded context.
+
+Because it posts its own amount, its order against its bill doesn't change the books: an offline scan often arrives first. Once every cash bill is handed over, `CASH_IN_TRANSIT` is back to 0 (posting rules §4.5's control property; tested in `handover.test.ts` and `cash-desk.int.test.ts`).
+
 ## 6. Known limits
 
 - **Arrival order** sets the cost of a late offline sale (D-017): recorded and reproducible, not re-costed (re-costing is Phase 2).

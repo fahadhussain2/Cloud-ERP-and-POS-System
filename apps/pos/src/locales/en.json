@@ -169,7 +169,9 @@
     "toLines": "Edit lines",
     "pay": "Pay cash",
     "reprint": "Reprint",
-    "customer": "Customer"
+    "customer": "Customer",
+    "desk": "Cash desk",
+    "sell": "Sell"
   },
   "dialog": {
     "cancel": "Cancel"
@@ -434,5 +436,82 @@
     "overCap": "Over today’s offline cap by {{amount}}: a manager approves when you finalize.",
     "needsCustomer": "Choose a credit customer (F4)",
     "notPermitted": "Your role can’t sell on account"
+  },
+  "desk": {
+    "title": "Cash desk",
+    "queue": "Waiting for the cash desk",
+    "empty": "Nothing waiting. New cash bills appear here within seconds.",
+    "scan": "Scan a bill",
+    "scanHelp": "Scan the bill’s code, or pick it with ↑ ↓ and press Enter",
+    "offline": "Offline since {{time}} · the queue is not updating · scan each bill",
+    "noSession": "No session open on this desk",
+    "otherSession": "{{name}}’s session is open since {{time}}. Only they take cash; you can still sell (Alt+Q).",
+    "session": "{{number}} · {{name}} · since {{time}}",
+    "float": "Float",
+    "handedIn": "Handed in",
+    "paidOut": "Paid out",
+    "expected": "Expected in the drawer",
+    "unknownSeller": "Unknown salesman",
+    "toCollect": "Bring {{amount}}",
+    "toPayOut": "Pay out {{amount}}",
+    "col": {
+      "counter": "Counter",
+      "bill": "Bill",
+      "time": "Time",
+      "due": "Amount",
+      "received": "Cash received",
+      "change": "Change"
+    },
+    "exact": "Exact",
+    "payout": "Pay out {{amount}}",
+    "received": "Received {{amount}} for {{number}} · change {{change}}",
+    "receivedNoChange": "Received {{amount}} for {{number}}",
+    "paid": "Paid out {{amount}} for {{number}}",
+    "invalidCode": "That isn’t a bill code: {{text}}",
+    "open": {
+      "title": "Open a session",
+      "help": "Count the cash already in the drawer. It is your float for this session.",
+      "label": "Opening float (whole rupees)",
+      "action": "Open session",
+      "opened": "Session {{number}} opened with {{amount}}"
+    },
+    "close": {
+      "title": "Close this session?",
+      "body": "The drawer should hold {{amount}}. Count it the usual way: counting by note comes later. The next cashier opens their own session.",
+      "action": "Close session",
+      "closed": "Session {{number}} closed"
+    },
+    "correct": {
+      "title": "Cash received for {{number}}",
+      "help": "Type what the salesman actually brought. The bill stays as printed; your correction is kept on the handover.",
+      "label": "Cash received (whole rupees)",
+      "action": "Confirm handover"
+    },
+    "unknown": {
+      "title": "{{number}} isn’t in the queue yet",
+      "body": "Its counter hasn’t synced, or this desk is offline. Record {{amount}} from the bill? The server matches it when the bill arrives.",
+      "action": "Record {{amount}}",
+      "payoutAction": "Pay out {{amount}}"
+    },
+    "keys": {
+      "confirm": "Confirm",
+      "correct": "Correct cash",
+      "select": "Select",
+      "open": "Open session",
+      "close": "Close session"
+    }
+  },
+  "handover": {
+    "nothing_to_collect": "Nothing to collect: this bill was paid without cash.",
+    "no_session": "Open a session first (Alt+O).",
+    "not_session_cashier": "Only the cashier of the open session takes cash. Close it first, or ask them.",
+    "not_permitted": "Your role can’t take cash at the desk.",
+    "already_handed_over": "This bill is already handed over.",
+    "already_handed_over_by": "Already handed over: {{number}} by {{name}} at {{time}}.",
+    "received_not_rounded": "Type whole rupees.",
+    "received_short": "That’s less than the amount due. The bill can’t be handed over short.",
+    "session_open": "A session is already open on this desk.",
+    "invalid_float": "Type the float in whole rupees, 0 or more.",
+    "failed": "The handover was not saved: {{message}}"
   }
 }

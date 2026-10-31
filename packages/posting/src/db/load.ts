@@ -1,7 +1,7 @@
 import { money, qty, type Money, type PaymentMethodCode, type Qty } from '@erp/domain';
 import type pg from 'pg';
 
-import type { LedgerState, PostingContext, PostingRole, PostingSale } from '../types';
+import type { LedgerState, PostingContext, PostingHandover, PostingRole, PostingSale } from '../types';
 
 // Reading what a posting needs from the database (W1-08). Money comes back as bigint text and quantities as
 // numeric; both are turned into whole minor units and thousandths here (rule 1).
@@ -76,6 +76,33 @@ export async function loadSale(
       },
       payments: payments.rows.map((p) => ({ method: p.code, amount: toMoney(p.amount) })),
     },
+  };
+}
+
+/** A stored handover, or null when there is none or it is a duplicate (a duplicate never posts, W1-10). */
+export async function loadHandover(c: pg.ClientBase, id: string): Promise<PostingHandover | null> {
+  const { rows } = await c.query<{
+    number: string;
+    bill_number: string;
+    branch_id: string;
+    business_date: string;
+    kind: 'in' | 'payout';
+    amount: string;
+  }>(
+    `SELECT number, bill_number, branch_id, business_date::text, kind, amount FROM erp.cash_handovers
+     WHERE id = $1 AND duplicate_of_id IS NULL`,
+    [id],
+  );
+  const h = rows[0];
+  if (!h) return null;
+  return {
+    id,
+    number: h.number,
+    billNumber: h.bill_number,
+    branchId: h.branch_id,
+    businessDate: h.business_date,
+    kind: h.kind,
+    amount: toMoney(h.amount),
   };
 }
 

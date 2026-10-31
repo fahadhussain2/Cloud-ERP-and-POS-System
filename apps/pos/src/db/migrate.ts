@@ -180,6 +180,27 @@ export const MIGRATIONS: readonly Migration[] = [
       'ALTER TABLE local_documents ADD COLUMN accepted_at TEXT',
     ],
   },
+  {
+    // The cash desk (W1-10, cash desk spec, sync spec §3): the pulled queue, exactly its columns; this desk's sessions;
+    // its handovers (family H) and session documents (family Z) live in local_documents and the outbox like bills,
+    // found by bill number for the duplicate check. A counter has these tables too and leaves them empty.
+    version: 8,
+    statements: [
+      `CREATE TABLE cash_queue (
+        id TEXT PRIMARY KEY, number TEXT NOT NULL, device_id TEXT NOT NULL, salesperson_user_id TEXT NOT NULL,
+        created_at_device TEXT NOT NULL, business_date TEXT NOT NULL, cash_due INTEGER NOT NULL, cash_received INTEGER,
+        change_due INTEGER, handover_status TEXT NOT NULL, status TEXT NOT NULL, row_version TEXT NOT NULL,
+        deleted_at TEXT
+      )`,
+      'CREATE INDEX cash_queue_number ON cash_queue (number)',
+      `CREATE TABLE cash_sessions (
+        id TEXT PRIMARY KEY, number TEXT NOT NULL, cashier_user_id TEXT NOT NULL, opened_at TEXT NOT NULL,
+        opening_float INTEGER NOT NULL, closed_at TEXT, closed_by_user_id TEXT,
+        status TEXT NOT NULL CHECK (status IN ('open', 'closed'))
+      )`,
+      "CREATE INDEX local_documents_bill ON local_documents (json_extract(payload, '$.billNumber')) WHERE family = 'H'",
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

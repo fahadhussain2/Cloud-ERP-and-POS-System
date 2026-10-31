@@ -5,6 +5,7 @@ import {
   DomainError,
   effectiveLimits,
   money,
+  type CashHandoverDocument,
   type CreditApproval,
   type Money,
   type PaymentMethodCode,
@@ -15,6 +16,7 @@ import {
 
 import { parseOpenBill } from '../bill/open-bill';
 import { creditFigures } from './customers';
+import { autoHandover } from './desk';
 import { getDevice, grantsFor, log } from './repo';
 import type { SqlDb } from './sql';
 
@@ -69,6 +71,8 @@ export interface Finalized {
   document: SaleDocument;
   /** True when there was no open bill and this is the person's last bill again (a second Enter): don't print it. */
   repeated: boolean;
+  /** On a cash desk with an open session, the bill's automatic handover (W1-10), written in the same transaction. */
+  handover: CashHandoverDocument | null;
 }
 
 export interface DocumentSummary {
@@ -172,7 +176,8 @@ const lastDocumentOf = (db: SqlDb, userId: string): SaleDocument | null =>
 
 /**
  * Finalizes the person's open bill in one transaction (POS spec §12): takes the next `S` number, writes the document
- * and its outbox row, deletes the open bill. Any error rolls all of it back.
+ * and its outbox row, deletes the open bill; on a cash desk with an open session, its automatic handover too (W1-10).
+ * Any error rolls all of it back.
  */
 export function finalizeSale(db: SqlDb, req: FinalizeRequest): Finalized {
   const device = getDevice(db);
@@ -186,7 +191,7 @@ export function finalizeSale(db: SqlDb, req: FinalizeRequest): Finalized {
       // A second Enter, or a click and an Enter: the bill is already finalized (POS spec §12, step 1).
       const last = lastDocumentOf(db, req.userId);
       if (last === null) throw new DomainError('empty_bill', 'there is no open bill to finalize');
-      return { document: last, repeated: true };
+      return { document: last, repeated: true, handover: null };
     }
     const seq = Number(db.selectValue("SELECT next_seq FROM local_series WHERE family = 'S'") ?? 1);
     db.exec(
@@ -230,7 +235,8 @@ export function finalizeSale(db: SqlDb, req: FinalizeRequest): Finalized {
       [document.id, seq, payload, document.createdAt],
     );
     db.exec('DELETE FROM open_bills WHERE user_id = ?', [req.userId]);
-    return { document, repeated: false };
+    const handover = autoHandover(db, document, req);
+    return { document, repeated: false, handover };
   });
 }
 
@@ -238,13 +244,14 @@ export function finalizeSale(db: SqlDb, req: FinalizeRequest): Finalized {
 export const setSignature = (db: SqlDb, documentId: string, signature: string): void =>
   db.exec('UPDATE outbox SET signature = ? WHERE id = ?', [signature, documentId]);
 
-/** This counter's bills since `since` (ISO), newest first; `filter` matches part of the number. */
+/** This counter's bills since `since` (ISO), newest first; `filter` matches part of the number. Bills only: a desk's
+ * handovers and sessions (W1-10) aren't reprinted. */
 export const recentDocuments = (db: SqlDb, since: string, filter = ''): DocumentSummary[] =>
   db
     .selectObjects(
       `SELECT id, number, created_at, json_extract(payload, '$.amounts.total') AS total,
          json_extract(payload, '$.cashDue') AS cash_due
-       FROM local_documents WHERE created_at >= ? AND instr(number, ?) > 0
+       FROM local_documents WHERE family = 'S' AND created_at >= ? AND instr(number, ?) > 0
        ORDER BY created_at DESC, seq DESC LIMIT 500`,
       [since, filter.trim().toUpperCase()],
     )

@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Not started (build on hold, D-068) |
+| **Status** | Cash desk 1 built in W1-10 (session, live queue, scan handover, refund payout), D-097; W1-11 next |
 | **Requirements** | 9 (CSH-01…CSH-09) |
-| **Feature spec needed** | No: covered by the PRD and posting rules |
+| **Feature spec** | [spec.md](spec.md) (W1-10) |
 
 ## Scope
 
@@ -28,10 +28,11 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 
 ## Related
 
-PRD W4, W7–W10; architecture §4.6; posting rules §4.5; D-003, D-024, D-025, D-047, D-049, D-059
+PRD W4, W7–W10; architecture §4.6; posting rules §4.5; D-003, D-024, D-025, D-047, D-049, D-059, D-097
 
 ## Work in this module
 
-- `spec.md`: only if needed (see above), written before the first plan that depends on it.
+- [`spec.md`](spec.md): the cash desk's behaviour (W1-10).
+- Plans: [W1-10 cash desk 1](plans/W1-10-cash-desk-handover.md).
 - `plans/<wave>-<nn>-<slug>.md`: one accepted plan per task, before any code ([delivery process](../../07-DELIVERY-PROCESS.md) §3).
 - `intent.md`: only for changes after the MVP.

@@ -1,4 +1,10 @@
-import { PULL_DATASETS, PULL_LIMIT_MAX, type PullResponse } from '@erp/contracts';
+import {
+  CASH_DESK_COLUMNS,
+  PULL_DATASETS,
+  PULL_LIMIT_MAX,
+  type PullDataset,
+  type PullResponse,
+} from '@erp/contracts';
 
 import { DeviceRefusedError, type TokenSource } from '../device/session';
 import { OfflineError, type Api } from '../net/api';
@@ -20,7 +26,16 @@ export interface PullDeps {
   ) => Promise<unknown>;
   /** After each applied page: the screens refresh (the staff list arrives long before a first catalog load ends). */
   onPage?: () => void;
+  /** What this device pulls (`datasetsFor`); every counter dataset when left out. */
+  datasets?: readonly PullDataset[];
 }
+
+/** Every dataset but the cash desk's queue, which the server sends only to cash desks (W1-10, sync spec §3). */
+const COUNTER_DATASETS = PULL_DATASETS.filter((d) => !(d in CASH_DESK_COLUMNS));
+
+/** A cash desk pulls everything a counter does, and its queue. */
+export const datasetsFor = (kind: string): readonly PullDataset[] =>
+  kind === 'cash_desk' ? PULL_DATASETS : COUNTER_DATASETS;
 
 export type PullResult =
   { ok: true; rows: number } | { ok: false; reason: 'offline' | 'refused' | 'revoked' | 'server' };
@@ -31,7 +46,10 @@ export async function pullAll(deps: PullDeps): Promise<PullResult> {
   const startedAt = new Date().toISOString();
   for (;;) {
     const cursor = await deps.cursor();
-    const query = new URLSearchParams({ datasets: PULL_DATASETS.join(','), limit: String(PULL_LIMIT_MAX) });
+    const query = new URLSearchParams({
+      datasets: (deps.datasets ?? COUNTER_DATASETS).join(','),
+      limit: String(PULL_LIMIT_MAX),
+    });
     if (cursor) query.set('cursor', cursor);
     let res;
     try {

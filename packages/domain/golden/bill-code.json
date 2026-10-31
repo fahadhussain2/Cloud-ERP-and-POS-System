@@ -75,6 +75,26 @@
       "name": "an item label is refused",
       "input": { "parse": "ABEA001" },
       "error": "invalid_bill_code"
+    },
+    {
+      "name": "a refund code prints a minus (W1-10)",
+      "input": { "encode": { "number": "C03-S000415", "cashDue": -45000 } },
+      "expected": "C03-S000415 -450"
+    },
+    {
+      "name": "a refund of zero ('-0') is refused",
+      "input": { "parse": "C03-S000414 -0" },
+      "error": "invalid_bill_code"
+    },
+    {
+      "name": "a doubled minus is refused",
+      "input": { "parse": "C03-S000414 --450" },
+      "error": "invalid_bill_code"
+    },
+    {
+      "name": "a plus sign is refused",
+      "input": { "parse": "C03-S000412 +4320" },
+      "error": "invalid_bill_code"
     }
   ]
 }

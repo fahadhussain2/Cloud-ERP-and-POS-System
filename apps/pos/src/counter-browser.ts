@@ -1,4 +1,4 @@
-import { signCanonical, SYNC_EVENTS, type DeviceHealth } from '@erp/contracts';
+import { signCanonical, SYNC_EVENTS, uuidv7, type DeviceHealth } from '@erp/contracts';
 
 import type { Counter } from './counter';
 import { createDbClient } from './db/client';
@@ -10,7 +10,7 @@ import { printBill } from './print/print-bill';
 import { browserStorage, runStorageChecks } from './storage/checks';
 import { openEventStream } from './sync/events';
 import { changePin } from './sync/pin';
-import { pullAll, type PullResult } from './sync/pull';
+import { datasetsFor, pullAll, type PullResult } from './sync/pull';
 import { pushAll, type PushOutcome } from './sync/push';
 import { CLIENT_VERSION } from './version';
 
@@ -45,15 +45,35 @@ export function browserCounter(): Counter {
     if (!pair) throw new Error('no device key');
     return signCanonical(pair.privateKey, payload);
   };
+  /**
+   * Signs a document already committed with its outbox row (POS spec §12): a failed signature leaves the row unsigned,
+   * and push signs it (W1-07).
+   */
+  const signStored = async <D extends { id: string }>(doc: D): Promise<D> => {
+    try {
+      await db.setSignature(doc.id, await sign(doc));
+    } catch (err) {
+      await db.log('document.sign_failed', { documentId: doc.id, error: String(err) });
+    }
+    return doc;
+  };
+  /** What every document made here carries: its UUIDv7, this PC's clock and the app version. */
+  const made = () => {
+    const createdAtMs = Date.now();
+    return { id: uuidv7(createdAtMs), createdAtMs, clientVersion: CLIENT_VERSION };
+  };
   // One pull at a time: the first catalog load takes longer than the 60-second timer (W1-03). A caller joining a
   // running pull still hears about its remaining pages.
   let pulling: Promise<PullResult> | null = null;
   const listeners = new Set<() => void>();
   const pullOnce = async () => {
     const started = Date.now();
+    const device = await db.getDevice();
     const r = await pullAll({
       api,
       tokens,
+      // A cash desk also pulls its queue (W1-10); a counter isn't sent it.
+      datasets: datasetsFor(device?.kind ?? 'counter'),
       cursor: () => db.getSync('pull_cursor'),
       apply: (changes, cursor, done, startedAt) => db.applyPull(changes, cursor, done, startedAt),
       onPage: () => listeners.forEach((l) => l()),
@@ -115,8 +135,9 @@ export function browserCounter(): Counter {
       const stream = openEventStream({
         fetchFn: (input, init) => fetch(input, init),
         tokens,
+        // A cash desk's `queue-changed` pulls like any nudge: the queue is one of its datasets (W1-10).
         onEvent: (name) => {
-          if (name === SYNC_EVENTS.changesAvailable) h.onChanges();
+          if (name === SYNC_EVENTS.changesAvailable || name === SYNC_EVENTS.queueChanged) h.onChanges();
         },
         onConnected: h.onConnected,
       });
@@ -168,13 +189,8 @@ export function browserCounter(): Counter {
     checkout: () => db.checkoutSettings(),
     finalize: async (req) => {
       const r = await db.finalizeSale(req);
-      // After the commit (POS spec §12): a failed signature leaves the row unsigned, and push signs it (W1-07).
-      if (!r.repeated)
-        try {
-          await db.setSignature(r.document.id, await sign(r.document));
-        } catch (err) {
-          await db.log('bill.sign_failed', { documentId: r.document.id, error: String(err) });
-        }
+      if (!r.repeated) await signStored(r.document);
+      if (r.handover) await signStored(r.handover);
       return r;
     },
     recentBills: (since, filter) => db.recentDocuments(since, filter),
@@ -183,5 +199,9 @@ export function browserCounter(): Counter {
     customers: () => db.customers(),
     creditFigures: (customerId, offline) => db.creditFigures(customerId, offline),
     print: (job) => printBill(job),
+    deskState: () => db.deskState(),
+    openSession: async (req) => signStored(await db.openSession({ ...req, ...made() })),
+    closeSession: async (req) => signStored(await db.closeSession({ ...req, ...made() })),
+    confirmHandover: async (req) => signStored(await db.confirmHandover({ ...req, ...made() })),
   };
 }

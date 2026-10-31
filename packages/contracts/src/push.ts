@@ -22,7 +22,7 @@ export const REJECT_CODES = [
 ] as const;
 export type RejectCode = (typeof REJECT_CODES)[number];
 
-/** Exception kinds (data model §10), including W1-07's `discount_over_limit` and `document_inconsistent`. */
+/** Exception kinds (data model §10) a push can record, including W1-07's and W1-10's. */
 export const EXCEPTION_KINDS = [
   'below_floor_no_override',
   'discount_over_limit',
@@ -37,6 +37,9 @@ export const EXCEPTION_KINDS = [
   'clock_skew',
   'revoked_device_doc',
   'bad_signature',
+  // The cash desk (W1-10): a second handover of one bill, and a cashier the server says may not take cash.
+  'duplicate_handover',
+  'handover_not_permitted',
 ] as const;
 export type ExceptionKind = (typeof EXCEPTION_KINDS)[number];
 
@@ -107,8 +110,8 @@ export interface PushResponse {
   events: string[];
 }
 
-/** The SSE events on `GET /api/sync/events` (sync spec §8). */
-export const SYNC_EVENTS = { changesAvailable: 'changes-available' } as const;
+/** The SSE events on `GET /api/sync/events` (sync spec §8); `queue-changed` goes to cash desks only (W1-10). */
+export const SYNC_EVENTS = { changesAvailable: 'changes-available', queueChanged: 'queue-changed' } as const;
 
 const Instant = z.iso.datetime();
 const Family = z.enum(['S', 'H', 'R', 'M', 'Z']);

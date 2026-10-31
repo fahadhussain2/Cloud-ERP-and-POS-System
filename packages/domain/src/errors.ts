@@ -31,7 +31,17 @@ export type DomainErrorCode =
   // Customers and credit (POS spec §15, W1-09)
   | 'invalid_customer'
   | 'invalid_phone'
-  | 'credit_approval_pending';
+  | 'credit_approval_pending'
+  // The cash desk (cash desk spec, W1-10): the handover check's problems, and the session's
+  | 'nothing_to_collect'
+  | 'no_session'
+  | 'not_session_cashier'
+  | 'not_permitted'
+  | 'already_handed_over'
+  | 'received_not_rounded'
+  | 'received_short'
+  | 'session_open'
+  | 'invalid_float';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

@@ -22,7 +22,7 @@ export {
   SetPinRequest,
   TokenRequest,
 } from './devices';
-export { SaleDocumentV1 } from './documents';
+export { CashHandoverV1, CashSessionV1, SaleDocumentV1 } from './documents';
 export {
   EXCEPTION_KINDS,
   PUSH_BATCH_MAX,
@@ -57,6 +57,8 @@ export {
   type UserAdminError,
 } from './users';
 export {
+  CASH_DESK_COLUMNS,
+  CASH_DESK_DATASETS,
   CATALOG_COLUMNS,
   CATALOG_DATASETS,
   CHECKOUT_COLUMNS,
@@ -68,6 +70,7 @@ export {
   PULL_LIMIT_DEFAULT,
   PULL_LIMIT_MAX,
   TemporaryPinRequest,
+  type CashDeskDataset,
   type CatalogDataset,
   type CheckoutDataset,
   type CustomerDataset,

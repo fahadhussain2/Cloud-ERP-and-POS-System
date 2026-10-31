@@ -1,9 +1,18 @@
 import type { CounterPinChangeRequest } from '@erp/contracts';
-import type { CreditView, Money, PinState, RoleGrant, SaleDocument } from '@erp/domain';
+import type {
+  CashHandoverDocument,
+  CashSessionDocument,
+  CreditView,
+  Money,
+  PinState,
+  RoleGrant,
+  SaleDocument,
+} from '@erp/domain';
 
 import type { OpenBill } from './bill/open-bill';
 import type { CheckoutSettings, DocumentSummary, FinalizeRequest, Finalized, Reprint } from './db/checkout';
 import type { CounterCustomer } from './db/customers';
+import type { DeskState, HandoverRequest } from './db/desk';
 import type { LocalHealth, QuarantinedRow } from './db/outbox';
 import type { DeviceInfo, PinEvent, TenantSettings } from './db/repo';
 import type { EnrollResult } from './device/session';
@@ -97,4 +106,13 @@ export interface Counter {
   creditFigures(customerId: string, offline: boolean): Promise<CreditView>;
   /** Prints a bill on the default printer (`window.print()` under `--kiosk-printing`, POS spec §13). */
   print(job: PrintJob): void;
+  /** The cash desk (W1-10, cash desk spec): its session, the pulled queue and its own handovers. */
+  deskState(): Promise<DeskState>;
+  /** Opens a session with its float; the document is written with its outbox row, then signed. */
+  openSession(req: { userId: string; openingFloat: Money }): Promise<CashSessionDocument>;
+  closeSession(req: { userId: string }): Promise<CashSessionDocument>;
+  /** Records a handover or a payout; refused with the check's problem as a DomainError. */
+  confirmHandover(
+    req: Omit<HandoverRequest, 'id' | 'createdAtMs' | 'clientVersion'>,
+  ): Promise<CashHandoverDocument>;
 }

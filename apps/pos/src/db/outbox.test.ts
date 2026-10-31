@@ -279,6 +279,26 @@ describe('keeping 30 days (SYN-01)', () => {
       2, 3,
     ]);
   });
+
+  it("drops a desk's queue rows handed over more than 7 days ago, never a pending one (W1-10)", () => {
+    const at = (days: number) => new Date(T0 - days * DAY).toISOString();
+    for (const [id, status, days] of [
+      ['old-received', 'received', 8],
+      ['old-pending', 'pending', 30],
+      ['new-received', 'received', 6],
+    ] as const)
+      db.exec(
+        `INSERT INTO cash_queue (id, number, device_id, salesperson_user_id, created_at_device, business_date, cash_due,
+           handover_status, status, row_version)
+         VALUES (?, ?, 'c3', 'sara', ?, '2026-11-02', 100, ?, 'finalized', '1')`,
+        [id, id, at(days), status],
+      );
+    pruneDocuments(db, T0);
+    expect(db.selectObjects('SELECT id FROM cash_queue ORDER BY id').map((r) => r['id'])).toEqual([
+      'new-received',
+      'old-pending',
+    ]);
+  });
 });
 
 describe('local health (PLT-09)', () => {

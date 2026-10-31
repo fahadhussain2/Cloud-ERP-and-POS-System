@@ -1,9 +1,10 @@
 import pg from 'pg';
 
 import { emptyState, withChanges } from '../replay';
+import { postHandover } from '../handover';
 import { postSale } from '../sale';
-import type { LedgerState, Posting, PostingContext } from '../types';
-import { loadSale } from './load';
+import type { LedgerState, Posting, PostingContext, PostingResult } from '../types';
+import { loadHandover, loadSale } from './load';
 import type { SourceType } from './post';
 import { writePosting } from './write';
 
@@ -46,8 +47,14 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
   let journals = 0;
   const steps: Replayed[] = [];
   for (const r of rows.rows) {
-    const loaded = await loadSale(c, r.source_id);
-    const result = loaded ? postSale(loaded.sale, r.context, state) : null;
+    let result: PostingResult | null;
+    if (r.source_type === 'cash_handover') {
+      const handover = await loadHandover(c, r.source_id);
+      result = handover ? postHandover(handover, r.context) : null;
+    } else {
+      const loaded = await loadSale(c, r.source_id);
+      result = loaded ? postSale(loaded.sale, r.context, state) : null;
+    }
     const posting = result?.ok ? result.posting : null;
     if (posting) state = withChanges(state, posting.state);
     const journalNumber =

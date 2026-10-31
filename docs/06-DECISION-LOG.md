@@ -811,3 +811,21 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Counters can't see each other offline, so the cap is per counter and the server, which sees all of them, is where a combined breach is found.
   - A customer's contacts are personal data: the counter keeps only what it needs to find them.
 - **Status:** Accepted (with the W1-09 plan, owner answers 1–6)
+
+### D-097 Cash desk 1: a desk is the POS app, the queue is pulled and nudged per branch, handovers are desk documents linked by bill number (2026-11-01)
+- **Decision:**
+  - **The cash desk is the POS app on a `cash_desk` device:** someone with `cash.handover.receive` lands on the Cash desk screen, `Alt+Q` switches to selling and back (the desk also sells, D-001).
+  - **A session** opens with a float (`Z` document, posts nothing) and belongs to its cashier; only they take cash. **It closes without a count** in W1-10, by anyone with `cash.session.close`, showing the expected cash; the denomination close comes with W1-11 (owner answer 1).
+  - **The queue is a pulled dataset**, `cash_queue` (the branch's bills with cash due, pending or of 7 days, no lines or customer), sent only to cash desks; **`queue-changed`** goes on its own channel to the branch's desks only, so counters aren't woken by every bill.
+  - **Enter confirms the selected bill as shown; `E` corrects** the cash received first. The correction is kept on the handover, never on the bill.
+  - **A scan selects a queued bill; a bill not in the queue is recorded from its code after Enter** (owner answer 2), with no sale id, and the server links it when the bill arrives.
+  - **Refund payouts are built now** (`kind: payout`, `cash.refund.pay`), first used with returns in W1-13 (owner answer 3).
+  - **A cash sale on the desk is handed over automatically** to the open session in the same local transaction; with no session it waits in the queue (owner answer 4).
+  - **Handovers (`H`) are desk documents**, local-first like bills, matched to the bill **by number**: the server never refuses one for its bill (it waits for it), flags a different amount (`handover_amount_mismatch`), keeps a second one as `duplicate_handover` (never posted) and flags a cashier without the permission (`handover_not_permitted`). A bill's cash and its handovers are judged under a per-bill lock.
+  - **Each handover posts `Dr CASH_DRAWER / Cr CASH_IN_TRANSIT`** (a payout the reverse) for its own amount, so the order it arrives in against its bill doesn't matter.
+- **Why:**
+  - One app keeps one local database, one outbox and one push for a PC that both sells and takes cash.
+  - Pulling the queue reuses the change feed (rule 8) and works the same online and after a reconnect; a per-branch nudge meets the 5-second target without waking every counter.
+  - Matching by bill number is what makes an offline scan work before the counter syncs; linking later, and posting the handover's own amount, keeps the books right whichever arrives first.
+  - A stray scan must not record cash that can't be taken back: documents are immutable (rule 3).
+- **Status:** Accepted (with the W1-10 plan, owner answers 1–4)
