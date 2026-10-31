@@ -700,8 +700,24 @@ describe('the first import', () => {
     expect(f.parties.bothRoles.map((p) => p.code)).toEqual(['0200']);
     expect(f.parties.abbreviationClashes).toEqual([{ abbr: 'ADDI', parties: ['0101', '0200'] }]);
     expect(f.parties.creditCustomers).toEqual([
-      { code: '0150', name: 'KHAN MECHANIC', tier: 'MECHANIC', legacyBalance: 350000 },
-      { code: '0200', name: 'BOTH TRADERS', tier: 'RETAIL', legacyBalance: 0 },
+      {
+        code: '0150',
+        name: 'KHAN MECHANIC',
+        tier: 'MECHANIC',
+        creditAllowed: true,
+        creditLimit: null,
+        offlineDailyCap: 2500000,
+        legacyBalance: 350000,
+      },
+      {
+        code: '0200',
+        name: 'BOTH TRADERS',
+        tier: 'RETAIL',
+        creditAllowed: true,
+        creditLimit: null,
+        offlineDailyCap: 2500000,
+        legacyBalance: 0,
+      },
     ]);
   });
 });
@@ -745,6 +761,33 @@ describe('running it again', () => {
         "SELECT b.name AS brand, o.name AS origin FROM erp.items i LEFT JOIN erp.brands b ON b.id = i.brand_id LEFT JOIN erp.origins o ON o.id = i.origin_id WHERE i.tenant_id = :tenant AND i.code = 'BBCD001'",
       ),
     ).toEqual([{ brand: null, origin: 'Indonesia' }]);
+  });
+
+  it('credit terms from the mapping update the accounts; without an entry a customer gets the defaults (W1-09)', async () => {
+    const terms = `SELECT p.code, ca.credit_allowed, ca.credit_limit::int, ca.offline_daily_cap::int
+                   FROM erp.parties p JOIN erp.customer_accounts ca ON ca.party_id = p.id
+                   WHERE p.tenant_id = :tenant ORDER BY p.code`;
+    const withTerms = parseMapping({
+      ...mappingFile,
+      partyCredit: { '0150': { creditLimit: 50000, offlineDailyCap: 0 }, '0200': { creditAllowed: false } },
+    });
+    const r = await run({ mapping: withTerms });
+    expect(r.groups.customerAccounts).toMatchObject({ created: 0, updated: 2 });
+    expect(await q(terms)).toEqual([
+      { code: '0150', credit_allowed: true, credit_limit: 5000000, offline_daily_cap: 0 },
+      { code: '0200', credit_allowed: false, credit_limit: null, offline_daily_cap: 2500000 },
+    ]);
+    expect(r.findings.parties.creditCustomers.map((c) => [c.code, c.creditLimit, c.offlineDailyCap])).toEqual(
+      [
+        ['0150', 5000000, 0],
+        ['0200', null, 2500000],
+      ],
+    );
+    await run();
+    expect(await q(terms)).toEqual([
+      { code: '0150', credit_allowed: true, credit_limit: null, offline_daily_cap: 2500000 },
+      { code: '0200', credit_allowed: true, credit_limit: null, offline_daily_cap: 2500000 },
+    ]);
   });
 
   it('a PartNo that is no longer a part number retires its identifier, and a missing item is reported, not deleted', async () => {

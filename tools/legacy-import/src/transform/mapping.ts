@@ -4,6 +4,9 @@ import { z } from 'zod';
 
 const Words = z.record(z.string(), z.string());
 
+/** Whole rupees in the file; minor units once read. */
+const Rupees = z.int().nonnegative();
+
 const MappingFile = z.strictObject({
   $comment: z.string().optional(),
   /** Values that mean "nothing" (None, N/A, -…). */
@@ -26,6 +29,20 @@ const MappingFile = z.strictObject({
   cashPartners: z.array(z.string()),
   /** Customer tier by party code (Retail when not listed). */
   partyTiers: z.record(z.string(), z.enum(['RETAIL', 'MECHANIC', 'WHOLESALE'])),
+  /**
+   * Credit terms by party code, in whole rupees (W1-09, owner answer 5): each optional; a customer without an entry
+   * is allowed credit with no limit (D-085) and the Rs 25,000 offline cap (PRD Q6).
+   */
+  partyCredit: z
+    .record(
+      z.string(),
+      z.strictObject({
+        creditAllowed: z.boolean().optional(),
+        creditLimit: Rupees.nullable().optional(),
+        offlineDailyCap: Rupees.optional(),
+      }),
+    )
+    .optional(),
   accounts: z.strictObject({
     /** Legacy account → template account code. */
     template: Words,
@@ -49,6 +66,8 @@ export interface Mapping {
   fractionUnits: ReadonlySet<string>;
   cashPartners: ReadonlySet<string>;
   partyTiers: ReadonlyMap<string, 'RETAIL' | 'MECHANIC' | 'WHOLESALE'>;
+  /** In minor units. */
+  partyCredit: ReadonlyMap<string, PartyCredit>;
   accounts: {
     template: ReadonlyMap<string, string>;
     retired: ReadonlySet<string>;
@@ -57,6 +76,29 @@ export interface Mapping {
     drawings: ReadonlyMap<string, string>;
   };
 }
+
+/** A party's credit terms from the mapping, in minor units; a missing field keeps the default. */
+export interface PartyCredit {
+  creditAllowed?: boolean;
+  creditLimit?: number | null;
+  offlineDailyCap?: number;
+}
+
+/** Rupees to paisa (Delux's PKR has 2 minor units). */
+const MINOR_PER_RUPEE = 100;
+
+const creditTerms = (t: {
+  creditAllowed?: boolean | undefined;
+  creditLimit?: number | null | undefined;
+  offlineDailyCap?: number | undefined;
+}) => {
+  const out: PartyCredit = {};
+  if (t.creditAllowed !== undefined) out.creditAllowed = t.creditAllowed;
+  if (t.creditLimit !== undefined)
+    out.creditLimit = t.creditLimit === null ? null : t.creditLimit * MINOR_PER_RUPEE;
+  if (t.offlineDailyCap !== undefined) out.offlineDailyCap = t.offlineDailyCap * MINOR_PER_RUPEE;
+  return out;
+};
 
 /** How values are compared: trimmed, single spaces, upper case. */
 export const key = (value: string): string => value.trim().replace(/\s+/g, ' ').toUpperCase();
@@ -82,6 +124,7 @@ export function parseMapping(raw: unknown): Mapping {
     fractionUnits: keySet(f.fractionUnits),
     cashPartners: new Set(f.cashPartners.map((c) => c.trim())),
     partyTiers: new Map(Object.entries(f.partyTiers).map(([k, v]) => [k.trim(), v])),
+    partyCredit: new Map(Object.entries(f.partyCredit ?? {}).map(([k, v]) => [k.trim(), creditTerms(v)])),
     accounts: {
       template: new Map(Object.entries(f.accounts.template)),
       retired: new Set(f.accounts.retired),
