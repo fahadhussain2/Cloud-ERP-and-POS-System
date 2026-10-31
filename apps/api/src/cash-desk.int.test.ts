@@ -469,6 +469,16 @@ describe('handovers and sessions in push (sync spec §6.2, posting rules §4.5)'
     for (const b of bills) expect(await billStatus(b.id)).toBe('received');
   });
 
+  it("accepts a handover naming a bill that hasn't arrived yet (the desk's own sale, pushed after it), and links it", async () => {
+    // The desk's outbox goes by family, so a sale's automatic handover (H) is sent before the sale (S) itself.
+    const bill = sale(desk, 1);
+    const h = handover(bill);
+    const r = await push(desk, [h, bill]);
+    expect(r.results.map((x) => x.status)).toEqual(['accepted', 'accepted']);
+    expect(await handoverRow(h.id)).toMatchObject({ sales_document_id: bill.id });
+    expect(await billStatus(bill.id)).toBe('received');
+  });
+
   it('flags an offline scan whose amount differs from the bill when it arrives (D-059)', async () => {
     const bill = sale(counter, 2);
     const h = handover({ number: bill.number, cashDue: bill.cashDue - 10000 }, 'scan');
