@@ -1,0 +1,20 @@
+{
+  "description": "normalizePhone (POS spec §15, POS-05): keep the digits; a leading +92, 0092 or 92 before 10 digits becomes 0; valid = 7 to 15 digits, else null.",
+  "cases": [
+    { "name": "a mobile with a dash", "input": "0300-1234567", "expected": "03001234567" },
+    { "name": "+92 with spaces", "input": "+92 300 1234567", "expected": "03001234567" },
+    { "name": "0092", "input": "0092 300 1234567", "expected": "03001234567" },
+    { "name": "92 without a plus", "input": "923001234567", "expected": "03001234567" },
+    { "name": "already normal", "input": "03001234567", "expected": "03001234567" },
+    { "name": "a Karachi landline", "input": "021-34567890", "expected": "02134567890" },
+    { "name": "spaces around and inside", "input": "  0300 123 4567 ", "expected": "03001234567" },
+    { "name": "brackets and dots", "input": "(021) 3456.7890", "expected": "02134567890" },
+    { "name": "letters are dropped", "input": "tel 0300-1234567", "expected": "03001234567" },
+    { "name": "92 before fewer than 10 digits is kept", "input": "921234567", "expected": "921234567" },
+    { "name": "7 digits, the shortest", "input": "3456789", "expected": "3456789" },
+    { "name": "6 digits is too short", "input": "345678", "expected": null },
+    { "name": "16 digits is too long", "input": "1234567890123456", "expected": null },
+    { "name": "no digits", "input": "walk-in", "expected": null },
+    { "name": "empty", "input": "", "expected": null }
+  ]
+}

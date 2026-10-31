@@ -168,4 +168,68 @@ describe('SaleDocumentV1', () => {
   it('refuses fields it does not know', () => {
     expect(accepts({ ...sale(), discountCode: 'X' })).toBe(false);
   });
+
+  // W1-09 (sync spec §6.1, D-096): additive fields, so every bill written before still parses (the base sale above).
+  const onAccount = () => ({
+    ...sale(),
+    customerId: ID('f1'),
+    payments: [{ method: 'on_account', amount: 390000, cashReceived: null, changeDue: null, reference: null }],
+    cashDue: 0,
+    handoverStatus: 'not_applicable',
+    overrides: [
+      {
+        kind: 'credit_limit',
+        lineNo: null,
+        requestedBy: ID('a1'),
+        approvedBy: ID('a2'),
+        reason: 'pay_soon',
+        note: null,
+        at: '2026-11-02T10:15:20.000Z',
+        values: { limit: 10000000, balance: 9800000, unsynced: 0, amount: 390000 },
+      },
+      {
+        kind: 'offline_cap',
+        lineNo: null,
+        requestedBy: ID('a1'),
+        approvedBy: ID('a2'),
+        reason: 'owner_instruction',
+        note: null,
+        at: '2026-11-02T10:15:20.000Z',
+        values: { cap: 2500000, offlineToday: 2400000, amount: 390000 },
+      },
+    ],
+    credit: {
+      offline: true,
+      balance: 9800000,
+      balanceAsOf: '2026-11-02T06:00:00.000Z',
+      unsynced: 0,
+      offlineToday: 2400000,
+    },
+  });
+
+  it('accepts a sale on account with its credit approvals and the counter’s credit view (W1-09)', () => {
+    expect(SaleDocumentV1.safeParse(onAccount()).error).toBeUndefined();
+    expect(accepts({ ...onAccount(), credit: { ...onAccount().credit, balance: -50000, balanceAsOf: null } })).toBe(
+      true,
+    );
+  });
+
+  it('accepts a walk-in phone without a customer, and refuses one with a customer (W1-09)', () => {
+    expect(accepts({ ...sale(), walkinPhone: '03001234567' })).toBe(true);
+    expect(accepts({ ...sale(), customerId: ID('f1'), walkinPhone: '03001234567' })).toBe(false);
+  });
+
+  it("refuses a credit override whose values don't match its kind, or tied to a line (W1-09)", () => {
+    const [limit, cap] = onAccount().overrides;
+    expect(accepts({ ...onAccount(), overrides: [{ ...limit!, values: cap!.values }] })).toBe(false);
+    expect(accepts({ ...onAccount(), overrides: [{ ...cap!, values: limit!.values }] })).toBe(false);
+    expect(accepts({ ...onAccount(), overrides: [{ ...limit!, lineNo: 1 }] })).toBe(false);
+    expect(accepts({ ...onAccount(), overrides: [{ ...limit!, reason: 'customer_bargain' }] })).toBe(false);
+  });
+
+  it('refuses a credit view with unknown fields or negative totals (W1-09)', () => {
+    const credit = onAccount().credit;
+    expect(accepts({ ...onAccount(), credit: { ...credit, limit: 1 } })).toBe(false);
+    expect(accepts({ ...onAccount(), credit: { ...credit, unsynced: -1 } })).toBe(false);
+  });
 });
