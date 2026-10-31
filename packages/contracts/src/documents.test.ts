@@ -173,7 +173,9 @@ describe('SaleDocumentV1', () => {
   const onAccount = () => ({
     ...sale(),
     customerId: ID('f1'),
-    payments: [{ method: 'on_account', amount: 390000, cashReceived: null, changeDue: null, reference: null }],
+    payments: [
+      { method: 'on_account', amount: 390000, cashReceived: null, changeDue: null, reference: null },
+    ],
     cashDue: 0,
     handoverStatus: 'not_applicable',
     overrides: [
@@ -209,9 +211,9 @@ describe('SaleDocumentV1', () => {
 
   it('accepts a sale on account with its credit approvals and the counter’s credit view (W1-09)', () => {
     expect(SaleDocumentV1.safeParse(onAccount()).error).toBeUndefined();
-    expect(accepts({ ...onAccount(), credit: { ...onAccount().credit, balance: -50000, balanceAsOf: null } })).toBe(
-      true,
-    );
+    expect(
+      accepts({ ...onAccount(), credit: { ...onAccount().credit, balance: -50000, balanceAsOf: null } }),
+    ).toBe(true);
   });
 
   it('accepts a walk-in phone without a customer, and refuses one with a customer (W1-09)', () => {

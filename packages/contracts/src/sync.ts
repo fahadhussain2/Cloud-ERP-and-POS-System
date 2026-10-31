@@ -91,6 +91,27 @@ export const CHECKOUT_COLUMNS = {
 export type CheckoutDataset = keyof typeof CHECKOUT_COLUMNS;
 export const CHECKOUT_DATASETS = Object.keys(CHECKOUT_COLUMNS) as CheckoutDataset[];
 
+/**
+ * Customers on the counter and the only columns each may send (sync spec §3, W1-09, D-096). Names and phones are
+ * personal data: addresses, emails, tax numbers, notes, payment terms and `legacy` stay on the server.
+ * `customer_balances` has one row per customer, keyed by `party_id`.
+ */
+export const CUSTOMER_COLUMNS = {
+  customers: { id: 'text', code: 'text', name: 'text', phones: 'json', city: 'text', status: 'text' },
+  customer_accounts: {
+    id: 'text',
+    party_id: 'text',
+    price_tier_id: 'text',
+    credit_allowed: 'bool',
+    credit_limit: 'money',
+    offline_daily_cap: 'money',
+  },
+  customer_balances: { party_id: 'text', balance: 'money', updated_at: 'text' },
+} as const satisfies Record<string, Record<string, ColumnType>>;
+
+export type CustomerDataset = keyof typeof CUSTOMER_COLUMNS;
+export const CUSTOMER_DATASETS = Object.keys(CUSTOMER_COLUMNS) as CustomerDataset[];
+
 export const PULL_DATASETS = [
   'tenant',
   'branch',
@@ -99,9 +120,10 @@ export const PULL_DATASETS = [
   'user_roles',
   ...(Object.keys(CATALOG_COLUMNS) as CatalogDataset[]),
   ...(Object.keys(CHECKOUT_COLUMNS) as CheckoutDataset[]),
+  ...(Object.keys(CUSTOMER_COLUMNS) as CustomerDataset[]),
 ] as const;
 export type PullDataset =
-  'tenant' | 'branch' | 'users' | 'roles' | 'user_roles' | CatalogDataset | CheckoutDataset;
+  'tenant' | 'branch' | 'users' | 'roles' | 'user_roles' | CatalogDataset | CheckoutDataset | CustomerDataset;
 
 export const PULL_LIMIT_DEFAULT = 500;
 export const PULL_LIMIT_MAX = 1000;

@@ -546,3 +546,158 @@ describe('checkout pull (W1-06)', () => {
     expect(JSON.stringify(changes['device'])).not.toContain(first.deviceId);
   });
 });
+
+describe('customer pull (W1-09)', () => {
+  // Sync spec §3, customer datasets: parties with a live customer account, their accounts and customer balances.
+  const CUSTOMERS = 'customers,customer_accounts,customer_balances';
+  let tier = '';
+  let khan = '';
+  let supplier = '';
+
+  const pullCustomers = async (deviceToken: string, cursor?: string) => {
+    const res = await pull(deviceToken, `datasets=${CUSTOMERS}${cursor ? `&cursor=${cursor}` : ''}`);
+    expect(res.statusCode, res.body).toBe(200);
+    return res.json<PullBody>();
+  };
+
+  beforeAll(async () => {
+    await withTenant(pool, { tenantId: tenant }, async (_db, c) => {
+      tier = (
+        await c.query<{ id: string }>(
+          `INSERT INTO erp.price_tiers (tenant_id, code, name, sort, is_default) VALUES ($1, 'CREDIT_T', 'Mechanic', 9, false)
+           RETURNING id`,
+          [tenant],
+        )
+      ).rows[0]!.id;
+      const party = async (code: string, name: string) =>
+        (
+          await c.query<{ id: string }>(
+            `INSERT INTO erp.parties (tenant_id, code, name, phones, email, address, city, tax_id, notes, legacy)
+             VALUES ($1, $2, $3, '{0300-1234567,021-34567890}', 'k@example.test', 'Shop 3, Plaza', 'Karachi',
+                     '1234567-8', 'pays late', '{"BusinessPartnerID": 7}')
+             RETURNING id`,
+            [tenant, code, name],
+          )
+        ).rows[0]!.id;
+      khan = await party('C0042', 'Khan Motors');
+      supplier = await party('S0007', 'Parts Supplier');
+      await c.query(
+        `INSERT INTO erp.customer_accounts (tenant_id, party_id, price_tier_id, credit_allowed, credit_limit,
+           offline_daily_cap, payment_terms_days, legacy)
+         VALUES ($1, $2, $3, true, 10000000, 2500000, 30, '{"label": "x"}')`,
+        [tenant, khan, tier],
+      );
+      await c.query(
+        `INSERT INTO erp.party_balances (tenant_id, party_id, role, balance) VALUES ($1, $2, 'customer', 4500000),
+                ($1, $3, 'supplier', 9900000)`,
+        [tenant, khan, supplier],
+      );
+    });
+  });
+
+  it('sends only parties with a customer account, with only their listed columns: never addresses or notes', async () => {
+    const { changes } = await pullCustomers(token);
+    const customers = changes['customers']!;
+    expect(customers.map((p) => p['code'])).toEqual(['C0042']);
+    expect(customers[0]).toEqual({
+      id: khan,
+      code: 'C0042',
+      name: 'Khan Motors',
+      phones: ['0300-1234567', '021-34567890'],
+      city: 'Karachi',
+      status: 'active',
+      row_version: expect.any(String) as unknown,
+      deleted_at: null,
+    });
+  });
+
+  it('sends accounts without their payment terms or legacy keys, and only customer balances', async () => {
+    const { changes } = await pullCustomers(token);
+    expect(changes['customer_accounts']).toEqual([
+      {
+        id: expect.any(String) as unknown,
+        party_id: khan,
+        price_tier_id: tier,
+        credit_allowed: true,
+        credit_limit: '10000000',
+        offline_daily_cap: '2500000',
+        row_version: expect.any(String) as unknown,
+        deleted_at: null,
+      },
+    ]);
+    expect(changes['customer_balances']).toEqual([
+      {
+        party_id: khan,
+        balance: '4500000',
+        updated_at: expect.any(String) as unknown,
+        row_version: expect.any(String) as unknown,
+        deleted_at: null,
+      },
+    ]);
+  });
+
+  it('sends a supplier given a customer account later, and a removed account as a tombstone', async () => {
+    const { cursor } = await pullCustomers(token);
+    await withTenant(pool, { tenantId: tenant }, (_db, c) =>
+      c.query(
+        `INSERT INTO erp.customer_accounts (tenant_id, party_id, price_tier_id, credit_allowed, offline_daily_cap)
+         VALUES ($1, $2, $3, false, 0)`,
+        [tenant, supplier, tier],
+      ),
+    );
+    const later = await pullCustomers(token, cursor);
+    expect(later.changes['customers']!.map((p) => p['code'])).toEqual(['S0007']);
+    expect(later.changes['customer_accounts']!.map((a) => a['party_id'])).toEqual([supplier]);
+    // The supplier's balance is not a customer balance.
+    expect(later.changes['customer_balances']).toEqual([]);
+
+    await withTenant(pool, { tenantId: tenant }, (_db, c) =>
+      c.query('UPDATE erp.customer_accounts SET deleted_at = now() WHERE party_id = $1', [supplier]),
+    );
+    const removed = await pullCustomers(token, later.cursor);
+    expect(removed.changes['customer_accounts']!.map((a) => [a['party_id'], a['deleted_at'] !== null])).toEqual([
+      [supplier, true],
+    ]);
+  });
+
+  it('the touch that re-sends a party writes nothing to the audit log', async () => {
+    const audit = await withTenant(pool, { tenantId: tenant }, async (_db, c) =>
+      (
+        await c.query<{ n: number }>(
+          "SELECT count(*)::int AS n FROM erp.audit_log WHERE entity = 'parties' AND entity_id = $1 AND action = 'update'",
+          [supplier],
+        )
+      ).rows[0]!.n,
+    );
+    expect(audit).toBe(0);
+  });
+
+  it('nudges the counters when a customer, an account or a balance changes (SYN-04)', async () => {
+    const listener = new pg.Client({ connectionString: db.appUrl });
+    await listener.connect();
+    try {
+      const heard: string[] = [];
+      listener.on('notification', (n) => heard.push(n.payload ?? ''));
+      await listener.query('LISTEN erp_sync');
+      for (const sql of [
+        "UPDATE erp.parties SET city = 'Lahore' WHERE id = $1",
+        'UPDATE erp.customer_accounts SET credit_limit = 12000000 WHERE party_id = $1',
+        "UPDATE erp.party_balances SET balance = 4600000 WHERE party_id = $1 AND role = 'customer'",
+      ]) {
+        heard.length = 0;
+        await withTenant(pool, { tenantId: tenant }, (_db, c) => c.query(sql, [khan]));
+        for (let i = 0; i < 50 && heard.length === 0; i += 1) await new Promise((r) => setTimeout(r, 20));
+        expect(heard, sql).toContain(tenant);
+      }
+    } finally {
+      await listener.end();
+    }
+  });
+
+  it("never sends another tenant's customers", async () => {
+    const { changes } = await pullCustomers(otherToken);
+    expect(changes['customers'] ?? []).toEqual([]);
+    expect(changes['customer_accounts'] ?? []).toEqual([]);
+    expect(changes['customer_balances'] ?? []).toEqual([]);
+  });
+});

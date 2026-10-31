@@ -26,6 +26,23 @@ const SEVERITY: Record<PostingException['kind'] | 'posting_failed', 'low' | 'med
 
 const journalNumber = (n: number) => `J${String(n).padStart(6, '0')}`;
 
+/**
+ * Takes the tenant's posting order lock (D-017) for the rest of the caller's transaction and returns the last posting
+ * and journal numbers. Push takes it before judging a sale on account (W1-09), so the balance it reads can't move
+ * until that sale is posted, and it is the same lock, in the same order, as every posting.
+ */
+export async function holdPostingOrder(
+  c: pg.ClientBase,
+  tenantId: string,
+): Promise<{ lastSeq: number; lastJournalNo: number }> {
+  await c.query('INSERT INTO erp.posting_state (tenant_id) VALUES ($1) ON CONFLICT DO NOTHING', [tenantId]);
+  const { rows } = await c.query<{ last_seq: string; last_journal_no: string }>(
+    'SELECT last_seq, last_journal_no FROM erp.posting_state WHERE tenant_id = $1 FOR UPDATE',
+    [tenantId],
+  );
+  return { lastSeq: Number(rows[0]!.last_seq), lastJournalNo: Number(rows[0]!.last_journal_no) };
+}
+
 export async function postDocument(
   c: pg.ClientBase,
   source: { tenantId: string; type: SourceType; id: string; now: Date },
@@ -53,11 +70,7 @@ export async function postDocument(
   try {
     // Postings of a tenant run one at a time, in a recorded order (D-017). Checked again once the lock is held, so
     // two catch-ups can't post the same document.
-    await c.query('INSERT INTO erp.posting_state (tenant_id) VALUES ($1) ON CONFLICT DO NOTHING', [tenantId]);
-    const numbers = await c.query<{ last_seq: string; last_journal_no: string }>(
-      'SELECT last_seq, last_journal_no FROM erp.posting_state WHERE tenant_id = $1 FOR UPDATE',
-      [tenantId],
-    );
+    const numbers = await holdPostingOrder(c, tenantId);
     const posted = await c.query('SELECT 1 FROM erp.postings WHERE source_type = $1 AND source_id = $2', [
       source.type,
       id,
@@ -77,8 +90,8 @@ export async function postDocument(
       return { status: 'failed', code: result.error.code };
     }
     const p = result.posting;
-    const seq = Number(numbers.rows[0]!.last_seq) + 1;
-    const journal = p.journal.lines.length > 0 ? Number(numbers.rows[0]!.last_journal_no) + 1 : null;
+    const seq = numbers.lastSeq + 1;
+    const journal = p.journal.lines.length > 0 ? numbers.lastJournalNo + 1 : null;
     await c.query(
       'UPDATE erp.posting_state SET last_seq = $2, last_journal_no = coalesce($3, last_journal_no) WHERE tenant_id = $1',
       [tenantId, seq, journal],

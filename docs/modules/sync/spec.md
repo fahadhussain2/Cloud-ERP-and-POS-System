@@ -164,7 +164,7 @@ POST /api/sync/push   (device token, body up to 5 MB)
 | `unknown_reference` | a seller, approver, requester, tier, item, payment method or customer that isn't this tenant's |
 | `seq_conflict` | another id already holds this device's seq |
 
-4. **Re-check the rules** with `reviewSale` (`packages/domain`, the counter's own functions, rule 2), and for a bill with an on-account payment `reviewCredit` against the customer's account, its balance (read `FOR UPDATE`, so two pushes for one customer wait for each other) and the device's offline on-account total for that customer and business date. Neither refuses: their findings become exceptions (below).
+4. **Re-check the rules** with `reviewSale` (`packages/domain`, the counter's own functions, rule 2), and for a bill with an on-account payment `reviewCredit` against the customer's account, its balance, read under the tenant's posting order lock (`holdPostingOrder`, D-017), so no other posting moves it before this sale is posted, and the device's offline on-account total for that customer and business date. Neither refuses: their findings become exceptions (below).
 5. **Store** `sales_documents` (with the payload, its hash and the signature), `sales_lines` (with the branch's SHOP location), `sales_payments`, `overrides` and the exceptions; `exception_count` on the document.
 6. **Record** the result in `sync_inbox` and update the device's series (§7). Posting joins this transaction in W1-08.
 

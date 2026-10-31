@@ -20,7 +20,11 @@ import { withTenant } from '@erp/db';
 import {
   businessDate,
   money,
+  onAccountAmount,
+  reviewCredit,
   reviewSale,
+  type CreditAccount,
+  type CreditFinding,
   type PaymentMethodCode,
   type PaymentMethodInfo,
   type RoleGrant,
@@ -28,14 +32,14 @@ import {
   type SaleDocument,
   type SaleFinding,
 } from '@erp/domain';
-import { postDocument, type PostOutcome } from '@erp/posting';
+import { holdPostingOrder, postDocument, type PostOutcome } from '@erp/posting';
 import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import type pg from 'pg';
 
 // Push (sync spec §6.2–§7, SYN-02, SYN-03, SYN-05, PLT-09, W1-07). Each document in its own transaction: claim its id
 // in sync_inbox → check it can be trusted and stored (else rejected, kept for a retry) → re-check the rules with
-// reviewSale and store it with its exceptions (never refused on business rules, D-011) → the device's series and
-// gaps. Then the audit events and the device's health. An accepted sale is posted in its own transaction (W1-08,
+// reviewSale (and a sale on account with reviewCredit, W1-09) and store it with its exceptions (never refused on
+// business rules, D-011) → the device's series and gaps. Then the audit events and the device's health. An accepted sale is posted in its own transaction (W1-08,
 // architecture §5.2 step 4); one that can't be posted is still accepted and flagged `posting_failed`.
 
 interface Deps {
@@ -74,6 +78,8 @@ const SEVERITY: Partial<Record<ExceptionKind, 'low' | 'medium' | 'high'>> = {
   revoked_device_doc: 'high',
   below_floor_no_override: 'medium',
   discount_over_limit: 'medium',
+  credit_limit_exceeded: 'medium',
+  offline_cap_exceeded: 'medium',
   seq_gap: 'medium',
   clock_skew: 'low',
 };
@@ -291,15 +297,22 @@ async function trusted(
 
   const users = [d.sellerId, ...d.overrides.flatMap((o) => [o.requestedBy, o.approvedBy])];
   const items = d.lines.map((l) => l.itemId);
-  const known = await c.query<{ users: number; items: number; tier: number }>(
+  const known = await c.query<{ users: number; items: number; tier: number; customer: number }>(
     `SELECT (SELECT count(*)::int FROM erp.users WHERE id = ANY($1)) AS users,
             (SELECT count(*)::int FROM erp.items WHERE id = ANY($2)) AS items,
-            (SELECT count(*)::int FROM erp.price_tiers WHERE id = $3) AS tier`,
-    [[...new Set(users)], [...new Set(items)], d.tierId],
+            (SELECT count(*)::int FROM erp.price_tiers WHERE id = $3) AS tier,
+            (SELECT count(*)::int FROM erp.parties WHERE id = $4) AS customer`,
+    [[...new Set(users)], [...new Set(items)], d.tierId, d.customerId],
   );
   const k = known.rows[0]!;
   const methodsKnown = d.payments.every((p) => s.methods.some((m) => m.code === p.method));
-  if (k.users !== new Set(users).size || k.items !== new Set(items).size || k.tier !== 1 || !methodsKnown)
+  if (
+    k.users !== new Set(users).size ||
+    k.items !== new Set(items).size ||
+    k.tier !== 1 ||
+    !methodsKnown ||
+    (d.customerId !== null && k.customer !== 1)
+  )
     throw new Rejected('unknown_reference');
 
   const taken = await c.query(
@@ -337,14 +350,16 @@ async function accept(
   doc: PushDocument,
   received: Date,
 ): Promise<PushResult> {
+  const grants = await grantsOf(c, [d.sellerId, ...d.overrides.map((o) => o.approvedBy)]);
   const findings = reviewSale(d, {
     deviceCode: device.code,
     timeZone: s.timeZone,
     cutoffHour: s.cutoffHour,
     increment: money(s.increment),
     methods: s.methods,
-    grants: await grantsOf(c, [d.sellerId, ...d.overrides.map((o) => o.approvedBy)]),
+    grants,
   });
+  const credit = await creditFindings(c, device, d, grants);
   const createdAt = Date.parse(d.createdAt);
   const whileRevoked =
     s.lastRevokedAt !== null &&
@@ -354,6 +369,9 @@ async function accept(
     kind: f.kind,
     details: detailsOf(f),
   }));
+  // The server's figures, and what the counter saw when it decided (sync spec §6.2).
+  for (const { kind, ...figures } of credit)
+    exceptions.push({ kind, details: { ...figures, counter: d.credit ?? null } });
   if (whileRevoked) exceptions.push({ kind: 'revoked_device_doc', details: { revokedAt: s.lastRevokedAt } });
 
   await c.query(
@@ -474,6 +492,56 @@ async function accept(
     exceptions: [...new Set(exceptions.map((e) => e.kind))],
     error: null,
   };
+}
+
+/**
+ * The credit findings on a sale on account (sync spec §6.2, W1-09): judged with the server's balance (every
+ * counter's posted sales) and this device's offline on-account sales to the customer that business day. The posting
+ * order lock is taken first, so no other posting moves the balance until this sale is posted after it.
+ */
+async function creditFindings(
+  c: pg.ClientBase,
+  device: Device,
+  d: SaleDocument,
+  grants: Record<string, RoleGrant[]>,
+): Promise<CreditFinding[]> {
+  if (d.customerId === null || onAccountAmount(d.payments) === 0) return [];
+  await holdPostingOrder(c, device.tenantId);
+  const { rows } = await c.query<{
+    credit_allowed: boolean | null;
+    credit_limit: string | null;
+    offline_daily_cap: string | null;
+    balance: string;
+    offline_today: string;
+  }>(
+    `SELECT a.credit_allowed, a.credit_limit, a.offline_daily_cap,
+            coalesce((SELECT balance FROM erp.party_balances WHERE party_id = $1 AND role = 'customer'), 0) AS balance,
+            (SELECT coalesce(sum(p.amount), 0)
+             FROM erp.sales_documents s
+             JOIN erp.sales_payments p ON p.tenant_id = s.tenant_id AND p.document_id = s.id
+             JOIN erp.payment_methods m ON m.tenant_id = p.tenant_id AND m.id = p.method_id
+             WHERE s.device_id = $2 AND s.customer_party_id = $1 AND s.business_date = $3 AND s.id <> $4
+               AND s.status = 'finalized' AND m.code = 'on_account'
+               AND (s.payload -> 'credit' ->> 'offline') = 'true') AS offline_today
+     FROM (SELECT 1) AS one
+     LEFT JOIN erp.customer_accounts a ON a.party_id = $1 AND a.deleted_at IS NULL`,
+    [d.customerId, device.deviceId, d.businessDate, d.id],
+  );
+  const r = rows[0]!;
+  const account: CreditAccount | null =
+    r.credit_allowed === null
+      ? null
+      : {
+          creditAllowed: r.credit_allowed,
+          creditLimit: r.credit_limit === null ? null : money(r.credit_limit),
+          offlineDailyCap: money(r.offline_daily_cap!),
+        };
+  return reviewCredit(d, {
+    account,
+    balanceBefore: money(r.balance),
+    offlineTodayBefore: money(r.offline_today),
+    grants,
+  });
 }
 
 const detailsOf = (f: SaleFinding) =>

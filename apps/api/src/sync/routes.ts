@@ -2,6 +2,7 @@ import {
   CATALOG_COLUMNS,
   CHECKOUT_COLUMNS,
   CounterPinChangeRequest,
+  CUSTOMER_COLUMNS,
   makePinVerifier,
   PULL_DATASETS,
   PULL_LIMIT_DEFAULT,
@@ -10,6 +11,7 @@ import {
   verifyPin,
   type CatalogDataset,
   type CheckoutDataset,
+  type CustomerDataset,
   type PullDataset,
   type PullResponse,
 } from '@erp/contracts';
@@ -22,7 +24,7 @@ import { mayGivePin } from '../admin/users';
 import { requirePermission } from '../auth/routes';
 import { recordPull } from './push';
 
-// Counter sync (sync spec v1, W1-02, W1-03, W1-06, D-089): pull with per-dataset column lists, and the counter PIN change.
+// Counter sync (sync spec v1, W1-02, W1-03, W1-06, W1-09, D-089): pull with per-dataset column lists, and the counter PIN change.
 
 interface Deps {
   pool: pg.Pool;
@@ -33,6 +35,18 @@ interface Deps {
 
 const isCatalog = (d: PullDataset): d is CatalogDataset => d in CATALOG_COLUMNS;
 const isCheckout = (d: PullDataset): d is CheckoutDataset => d in CHECKOUT_COLUMNS;
+const isCustomer = (d: PullDataset): d is CustomerDataset => d in CUSTOMER_COLUMNS;
+
+/** Customers (W1-09): only parties with a live customer account, and only customer balances. */
+const CUSTOMER_SOURCES: Record<CustomerDataset, Omit<PullSource, 'columns'>> = {
+  customers: {
+    table: 'parties',
+    where: `EXISTS (SELECT 1 FROM erp.customer_accounts a
+                    WHERE a.party_id = parties.id AND a.tenant_id = parties.tenant_id AND a.deleted_at IS NULL)`,
+  },
+  customer_accounts: { table: 'customer_accounts' },
+  customer_balances: { table: 'party_balances', where: "role = 'customer'" },
+};
 
 /** Each dataset's source and the only columns that may leave the server (sync spec §3). */
 function datasetSource(dataset: PullDataset, branchId: string, deviceId: string): PullSource {
@@ -48,6 +62,11 @@ function datasetSource(dataset: PullDataset, branchId: string, deviceId: string)
     if (dataset === 'device') return { table: 'devices', columns, where: 'id = $4', params: [deviceId] };
     return { table: dataset, columns };
   }
+  if (isCustomer(dataset))
+    return {
+      ...CUSTOMER_SOURCES[dataset],
+      columns: [...Object.keys(CUSTOMER_COLUMNS[dataset]), 'row_version', 'deleted_at'],
+    };
   switch (dataset) {
     case 'tenant':
       return {
