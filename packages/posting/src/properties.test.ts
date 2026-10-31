@@ -159,4 +159,61 @@ describe('posting properties', () => {
   it('starts a replay from nothing known', () => {
     expect(emptyState()).toStrictEqual({ costs: {}, balances: {} });
   });
+
+  it('leaves the state as it was after a step that can’t be posted', () => {
+    const unmapped: PostingContext = {
+      ...CONTEXT,
+      accounts: { ...CONTEXT.accounts, methods: { raast: null } },
+    };
+    const s: PostingSale = {
+      id: 'sale-1',
+      number: 'C03-S000001',
+      branchId: 'br-main',
+      businessDate: '2026-11-02',
+      customerId: null,
+      lines: [
+        {
+          id: 'l1',
+          lineNo: 1,
+          itemId: 'item-a',
+          locationId: 'loc-shop',
+          qty: 1000 as Qty,
+          lineTotal: 1000 as Money,
+          taxAmount: 0 as Money,
+        },
+      ],
+      amounts: { billDiscount: 0 as Money, rounding: 0 as Money, taxTotal: 0 as Money },
+      payments: [{ method: 'raast', amount: 1000 as Money }],
+    };
+    const start: LedgerState = {
+      costs: { 'item-a': { avgCost: 500 as Money, onHand: 1000 as Qty } },
+      balances: {},
+    };
+    const r = replay([{ sale: s, context: unmapped }], start);
+    expect(r.results).toEqual([{ ok: false, error: { code: 'method_unmapped', method: 'raast' } }]);
+    expect(r.state).toStrictEqual(start);
+  });
+
+  it('throws, rather than posting, on amounts outside the safe range', () => {
+    const huge = Number.MAX_SAFE_INTEGER as Money;
+    const s: PostingSale = {
+      id: 'sale-1',
+      number: 'C03-S000001',
+      branchId: 'br-main',
+      businessDate: '2026-11-02',
+      customerId: null,
+      lines: [1, 2].map((n) => ({
+        id: `l${n}`,
+        lineNo: n,
+        itemId: 'item-a',
+        locationId: 'loc-shop',
+        qty: 1000 as Qty,
+        lineTotal: huge,
+        taxAmount: 0 as Money,
+      })),
+      amounts: { billDiscount: 0 as Money, rounding: 0 as Money, taxTotal: 0 as Money },
+      payments: [{ method: 'cash', amount: 1000 as Money }],
+    };
+    expect(() => postSale(s, CONTEXT, emptyState())).toThrow(/safe range/);
+  });
 });
