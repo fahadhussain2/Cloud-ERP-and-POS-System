@@ -457,6 +457,18 @@ describe('handovers and sessions in push (sync spec §6.2, posting rules §4.5)'
     expect(postings).toHaveLength(1);
   });
 
+  it('links a scan and its bill pushed at the same moment, whichever commits first (e2e found the race)', async () => {
+    const bills = Array.from({ length: 12 }, () => sale(counter, 1));
+    const scans = bills.map((b) => handover({ number: b.number, cashDue: b.cashDue }, 'scan'));
+    // Each pair in parallel, so the two transactions overlap as when a desk and a counter reconnect together.
+    for (const [i, b] of bills.entries()) await Promise.all([push(counter, [b]), push(desk, [scans[i]!])]);
+    for (const h of scans)
+      expect(await handoverRow(h.id), h.billNumber).toMatchObject({
+        sales_document_id: expect.any(String) as string,
+      });
+    for (const b of bills) expect(await billStatus(b.id)).toBe('received');
+  });
+
   it('flags an offline scan whose amount differs from the bill when it arrives (D-059)', async () => {
     const bill = sale(counter, 2);
     const h = handover({ number: bill.number, cashDue: bill.cashDue - 10000 }, 'scan');
