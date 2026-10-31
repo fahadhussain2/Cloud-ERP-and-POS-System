@@ -65,7 +65,11 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
   return { steps, state };
 }
 
-const qtyText = (thousandths: number) => (thousandths / 1000).toFixed(3);
+/** Thousandths as the database prints numeric(14,3): 1500 → "1.500", −2000 → "-2.000". */
+function qtyText(thousandths: number): string {
+  const abs = Math.abs(thousandths);
+  return `${thousandths < 0 ? '-' : ''}${Math.trunc(abs / 1000)}.${String(abs % 1000).padStart(3, '0')}`;
+}
 
 /** What the replay says the ledger rows are, as comparable text keyed by table and seq. */
 function expectedRows(steps: Replayed[], state: LedgerState) {

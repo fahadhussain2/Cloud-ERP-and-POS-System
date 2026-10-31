@@ -46,7 +46,7 @@ Lines come out in this order: tenders, `SALES`, `SALES_DISCOUNT`, `ROUNDING`, `T
 
 Push's answer to the counter doesn't change: posting exceptions are recorded on the server only (counters on an older app know no new kinds).
 
-**Catch-up.** `postPending(pool, tenantId)` posts, oldest received first, every accepted sale without a `postings` row (at most 500 a run). The worker runs it for every shop at start-up and a minute after each run. It posts the bills accepted before W1-08 on its first run, and a bill held by `posting_failed` as soon as its cause is fixed (e.g. Raast mapped to a bank). The `posting_failed` exception stays open for review.
+**Catch-up.** `postPending(pool, tenantId)` posts every accepted sale without a `postings` row in arrival order (oldest received first; a counter's bills from one push, which share a receive time, by their sequence), at most 500 a run. The worker runs it for every shop at start-up and a minute after each run. It posts the bills accepted before W1-08 on its first run, and a bill held by `posting_failed` as soon as its cause is fixed (e.g. Raast mapped to a bank). The `posting_failed` exception stays open for review.
 
 ## 4. Tables (migration 0009, data model §4, §7, §9)
 

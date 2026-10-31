@@ -15,7 +15,7 @@ export type SourceType = 'sale';
 export type PostOutcome =
   | { status: 'posted'; seq: number; journalNumber: string | null; exceptions: PostingException['kind'][] }
   | { status: 'already_posted' }
-  | { status: 'failed'; code: string };
+  | { status: 'failed'; code: string; message?: string };
 
 const SEVERITY: Record<PostingException['kind'] | 'posting_failed', 'low' | 'medium' | 'high'> = {
   no_cost: 'low',
@@ -111,12 +111,16 @@ export async function postDocument(
   } catch (err) {
     // A bug or a database error must not lose the sale: it stays accepted, unposted and flagged.
     await c.query('ROLLBACK TO SAVEPOINT posting');
-    await exception('posting_failed', { code: 'internal_error', message: (err as Error).message });
-    return { status: 'failed', code: 'internal_error' };
+    const message = (err as Error).message;
+    await exception('posting_failed', { code: 'internal_error', message });
+    return { status: 'failed', code: 'internal_error', message };
   }
 }
 
-/** Posts every accepted document of the tenant that has no posting yet, oldest received first. */
+/**
+ * Posts every accepted document of the tenant that has no posting yet, in arrival order: oldest received first, and a
+ * counter's documents of one push (received together) in their sequence order.
+ */
 export async function postPending(
   pool: pg.Pool,
   tenantId: string,
@@ -130,7 +134,7 @@ export async function postPending(
         await c.query<{ id: string }>(
           `SELECT d.id FROM erp.sales_documents d
          WHERE NOT EXISTS (SELECT 1 FROM erp.postings p WHERE p.source_type = 'sale' AND p.source_id = d.id)
-         ORDER BY d.received_at, d.id LIMIT 500`,
+         ORDER BY d.received_at, d.device_id, d.seq LIMIT 500`,
         )
       ).rows,
   );

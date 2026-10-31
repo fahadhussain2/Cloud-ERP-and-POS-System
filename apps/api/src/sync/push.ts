@@ -100,13 +100,13 @@ export function registerPush(scope: FastifyInstance, { pool, now, requireDevice 
     const results: PushResult[] = [];
     for (const doc of body.documents) {
       const started = performance.now();
-      const { result, posting } = await withTenant(pool, ctx, (_db, c) =>
+      const { result, posting, postingMs } = await withTenant(pool, ctx, (_db, c) =>
         pushOne(c, device, setting, doc, received),
       );
       results.push(result);
       // Posting errors must be 0 (architecture §11): each one is logged as an error and alerts.
       if (posting?.status === 'failed')
-        req.log.error({ documentId: doc.id, code: posting.code }, 'posting.failed');
+        req.log.error({ documentId: doc.id, code: posting.code, message: posting.message }, 'posting.failed');
       // Every document's result against its id (architecture §11.2); never the payload or the signature.
       req.log.info(
         {
@@ -117,6 +117,7 @@ export function registerPush(scope: FastifyInstance, { pool, now, requireDevice 
           error: result.error,
           exceptions: result.exceptions,
           posting: posting?.status ?? null,
+          postingMs,
           ms: Math.round(performance.now() - started),
         },
         'sync.push.document',
@@ -193,7 +194,7 @@ async function pushOne(
   s: Setting,
   doc: PushDocument,
   received: Date,
-): Promise<{ result: PushResult; posting: PostOutcome | null }> {
+): Promise<{ result: PushResult; posting: PostOutcome | null; postingMs: number | null }> {
   const hash = sha256(doc.payload);
   const claimed = await c.query(
     `INSERT INTO erp.sync_inbox (tenant_id, document_id, device_id, family, seq, status, result, payload_hash, received_at)
@@ -215,6 +216,7 @@ async function pushOne(
           ? { ...prior.result, status: 'duplicate' }
           : { id: doc.id, status: 'rejected', exceptions: [], error: 'id_conflict' },
         posting: null,
+        postingMs: null,
       };
     // A rejected document is checked again: it may come back fixed (signed, say).
     await c.query(
@@ -225,15 +227,18 @@ async function pushOne(
 
   let result: PushResult;
   let posting: PostOutcome | null = null;
+  let postingMs: number | null = null;
   try {
     const document = await trusted(c, device, s, doc);
     result = await accept(c, device, s, document, doc, received);
+    const started = performance.now();
     posting = await postDocument(c, {
       tenantId: device.tenantId,
       type: 'sale',
       id: document.id,
       now: received,
     });
+    postingMs = Math.round(performance.now() - started);
   } catch (err) {
     if (!(err instanceof Rejected)) throw err;
     const exceptions: ExceptionKind[] = err.code === 'bad_signature' ? ['bad_signature'] : [];
@@ -253,7 +258,7 @@ async function pushOne(
     JSON.stringify(result),
   ]);
   if (isNew) await advanceSeries(c, device, s, doc, received);
-  return { result, posting };
+  return { result, posting, postingMs };
 }
 
 /** The reasons a document can't be trusted or stored (sync spec §6.2); anything else is accepted. */

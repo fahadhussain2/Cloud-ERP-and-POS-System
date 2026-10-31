@@ -1,4 +1,4 @@
-import { money, negate, qty, sum, type Money, type PaymentMethodCode, type Qty } from '@erp/domain';
+import { add, money, negate, qty, sum, type Money, type PaymentMethodCode, type Qty } from '@erp/domain';
 
 import { costOf } from './cost';
 import { addDays, entryDateOf } from './dates';
@@ -29,19 +29,19 @@ class Unpostable extends Error {
 
 /** Debit and credit lines, one per account and party, kept in the order they were first added. */
 class Entry {
-  private readonly lines = new Map<string, { accountId: string; partyId: string | null; net: number }>();
+  private readonly lines = new Map<string, { accountId: string; partyId: string | null; net: Money }>();
 
   /** `amount` > 0 debits the account, < 0 credits it. */
   add(accountId: string, amount: Money, partyId: string | null = null): void {
     const key = `${accountId}|${partyId ?? ''}`;
-    const line = this.lines.get(key) ?? { accountId, partyId, net: 0 };
-    line.net += amount;
+    const line = this.lines.get(key) ?? { accountId, partyId, net: money(0) };
+    line.net = add(line.net, amount);
     this.lines.set(key, line);
   }
 
   /** Debits minus credits so far. */
   balance(): Money {
-    return sum([...this.lines.values()].map((l) => money(l.net)));
+    return sum([...this.lines.values()].map((l) => l.net));
   }
 
   journalLines(): JournalLine[] {
@@ -51,7 +51,7 @@ class Entry {
         accountId: l.accountId,
         partyId: l.partyId,
         debit: money(Math.max(l.net, 0)),
-        credit: money(Math.max(-l.net, 0)),
+        credit: money(Math.max(negate(l.net), 0)),
       }));
   }
 }

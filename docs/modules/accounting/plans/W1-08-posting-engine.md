@@ -71,6 +71,10 @@ Every test in this list is written and fails on its typed stub (2026-10-29): 37 
 - **The replay property test** computed `-0` for a sale with no costed item; it now subtracts from 0.
 - **The worker** now connects as the app role (it already had `app.env`) and runs jobs on a small runner: start-up, then a minute after each run, never overlapping, a failing run reported to Sentry. It has unit tests; `postPending` itself is integration-tested.
 - **`@erp/domain` exports `divRound`**, so the average uses the one rounding rule (D-079).
+- **Catch-up order fixed:** bills of one push share their receive time, and ordering ties by id (random within a millisecond) could post a counter's bills out of sequence. Caught by the catch-up integration test failing on a run; it now orders by receive time, device and seq (test locked during the fix).
+- **The migration is safe for a rollback** (D-075): the W1-07 code never reads `sales_lines.unit_cost` (always empty) and inserts lines by column list; the widened checks and new tables don't affect it.
+- **Review fixes:** the journal builder adds with `@erp/domain`'s checked `add`; the rebuild formats quantities with integer arithmetic; the push log line carries `postingMs` and an internal error's message.
+- **The end-to-end restore simulation** deletes a counter's documents and exceptions but not their postings, so there the re-pushed bills answer `already_posted` without new exceptions. A real restore rolls the ledgers back with the documents; the simulation was left as is.
 
 ## Verify
 
