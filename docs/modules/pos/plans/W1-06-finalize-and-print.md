@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#51](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/51) |
 | **Module** | pos (rules in `packages/domain`, the document contract in `packages/contracts`, the barcode in a new `packages/print`) |
-| **Status** | Accepted (2026-10-27), with the owner answers below |
+| **Status** | Done (2026-10-29): built in PR #80, merged to staging; verified below. The shop print test is W1-01 |
 | **Refs** | POS-06, POS-09, POS-10, POS-13, POS-15, POS-16, POS-17; PRD W1, W3, W15, Q5, Q7, Q12; architecture §4.2–§4.5, §5.2, §8; data model §2, §5, §12; POS spec §6, §8, §10, §11; sync spec §3, §6; CLAUDE.md rules 1–3, 6, 7, 9, 10; D-002, D-047, D-048, D-053, D-055, D-056, D-092 |
 | **Depends on** | W1-05 (the bill), W1-02 (local database, outbox, device key). **W1-01** (the print test at the shop) now follows this task instead of preceding it: see Design |
 | **Size** | about 4 days |
@@ -84,6 +84,8 @@
 2. **On your PC, with the real catalog** (local API, built POS in Edge started with `--kiosk-printing`, *Microsoft Print to PDF* as the default printer): a 15-line bill paid in cash with change; a split Raast + cash bill; reprint. Timings: Enter in the Cash popup to the print sent (target ≤ 500 ms); the PDFs checked for layout at A5 landscape and A4; the barcode in the PDF scanned with a phone scanner app. The same bill offline. Results go into this plan.
 3. **On staging:** the same in Chrome on the generated catalog.
 4. **At the shop (W1-01, with you):** real bills on the HP P1005, timed and scanned with the cash-desk scanner.
+
+**Results (2026-10-29):** the checks in PR #80. Verify 2 and 3 checked by the owner by hand on their PC and on staging while testing W1-07: cash, split and non-cash bills, printing and reprint. **The owner accepts the print layout for now**; changes, if any, come later as their own task. Not measured: the 500 ms print timing and the barcode scanned from a PDF. **Verify 4 is W1-01** (the shop hour on the HP P1005, with the cash-desk scanner).
 
 ## Risks
 

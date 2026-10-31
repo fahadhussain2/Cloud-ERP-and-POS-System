@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#49](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/49) |
 | **Module** | platform (with pos for the counter unlock, and `packages/ui`) |
-| **Status** | Accepted (2026-10-26); built, checks green, waiting for Verify 2–3 and review |
+| **Status** | Done (2026-10-29): built in PR #71, merged to staging; verified below |
 | **Refs** | PLT-04, PLT-05 (assign), PLT-08; PRD §4; platform spec §4; POS spec §5; migration §6; D-051, D-053, D-066, D-081, D-082, D-083, D-089, D-090 |
 | **Depends on** | W1-02 (Staff PINs, Counters, unlock), W1-03 (`packages/ui`, tokens) |
 | **Size** | about 3 days |
@@ -123,6 +123,8 @@ Every change is in the audit log through the W0-09 triggers (before/after, secre
 1. `pnpm check`, `pnpm test:integration` and `pnpm e2e`, output shown.
 2. **On your PC, with the Delux tenant** (local API, built back office and POS in Edge): add three of the legacy staff (a salesman without a password, a cashier, a manager with a password), check their roles and the audit rows; lock the salesman on a counter and unlock as the manager with the network off.
 3. **On staging:** the owner signs in, adds a test person, deactivates them; the layout at full width and in a narrow window.
+
+**Results (2026-10-29):** the checks in PR #71; Verify 2 and 3 checked by the owner by hand on their PC and on staging, while testing this and the later tasks (W1-05 to W1-07). All working; nothing timed.
 
 ## Risks
 
