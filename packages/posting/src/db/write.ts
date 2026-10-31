@@ -4,8 +4,9 @@ import type { Posting, PostingContext } from '../types';
 import type { SourceType } from './post';
 
 // Writing one posting's rows (rule 4): the order-of-record row, the journal entry and lines, the stock movements,
-// the party entries, and the balances beside them. Used by live posting and by the rebuild's apply. The caller holds
-// the tenant's `posting_state` lock and passes the seq and journal number it took.
+// the party entries, and the balances beside them. Used by live posting and by the rebuild's apply, which keeps the
+// existing order-of-record row. The caller holds the tenant's `posting_state` lock and passes the seq and journal
+// number it took.
 
 export interface Numbers {
   seq: number;
@@ -21,13 +22,15 @@ export async function writePosting(
   context: PostingContext,
   numbers: Numbers,
   postedAt: Date,
+  opts: { orderRow: boolean } = { orderRow: true },
 ): Promise<void> {
   const { seq } = numbers;
-  await c.query(
-    `INSERT INTO erp.postings (tenant_id, seq, source_type, source_id, entry_date, posted_at, context)
+  if (opts.orderRow)
+    await c.query(
+      `INSERT INTO erp.postings (tenant_id, seq, source_type, source_id, entry_date, posted_at, context)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [tenantId, seq, source.type, source.id, posting.entryDate, postedAt, JSON.stringify(context)],
-  );
+      [tenantId, seq, source.type, source.id, posting.entryDate, postedAt, JSON.stringify(context)],
+    );
 
   if (numbers.journalNumber !== null) {
     const entry = await c.query<{ id: string }>(
