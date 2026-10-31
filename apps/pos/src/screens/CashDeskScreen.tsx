@@ -1,5 +1,4 @@
 import {
-  can,
   DomainError,
   money,
   parseBillCode,
@@ -7,7 +6,6 @@ import {
   queueGroups,
   type Money,
   type QueueBill,
-  type RoleGrant,
 } from '@erp/domain';
 import {
   Badge,
@@ -55,7 +53,6 @@ export function CashDeskScreen({
   money: fmt,
   user,
   staff,
-  branchId,
   timeZone,
   offline,
   offlineSince,
@@ -68,6 +65,7 @@ export function CashDeskScreen({
   money: MoneyFormat;
   user: StaffUser;
   staff: readonly StaffUser[];
+  /** Kept for the shell; the worker checks the permissions (W1-10). */
   branchId: string | null;
   timeZone: string;
   offline: boolean;
@@ -81,7 +79,6 @@ export function CashDeskScreen({
 }) {
   const { t } = useTranslation();
   const [desk, setDesk] = useState<DeskState | null>(null);
-  const [grants, setGrants] = useState<RoleGrant[]>([]);
   const [selected, setSelected] = useState(0);
   const [scanned, setScanned] = useState<string | null>(null);
   const [text, setText] = useState('');
@@ -100,9 +97,6 @@ export function CashDeskScreen({
   useEffect(() => {
     void counter.deskState().then(setDesk);
   }, [counter, syncTick]);
-  useEffect(() => {
-    void counter.grants(user.id).then(setGrants);
-  }, [counter, user.id]);
 
   const groups = desk
     ? queueGroups({
@@ -115,8 +109,6 @@ export function CashDeskScreen({
   const current = bills[Math.min(selected, bills.length - 1)] ?? null;
   const session = desk?.session ?? null;
   const open = session?.status === 'open' ? session : null;
-  const mayOpen = can(grants, 'cash.handover.receive', branchId);
-  const mayClose = can(grants, 'cash.session.close', branchId);
 
   // The scan field keeps the focus whenever no dialog is open (a keyboard-wedge scanner types into it).
   useEffect(() => {
@@ -252,8 +244,10 @@ export function CashDeskScreen({
 
   useShortcuts(
     {
-      'Alt+O': () => mayOpen && open === null && setDialog({ kind: 'open' }),
-      'Alt+X': () => mayClose && open !== null && setDialog({ kind: 'close' }),
+      // Not gated on the roles, which load after the screen: the worker refuses without the permission
+      // (`not_permitted`), and the message says so.
+      'Alt+O': () => open === null && setDialog({ kind: 'open' }),
+      'Alt+X': () => open !== null && setDialog({ kind: 'close' }),
       'Alt+Q': onSell,
       'Alt+L': onLock,
     },
@@ -269,8 +263,8 @@ export function CashDeskScreen({
     },
     { keys: '↑ ↓', label: t('desk.keys.select'), run: () => scan.current?.focus() },
     open === null
-      ? { keys: 'Alt+O', label: t('desk.keys.open'), run: () => mayOpen && setDialog({ kind: 'open' }) }
-      : { keys: 'Alt+X', label: t('desk.keys.close'), run: () => mayClose && setDialog({ kind: 'close' }) },
+      ? { keys: 'Alt+O', label: t('desk.keys.open'), run: () => setDialog({ kind: 'open' }) }
+      : { keys: 'Alt+X', label: t('desk.keys.close'), run: () => setDialog({ kind: 'close' }) },
     { keys: 'Alt+Q', label: t('keys.sell'), run: onSell },
     { keys: 'Alt+L', label: t('keys.lock'), run: onLock },
   ];
