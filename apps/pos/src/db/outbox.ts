@@ -199,13 +199,24 @@ export function retryQuarantined(db: SqlDb, id: string): boolean {
   return changes(db) === 1;
 }
 
-/** Drops local documents older than KEEP_DAYS, never one still in the outbox (rule 9). Returns how many. */
+/**
+ * Drops local documents older than KEEP_DAYS, never one still in the outbox (rule 9). Returns how many. A desk also
+ * drops queue rows already handed over and older than the queue's 7 days (W1-10): the server no longer sends them,
+ * and a pending one stays, however old.
+ */
 export function pruneDocuments(db: SqlDb, nowMs: number): number {
   db.exec('DELETE FROM local_documents WHERE created_at < ? AND id NOT IN (SELECT id FROM outbox)', [
     daysAgo(nowMs),
   ]);
-  return changes(db);
+  const pruned = changes(db);
+  db.exec(`DELETE FROM cash_queue WHERE handover_status <> 'pending' AND created_at_device < ?`, [
+    new Date(nowMs - QUEUE_DAYS * 86_400_000).toISOString(),
+  ]);
+  return pruned;
 }
+
+/** The cash queue's window on the server (sync spec §3). */
+const QUEUE_DAYS = 7;
 
 export function localHealth(db: SqlDb): LocalHealth {
   const [o] = db.selectObjects(

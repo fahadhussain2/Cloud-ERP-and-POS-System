@@ -4,6 +4,7 @@ import {
   DomainError,
   expectedCash,
   money,
+  sum,
   type CashHandoverDocument,
   type CashSessionDocument,
   type DeskSession,
@@ -115,12 +116,12 @@ export function deskState(db: SqlDb, nowMs = Date.now()): DeskState {
   let session: DeskSessionView | null = null;
   if (s !== null) {
     const handovers = sessionHandovers(db, s.id);
-    const sum = (kind: 'in' | 'payout') =>
-      money(handovers.filter((h) => h.kind === kind).reduce((t, h) => t + h.amount, 0));
+    const total = (kind: 'in' | 'payout') =>
+      sum(handovers.filter((h) => h.kind === kind).map((h) => h.amount));
     session = {
       ...s,
-      handedIn: sum('in'),
-      paidOut: sum('payout'),
+      handedIn: total('in'),
+      paidOut: total('payout'),
       expected: expectedCash({ openingFloat: s.openingFloat, handovers }),
     };
   }
