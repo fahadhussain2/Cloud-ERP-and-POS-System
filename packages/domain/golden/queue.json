@@ -289,6 +289,132 @@
           "toPayOut": 0
         }
       ]
+    },
+    {
+      "name": "two unnamed salesmen and two with the same name: by name, then by id",
+      "input": {
+        "sellers": {
+          "019a0000-0000-7000-8000-0000000000a1": "Ali",
+          "019a0000-0000-7000-8000-0000000000a3": "Ali"
+        },
+        "entries": [
+          {
+            "id": "019a5000-0000-7000-8000-000000000601",
+            "number": "C05-S000001",
+            "sellerId": "019a0000-0000-7000-8000-0000000000b9",
+            "createdAt": "2026-11-02T09:00:00.000Z",
+            "cashDue": 10000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000602",
+            "number": "C05-S000002",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a3",
+            "createdAt": "2026-11-02T09:01:00.000Z",
+            "cashDue": 10000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000603",
+            "number": "C05-S000003",
+            "sellerId": "019a0000-0000-7000-8000-0000000000b8",
+            "createdAt": "2026-11-02T09:02:00.000Z",
+            "cashDue": 10000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000604",
+            "number": "C05-S000004",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "createdAt": "2026-11-02T09:03:00.000Z",
+            "cashDue": 10000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          }
+        ],
+        "local": []
+      },
+      "expected": [
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "sellerName": "Ali",
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000604",
+              "number": "C05-S000004",
+              "createdAt": "2026-11-02T09:03:00.000Z",
+              "kind": "in",
+              "amount": 10000,
+              "cashReceived": null,
+              "changeDue": 0
+            }
+          ],
+          "toCollect": 10000,
+          "toPayOut": 0
+        },
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000a3",
+          "sellerName": "Ali",
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000602",
+              "number": "C05-S000002",
+              "createdAt": "2026-11-02T09:01:00.000Z",
+              "kind": "in",
+              "amount": 10000,
+              "cashReceived": null,
+              "changeDue": 0
+            }
+          ],
+          "toCollect": 10000,
+          "toPayOut": 0
+        },
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000b8",
+          "sellerName": null,
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000603",
+              "number": "C05-S000003",
+              "createdAt": "2026-11-02T09:02:00.000Z",
+              "kind": "in",
+              "amount": 10000,
+              "cashReceived": null,
+              "changeDue": 0
+            }
+          ],
+          "toCollect": 10000,
+          "toPayOut": 0
+        },
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000b9",
+          "sellerName": null,
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000601",
+              "number": "C05-S000001",
+              "createdAt": "2026-11-02T09:00:00.000Z",
+              "kind": "in",
+              "amount": 10000,
+              "cashReceived": null,
+              "changeDue": 0
+            }
+          ],
+          "toCollect": 10000,
+          "toPayOut": 0
+        }
+      ]
     }
   ]
 }

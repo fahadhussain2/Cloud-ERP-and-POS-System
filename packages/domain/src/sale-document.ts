@@ -166,7 +166,11 @@ export function billCode(code: BillCode, unit: Money): string {
 export function parseBillCode(scanned: string, unit: Money): BillCode {
   const m = SCANNED_BILL_CODE.exec(scanned.trim());
   if (m === null) throw new DomainError('invalid_bill_code', `not a bill code: "${scanned}"`);
-  return { number: m[1]!, cashDue: toSafeNumber(BigInt(m[2]!) * BigInt(unit)) as Money };
+  const whole = BigInt(m[2]!);
+  // A minus marks a refund (W1-10), so a refund of nothing isn't a code the counter prints.
+  if (whole === 0n && m[2]!.startsWith('-'))
+    throw new DomainError('invalid_bill_code', `not a bill code: "${scanned}"`);
+  return { number: m[1]!, cashDue: toSafeNumber(whole * BigInt(unit)) as Money };
 }
 
 /** Who the bill is for (POS spec §15): a customer's party id, or a walk-in with an optional phone. */

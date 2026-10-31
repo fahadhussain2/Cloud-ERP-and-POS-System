@@ -46,6 +46,14 @@ export {
 } from './bill';
 export { businessDate } from './business-date';
 export {
+  buildSessionDocument,
+  expectedCash,
+  type CashSessionDocument,
+  type DeskContext,
+  type DeskSession,
+  type SessionHandover,
+} from './cash-session';
+export {
   checkCredit,
   CREDIT_REASONS,
   onAccountAmount,
@@ -74,6 +82,25 @@ export {
 } from './device';
 export { DomainError, type DomainErrorCode } from './errors';
 export { divRound } from './exact';
+export {
+  buildHandoverDocument,
+  checkHandover,
+  queueGroups,
+  reviewHandover,
+  type CashHandoverDocument,
+  type HandoverCheck,
+  type HandoverFinding,
+  type HandoverInput,
+  type HandoverKind,
+  type HandoverMethod,
+  type HandoverProblem,
+  type HandoverStatus,
+  type HandoverTarget,
+  type LocalHandover,
+  type QueueBill,
+  type QueueEntry,
+  type QueueGroup,
+} from './handover';
 export { normalizeIdentifier } from './identifier';
 export { add, money, mulBp, mulQty, negate, parseMoney, sub, sum, type Money } from './money';
 export {

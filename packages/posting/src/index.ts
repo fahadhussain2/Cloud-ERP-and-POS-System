@@ -2,6 +2,7 @@
 export { averageAfterReceipt } from './cost';
 export { holdPostingOrder, postDocument, postPending, type PostOutcome, type SourceType } from './db/post';
 export { applyRebuild, checkRebuild, RebuildRefused, type RebuildCheck } from './db/rebuild';
+export { postHandover } from './handover';
 export { emptyState, replay, type ReplayStep } from './replay';
 export { postSale } from './sale';
 export type {
@@ -13,6 +14,7 @@ export type {
   PostingContext,
   PostingError,
   PostingException,
+  PostingHandover,
   PostingResult,
   PostingRole,
   PostingSale,

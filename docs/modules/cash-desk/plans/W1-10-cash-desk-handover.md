@@ -67,6 +67,14 @@
 - [ ] **Cash desk screen (jsdom, fake desk):** no session → open dialog; Enter confirms the selected bill; `E` corrects; a scan of a queued bill selects it; a scan of an unknown bill asks before recording; a second scan refused; another person's session blocks confirming; offline banner.
 - [ ] **E2E:** the flows in scope item 7.
 
+## Build notes
+
+- **The bill code already printed and read refunds** (`C03-S000414 -1250`, since W1-06). W1-10 only refuses `-0`; `--450` and `+4320` were already refused and stay as guards.
+- **`checkHandover`'s order of problems:** nothing to collect, no session, another cashier's session, not permitted, already handed over (this desk first, then the server's status), a correction with paisa, a correction below the amount due. `buildHandoverDocument` throws the problem as its `DomainError` code.
+- **A bill known only from its code** records no cash received or change unless the cashier types the figure; a payout records neither.
+- **Session documents** carry `userId` (who opened, or who closed) and `expectedCash` on a close; the float and the expected cash are `null` on the other event.
+- **The domain and posting tests came first** (commit `b6d98ad`); the push, pull and desk tests are written with their code, as in W1-09.
+
 ## Verify
 
 1. `pnpm check`, `pnpm test:integration` and `pnpm e2e`, output shown.

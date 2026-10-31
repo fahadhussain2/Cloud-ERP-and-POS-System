@@ -6,7 +6,7 @@ import handoverCases from '../golden/post-handover.json';
 import { postHandover } from './handover';
 import { postSale } from './sale';
 import { runGolden, type GoldenFile } from './testing/golden';
-import type { JournalLine, PostingContext, PostingHandover, PostingRole } from './types';
+import type { JournalLine, PostingContext, PostingHandover, PostingResult, PostingRole } from './types';
 
 // Delux's accounts by code (posting rules §2).
 const ROLES: Partial<Record<PostingRole, string>> = {
@@ -72,7 +72,7 @@ describe('a cash bill and its handover, in either order', () => {
     for (const l of lines) out[l.accountId] = (out[l.accountId] ?? 0) + l.debit - l.credit;
     return out as Record<string, Money>;
   };
-  const linesOf = (r: ReturnType<typeof postHandover> | ReturnType<typeof postSale>): JournalLine[] => {
+  const linesOf = (r: PostingResult): JournalLine[] => {
     if (!r.ok) throw new Error(`not posted: ${r.error.code}`);
     return r.posting.journal.lines;
   };
