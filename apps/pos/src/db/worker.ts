@@ -1,12 +1,13 @@
 /// <reference lib="webworker" />
 import { verifyPin, type PushResult, type SeriesState } from '@erp/contracts';
-import { businessDate } from '@erp/domain';
+import { businessDate, type Money } from '@erp/domain';
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 
 import type { OpenBill } from '../bill/open-bill';
 import { SearchIndex, type SearchOptions } from '../search/search-index';
 import * as checkout from './checkout';
 import * as customers from './customers';
+import * as desk from './desk';
 import { currentVersion, migrate } from './migrate';
 import * as outbox from './outbox';
 import * as repo from './repo';
@@ -88,6 +89,11 @@ const ops = {
     const today = businessDate(Date.now(), s.timeZone, s.cutoffHour);
     return customers.creditFigures(open(), customerId, offline, today);
   },
+  /** The cash desk (W1-10): its session, the pulled queue, its handovers; each write is one transaction. */
+  deskState: () => desk.deskState(open()),
+  openSession: (req: desk.DeskRequest & { openingFloat: Money }) => desk.openSession(open(), req),
+  closeSession: (req: desk.DeskRequest) => desk.closeSession(open(), req),
+  confirmHandover: (req: desk.HandoverRequest) => desk.confirmHandover(open(), req),
   /** Push (sync spec §6.2–§7, W1-07): the outbox, the answer, re-queue after a restore, audit events, health. */
   outboxBatch: () => outbox.outboxBatch(open()),
   ackPush: (results: PushResult[], at: string) => outbox.ackPush(open(), results, at),

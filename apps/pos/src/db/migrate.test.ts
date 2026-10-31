@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { CATALOG_COLUMNS, CATALOG_DATASETS, CUSTOMER_COLUMNS } from '@erp/contracts';
+import { CASH_DESK_COLUMNS, CATALOG_COLUMNS, CATALOG_DATASETS, CUSTOMER_COLUMNS } from '@erp/contracts';
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -245,6 +245,37 @@ describe('migrations', () => {
       db.selectObjects(`PRAGMA table_info(${table})`).map((r) => String(r['name']));
     for (const [table, list] of Object.entries(CUSTOMER_COLUMNS))
       expect(columns(table)).toEqual([...Object.keys(list), 'row_version', 'deleted_at']);
+  });
+
+  it("schema 8 adds the cash queue and the desk's sessions (W1-10) and keeps a W1-09 counter's rows", () => {
+    const db = fresh();
+    migrate(db, MIGRATIONS.slice(0, 7));
+    db.exec(`INSERT INTO open_bills (user_id, bill, updated_at) VALUES ('sara', '{"version":1}', 'now')`);
+    db.exec(
+      `INSERT INTO local_documents (id, family, seq, number, kind, business_date, payload, created_at, signature)
+       VALUES ('d1', 'S', 1, 'C03-S000001', 'sale', '2026-11-02', '{}', 'now', 'sig'),
+              ('d2', 'S', 2, 'C03-S000002', 'sale', '2026-11-02', '{}', 'now', null)`,
+    );
+    db.exec(
+      `INSERT INTO outbox (id, family, seq, payload, signature, status, attempts, created_at)
+       VALUES ('d1', 'S', 1, '{}', 'sig', 'quarantined', 1, 'now'), ('d2', 'S', 2, '{}', null, 'pending', 0, 'now')`,
+    );
+    migrate(db);
+    expect(LATEST_VERSION).toBeGreaterThanOrEqual(8);
+    expect(db.selectValue('SELECT count(*) FROM open_bills')).toBe(1);
+    expect(db.selectValue('SELECT count(*) FROM local_documents')).toBe(2);
+    expect(db.selectObjects('SELECT id, status FROM outbox ORDER BY id')).toEqual([
+      { id: 'd1', status: 'quarantined' },
+      { id: 'd2', status: 'pending' },
+    ]);
+    const columns = (table: string) =>
+      db.selectObjects(`PRAGMA table_info(${table})`).map((r) => String(r['name']));
+    expect(columns('cash_queue')).toEqual([
+      ...Object.keys(CASH_DESK_COLUMNS.cash_queue),
+      'row_version',
+      'deleted_at',
+    ]);
+    expect(db.selectValue('SELECT count(*) FROM cash_sessions')).toBe(0);
   });
 
   it('roll back a migration that fails and leave the previous schema', () => {

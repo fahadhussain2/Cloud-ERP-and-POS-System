@@ -79,6 +79,14 @@
 - **`queue-changed`** uses its own channel, `erp_queue` (`<tenant>:<branch>`), with a trigger on `sales_documents` for bills with cash due ≠ 0; `sales_documents` doesn't get the general `erp_sync` nudge, so counters aren't woken by every bill. The change feed subscribes by key (`queueKey`).
 - **The counter leaves `cash_queue` out of its pull** (the server answers `403 not_cash_desk`); the desk adds it with local schema 8.
 - **A late link** (the bill arrives after its offline scan) re-checks only the amount: the cashier's permission was judged when the handover arrived.
+- **Two server bugs the desk e2e caught**, each fixed with its failing test committed first (bug-fix rule):
+  - a scan and its bill arriving in overlapping transactions never linked (each looked for the other before either committed): both pushes now take a **per-bill advisory lock** first, before the posting order lock (`2570816`, `23303a1`);
+  - a handover naming a sale the server didn't have yet was refused as `unknown_reference`; the desk's outbox goes by family, so its own sale is pushed after the automatic handover. The bill isn't checked any more: it is linked by number, now or later (`H` checks only the cashier).
+- **On the desk:** `deskState` reads the session (with handed in, paid out and expected), every pulled queue row and the desk's own handovers of 7 days; `openSession`, `closeSession` and `confirmHandover` each write the document and its outbox row in one transaction, signed after the commit. The reprint list shows bills only.
+- **The automatic handover** is made by `finalizeSale` on a desk with an open session, for the session's cashier, with its own id; `Finalized.handover` carries it so it is signed too.
+- **`queue-changed` pulls like `changes-available`** on the desk: the queue is one of its datasets, and the screen reads it again after every pull.
+- **Keys on the Cash desk screen:** Enter confirms, `E` corrects, `↑ ↓` select, `Alt+O` opens and `Alt+X` closes the session, `Alt+Q` switches to selling and back, `Alt+L` locks. The scan field keeps the focus; a click on a row selects it.
+- **Desk e2e** (`e2e/till.spec.ts`, a second browser profile as the desk PC) runs after the counter and sync flows: the queue then also holds their unhanded cash bills, so the flows pick their bill as a cashier would.
 
 ## Verify
 

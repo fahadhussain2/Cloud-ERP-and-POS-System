@@ -284,7 +284,7 @@ describe('finalizing a sale (one transaction)', () => {
     saveOpenBill(db, SARA, openBill());
     const first = finalizeSale(db, request(1));
     const again = finalizeSale(db, request(2));
-    expect(again).toEqual({ document: first.document, repeated: true });
+    expect(again).toEqual({ document: first.document, repeated: true, handover: null });
     expect(count('outbox')).toBe(1);
     expect(nextSeq()).toBe(2);
   });

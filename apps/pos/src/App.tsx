@@ -1,3 +1,4 @@
+import { can } from '@erp/domain';
 import { AppFrame } from '@erp/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,6 +7,7 @@ import type { Counter, CounterHealth, CounterStatus } from './counter';
 import type { QuarantinedRow } from './db/outbox';
 import type { DeviceInfo } from './db/repo';
 import { CardScreen } from './screens/Card';
+import { CashDeskScreen } from './screens/CashDeskScreen';
 import { ChoosePinScreen } from './screens/ChoosePinScreen';
 import { CounterScreen } from './screens/CounterScreen';
 import { HealthDialog, type RetryAttempt } from './screens/HealthDialog';
@@ -73,6 +75,9 @@ export function App({ counter }: { counter: Counter }) {
   const [liveShown, setLiveShown] = useState(false);
   const lastPullAt = useRef(0);
   const pusher = useRef<PushScheduler | null>(null);
+  const [syncTick, setSyncTick] = useState(0);
+  // On a cash desk (W1-10): the Cash desk screen, or selling (Alt+Q switches, D-001: the desk also sells).
+  const [deskView, setDeskView] = useState(false);
 
   // Who is selling, for the pull below (a callback can't read the current phase).
   const phaseRef = useRef<Phase>(phase);
@@ -117,6 +122,8 @@ export function App({ counter }: { counter: Counter }) {
     const r = await counter.pull(() => void refresh());
     noteOutcome(r);
     await refresh();
+    // The cash desk reads its queue again after every pull (W1-10).
+    setSyncTick((n) => n + 1);
     return r.ok;
   }, [counter, refresh, noteOutcome]);
 
@@ -318,6 +325,32 @@ export function App({ counter }: { counter: Counter }) {
     setHealth({ health: h, attention });
   }, [counter]);
 
+  // A cash desk opens on the Cash desk screen for someone who may take cash, else on selling (cash desk spec).
+  const isDesk = device?.kind === 'cash_desk';
+  const unlockedId = phase.name === 'unlocked' ? phase.user.id : null;
+  useEffect(() => {
+    if (!isDesk || unlockedId === null) return;
+    let cancelled = false;
+    void counter.grants(unlockedId).then((g) => {
+      if (!cancelled) setDeskView(can(g, 'cash.handover.receive', device?.branchId ?? null));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isDesk, unlockedId, counter, device?.branchId]);
+
+  // Alt+Q from selling back to the Cash desk screen; the desk screen has its own Alt+Q to selling.
+  useEffect(() => {
+    if (!isDesk || unlockedId === null || deskView) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.key.toLowerCase() !== 'q') return;
+      e.preventDefault();
+      setDeskView(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isDesk, unlockedId, deskView]);
+
   // Alt+S opens it from the staff list, the counter and the revoked screen (POS spec §11).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -387,27 +420,51 @@ export function App({ counter }: { counter: Counter }) {
       );
       break;
     case 'unlocked':
-      screen = (
-        <CounterScreen
-          counter={counter}
-          money={{
-            locale: settings?.locale ?? i18n.language,
-            currency: settings?.currency ?? 'PKR',
-            minorUnits: settings?.minorUnits ?? 2,
-          }}
-          user={phase.user}
-          staff={staff}
-          branchId={device?.branchId ?? null}
-          shopName={settings?.name ?? ''}
-          offline={connection.state !== 'online'}
-          onLock={() => setPhase({ name: 'locked' })}
-          onSaved={() => {
-            void refresh();
-            // A finalized bill goes to the server at once, not on a timer (SYN-02).
-            pusher.current?.trigger();
-          }}
-        />
-      );
+      screen =
+        isDesk && deskView ? (
+          <CashDeskScreen
+            counter={counter}
+            money={{
+              locale: settings?.locale ?? i18n.language,
+              currency: settings?.currency ?? 'PKR',
+              minorUnits: settings?.minorUnits ?? 2,
+            }}
+            user={phase.user}
+            staff={staff}
+            branchId={device?.branchId ?? null}
+            timeZone={settings?.timeZone ?? 'Asia/Karachi'}
+            offline={connection.state !== 'online'}
+            offlineSince={connection.offlineSince}
+            syncTick={syncTick}
+            onSaved={() => {
+              void refresh();
+              // A handover reaches the server at once, like a bill (SYN-02).
+              pusher.current?.trigger();
+            }}
+            onSell={() => setDeskView(false)}
+            onLock={() => setPhase({ name: 'locked' })}
+          />
+        ) : (
+          <CounterScreen
+            counter={counter}
+            money={{
+              locale: settings?.locale ?? i18n.language,
+              currency: settings?.currency ?? 'PKR',
+              minorUnits: settings?.minorUnits ?? 2,
+            }}
+            user={phase.user}
+            staff={staff}
+            branchId={device?.branchId ?? null}
+            shopName={settings?.name ?? ''}
+            offline={connection.state !== 'online'}
+            onLock={() => setPhase({ name: 'locked' })}
+            onSaved={() => {
+              void refresh();
+              // A finalized bill goes to the server at once, not on a timer (SYN-02).
+              pusher.current?.trigger();
+            }}
+          />
+        );
       break;
     case 'revoked':
       screen = <RevokedScreen waiting={status.outboxCount} onRetry={() => window.location.reload()} />;

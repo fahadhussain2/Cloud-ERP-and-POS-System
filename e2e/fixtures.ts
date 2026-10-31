@@ -28,6 +28,15 @@ export const NEWCOMER = {
   pin: '6071',
 };
 
+/** Added by the owner for the cash desk (W1-10): a cashier with a temporary PIN they replace at the desk. */
+export const CASHIER = {
+  username: 'ayesha',
+  fullName: 'Ayesha Cashier',
+  shortCode: '56',
+  temporaryPin: '3719',
+  pin: '6284',
+};
+
 export const API_PORT = 3100;
 export const POS_PORT = 4173;
 export const BACKOFFICE_PORT = 4174;
