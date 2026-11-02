@@ -288,6 +288,30 @@ describe('the cash desk screen', () => {
     expect(await screen.findByRole('textbox', { name: 'Opening float (whole rupees)' })).toBeTruthy();
   });
 
+  it('keeps the selected bill in view while ↓ walks down a long queue', async () => {
+    const queue = Array.from({ length: 30 }, (_, i) =>
+      bill(`C03-S0005${String(i).padStart(2, '0')}`, 'imran', 10000 + i * 100),
+    );
+    const scrolled: string[] = [];
+    // jsdom has no scrollIntoView: record which row asks for it.
+    const saved = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: function (this: Element) {
+        scrolled.push(this.textContent ?? '');
+      },
+    });
+    try {
+      show(fakeDesk({ queue }).counter);
+      await screen.findByText('C03-S000529');
+      for (let i = 0; i < 29; i++) press('ArrowDown');
+      await waitFor(() => expect(scrolled.at(-1)).toContain('C03-S000529'));
+    } finally {
+      if (saved) Object.defineProperty(Element.prototype, 'scrollIntoView', saved);
+      else delete (Element.prototype as Partial<Element>).scrollIntoView;
+    }
+  });
+
   it('offline, says the queue is not updating and to scan each bill', async () => {
     show(fakeDesk().counter, { offline: true });
     expect(await screen.findByText(/queue is not updating · scan each bill/)).toBeTruthy();
