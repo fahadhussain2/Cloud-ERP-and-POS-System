@@ -22,15 +22,21 @@ export function denominations(currency: string): Money[] {
   return list.map((d) => money(d));
 }
 
-/** The counted total: counts keyed by the denomination in minor units, each a whole number of notes or coins. */
-export function countDrawer(currency: string, counts: Readonly<Record<string, number>>): Money {
+/** The counted total, or null when a count isn't a whole number of one of the currency's notes or coins. */
+function countOf(currency: string, counts: Readonly<Record<string, number>>): Money | null {
   const valid = new Set(denominations(currency).map(String));
   let total = money(0);
   for (const [key, count] of Object.entries(counts)) {
-    if (!valid.has(key) || !Number.isSafeInteger(count) || count < 0)
-      throw new DomainError('invalid_count', `not a count: ${count} × ${key}`);
+    if (!valid.has(key) || !Number.isSafeInteger(count) || count < 0) return null;
     total = money(total + Number(key) * count);
   }
+  return total;
+}
+
+/** The counted total: counts keyed by the denomination in minor units, each a whole number of notes or coins. */
+export function countDrawer(currency: string, counts: Readonly<Record<string, number>>): Money {
+  const total = countOf(currency, counts);
+  if (total === null) throw new DomainError('invalid_count', `not a count: ${JSON.stringify(counts)}`);
   return total;
 }
 
@@ -99,14 +105,8 @@ export function checkClose(input: CloseInput): CloseCheck {
   if (session === null || session.status !== 'open') return { ok: false, problem: 'no_session' };
   if (!can(input.grants, 'cash.session.close', input.branchId))
     return { ok: false, problem: 'not_permitted', permission: 'cash.session.close' };
-  let counted: Money;
-  try {
-    counted = countDrawer(input.currency, input.counts);
-  } catch (err) {
-    if (err instanceof DomainError && err.code === 'invalid_count')
-      return { ok: false, problem: 'invalid_count' };
-    throw err;
-  }
+  const counted = countOf(input.currency, input.counts);
+  if (counted === null) return { ok: false, problem: 'invalid_count' };
   const left = input.leftInDrawer ?? counted;
   if (!Number.isSafeInteger(left) || left < 0 || left > counted || left % input.increment !== 0)
     return { ok: false, problem: 'left_invalid' };

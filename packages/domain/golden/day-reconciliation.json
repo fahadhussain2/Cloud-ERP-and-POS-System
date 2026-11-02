@@ -5,8 +5,16 @@
       "name": "a final day with one exact session",
       "input": {
         "devices": [
-          { "code": "D01", "lastContactAt": "2026-11-03T04:12:00.000Z", "oldestUnsyncedAt": null },
-          { "code": "C03", "lastContactAt": "2026-11-03T04:10:00.000Z", "oldestUnsyncedAt": null }
+          {
+            "code": "D01",
+            "lastContactAt": "2026-11-03T04:12:00.000Z",
+            "oldestUnsyncedAt": null
+          },
+          {
+            "code": "C03",
+            "lastContactAt": "2026-11-03T04:10:00.000Z",
+            "oldestUnsyncedAt": null
+          }
         ],
         "sessions": [
           {
@@ -22,15 +30,35 @@
             "varianceReason": null,
             "acknowledgedByName": null,
             "handovers": [
-              { "kind": "in", "amount": 432000 },
-              { "kind": "in", "amount": 125000 },
-              { "kind": "payout", "amount": 45000 }
+              {
+                "kind": "in",
+                "amount": 432000
+              },
+              {
+                "kind": "in",
+                "amount": 125000
+              },
+              {
+                "kind": "payout",
+                "amount": 45000
+              }
             ],
             "collections": [
-              { "cash": true, "amount": 500000 },
-              { "cash": false, "amount": 900000 }
+              {
+                "cash": true,
+                "amount": 500000
+              },
+              {
+                "cash": false,
+                "amount": 900000
+              }
             ],
-            "movements": [{ "kind": "expense", "amount": 20000 }]
+            "movements": [
+              {
+                "kind": "expense",
+                "amount": 20000
+              }
+            ]
           }
         ]
       },
@@ -75,11 +103,18 @@
     },
     {
       "name": "today is not over yet",
-      "input": { "now": "2026-11-02T12:00:00.000Z" },
+      "input": {
+        "now": "2026-11-02T12:00:00.000Z"
+      },
       "expected": {
         "businessDate": "2026-11-02",
         "status": "provisional",
-        "holds": [{ "kind": "day_not_over", "dayEndsAt": "2026-11-02T23:00:00.000Z" }],
+        "holds": [
+          {
+            "kind": "day_not_over",
+            "dayEndsAt": "2026-11-02T23:00:00.000Z"
+          }
+        ],
         "sessions": [],
         "missingHandovers": [],
         "unmatchedScans": [],
@@ -92,20 +127,35 @@
       "name": "what holds a day: devices not heard from or not synced, a gap, an open session (devices by code)",
       "input": {
         "devices": [
-          { "code": "D01", "lastContactAt": null, "oldestUnsyncedAt": null },
+          {
+            "code": "D01",
+            "lastContactAt": null,
+            "oldestUnsyncedAt": null
+          },
           {
             "code": "C05",
             "lastContactAt": "2026-11-03T04:00:00.000Z",
             "oldestUnsyncedAt": "2026-11-03T03:00:00.000Z"
           },
-          { "code": "C04", "lastContactAt": "2026-11-02T09:05:00.000Z", "oldestUnsyncedAt": null },
+          {
+            "code": "C04",
+            "lastContactAt": "2026-11-02T09:05:00.000Z",
+            "oldestUnsyncedAt": null
+          },
           {
             "code": "C03",
             "lastContactAt": "2026-11-03T04:00:00.000Z",
             "oldestUnsyncedAt": "2026-11-02T15:00:00.000Z"
           }
         ],
-        "gaps": [{ "deviceCode": "C03", "family": "S", "fromSeq": 410, "toSeq": 411 }],
+        "gaps": [
+          {
+            "deviceCode": "C03",
+            "family": "S",
+            "fromSeq": 410,
+            "toSeq": 411
+          }
+        ],
         "sessions": [
           {
             "id": "019a6000-0000-7000-8000-000000000059",
@@ -129,11 +179,34 @@
         "businessDate": "2026-11-02",
         "status": "provisional",
         "holds": [
-          { "kind": "device_unsynced", "deviceCode": "C03", "oldestUnsyncedAt": "2026-11-02T15:00:00.000Z" },
-          { "kind": "device_not_heard", "deviceCode": "C04", "lastContactAt": "2026-11-02T09:05:00.000Z" },
-          { "kind": "device_not_heard", "deviceCode": "D01", "lastContactAt": null },
-          { "kind": "sequence_gap", "deviceCode": "C03", "family": "S", "fromSeq": 410, "toSeq": 411 },
-          { "kind": "session_open", "number": "D01-Z000009", "deviceCode": "D01", "cashierName": "Ali" }
+          {
+            "kind": "device_unsynced",
+            "deviceCode": "C03",
+            "oldestUnsyncedAt": "2026-11-02T15:00:00.000Z"
+          },
+          {
+            "kind": "device_not_heard",
+            "deviceCode": "C04",
+            "lastContactAt": "2026-11-02T09:05:00.000Z"
+          },
+          {
+            "kind": "device_not_heard",
+            "deviceCode": "D01",
+            "lastContactAt": null
+          },
+          {
+            "kind": "sequence_gap",
+            "deviceCode": "C03",
+            "family": "S",
+            "fromSeq": 410,
+            "toSeq": 411
+          },
+          {
+            "kind": "session_open",
+            "number": "D01-Z000009",
+            "deviceCode": "D01",
+            "cashierName": "Ali"
+          }
         ],
         "sessions": [
           {
@@ -220,10 +293,26 @@
           }
         ],
         "exceptions": [
-          { "kind": "negative_stock", "severity": "low", "count": 3 },
-          { "kind": "offline_cap_exceeded", "severity": "medium", "count": 1 },
-          { "kind": "below_floor_no_override", "severity": "high", "count": 2 },
-          { "kind": "handover_amount_mismatch", "severity": "medium", "count": 1 }
+          {
+            "kind": "negative_stock",
+            "severity": "low",
+            "count": 3
+          },
+          {
+            "kind": "offline_cap_exceeded",
+            "severity": "medium",
+            "count": 1
+          },
+          {
+            "kind": "below_floor_no_override",
+            "severity": "high",
+            "count": 2
+          },
+          {
+            "kind": "handover_amount_mismatch",
+            "severity": "medium",
+            "count": 1
+          }
         ],
         "cashInTransit": 463000
       },
@@ -299,10 +388,26 @@
           }
         ],
         "exceptions": [
-          { "kind": "below_floor_no_override", "severity": "high", "count": 2 },
-          { "kind": "handover_amount_mismatch", "severity": "medium", "count": 1 },
-          { "kind": "offline_cap_exceeded", "severity": "medium", "count": 1 },
-          { "kind": "negative_stock", "severity": "low", "count": 3 }
+          {
+            "kind": "below_floor_no_override",
+            "severity": "high",
+            "count": 2
+          },
+          {
+            "kind": "handover_amount_mismatch",
+            "severity": "medium",
+            "count": 1
+          },
+          {
+            "kind": "offline_cap_exceeded",
+            "severity": "medium",
+            "count": 1
+          },
+          {
+            "kind": "negative_stock",
+            "severity": "low",
+            "count": 3
+          }
         ],
         "cashInTransit": 463000,
         "totalVariance": 0
@@ -350,7 +455,12 @@
             "variance": 5000,
             "varianceReason": "unknown",
             "acknowledgedByName": null,
-            "handovers": [{ "kind": "in", "amount": 100000 }],
+            "handovers": [
+              {
+                "kind": "in",
+                "amount": 100000
+              }
+            ],
             "collections": [],
             "movements": []
           },
@@ -367,13 +477,30 @@
             "varianceReason": "change_error",
             "acknowledgedByName": "Imran",
             "handovers": [
-              { "kind": "in", "amount": 929700 },
-              { "kind": "payout", "amount": 45000 }
+              {
+                "kind": "in",
+                "amount": 929700
+              },
+              {
+                "kind": "payout",
+                "amount": 45000
+              }
             ],
-            "collections": [{ "cash": true, "amount": 500000 }],
+            "collections": [
+              {
+                "cash": true,
+                "amount": 500000
+              }
+            ],
             "movements": [
-              { "kind": "expense", "amount": 20000 },
-              { "kind": "to_safe", "amount": 400000 }
+              {
+                "kind": "expense",
+                "amount": 20000
+              },
+              {
+                "kind": "to_safe",
+                "amount": 400000
+              }
             ]
           },
           {
@@ -483,6 +610,77 @@
         "exceptions": [],
         "cashInTransit": 0,
         "totalVariance": -25000
+      }
+    },
+    {
+      "name": "open gaps by device, then family, then where they start",
+      "input": {
+        "gaps": [
+          {
+            "deviceCode": "C04",
+            "family": "S",
+            "fromSeq": 7,
+            "toSeq": 7
+          },
+          {
+            "deviceCode": "C03",
+            "family": "S",
+            "fromSeq": 420,
+            "toSeq": 421
+          },
+          {
+            "deviceCode": "C03",
+            "family": "H",
+            "fromSeq": 5,
+            "toSeq": 5
+          },
+          {
+            "deviceCode": "C03",
+            "family": "S",
+            "fromSeq": 410,
+            "toSeq": 411
+          }
+        ]
+      },
+      "expected": {
+        "businessDate": "2026-11-02",
+        "status": "provisional",
+        "holds": [
+          {
+            "kind": "sequence_gap",
+            "deviceCode": "C03",
+            "family": "H",
+            "fromSeq": 5,
+            "toSeq": 5
+          },
+          {
+            "kind": "sequence_gap",
+            "deviceCode": "C03",
+            "family": "S",
+            "fromSeq": 410,
+            "toSeq": 411
+          },
+          {
+            "kind": "sequence_gap",
+            "deviceCode": "C03",
+            "family": "S",
+            "fromSeq": 420,
+            "toSeq": 421
+          },
+          {
+            "kind": "sequence_gap",
+            "deviceCode": "C04",
+            "family": "S",
+            "fromSeq": 7,
+            "toSeq": 7
+          }
+        ],
+        "sessions": [],
+        "missingHandovers": [],
+        "unmatchedScans": [],
+        "exceptions": [],
+        "cashInTransit": 0,
+        "totalVariance": 0
       }
     }
   ]

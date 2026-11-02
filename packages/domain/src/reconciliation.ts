@@ -116,6 +116,9 @@ export interface DayReconciliation {
 }
 
 const before = (a: string, b: string) => Date.parse(a) < Date.parse(b);
+/** A copy of `rows` in the order of their keys (keys are unique, so no two compare equal). */
+const sortedBy = <T>(rows: readonly T[], key: (row: T) => string): T[] =>
+  [...rows].sort((a, b) => (key(a) < key(b) ? -1 : 1));
 const SEVERITY_ORDER = { high: 0, medium: 1, low: 2 } as const;
 const MOVEMENT_KINDS: readonly CashMovementKind[] = [
   'expense',
@@ -166,9 +169,7 @@ function summarize(s: DaySession): DaySessionSummary {
 
 function missingHandovers(bills: DayInput['pendingBills']): MissingHandoverGroup[] {
   const groups = new Map<string, MissingHandoverGroup>();
-  const sorted = [...bills].sort((a, b) =>
-    `${a.createdAt} ${a.number}` < `${b.createdAt} ${b.number}` ? -1 : 1,
-  );
+  const sorted = sortedBy(bills, (b) => `${b.createdAt} ${b.number}`);
   for (const b of sorted) {
     const g = groups.get(b.sellerId) ?? {
       sellerId: b.sellerId,
@@ -187,31 +188,24 @@ function missingHandovers(bills: DayInput['pendingBills']): MissingHandoverGroup
   // Like the desk's queue: named first, by name, then by id.
   const key = (g: MissingHandoverGroup) =>
     `${g.sellerName === null ? 1 : 0}\n${g.sellerName ?? ''}\n${g.sellerId}`;
-  return [...groups.values()].sort((a, b) => (key(a) < key(b) ? -1 : 1));
+  return sortedBy([...groups.values()], key);
 }
 
 export function reconcileDay(input: DayInput): DayReconciliation {
   const holds: DayHold[] = [];
   if (before(input.now, input.dayEndsAt)) holds.push({ kind: 'day_not_over', dayEndsAt: input.dayEndsAt });
-  for (const d of [...input.devices].sort((a, b) => (a.code < b.code ? -1 : 1))) {
+  for (const d of sortedBy(input.devices, (x) => x.code)) {
     if (d.lastContactAt === null || before(d.lastContactAt, input.dayEndsAt))
       holds.push({ kind: 'device_not_heard', deviceCode: d.code, lastContactAt: d.lastContactAt });
     else if (d.oldestUnsyncedAt !== null && before(d.oldestUnsyncedAt, input.dayEndsAt))
       holds.push({ kind: 'device_unsynced', deviceCode: d.code, oldestUnsyncedAt: d.oldestUnsyncedAt });
   }
-  const gaps = [...input.gaps].sort((a, b) =>
-    a.deviceCode !== b.deviceCode
-      ? a.deviceCode < b.deviceCode
-        ? -1
-        : 1
-      : a.family !== b.family
-        ? a.family < b.family
-          ? -1
-          : 1
-        : a.fromSeq - b.fromSeq,
+  const gaps = sortedBy(
+    input.gaps,
+    (g) => `${g.deviceCode}\n${g.family}\n${String(g.fromSeq).padStart(12, '0')}`,
   );
   for (const g of gaps) holds.push({ kind: 'sequence_gap', ...g });
-  const sessions = [...input.sessions].sort((a, b) => (a.number < b.number ? -1 : 1));
+  const sessions = sortedBy(input.sessions, (x) => x.number);
   for (const s of sessions)
     if (s.status === 'open')
       holds.push({
@@ -227,15 +221,11 @@ export function reconcileDay(input: DayInput): DayReconciliation {
     holds,
     sessions: sessions.map(summarize),
     missingHandovers: input.handoverMode === 'off' ? null : missingHandovers(input.pendingBills),
-    unmatchedScans: [...input.unmatched].sort((a, b) =>
-      `${a.createdAt} ${a.number}` < `${b.createdAt} ${b.number}` ? -1 : 1,
-    ),
-    exceptions: [...input.exceptions].sort((a, b) =>
-      a.severity !== b.severity
-        ? SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
-        : a.kind < b.kind
-          ? -1
-          : 1,
+    unmatchedScans: sortedBy(input.unmatched, (h) => `${h.createdAt} ${h.number}`),
+    exceptions: sortedBy(
+      input.exceptions,
+      (e) => `${SEVERITY_ORDER[e.severity]}
+${e.kind}`,
     ),
     cashInTransit: input.cashInTransit,
     totalVariance: sum(sessions.map((s) => s.variance ?? money(0))),

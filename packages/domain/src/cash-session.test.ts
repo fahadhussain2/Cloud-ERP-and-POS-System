@@ -47,12 +47,8 @@ const SESSION_CONTEXT = { ...CONTEXT, id: '019a6000-0000-7000-8000-000000000081'
 
 runGolden(sessionCases as unknown as GoldenFile<SessionCase>, (i) => {
   if (i.expected !== undefined)
-    return expectedCash({
-      openingFloat: i.expected.openingFloat,
-      handovers: i.expected.handovers ?? [],
-      collections: i.expected.collections ?? [],
-      movements: i.expected.movements ?? [],
-    });
+    // Collections and movements are left out when a case has none: they default to none.
+    return expectedCash({ ...i.expected, handovers: i.expected.handovers ?? [] });
   const e = (i.open ?? i.close)!;
   const count = i.close?.count;
   const ack = count?.acknowledgerId ?? null;

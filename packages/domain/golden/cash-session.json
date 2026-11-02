@@ -612,6 +612,24 @@
         }
       },
       "error": "own_variance"
+    },
+    {
+      "name": "a close without the drawer count is refused",
+      "input": {
+        "close": {
+          "current": {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+            "openingFloat": 500000,
+            "status": "open"
+          },
+          "handovers": [],
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "seq": 7,
+          "createdAt": "2026-11-02T15:30:00.000Z"
+        }
+      },
+      "error": "invalid_count"
     }
   ]
 }
