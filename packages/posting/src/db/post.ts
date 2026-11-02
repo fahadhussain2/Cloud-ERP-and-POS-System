@@ -1,24 +1,52 @@
 import { withTenant } from '@erp/db';
 import type pg from 'pg';
 
+import { postCashMovement, postCollection, postSession } from '../cash';
 import { postHandover } from '../handover';
 import { postSale } from '../sale';
 import type { PostingContext, PostingException, PostingResult } from '../types';
-import { loadContext, loadHandover, loadSale, loadState } from './load';
+import {
+  loadCashMovement,
+  loadCollection,
+  loadContext,
+  loadHandover,
+  loadSale,
+  loadSessionEvent,
+  loadState,
+} from './load';
 import { writePosting } from './write';
 
-// Posting against the database (architecture §5.2 step 4, §7; W1-08; handovers W1-10). The only writer of the ledger
+// Posting against the database (architecture §5.2 step 4, §7; W1-08; handovers W1-10; collections, cash-outs and
+// sessions W1-11). The only writer of the ledger
 // tables (rule 4). `postDocument` runs inside the caller's tenant transaction (`withTenant`), under its own savepoint:
 // a posting that fails is rolled back alone, the document stays accepted (SYN-03) and gets a `posting_failed`
 // exception.
 
-export type SourceType = 'sale' | 'cash_handover';
+export type SourceType = 'sale' | 'cash_handover' | 'payment' | 'cash_movement' | 'cash_session';
 
-/** Where each kind of document lives, and whom an exception on it belongs to. Constants, never input. */
-const SOURCES: Record<SourceType, { table: string; documentType: string; userColumn: string }> = {
+/**
+ * Where each kind of document lives, which row holds it, and whom an exception on it belongs to. Constants, never
+ * input. A session's open posts under the session's id and its close under the close document's id.
+ */
+const SOURCES: Record<
+  SourceType,
+  { table: string; documentType: string; userColumn: string; byClose?: true }
+> = {
   sale: { table: 'sales_documents', documentType: 'sales_document', userColumn: 'salesperson_user_id' },
   cash_handover: { table: 'cash_handovers', documentType: 'cash_handover', userColumn: 'cashier_user_id' },
+  payment: { table: 'payments', documentType: 'payment', userColumn: 'cashier_user_id' },
+  cash_movement: { table: 'cash_movements', documentType: 'cash_movement', userColumn: 'cashier_user_id' },
+  cash_session: {
+    table: 'cash_sessions',
+    documentType: 'cash_session',
+    userColumn: 'cashier_user_id',
+    byClose: true,
+  },
 };
+
+/** The SQL that finds a source's row by the document id in `$n`. */
+const rowOf = (src: (typeof SOURCES)[SourceType], n: number, alias = '') =>
+  src.byClose ? `(${alias}id = $${n} OR ${alias}close_document_id = $${n})` : `${alias}id = $${n}`;
 
 export type PostOutcome =
   | { status: 'posted'; seq: number; journalNumber: string | null; exceptions: PostingException['kind'][] }
@@ -63,13 +91,16 @@ export async function postDocument(
     const r = await c.query(
       `INSERT INTO erp.exceptions (tenant_id, kind, severity, document_type, document_id, device_id, user_id,
          business_date, details)
-       SELECT $1, $2, $3, $6, d.id, d.device_id, d.${src.userColumn}, d.business_date, $5
-       FROM erp.${src.table} d WHERE d.id = $4
+       SELECT $1, $2, $3, $6, $4, d.device_id, d.${src.userColumn}, d.business_date, $5
+       FROM erp.${src.table} d WHERE ${rowOf(src, 4, 'd.')}
        ON CONFLICT (tenant_id, document_id) WHERE kind = 'posting_failed' DO NOTHING`,
       [tenantId, kind, SEVERITY[kind], id, details, src.documentType],
     );
     if (r.rowCount)
-      await c.query(`UPDATE erp.${src.table} SET exception_count = exception_count + 1 WHERE id = $1`, [id]);
+      await c.query(
+        `UPDATE erp.${src.table} SET exception_count = exception_count + 1 WHERE ${rowOf(src, 1)}`,
+        [id],
+      );
   };
 
   // Everything from the lock on is under the savepoint: whatever fails, the sale stays accepted (SYN-03).
@@ -137,12 +168,31 @@ async function compute(
   type: SourceType,
   id: string,
 ): Promise<{ context: PostingContext; result: PostingResult }> {
+  const missing = () => new Error(`no ${type} ${id} to post`);
   if (type === 'cash_handover') {
     // A duplicate loads as null like a missing row: it is never posted (W1-10).
     const handover = await loadHandover(c, id);
-    if (!handover) throw new Error(`no ${type} ${id} to post`);
+    if (!handover) throw missing();
     const context = await loadContext(c, null);
     return { context, result: postHandover(handover, context) };
+  }
+  if (type === 'payment') {
+    const doc = await loadCollection(c, id);
+    if (!doc) throw missing();
+    const context = await loadContext(c, null);
+    return { context, result: postCollection(doc, context) };
+  }
+  if (type === 'cash_movement') {
+    const doc = await loadCashMovement(c, id);
+    if (!doc) throw missing();
+    const context = await loadContext(c, null, doc.targetId);
+    return { context, result: postCashMovement(doc, context) };
+  }
+  if (type === 'cash_session') {
+    const doc = await loadSessionEvent(c, id);
+    if (!doc) throw missing();
+    const context = await loadContext(c, null);
+    return { context, result: postSession(doc, context) };
   }
   const loaded = await loadSale(c, id);
   if (!loaded) throw new Error(`no ${type} ${id} to post`);
@@ -159,7 +209,8 @@ interface Pending {
 }
 
 /**
- * Posts every accepted document of the tenant that has no posting yet (sales, and handovers that aren't duplicates),
+ * Posts every accepted document of the tenant that has no posting yet (sales, handovers that aren't duplicates,
+ * collections, cash movements, session opens and closes),
  * in arrival order: oldest received first, and a device's documents of one push (received together) in their
  * sequence order. It pages through all of them, so documents that never post can't hold back the ones behind them.
  */
@@ -187,6 +238,24 @@ export async function postPending(
                WHERE h.duplicate_of_id IS NULL
                  AND NOT EXISTS (SELECT 1 FROM erp.postings p
                                  WHERE p.source_type = 'cash_handover' AND p.source_id = h.id)
+               UNION ALL
+               SELECT r.id, 'payment', r.received_at, r.device_id, r.seq FROM erp.payments r
+               WHERE NOT EXISTS (SELECT 1 FROM erp.postings p WHERE p.source_type = 'payment' AND p.source_id = r.id)
+               UNION ALL
+               SELECT m.id, 'cash_movement', m.received_at, m.device_id, m.seq FROM erp.cash_movements m
+               WHERE NOT EXISTS (SELECT 1 FROM erp.postings p
+                                 WHERE p.source_type = 'cash_movement' AND p.source_id = m.id)
+               UNION ALL
+               SELECT z.id, 'cash_session', z.created_at, z.device_id, (z.payload->>'seq')::int
+               FROM erp.cash_sessions z
+               WHERE NOT EXISTS (SELECT 1 FROM erp.postings p
+                                 WHERE p.source_type = 'cash_session' AND p.source_id = z.id)
+               UNION ALL
+               SELECT z.close_document_id, 'cash_session', z.closed_at, z.device_id, (z.close_payload->>'seq')::int
+               FROM erp.cash_sessions z
+               WHERE z.close_document_id IS NOT NULL
+                 AND NOT EXISTS (SELECT 1 FROM erp.postings p
+                                 WHERE p.source_type = 'cash_session' AND p.source_id = z.close_document_id)
              ) pending
              WHERE $1::timestamptz IS NULL
                 OR (received_at, device_id, type, seq) > ($1, $2::uuid, $3::text, $4::int)

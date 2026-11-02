@@ -802,6 +802,7 @@ export const cashSessions = erp.table('cash_sessions', {
   leftInDrawer: bigint('left_in_drawer', { mode: 'number' }),
   acknowledgedByUserId: uuid('acknowledged_by_user_id'),
   acknowledgedAt: timestamp('acknowledged_at', { withTimezone: true }),
+  exceptionCount: integer('exception_count').notNull(),
   ...syncColumns,
   ...auditColumns,
 });

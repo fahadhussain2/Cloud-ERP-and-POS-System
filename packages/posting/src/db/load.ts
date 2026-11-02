@@ -1,7 +1,16 @@
-import { money, qty, type Money, type PaymentMethodCode, type Qty } from '@erp/domain';
+import { money, qty, type CashMovementKind, type Money, type PaymentMethodCode, type Qty } from '@erp/domain';
 import type pg from 'pg';
 
-import type { LedgerState, PostingContext, PostingHandover, PostingRole, PostingSale } from '../types';
+import type {
+  LedgerState,
+  PostingCashMovement,
+  PostingCollection,
+  PostingContext,
+  PostingHandover,
+  PostingRole,
+  PostingSale,
+  PostingSessionEvent,
+} from '../types';
 
 // Reading what a posting needs from the database (W1-08). Money comes back as bigint text and quantities as
 // numeric; both are turned into whole minor units and thousandths here (rule 1).
@@ -106,8 +115,121 @@ export async function loadHandover(c: pg.ClientBase, id: string): Promise<Postin
   };
 }
 
-/** The settings as they are now (ACC-01, ACC-08): accounts by role and by method, the lock date, the terms. */
-export async function loadContext(c: pg.ClientBase, customerId: string | null): Promise<PostingContext> {
+/** A stored collection (W1-11), or null when there is none. */
+export async function loadCollection(c: pg.ClientBase, id: string): Promise<PostingCollection | null> {
+  const { rows } = await c.query<{
+    number: string;
+    branch_id: string;
+    business_date: string;
+    party_id: string;
+    method: PaymentMethodCode;
+    amount: string;
+  }>(
+    `SELECT p.number, p.branch_id, p.business_date::text, p.party_id, m.code AS method, p.amount
+     FROM erp.payments p JOIN erp.payment_methods m ON m.id = p.method_id WHERE p.id = $1`,
+    [id],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id,
+    number: r.number,
+    branchId: r.branch_id,
+    businessDate: r.business_date,
+    partyId: r.party_id,
+    method: r.method,
+    amount: toMoney(r.amount),
+  };
+}
+
+/** A stored cash-out or safe movement (W1-11), or null when there is none. */
+export async function loadCashMovement(c: pg.ClientBase, id: string): Promise<PostingCashMovement | null> {
+  const { rows } = await c.query<{
+    number: string;
+    branch_id: string;
+    business_date: string;
+    kind: CashMovementKind;
+    amount: string;
+    party_id: string | null;
+    target_id: string | null;
+  }>(
+    `SELECT number, branch_id, business_date::text, kind, amount, party_id,
+       coalesce(expense_category_id, bank_account_id) AS target_id
+     FROM erp.cash_movements WHERE id = $1`,
+    [id],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id,
+    number: r.number,
+    branchId: r.branch_id,
+    businessDate: r.business_date,
+    kind: r.kind,
+    amount: toMoney(r.amount),
+    partyId: r.party_id,
+    targetId: r.target_id,
+  };
+}
+
+/**
+ * A session's open (by the session's id) or close (by its close document's id), or null when there is none: each
+ * posts once, under its own document's id (W1-11).
+ */
+export async function loadSessionEvent(c: pg.ClientBase, id: string): Promise<PostingSessionEvent | null> {
+  const { rows } = await c.query<{
+    is_open: boolean;
+    number: string;
+    close_number: string | null;
+    branch_id: string;
+    business_date: string;
+    close_business_date: string | null;
+    opening_float: string;
+    float_expected: string | null;
+    variance: string | null;
+    to_safe: string | null;
+  }>(
+    `SELECT id = $1 AS is_open, number, close_number, branch_id, business_date::text,
+       close_payload->>'businessDate' AS close_business_date, opening_float, float_expected, variance,
+       counted_cash - left_in_drawer AS to_safe
+     FROM erp.cash_sessions WHERE id = $1 OR close_document_id = $1`,
+    [id],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  const common = { id, branchId: r.branch_id };
+  if (r.is_open)
+    return {
+      ...common,
+      number: r.number,
+      businessDate: r.business_date,
+      event: 'open',
+      openingFloat: toMoney(r.opening_float),
+      floatExpected: r.float_expected === null ? null : toMoney(r.float_expected),
+      variance: null,
+      toSafe: money(0),
+    };
+  return {
+    ...common,
+    number: r.close_number!,
+    businessDate: r.close_business_date!,
+    event: 'close',
+    openingFloat: null,
+    floatExpected: null,
+    variance: r.variance === null ? null : toMoney(r.variance),
+    toSafe: r.to_safe === null ? money(0) : toMoney(r.to_safe),
+  };
+}
+
+/**
+ * The settings as they are now (ACC-01, ACC-08): accounts by role and by method, the lock date, the terms, and for a
+ * cash-out the account of its category or bank (W1-11).
+ */
+export async function loadContext(
+  c: pg.ClientBase,
+  customerId: string | null,
+  targetId: string | null = null,
+): Promise<PostingContext> {
   const roles = await c.query<{ system_role: PostingRole; id: string }>(
     'SELECT system_role, id FROM erp.accounts WHERE system_role IS NOT NULL ORDER BY system_role',
   );
@@ -124,10 +246,20 @@ export async function loadContext(c: pg.ClientBase, customerId: string | null): 
     );
     customer = { paymentTermsDays: terms.rows[0]?.payment_terms_days ?? null };
   }
+  let targets: Record<string, string> | undefined;
+  if (targetId !== null) {
+    const t = await c.query<{ id: string; account: string }>(
+      `SELECT id, gl_account_id AS account FROM erp.expense_categories WHERE id = $1
+       UNION ALL SELECT id, gl_account_id FROM erp.bank_accounts WHERE id = $1`,
+      [targetId],
+    );
+    targets = Object.fromEntries(t.rows.map((r) => [r.id, r.account]));
+  }
   return {
     accounts: {
       roles: Object.fromEntries(roles.rows.map((r) => [r.system_role, r.id])),
       methods: Object.fromEntries(methods.rows.map((m) => [m.code, m.account])),
+      ...(targets === undefined ? {} : { targets }),
     },
     lockDate: tenant.rows[0]?.lock_date ?? null,
     customer,

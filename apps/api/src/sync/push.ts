@@ -3,7 +3,10 @@ import { createHash } from 'node:crypto';
 import {
   canonicalJson,
   CashHandoverV1,
+  CashMovementV1,
   CashSessionV1,
+  CashSessionV2,
+  CustomerCollectionV1,
   fromBase64Url,
   PushRequestSchema,
   SaleDocumentV1,
@@ -24,10 +27,15 @@ import {
   money,
   onAccountAmount,
   reviewCredit,
+  reviewDeskDocument,
   reviewHandover,
   reviewSale,
+  reviewSession,
+  type CashFinding,
   type CashHandoverDocument,
+  type CashMovementDocument,
   type CashSessionDocument,
+  type CustomerCollectionDocument,
   type CreditAccount,
   type CreditFinding,
   type DeviceKind,
@@ -39,7 +47,7 @@ import {
   type SaleDocument,
   type SaleFinding,
 } from '@erp/domain';
-import { holdPostingOrder, postDocument, type PostOutcome } from '@erp/posting';
+import { holdPostingOrder, postDocument, type PostOutcome, type SourceType } from '@erp/posting';
 import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import type pg from 'pg';
 
@@ -50,6 +58,8 @@ import type pg from 'pg';
 // sale is posted in its own transaction (W1-08, architecture §5.2 step 4); one that can't be posted is still accepted
 // and flagged `posting_failed`. A cash desk also pushes its handovers (H) and its sessions' open and close (Z, W1-10):
 // a handover is linked to its bill by number, now or when the bill arrives, reviewed with reviewHandover and posted.
+// From W1-11 it also pushes collections (R) and cash movements (M), and closes with a count (CashSessionV2): each is
+// reviewed (reviewDeskDocument, reviewSession), stored and posted like a handover.
 
 interface Deps {
   pool: pg.Pool;
@@ -69,6 +79,8 @@ interface Device {
 type Trusted =
   | { family: 'S'; doc: SaleDocument }
   | { family: 'H'; doc: CashHandoverDocument }
+  | { family: 'R'; doc: CustomerCollectionDocument }
+  | { family: 'M'; doc: CashMovementDocument }
   | { family: 'Z'; doc: CashSessionDocument };
 
 /** What every document of one push is checked against, read once per push. */
@@ -98,8 +110,10 @@ const SEVERITY: Partial<Record<ExceptionKind, 'low' | 'medium' | 'high'>> = {
   offline_cap_exceeded: 'medium',
   handover_amount_mismatch: 'medium',
   duplicate_handover: 'medium',
+  float_mismatch: 'medium',
   seq_gap: 'medium',
   handover_not_permitted: 'low',
+  cash_not_permitted: 'low',
   clock_skew: 'low',
 };
 
@@ -261,7 +275,7 @@ async function pushOne(
   let postingMs: number | null = null;
   try {
     const t = await trusted(c, device, s, doc);
-    let post: 'sale' | 'cash_handover' | null = null;
+    let post: SourceType | null = null;
     if (t.family === 'S') {
       result = await accept(c, device, s, t.doc, doc, received);
       post = 'sale';
@@ -270,7 +284,17 @@ async function pushOne(
       result = stored.result;
       // A duplicate is kept for review and never posted (it would count the cash twice).
       if (!stored.duplicate) post = 'cash_handover';
-    } else result = await acceptSession(c, device, t.doc, doc);
+    } else if (t.family === 'R') {
+      result = await acceptCollection(c, device, t.doc, doc, received);
+      post = 'payment';
+    } else if (t.family === 'M') {
+      result = await acceptMovement(c, device, t.doc, doc, received);
+      post = 'cash_movement';
+    } else {
+      result = await acceptSession(c, device, t.doc, doc);
+      // The open posts a float other than what stayed; the close its variance and what went to the safe.
+      post = 'cash_session';
+    }
     if (post !== null) {
       const started = performance.now();
       posting = await postDocument(c, { tenantId: device.tenantId, type: post, id: doc.id, now: received });
@@ -317,8 +341,8 @@ async function trusted(c: pg.ClientBase, device: Device, s: Setting, doc: PushDo
   if (!(await verifyCanonical(s.publicKey, doc.payload, doc.signature))) throw new Rejected('bad_signature');
   if (doc.family === 'H') return { family: 'H', doc: await trustedHandover(c, device, doc) };
   if (doc.family === 'Z') return { family: 'Z', doc: await trustedSession(c, device, doc) };
-  // Collections (R) and cash movements (M) come with W1-11.
-  if (doc.family !== 'S') throw new Rejected('bad_schema');
+  if (doc.family === 'R') return { family: 'R', doc: await trustedCollection(c, device, s, doc) };
+  if (doc.family === 'M') return { family: 'M', doc: await trustedMovement(c, device, doc) };
   const parsed = SaleDocumentV1.safeParse(doc.payload);
   if (!parsed.success) throw new Rejected('bad_schema');
   const d = parsed.data as unknown as SaleDocument;
@@ -389,10 +413,25 @@ async function trustedHandover(c: pg.ClientBase, device: Device, doc: PushDocume
   return h;
 }
 
+/** A W1-10 close (no count) reads as version 1 with the counted fields empty. */
+const V1_FIELDS = {
+  floatExpected: null,
+  countedCash: null,
+  denominations: null,
+  variance: null,
+  varianceReason: null,
+  varianceNote: null,
+  acknowledgedByUserId: null,
+  leftInDrawer: null,
+};
+
 async function trustedSession(c: pg.ClientBase, device: Device, doc: PushDocument) {
-  const parsed = CashSessionV1.safeParse(doc.payload);
-  if (!parsed.success) throw new Rejected('bad_schema');
-  const z = parsed.data as unknown as CashSessionDocument;
+  const v2 = CashSessionV2.safeParse(doc.payload);
+  const v1 = v2.success ? null : CashSessionV1.safeParse(doc.payload);
+  let z: CashSessionDocument;
+  if (v2.success) z = v2.data as unknown as CashSessionDocument;
+  else if (v1?.success) z = { ...(v1.data as unknown as CashSessionDocument), ...V1_FIELDS };
+  else throw new Rejected('bad_schema');
   sameRow(z, doc, device);
   const known = await c.query<{ users: number; session: number }>(
     `SELECT (SELECT count(*)::int FROM erp.users WHERE id = $1) AS users,
@@ -404,6 +443,31 @@ async function trustedSession(c: pg.ClientBase, device: Device, doc: PushDocumen
   if (k.users !== 1 || (z.event === 'close' && k.session !== 1)) throw new Rejected('unknown_reference');
   await seqTaken(c, device, doc);
   return z;
+}
+
+/** A collection (W1-11): the cashier and the method must be this tenant's; the customer is checked by posting. */
+async function trustedCollection(c: pg.ClientBase, device: Device, s: Setting, doc: PushDocument) {
+  const parsed = CustomerCollectionV1.safeParse(doc.payload);
+  if (!parsed.success) throw new Rejected('bad_schema');
+  const r = parsed.data as unknown as CustomerCollectionDocument;
+  sameRow(r, doc, device);
+  const known = await c.query('SELECT 1 FROM erp.users WHERE id = $1', [r.cashierId]);
+  if (known.rowCount !== 1 || !s.methods.some((m) => m.id === r.methodId))
+    throw new Rejected('unknown_reference');
+  await seqTaken(c, device, doc);
+  return r;
+}
+
+/** A cash movement (W1-11): the cashier must be this tenant's; its category, supplier or bank is checked by posting. */
+async function trustedMovement(c: pg.ClientBase, device: Device, doc: PushDocument) {
+  const parsed = CashMovementV1.safeParse(doc.payload);
+  if (!parsed.success) throw new Rejected('bad_schema');
+  const m = parsed.data as unknown as CashMovementDocument;
+  sameRow(m, doc, device);
+  const known = await c.query('SELECT 1 FROM erp.users WHERE id = $1', [m.cashierId]);
+  if (known.rowCount !== 1) throw new Rejected('unknown_reference');
+  await seqTaken(c, device, doc);
+  return m;
 }
 
 async function grantsOf(c: pg.ClientBase, userIds: string[]): Promise<Record<string, RoleGrant[]>> {
@@ -745,7 +809,11 @@ async function addHandoverException(
   });
 }
 
-/** A session's open creates its row; its close sets the close fields (data model §6). Nothing posts (W1-10). */
+/**
+ * A session's open creates its row; its close sets the close fields and the count (data model §6, W1-11). Reviewed
+ * with reviewSession: an acknowledgement the server says isn't allowed is not stored, so the variance waits for a
+ * manager on the day reconciliation (owner answer 1), and the finding says why.
+ */
 async function acceptSession(
   c: pg.ClientBase,
   device: Device,
@@ -753,11 +821,34 @@ async function acceptSession(
   doc: PushDocument,
 ): Promise<PushResult> {
   const signature = Buffer.from(fromBase64Url(doc.signature!));
+  const sessionCashier =
+    z.event === 'open'
+      ? z.userId
+      : ((
+          await c.query<{ cashier_user_id: string }>(
+            'SELECT cashier_user_id FROM erp.cash_sessions WHERE id = $1',
+            [z.sessionId],
+          )
+        ).rows[0]?.cashier_user_id ?? null);
+  const people = [z.userId, ...(z.acknowledgedByUserId === null ? [] : [z.acknowledgedByUserId])];
+  const grants = await grantsOf(c, people);
+  const findings = reviewSession(z, {
+    grantsOf: (id) => grants[id] ?? [],
+    sessionCashierId: sessionCashier,
+    branchId: z.branchId,
+  });
+  const ackRefused = findings.some(
+    (f) =>
+      f.kind === 'cash_not_permitted' &&
+      f.userId === z.acknowledgedByUserId &&
+      f.permission === 'cash.variance.approve',
+  );
+  const acknowledgedBy = ackRefused ? null : z.acknowledgedByUserId;
   if (z.event === 'open')
     await c.query(
       `INSERT INTO erp.cash_sessions (id, tenant_id, branch_id, device_id, number, cashier_user_id, opened_at,
-         business_date, opening_float, payload, signature, client_version)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+         business_date, opening_float, float_expected, payload, signature, client_version, exception_count)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
       [
         z.id,
         device.tenantId,
@@ -768,15 +859,20 @@ async function acceptSession(
         z.createdAt,
         z.businessDate,
         z.openingFloat,
+        z.floatExpected,
         JSON.stringify(doc.payload),
         signature,
         z.clientVersion,
+        findings.length,
       ],
     );
   else
     await c.query(
       `UPDATE erp.cash_sessions SET status = 'closed', closed_at = $2, closed_by_user_id = $3,
-         close_document_id = $4, close_number = $5, expected_cash = $6, close_payload = $7, close_signature = $8
+         close_document_id = $4, close_number = $5, expected_cash = $6, close_payload = $7, close_signature = $8,
+         counted_cash = $9, denominations = $10, variance = $11, variance_reason_code = $12, variance_note = $13,
+         left_in_drawer = $14, acknowledged_by_user_id = $15, acknowledged_at = CASE WHEN $15::uuid IS NULL THEN NULL
+         ELSE $2::timestamptz END, exception_count = exception_count + $16
        WHERE id = $1 AND status = 'open'`,
       [
         z.sessionId,
@@ -787,9 +883,172 @@ async function acceptSession(
         z.expectedCash,
         JSON.stringify(doc.payload),
         signature,
+        z.countedCash,
+        z.denominations === null ? null : JSON.stringify(z.denominations),
+        z.variance,
+        z.varianceReason,
+        z.varianceNote,
+        z.leftInDrawer,
+        acknowledgedBy,
+        findings.length,
       ],
     );
-  return { id: z.id, status: 'accepted', exceptions: [], error: null };
+  for (const f of findings)
+    await addCashException(
+      c,
+      device,
+      {
+        documentType: 'cash_session',
+        id: z.id,
+        number: z.number,
+        userId: z.userId,
+        businessDate: z.businessDate,
+      },
+      f,
+    );
+  return {
+    id: z.id,
+    status: 'accepted',
+    exceptions: [...new Set(findings.map((f) => f.kind))],
+    error: null,
+  };
+}
+
+/** A collection at the desk (CSH-05, W1-11), stored as a payment in; reviewed, never refused (rule 7). */
+async function acceptCollection(
+  c: pg.ClientBase,
+  device: Device,
+  r: CustomerCollectionDocument,
+  doc: PushDocument,
+  received: Date,
+): Promise<PushResult> {
+  const grants = await grantsOf(c, [r.cashierId]);
+  const findings = reviewDeskDocument(r, { grants: grants[r.cashierId] ?? [], branchId: r.branchId });
+  await c.query(
+    `INSERT INTO erp.payments (id, tenant_id, branch_id, device_id, number, seq, direction, party_id, method_id,
+       amount, reference, note, session_id, cashier_user_id, at_device, business_date, received_at, payload,
+       payload_hash, signature, client_version, exception_count)
+     VALUES ($1, $2, $3, $4, $5, $6, 'in', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
+    [
+      r.id,
+      device.tenantId,
+      r.branchId,
+      r.deviceId,
+      r.number,
+      r.seq,
+      r.partyId,
+      r.methodId,
+      r.amount,
+      r.reference,
+      r.note,
+      r.sessionId,
+      r.cashierId,
+      r.createdAt,
+      r.businessDate,
+      received,
+      JSON.stringify(doc.payload),
+      sha256(doc.payload),
+      Buffer.from(fromBase64Url(doc.signature!)),
+      r.clientVersion,
+      findings.length,
+    ],
+  );
+  for (const f of findings)
+    await addCashException(
+      c,
+      device,
+      {
+        documentType: 'payment',
+        id: r.id,
+        number: r.number,
+        userId: r.cashierId,
+        businessDate: r.businessDate,
+      },
+      f,
+    );
+  return { id: r.id, status: 'accepted', exceptions: [...new Set(findings.map((f) => f.kind))], error: null };
+}
+
+/** A cash-out or safe movement at the desk (CSH-06, W1-11); reviewed, never refused (rule 7). */
+async function acceptMovement(
+  c: pg.ClientBase,
+  device: Device,
+  m: CashMovementDocument,
+  doc: PushDocument,
+  received: Date,
+): Promise<PushResult> {
+  const grants = await grantsOf(c, [m.cashierId]);
+  const findings = reviewDeskDocument(m, { grants: grants[m.cashierId] ?? [], branchId: m.branchId });
+  await c.query(
+    `INSERT INTO erp.cash_movements (id, tenant_id, branch_id, device_id, number, seq, kind, amount,
+       expense_category_id, party_id, bank_account_id, note, reference, session_id, cashier_user_id, at_device,
+       business_date, received_at, payload, payload_hash, signature, client_version, exception_count)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
+       $23)`,
+    [
+      m.id,
+      device.tenantId,
+      m.branchId,
+      m.deviceId,
+      m.number,
+      m.seq,
+      m.kind,
+      m.amount,
+      m.expenseCategoryId,
+      m.partyId,
+      m.bankAccountId,
+      m.note,
+      m.reference,
+      m.sessionId,
+      m.cashierId,
+      m.createdAt,
+      m.businessDate,
+      received,
+      JSON.stringify(doc.payload),
+      sha256(doc.payload),
+      Buffer.from(fromBase64Url(doc.signature!)),
+      m.clientVersion,
+      findings.length,
+    ],
+  );
+  for (const f of findings)
+    await addCashException(
+      c,
+      device,
+      {
+        documentType: 'cash_movement',
+        id: m.id,
+        number: m.number,
+        userId: m.cashierId,
+        businessDate: m.businessDate,
+      },
+      f,
+    );
+  return { id: m.id, status: 'accepted', exceptions: [...new Set(findings.map((f) => f.kind))], error: null };
+}
+
+/** One exception on a collection, cash movement or session document, with its figures (sync spec §6.2). */
+async function addCashException(
+  c: pg.ClientBase,
+  device: Pick<Device, 'tenantId' | 'deviceId'>,
+  d: {
+    documentType: 'payment' | 'cash_movement' | 'cash_session';
+    id: string;
+    number: string;
+    userId: string;
+    businessDate: string;
+  },
+  f: CashFinding,
+) {
+  const { kind, ...details } = f;
+  await addException(c, device, {
+    kind,
+    documentType: d.documentType,
+    documentId: d.id,
+    userId: d.userId,
+    businessDate: d.businessDate,
+    details: { ...details, number: d.number },
+  });
 }
 
 /**
@@ -853,7 +1112,7 @@ async function addException(
   e: {
     kind: ExceptionKind;
     /** Defaults to a sale. */
-    documentType?: 'sales_document' | 'cash_handover';
+    documentType?: 'sales_document' | 'cash_handover' | 'payment' | 'cash_movement' | 'cash_session';
     documentId: string | null;
     userId: string | null;
     businessDate: string;

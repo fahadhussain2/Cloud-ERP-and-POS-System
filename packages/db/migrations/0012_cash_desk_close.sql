@@ -122,6 +122,8 @@ ALTER TABLE erp.cash_sessions
   ADD COLUMN left_in_drawer bigint CHECK (left_in_drawer >= 0),
   ADD COLUMN acknowledged_by_user_id uuid,
   ADD COLUMN acknowledged_at timestamptz,
+  -- Exceptions on the open or the close (a posting that failed, a float mismatch, a close by someone not permitted).
+  ADD COLUMN exception_count integer NOT NULL DEFAULT 0 CHECK (exception_count >= 0),
   ADD FOREIGN KEY (tenant_id, acknowledged_by_user_id) REFERENCES erp.users (tenant_id, id),
   ADD CHECK (variance IS NULL OR variance = counted_cash - expected_cash),
   ADD CHECK ((acknowledged_by_user_id IS NULL) = (acknowledged_at IS NULL));
