@@ -86,6 +86,7 @@ export function CashDeskScreen({
   const [message, setMessage] = useState<Message | null>(null);
   const [busy, setBusy] = useState(false);
   const scan = useRef<HTMLInputElement>(null);
+  const queuePanel = useRef<HTMLElement>(null);
 
   const unit = money(10 ** fmt.minorUnits);
   const rs = (m: number) => formatMoney(m, fmt);
@@ -109,6 +110,14 @@ export function CashDeskScreen({
   const current = bills[Math.min(selected, bills.length - 1)] ?? null;
   const session = desk?.session ?? null;
   const open = session?.status === 'open' ? session : null;
+
+  // The selected bill stays in view as ↑ ↓ or a scan move it (the queue scrolls inside its panel, like the search list).
+  const currentId = current?.id ?? null;
+  useEffect(() => {
+    queuePanel.current
+      ?.querySelector<HTMLElement>('tr[aria-selected="true"]')
+      ?.scrollIntoView?.({ block: 'nearest' });
+  }, [currentId]);
 
   // The scan field keeps the focus whenever no dialog is open (a keyboard-wedge scanner types into it).
   useEffect(() => {
@@ -329,7 +338,12 @@ export function CashDeskScreen({
         )}
       </div>
 
-      <Panel title={t('desk.queue')} aria-label={t('desk.queue')} className="min-h-0 flex-1 overflow-y-auto">
+      <Panel
+        ref={queuePanel}
+        title={t('desk.queue')}
+        aria-label={t('desk.queue')}
+        className="min-h-0 flex-1 overflow-y-auto"
+      >
         {groups.length === 0 ? (
           <p className="m-0 px-3.5 pb-3 text-muted-foreground">{t('desk.empty')}</p>
         ) : (

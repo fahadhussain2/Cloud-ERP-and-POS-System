@@ -287,6 +287,8 @@ test('a cash sale on the desk itself is handed over by itself; then the session 
 
   await till.keyboard.press('Alt+Q');
   await expect(queue()).toBeVisible();
+  // The desk reads its session again when the screen comes back: wait for the bar, as the cashier sees it.
+  await expect(till.getByText(pos.desk.expected)).toBeVisible();
   await till.keyboard.press('Alt+X');
   await till.getByRole('dialog').getByRole('button', { name: pos.desk.close.action }).click();
   await expect(deskNotice()).toHaveText(/Session D01-Z000002 closed/);

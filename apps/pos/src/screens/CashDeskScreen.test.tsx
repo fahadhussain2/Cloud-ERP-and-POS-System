@@ -293,17 +293,22 @@ describe('the cash desk screen', () => {
       bill(`C03-S0005${String(i).padStart(2, '0')}`, 'imran', 10000 + i * 100),
     );
     const scrolled: string[] = [];
-    const original = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (this: Element) {
-      scrolled.push(this.textContent ?? '');
-    };
+    // jsdom has no scrollIntoView: record which row asks for it.
+    const saved = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: function (this: Element) {
+        scrolled.push(this.textContent ?? '');
+      },
+    });
     try {
       show(fakeDesk({ queue }).counter);
       await screen.findByText('C03-S000529');
       for (let i = 0; i < 29; i++) press('ArrowDown');
       await waitFor(() => expect(scrolled.at(-1)).toContain('C03-S000529'));
     } finally {
-      Element.prototype.scrollIntoView = original;
+      if (saved) Object.defineProperty(Element.prototype, 'scrollIntoView', saved);
+      else delete (Element.prototype as Partial<Element>).scrollIntoView;
     }
   });
 
