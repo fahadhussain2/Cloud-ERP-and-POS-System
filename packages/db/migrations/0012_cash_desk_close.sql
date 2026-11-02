@@ -9,9 +9,25 @@ ALTER TABLE erp.accounts ADD CONSTRAINT accounts_system_role_check CHECK (system
   'SALES_DISCOUNT', 'ROUNDING', 'CASH_SHORT_OVER', 'INVENTORY_ADJUSTMENT', 'PURCHASE_PRICE_VARIANCE',
   'OPENING_BALANCE_EQUITY', 'RETAINED_EARNINGS', 'TAX_PAYABLE', 'TAX_RECOVERABLE', 'SUSPENSE', 'CASH_SAFE'));
 -- BEGIN cash-safe-role
-UPDATE erp.accounts a SET system_role = 'CASH_SAFE'
-WHERE a.code = '1130' AND a.is_postable AND a.system_role IS NULL
-  AND NOT EXISTS (SELECT 1 FROM erp.accounts b WHERE b.tenant_id = a.tenant_id AND b.system_role = 'CASH_SAFE');
+-- The migration role is under the forced RLS too, and the change is audited per tenant: so each tenant in its own
+-- context. RLS is lifted only to read which tenants have accounts.
+ALTER TABLE erp.accounts NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE erp.accounts DISABLE ROW LEVEL SECURITY;
+CREATE TEMPORARY TABLE cash_safe_tenants ON COMMIT DROP AS SELECT DISTINCT tenant_id FROM erp.accounts;
+ALTER TABLE erp.accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE erp.accounts FORCE ROW LEVEL SECURITY;
+DO $$
+DECLARE
+  t uuid;
+BEGIN
+  FOR t IN SELECT tenant_id FROM cash_safe_tenants LOOP
+    PERFORM set_config('app.tenant_id', t::text, true);
+    UPDATE erp.accounts a SET system_role = 'CASH_SAFE'
+    WHERE a.code = '1130' AND a.is_postable AND a.system_role IS NULL
+      AND NOT EXISTS (SELECT 1 FROM erp.accounts b WHERE b.tenant_id = a.tenant_id AND b.system_role = 'CASH_SAFE');
+  END LOOP;
+  PERFORM set_config('app.tenant_id', '', true);
+END $$;
 -- END cash-safe-role
 
 -- A customer collection at the desk (family R, CSH-05). The back office's bank receipts and payments join it later
