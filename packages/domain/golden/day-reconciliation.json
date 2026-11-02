@@ -1,5 +1,5 @@
 {
-  "description": "The business-day reconciliation (CSH-08, RPT-02, PRD W10.2, W1-11): one branch and business date, from what the server holds. Unless a case says otherwise (reconciliation.test.ts): business date 2026-11-02, the day ends at 2026-11-02T23:00Z (04:00 Karachi the next morning, D-056), now is 2026-11-03T05:00Z, handover confirmation Required, and no devices, gaps, sessions, pending bills, unmatched scans or exceptions, cash in transit 0. Final = the day is over, every active device was heard from after it ended with nothing older unsynced, no open sequence gap, no session still open. The expected cash is recomputed from the session's documents on the server; the desk's figure is shown beside it. Missing handovers (Required only) are grouped by salesman like the desk's queue.",
+  "description": "The business-day reconciliation (CSH-08, RPT-02, PRD W10.2, W1-11): one branch and business date, from what the server holds. Unless a case says otherwise (reconciliation.test.ts): business date 2026-11-02, the day ends at 2026-11-02T23:00Z (04:00 Karachi the next morning, D-056), now is 2026-11-03T05:00Z, handover confirmation Required, and no devices, gaps, sessions, pending bills, unmatched scans or exceptions, cash in transit 0. Final = the day is over (until then the devices aren't held against it: they may still sell), every active device was heard from after it ended with nothing older unsynced, no open sequence gap, no session still open. The expected cash is recomputed from the session's documents on the server; the desk's figure is shown beside it. Missing handovers (Required only) are grouped by salesman like the desk's queue.",
   "cases": [
     {
       "name": "a final day with one exact session",
@@ -113,6 +113,55 @@
           {
             "kind": "day_not_over",
             "dayEndsAt": "2026-11-02T23:00:00.000Z"
+          }
+        ],
+        "sessions": [],
+        "missingHandovers": [],
+        "unmatchedScans": [],
+        "exceptions": [],
+        "cashInTransit": 0,
+        "totalVariance": 0
+      }
+    },
+    {
+      "name": "while the day isn't over, only that and open sessions hold it: the devices haven't missed anything yet",
+      "input": {
+        "now": "2026-11-02T15:30:00.000Z",
+        "devices": [
+          {
+            "code": "C01",
+            "lastContactAt": "2026-11-02T15:29:00.000Z",
+            "oldestUnsyncedAt": null
+          },
+          {
+            "code": "D01",
+            "lastContactAt": "2026-11-02T15:29:30.000Z",
+            "oldestUnsyncedAt": "2026-11-02T15:29:20.000Z"
+          }
+        ],
+        "gaps": [
+          {
+            "deviceCode": "C01",
+            "family": "S",
+            "fromSeq": 4,
+            "toSeq": 4
+          }
+        ]
+      },
+      "expected": {
+        "businessDate": "2026-11-02",
+        "status": "provisional",
+        "holds": [
+          {
+            "kind": "day_not_over",
+            "dayEndsAt": "2026-11-02T23:00:00.000Z"
+          },
+          {
+            "kind": "sequence_gap",
+            "deviceCode": "C01",
+            "family": "S",
+            "fromSeq": 4,
+            "toSeq": 4
           }
         ],
         "sessions": [],
