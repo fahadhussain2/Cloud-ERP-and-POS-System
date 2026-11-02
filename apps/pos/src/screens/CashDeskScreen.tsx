@@ -111,7 +111,7 @@ export function CashDeskScreen({
   const session = desk?.session ?? null;
   const open = session?.status === 'open' ? session : null;
 
-  // The selected bill stays in view as ↑ ↓ or a scan move it (the queue scrolls inside its panel, like the search list).
+  // The selected bill stays in view as ↑ ↓ or a scan move it (the rows scroll inside the panel, like the search list).
   const currentId = current?.id ?? null;
   useEffect(() => {
     queuePanel.current
@@ -342,77 +342,80 @@ export function CashDeskScreen({
         ref={queuePanel}
         title={t('desk.queue')}
         aria-label={t('desk.queue')}
-        className="min-h-0 flex-1 overflow-y-auto"
+        className="flex min-h-0 flex-1 flex-col"
       >
-        {groups.length === 0 ? (
-          <p className="m-0 px-3.5 pb-3 text-muted-foreground">{t('desk.empty')}</p>
-        ) : (
-          <table className="w-full border-collapse text-[15px]">
-            <thead>
-              <tr className="text-start text-sm text-muted-foreground">
-                <th className="px-3.5 py-1 text-start font-medium">{t('desk.col.counter')}</th>
-                <th className="px-2 py-1 text-start font-medium">{t('desk.col.bill')}</th>
-                <th className="px-2 py-1 text-start font-medium">{t('desk.col.time')}</th>
-                <th className="px-2 py-1 text-end font-medium">{t('desk.col.due')}</th>
-                <th className="px-2 py-1 text-end font-medium">{t('desk.col.received')}</th>
-                <th className="px-3.5 py-1 text-end font-medium">{t('desk.col.change')}</th>
-              </tr>
-            </thead>
-            {groups.map((g) => (
-              <tbody key={g.sellerId} aria-label={g.sellerName ?? t('desk.unknownSeller')}>
-                <tr className="bg-surface-2">
-                  <th colSpan={6} className="px-3.5 py-1.5 text-start">
-                    <span className="font-semibold">{g.sellerName ?? t('desk.unknownSeller')}</span>
-                    {g.toCollect > 0 && (
-                      <Badge variant="secondary" className="ms-3">
-                        {t('desk.toCollect', { amount: rs(g.toCollect) })}
-                      </Badge>
-                    )}
-                    {g.toPayOut > 0 && (
-                      <Badge variant="secondary" className="ms-2 text-warn">
-                        {t('desk.toPayOut', { amount: rs(g.toPayOut) })}
-                      </Badge>
-                    )}
-                  </th>
+        {/* Only the rows scroll: the panel heading sits above this box and the column headings stick to its top. */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {groups.length === 0 ? (
+            <p className="m-0 px-3.5 pb-3 text-muted-foreground">{t('desk.empty')}</p>
+          ) : (
+            <table className="w-full border-collapse text-[15px]">
+              <thead className="sticky top-0 z-10 bg-surface">
+                <tr className="text-start text-sm text-muted-foreground">
+                  <th className="px-3.5 py-1 text-start font-medium">{t('desk.col.counter')}</th>
+                  <th className="px-2 py-1 text-start font-medium">{t('desk.col.bill')}</th>
+                  <th className="px-2 py-1 text-start font-medium">{t('desk.col.time')}</th>
+                  <th className="px-2 py-1 text-end font-medium">{t('desk.col.due')}</th>
+                  <th className="px-2 py-1 text-end font-medium">{t('desk.col.received')}</th>
+                  <th className="px-3.5 py-1 text-end font-medium">{t('desk.col.change')}</th>
                 </tr>
-                {g.bills.map((b) => {
-                  const isSelected = b === current;
-                  return (
-                    <tr
-                      key={b.id}
-                      aria-selected={isSelected}
-                      onClick={() => {
-                        setSelected(bills.indexOf(b));
-                        setScanned(null);
-                        scan.current?.focus();
-                      }}
-                      className={isSelected ? 'bg-select' : 'cursor-pointer'}
-                    >
-                      <td className="px-3.5 py-1.5 font-mono">{b.number.split('-')[0]}</td>
-                      <td className="px-2 py-1.5 font-mono">{b.number}</td>
-                      <td className="px-2 py-1.5">{time(b.createdAt)}</td>
-                      <td
-                        className={`px-2 py-1.5 text-end text-lg font-semibold ${b.kind === 'in' ? 'text-ok' : 'text-warn'}`}
+              </thead>
+              {groups.map((g) => (
+                <tbody key={g.sellerId} aria-label={g.sellerName ?? t('desk.unknownSeller')}>
+                  <tr className="bg-surface-2">
+                    <th colSpan={6} className="px-3.5 py-1.5 text-start">
+                      <span className="font-semibold">{g.sellerName ?? t('desk.unknownSeller')}</span>
+                      {g.toCollect > 0 && (
+                        <Badge variant="secondary" className="ms-3">
+                          {t('desk.toCollect', { amount: rs(g.toCollect) })}
+                        </Badge>
+                      )}
+                      {g.toPayOut > 0 && (
+                        <Badge variant="secondary" className="ms-2 text-warn">
+                          {t('desk.toPayOut', { amount: rs(g.toPayOut) })}
+                        </Badge>
+                      )}
+                    </th>
+                  </tr>
+                  {g.bills.map((b) => {
+                    const isSelected = b === current;
+                    return (
+                      <tr
+                        key={b.id}
+                        aria-selected={isSelected}
+                        onClick={() => {
+                          setSelected(bills.indexOf(b));
+                          setScanned(null);
+                          scan.current?.focus();
+                        }}
+                        className={isSelected ? 'bg-select' : 'cursor-pointer'}
                       >
-                        {b.kind === 'in' ? rs(b.amount) : t('desk.payout', { amount: rs(b.amount) })}
-                      </td>
-                      <td className="px-2 py-1.5 text-end">
-                        {b.kind === 'in'
-                          ? b.cashReceived === null
-                            ? t('desk.exact')
-                            : rs(b.cashReceived)
-                          : '—'}
-                      </td>
-                      <td className="px-3.5 py-1.5 text-end">
-                        {b.kind === 'in' && b.changeDue !== null ? rs(b.changeDue) : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            ))}
-          </table>
-        )}
+                        <td className="px-3.5 py-1.5 font-mono">{b.number.split('-')[0]}</td>
+                        <td className="px-2 py-1.5 font-mono">{b.number}</td>
+                        <td className="px-2 py-1.5">{time(b.createdAt)}</td>
+                        <td
+                          className={`px-2 py-1.5 text-end text-lg font-semibold ${b.kind === 'in' ? 'text-ok' : 'text-warn'}`}
+                        >
+                          {b.kind === 'in' ? rs(b.amount) : t('desk.payout', { amount: rs(b.amount) })}
+                        </td>
+                        <td className="px-2 py-1.5 text-end">
+                          {b.kind === 'in'
+                            ? b.cashReceived === null
+                              ? t('desk.exact')
+                              : rs(b.cashReceived)
+                            : '—'}
+                        </td>
+                        <td className="px-3.5 py-1.5 text-end">
+                          {b.kind === 'in' && b.changeDue !== null ? rs(b.changeDue) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              ))}
+            </table>
+          )}
+        </div>
       </Panel>
 
       <KeyBar title={t('keys.desk')} hints={hints} />
