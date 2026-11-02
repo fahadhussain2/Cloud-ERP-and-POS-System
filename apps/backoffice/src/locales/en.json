@@ -210,7 +210,8 @@
       "unmatched": "Scans whose bill never arrived",
       "unmatchedRow": "{{number}} for {{bill}} · {{amount}}",
       "exceptions": "Exceptions of the day",
-      "noExceptions": "No open exceptions."
+      "noExceptions": "No open exceptions.",
+      "fromSafe": "{{amount}} in from the safe"
     },
     "hold": {
       "day_not_over": "The day isn’t over yet: it ends at {{time}}.",

@@ -21,7 +21,7 @@ import {
   TableRow,
   type ChipTone,
 } from '@erp/ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
@@ -83,6 +83,7 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
   const [date, setDate] = useState(() => dayOf(-1));
   const [report, setReport] = useState<DayReconciliationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const branchField = useId();
   const mayAcknowledge = permissions.includes('cash.variance.approve') || permissions.includes('*');
 
   useEffect(() => {
@@ -135,9 +136,12 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
     <>
       <PageHeader title={t('reports.day.title')} help={t('reports.day.help')} />
       <Panel className="flex flex-wrap items-end gap-4 p-3.5">
-        <label className="flex flex-col gap-1">
-          <span className={LABEL_CLASS}>{t('reports.branch')}</span>
+        <div className="flex flex-col gap-1">
+          <label htmlFor={branchField} className={LABEL_CLASS}>
+            {t('reports.branch')}
+          </label>
           <select
+            id={branchField}
             className="h-9 rounded-md border border-input bg-surface px-2"
             value={branchId}
             onChange={(e) => setBranchId(e.target.value)}
@@ -148,7 +152,7 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
               </option>
             ))}
           </select>
-        </label>
+        </div>
         <DateField label={t('reports.day.date')} value={date} onChange={setDate} />
         {report && (
           <Button asChild variant="outline">
@@ -220,13 +224,13 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
                 </TableHeader>
                 <TableBody>
                   {report.sessions.map((s) => {
+                    // Every rupee out; what came in from the safe is shown beside it, never netted off.
                     const out =
                       s.paidOut +
                       s.cashOuts.expense +
                       s.cashOuts.supplier_payment +
                       s.cashOuts.bank_deposit +
-                      s.cashOuts.to_safe -
-                      s.cashOuts.from_safe;
+                      s.cashOuts.to_safe;
                     return (
                       <TableRow key={s.id}>
                         <TableCell className="font-mono">{s.number}</TableCell>
@@ -238,7 +242,14 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
                         <TableCell className="text-end tabular-nums">
                           {m(s.cashCollections, report.money)}
                         </TableCell>
-                        <TableCell className="text-end tabular-nums">{m(out, report.money)}</TableCell>
+                        <TableCell className="text-end tabular-nums">
+                          {m(out, report.money)}
+                          {s.cashOuts.from_safe > 0 && (
+                            <span className="block text-xs text-muted-foreground">
+                              {t('reports.day.fromSafe', { amount: m(s.cashOuts.from_safe, report.money) })}
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-end tabular-nums">
                           {m(s.expected, report.money)}
                           {s.expectedDiffers && (

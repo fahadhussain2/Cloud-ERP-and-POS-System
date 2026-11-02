@@ -22,7 +22,7 @@ import {
   TextField,
   type MoneyFormat,
 } from '@erp/ui';
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { CounterCustomer } from '../db/customers';
@@ -293,6 +293,7 @@ export function CashOutDialog({
   const [note, setNote] = useState('');
   const [reference, setReference] = useState('');
   const [confirmOver, setConfirmOver] = useState(false);
+  const targetId = useId();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -367,9 +368,13 @@ export function CashOutDialog({
         ))}
       </fieldset>
       {kind === 'expense' || kind === 'supplier_payment' || kind === 'bank_deposit' ? (
-        <label className="flex flex-col gap-1">
-          <span className={LABEL_CLASS}>{t(`desk.cashOut.target.${kind}`)}</span>
+        // A label beside the select, not around it: Chrome would name the select after its options too.
+        <div className="flex flex-col gap-1">
+          <label htmlFor={targetId} className={LABEL_CLASS}>
+            {t(`desk.cashOut.target.${kind}`)}
+          </label>
           <select
+            id={targetId}
             className="h-9 rounded-md border border-input bg-surface px-2"
             value={target}
             onChange={(e) => {
@@ -384,7 +389,7 @@ export function CashOutDialog({
               </option>
             ))}
           </select>
-        </label>
+        </div>
       ) : null}
       <TextField
         label={t('desk.cashOut.amount')}

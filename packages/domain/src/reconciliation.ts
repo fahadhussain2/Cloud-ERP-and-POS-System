@@ -193,8 +193,10 @@ function missingHandovers(bills: DayInput['pendingBills']): MissingHandoverGroup
 
 export function reconcileDay(input: DayInput): DayReconciliation {
   const holds: DayHold[] = [];
-  if (before(input.now, input.dayEndsAt)) holds.push({ kind: 'day_not_over', dayEndsAt: input.dayEndsAt });
-  for (const d of sortedBy(input.devices, (x) => x.code)) {
+  const over = !before(input.now, input.dayEndsAt);
+  if (!over) holds.push({ kind: 'day_not_over', dayEndsAt: input.dayEndsAt });
+  // Until the day is over the devices may still sell into it: they hold it only once it has ended.
+  for (const d of over ? sortedBy(input.devices, (x) => x.code) : []) {
     if (d.lastContactAt === null || before(d.lastContactAt, input.dayEndsAt))
       holds.push({ kind: 'device_not_heard', deviceCode: d.code, lastContactAt: d.lastContactAt });
     else if (d.oldestUnsyncedAt !== null && before(d.oldestUnsyncedAt, input.dayEndsAt))
