@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#56](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/56) |
 | **Module** | cash-desk (rules in `packages/domain`, the postings in `packages/posting`, push and the four desk datasets in `apps/api`, the desk dialogs and prints in `apps/pos`, the two reports in `apps/backoffice`) |
-| **Status** | Accepted (2026-11-02) with the owner answers below |
+| **Status** | Built (2026-11-02) on `w1-11-cash-desk-close`, in review; Verify 2 and 3 to do |
 | **Refs** | CSH-05, CSH-06, CSH-07, CSH-08, RPT-02, PUR-09 (desk payments), ACC-01 (`CASH_SAFE`), SYN-02; PRD §3 (variance traceable 100%, missing handovers every day), §4 (Cashier can't approve their own variance), W8, W9, W10, W15; architecture §4.4 (`R`, `M`, `Z`), print table; data model §3, §6, §9, §10, §12; posting rules §4.5, §2 (1130, 6500); accounting spec; sync spec §3, §6.2; cash desk spec; CLAUDE.md rules 1–10; D-011, D-024, D-025, D-049, D-056, D-057, D-059, D-090, D-095, D-096, D-097 |
 | **Depends on** | W1-10 (session, the desk's documents and outbox), W1-08 (posting, party ledgers) |
 | **Size** | about 5 days (the task list says 3; owner answer 5 keeps it one task) |
@@ -61,6 +61,19 @@
 - [ ] **Local schema 9 (worker):** a schema-8 desk with open bills, outbox and quarantined rows upgrades in place; a collection, a cash-out and a close each write the document and its outbox row together or not at all.
 - [ ] **Dialogs (jsdom, fake desk):** collection search, balance, reference, receipt print call; cash-out kinds and the over-drawer warning; the close grid with the expected cash hidden until the count, variance, reason, PIN or later, what stays in the drawer; the open's float filled in.
 - [ ] **E2E:** the flows in scope item 8.
+
+## Build notes
+
+- **The tests came first** (commit `4a8a4eb`): the domain goldens (`collection`, `cash-movement`, `drawer`, `cash-review`, `cash-session` V2, `day-reconciliation`) and the posting goldens (`post-cash.json`); push, datasets, reports, the desk worker and the screens were tested with their code, as in W1-10.
+- **What goes to the safe at close is on the close itself**, not a separate *to safe* cash-out written in the same transaction: the close carries `leftInDrawer` and posts counted − left to `CASH_SAFE`. One document, and a session's expected cash stays what its own documents say (a closing *to safe* would have been counted in it).
+- **The session bar hides the expected cash while the count dialog is open** (owner answer 2): the figure was otherwise in view behind the dialog. The over-the-drawer warning on a cash-out still says it.
+- **Every session document posts** (source `cash_session`; the open under the session's id, the close under its close document's id), most with no lines: one order of record for every document, like a handover. A W1-10 close (`CashSessionV1`) is still taken, *not counted*, and posts nothing.
+- **The acknowledgement:** the desk checks the manager's PIN offline (`checkVarianceApprover`: `cash.variance.approve`, not the session's cashier); the server judges it again and stores it only when it agrees (`cash_not_permitted`, `ownVariance`), so a wrong one leaves the variance *waiting*. The back office's later one is `POST /api/reports/cash-sessions/:id/acknowledge`, audited `cash.variance.acknowledged`.
+- **`float_mismatch` compares the open's float with its own `floatExpected`** (what the desk says stayed); the server doesn't re-derive it from its last close of that desk.
+- **The collection balance on the desk** = the pulled balance + this desk's unsynced bills on account − its unsynced collections (`deskCustomer`); the receipt prints the balance after *as of the last sync*.
+- **Not printed:** amounts in words (no number-to-words yet), and a voucher for *to/from the safe* (only the three cash-outs).
+- **The reports carry the tenant's money format** (`money`: locale, currency, minor units): the back office has no other way to know it.
+- **`postPending`** now reads all five sources; a session's close is ordered by its `closed_at` and its payload's seq.
 
 ## Verify
 

@@ -192,7 +192,7 @@ Held bills are **device-local only** and never sent to the server.
 ## 6. Cash management
 
 **cash_sessions:** `branch_id, device_id, number, cashier_user_id, opened_at, opening_float, closed_at, expected_cash†, counted_cash, variance, denominations jsonb ({"5000":3,"1000":12,…}), variance_reason_code, acknowledged_by_user_id, status (open|closed)`
-- **Built in W1-10 (migration 0011):** `id` (the open document's id), `branch_id, device_id, number, cashier_user_id, opened_at, business_date, opening_float, closed_at, closed_by_user_id, close_document_id, close_number, expected_cash` (the desk's figure at close), `status`, and the open and close documents as signed (`payload, signature, close_payload, close_signature`, `client_version`). The count, variance and acknowledgement columns come with W1-11.
+- **Built in W1-10 (migration 0011):** `id` (the open document's id), `branch_id, device_id, number, cashier_user_id, opened_at, business_date, opening_float, closed_at, closed_by_user_id, close_document_id, close_number, expected_cash` (the desk's figure at close), `status`, and the open and close documents as signed (`payload, signature, close_payload, close_signature`, `client_version`). **Built in W1-11 (migration 0012):** `float_expected` (what stayed at the desk's last close, from the open), `counted_cash, denominations, variance, variance_reason_code, variance_note, left_in_drawer` (from the close, `CashSessionV2`), `acknowledged_by_user_id, acknowledged_at` (from the close, or set later from the back office, audited), `exception_count`. `variance = counted_cash − expected_cash`.
 
 **cash_handovers:** `session_id, sales_document_id, bill_number, kind (in|payout), amount (cash due or refund; the posted figure), received_amount (cash actually handed over, as confirmed by the cashier), change_given, corrected_from (the salesman's cash received, if the cashier changed it), method (queue|scan|auto), cashier_user_id, device_id, at_device`
 - This is a POS document created by the cash desk (own outbox and series). The sale document itself is never modified.
@@ -202,8 +202,10 @@ Held bills are **device-local only** and never sent to the server.
 - A sale created on the cash desk device itself gets an automatic `in` handover (`method = auto`). With `cash_handover_mode = off`, the server creates an automatic handover for **every** cash bill and refund on acceptance.
 
 **payments** (party money movements): `number, direction (in = customer collection | out = supplier payment), party_id, method_id, amount, reference, business_date, session_id (if at the cash desk), bank_account_id (if via bank), device_id, created_by_user_id`
+- **Built in W1-11 (migration 0012)** for the desk's collections (family `R`): `id` (the desk's UUIDv7), `branch_id, device_id, number, seq, direction ('in'), party_id, method_id, amount, reference, note, session_id, cashier_user_id, at_device, business_date, received_at`, the signed `payload, payload_hash, signature`, `client_version, exception_count`. Never changed once stored. No foreign key on the party (a collection is stored and fails to post until the customer exists, D-095). **A desk's supplier payment is a cash movement**, not a payment (D-098); the back office's bank receipts and payments join this table later (W1-16, W1-19).
 
 **cash_movements** (non-party cash): `session_id, device_id, number, kind (expense|bank_deposit|float_in|float_out|other), amount, expense_category_id, bank_account_id, note, reference, user_id`
+- **Built in W1-11 (migration 0012)** for the desk's family `M`: `kind (expense | supplier_payment | bank_deposit | to_safe | from_safe)` with exactly the one of `expense_category_id`, `party_id` (the supplier) and `bank_account_id` its kind needs (none for the safe), and the same identity, signed payload and audit columns as `payments`. Never changed once stored.
 
 **expense_categories:** `code, name, gl_account_id (a postable expense account), is_active`
 
@@ -211,6 +213,7 @@ Held bills are **device-local only** and never sent to the server.
 - Delux: Soneri (1150), HBL (1160), JazzCash (1170), Easypaisa (1171), card settlement clearing (1180).
 
 **day_reconciliations**†: `branch_id, business_date, status (provisional|final), summary jsonb (missing handovers, variances, exceptions), computed_at`
+- **Not stored (W1-11, D-098):** the day reconciliation is computed on request from the documents (`reconcileDay`), so it never goes stale when a counter syncs late.
 
 ---
 
@@ -255,7 +258,7 @@ Held bills are **device-local only** and never sent to the server.
 
 **accounts:** `code, name, type (asset|liability|equity|income|expense), parent_id, is_postable, system_role (nullable, unique per tenant), is_active, legacy_code`
 
-System roles: `CASH_DRAWER, CASH_IN_TRANSIT, AR_CONTROL, AP_CONTROL, INVENTORY, COGS, SALES, SALES_RETURNS, SALES_DISCOUNT, ROUNDING, CASH_SHORT_OVER, INVENTORY_ADJUSTMENT, PURCHASE_PRICE_VARIANCE, OPENING_BALANCE_EQUITY, RETAINED_EARNINGS, TAX_PAYABLE, TAX_RECOVERABLE` (the tax roles are unused in the MVP). Bank, wallet and card accounts are mapped through `bank_accounts` and `payment_methods`.
+System roles: `CASH_DRAWER, CASH_IN_TRANSIT, AR_CONTROL, AP_CONTROL, INVENTORY, COGS, SALES, SALES_RETURNS, SALES_DISCOUNT, ROUNDING, CASH_SHORT_OVER, INVENTORY_ADJUSTMENT, PURCHASE_PRICE_VARIANCE, OPENING_BALANCE_EQUITY, RETAINED_EARNINGS, TAX_PAYABLE, TAX_RECOVERABLE` (the tax roles are unused in the MVP), `SUSPENSE` (W1-08), `CASH_SAFE` (1130 *Cash in safe*, W1-11, migration 0012 sets it on every tenant's 1130). Bank, wallet and card accounts are mapped through `bank_accounts` and `payment_methods`.
 - A new tenant's chart comes from the retail template (`packages/db/templates/retail-coa.json`, posting rules §2) plus one account per bank account (D-083).
 - `validateChartOfAccounts` (`packages/domain`) checks it before anything is written: every required role exactly once, on a postable account; children share their parent's type; parents aren't postable; codes unique. Only postable accounts carry a role (a CHECK in the database too).
 
@@ -281,7 +284,7 @@ Journal vouchers written by the accountant are stored as `journal_entries` with 
 
 **sync_inbox:** `tenant_id, document_id (PK together), device_id, family, seq, status (accepted|rejected), result jsonb, payload_hash, received_at, attempts`. A `duplicate` is an answer, not a stored state; a rejected row is checked again when the document comes back (sync spec §6.2).
 
-**exceptions:** `kind (below_floor_no_override|discount_over_limit|document_inconsistent|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature|no_cost|posting_failed|posted_after_lock|duplicate_handover|handover_not_permitted), severity (low|medium|high), document_type, document_id, device_id, user_id, business_date, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`. Clock skew is unique per device and business date; `posting_failed` is one per document (W1-08).
+**exceptions:** `kind (below_floor_no_override|discount_over_limit|document_inconsistent|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature|no_cost|posting_failed|posted_after_lock|duplicate_handover|handover_not_permitted|cash_not_permitted|float_mismatch), severity (low|medium|high), document_type, document_id, device_id, user_id, business_date, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`. Clock skew is unique per device and business date; `posting_failed` is one per document (W1-08).
 
 **Built in W1-07** with the two above (migration 0008, sync spec §6.2–§8):
 
@@ -359,6 +362,8 @@ SQLite WASM in a dedicated worker, on OPFS (`opfs-sahpool`), changed only by num
 **Built in W1-09 (local schema 7):** `customers`, `customer_accounts` and `customer_balances` (keyed by `party_id`), with exactly the pulled columns (sync spec §3, `CUSTOMER_COLUMNS` in `@erp/contracts`); `local_documents.accepted_at`, set when push acks a bill. `sync_state.complete_pull_started_at` is when the last complete pull began: a bill on account counts as unsynced credit while it is in the outbox, or was accepted after that time (POS spec §15). `open_bills.bill` gains `customer` (`id`, `code`, `name`) and `walkinPhone`; a bill saved before reads as a walk-in.
 
 **Built in W1-10 (local schema 8):** `cash_queue` with exactly the pulled columns (`CASH_DESK_COLUMNS`), pulled on a cash desk only; `cash_sessions` (`id, number, cashier_user_id, opened_at, opening_float, closed_at, closed_by_user_id, status`), this desk's sessions; handovers (`H`) and session documents (`Z`) in `local_documents` and the outbox like bills, with an index on the handover's bill number. A counter has the tables and leaves them empty (cash desk spec).
+
+**Built in W1-11 (local schema 9):** `suppliers`, `supplier_balances` (keyed by `party_id`), `expense_categories` and `bank_accounts` with exactly the pulled columns (`CASH_DESK_COLUMNS`), pulled on a cash desk only; `cash_sessions` gains `counted_cash`, `variance`, `left_in_drawer`; collections (`R`) and cash movements (`M`) in `local_documents` and the outbox like handovers, with an index on the session id of `H`, `R` and `M` for the expected cash.
 
 The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` in IndexedDB (`erp-pos-keys`), and the device token is kept only in memory.
 
