@@ -1,0 +1,96 @@
+{
+  "description": "The cash-out document (CashMovementV1, family M, W1-11): desk D01, session …51 of the cashier …a5, document id …71, Asia/Karachi with the 04:00 cutoff, client 0.8.0 (testing/desk.ts). Categories, supplier and banks as in cash-movement.json. The check's problem is raised as its DomainError code.",
+  "cases": [
+    {
+      "name": "Rs 200 for tea: D01-M000004",
+      "input": {
+        "kind": "expense",
+        "amount": 20000,
+        "category": "tea",
+        "note": "tea for the staff",
+        "seq": 4,
+        "createdAt": "2026-11-02T11:00:00.000Z"
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a7000-0000-7000-8000-000000000071",
+        "family": "M",
+        "seq": 4,
+        "number": "D01-M000004",
+        "kind": "expense",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+        "amount": 20000,
+        "expenseCategoryId": "019a1000-0000-7000-8000-000000000201",
+        "partyId": null,
+        "bankAccountId": null,
+        "targetName": "Tea",
+        "note": "tea for the staff",
+        "reference": null,
+        "createdAt": "2026-11-02T11:00:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "a supplier payment",
+      "input": {
+        "kind": "supplier_payment",
+        "amount": 800000,
+        "supplier": true,
+        "note": "runner Bilal",
+        "reference": "INV-778",
+        "seq": 5,
+        "createdAt": "2026-11-02T12:00:00.000Z"
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a7000-0000-7000-8000-000000000071",
+        "family": "M",
+        "seq": 5,
+        "number": "D01-M000005",
+        "kind": "supplier_payment",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+        "amount": 800000,
+        "expenseCategoryId": null,
+        "partyId": "019a3000-0000-7000-8000-0000000000c2",
+        "bankAccountId": null,
+        "targetName": "Addi Traders",
+        "note": "runner Bilal",
+        "reference": "INV-778",
+        "createdAt": "2026-11-02T12:00:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "over the drawer without the confirmation is refused",
+      "input": {
+        "kind": "expense",
+        "amount": 1500000,
+        "category": "tea",
+        "note": "generator",
+        "seq": 6,
+        "createdAt": "2026-11-02T12:00:00.000Z"
+      },
+      "error": "over_drawer"
+    },
+    {
+      "name": "a bank deposit to a wallet is refused",
+      "input": {
+        "kind": "bank_deposit",
+        "amount": 20000,
+        "bank": "jazzcash",
+        "note": "deposit",
+        "seq": 6,
+        "createdAt": "2026-11-02T12:00:00.000Z"
+      },
+      "error": "missing_target"
+    }
+  ]
+}

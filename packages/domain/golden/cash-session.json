@@ -1,5 +1,5 @@
 {
-  "description": "Cash sessions on the desk (CSH-01, cash desk spec, owner answer 1 to W1-10): the expected cash (float + handovers in − payouts), and the open and close documents (CashSessionV1, family Z). Desk D01 (…d9) in branch …e1, Asia/Karachi with the 04:00 cutoff, document id …81, unit Rs 1 = 100. Opening needs cash.handover.receive; closing needs cash.session.close, by anyone who holds it. Staff: …a5 a cashier; …a2 a manager (cash.session.close, not cash.handover.receive); …a1 a salesman. Amounts in paisa.",
+  "description": "Cash sessions on the desk (CSH-01, CSH-07, cash desk spec, W1-10 and W1-11): the expected cash, and the open and close documents (CashSessionV2, family Z). Desk D01 (…d9) in branch …e1, Asia/Karachi with the 04:00 cutoff, document id …81, unit Rs 1 = 100. Opening needs cash.handover.receive and carries floatExpected (what stayed in the drawer at the desk's last close; null for its first session). Closing needs cash.session.close, by anyone who holds it, and carries the denomination count, the variance with its reason and acknowledgement, and what stays in the drawer (drawer.json has the close's rules). Staff: …a5 a cashier; …a2 a manager (cash.session.close, cash.variance.approve, not cash.handover.receive); …a1 a salesman; …a7 a senior cashier (testing/desk.ts). Amounts in paisa.",
   "cases": [
     {
       "name": "expected cash: float, two handovers and a payout",
@@ -7,9 +7,18 @@
         "expected": {
           "openingFloat": 500000,
           "handovers": [
-            { "kind": "in", "amount": 432000 },
-            { "kind": "in", "amount": 125000 },
-            { "kind": "payout", "amount": 45000 }
+            {
+              "kind": "in",
+              "amount": 432000
+            },
+            {
+              "kind": "in",
+              "amount": 125000
+            },
+            {
+              "kind": "payout",
+              "amount": 45000
+            }
           ]
         }
       },
@@ -17,8 +26,60 @@
     },
     {
       "name": "expected cash with nothing handed over is the float",
-      "input": { "expected": { "openingFloat": 500000, "handovers": [] } },
+      "input": {
+        "expected": {
+          "openingFloat": 500000,
+          "handovers": []
+        }
+      },
       "expected": 500000
+    },
+    {
+      "name": "expected cash with collections, cash-outs and the safe (non-cash collections don't count)",
+      "input": {
+        "expected": {
+          "openingFloat": 500000,
+          "handovers": [
+            {
+              "kind": "in",
+              "amount": 432000
+            }
+          ],
+          "collections": [
+            {
+              "cash": true,
+              "amount": 500000
+            },
+            {
+              "cash": false,
+              "amount": 1250000
+            }
+          ],
+          "movements": [
+            {
+              "kind": "expense",
+              "amount": 20000
+            },
+            {
+              "kind": "supplier_payment",
+              "amount": 300000
+            },
+            {
+              "kind": "bank_deposit",
+              "amount": 200000
+            },
+            {
+              "kind": "to_safe",
+              "amount": 100000
+            },
+            {
+              "kind": "from_safe",
+              "amount": 50000
+            }
+          ]
+        }
+      },
+      "expected": 862000
     },
     {
       "name": "open with a Rs 5,000 float",
@@ -32,7 +93,7 @@
         }
       },
       "expected": {
-        "version": 1,
+        "version": 2,
         "id": "019a6000-0000-7000-8000-000000000081",
         "family": "Z",
         "seq": 3,
@@ -44,6 +105,14 @@
         "userId": "019a0000-0000-7000-8000-0000000000a5",
         "openingFloat": 500000,
         "expectedCash": null,
+        "floatExpected": null,
+        "countedCash": null,
+        "denominations": null,
+        "variance": null,
+        "varianceReason": null,
+        "varianceNote": null,
+        "acknowledgedByUserId": null,
+        "leftInDrawer": null,
         "createdAt": "2026-11-02T05:02:00.000Z",
         "businessDate": "2026-11-02",
         "clientVersion": "0.8.0"
@@ -61,7 +130,7 @@
         }
       },
       "expected": {
-        "version": 1,
+        "version": 2,
         "id": "019a6000-0000-7000-8000-000000000081",
         "family": "Z",
         "seq": 1,
@@ -73,6 +142,14 @@
         "userId": "019a0000-0000-7000-8000-0000000000a5",
         "openingFloat": 0,
         "expectedCash": null,
+        "floatExpected": null,
+        "countedCash": null,
+        "denominations": null,
+        "variance": null,
+        "varianceReason": null,
+        "varianceNote": null,
+        "acknowledgedByUserId": null,
+        "leftInDrawer": null,
         "createdAt": "2026-11-02T05:02:00.000Z",
         "businessDate": "2026-11-02",
         "clientVersion": "0.8.0"
@@ -113,7 +190,7 @@
         }
       },
       "expected": {
-        "version": 1,
+        "version": 2,
         "id": "019a6000-0000-7000-8000-000000000081",
         "family": "Z",
         "seq": 5,
@@ -125,6 +202,14 @@
         "userId": "019a0000-0000-7000-8000-0000000000a5",
         "openingFloat": 300000,
         "expectedCash": null,
+        "floatExpected": null,
+        "countedCash": null,
+        "denominations": null,
+        "variance": null,
+        "varianceReason": null,
+        "varianceNote": null,
+        "acknowledgedByUserId": null,
+        "leftInDrawer": null,
         "createdAt": "2026-11-02T10:00:00.000Z",
         "businessDate": "2026-11-02",
         "clientVersion": "0.8.0"
@@ -170,6 +255,49 @@
       "error": "invalid_float"
     },
     {
+      "name": "open with a float other than what stayed at the last close: both are recorded",
+      "input": {
+        "open": {
+          "current": {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+            "openingFloat": 500000,
+            "status": "closed"
+          },
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "openingFloat": 480000,
+          "floatExpected": 500000,
+          "seq": 6,
+          "createdAt": "2026-11-03T05:00:00.000Z"
+        }
+      },
+      "expected": {
+        "version": 2,
+        "id": "019a6000-0000-7000-8000-000000000081",
+        "family": "Z",
+        "seq": 6,
+        "number": "D01-Z000006",
+        "event": "open",
+        "sessionId": "019a6000-0000-7000-8000-000000000081",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "userId": "019a0000-0000-7000-8000-0000000000a5",
+        "openingFloat": 480000,
+        "expectedCash": null,
+        "floatExpected": 500000,
+        "countedCash": null,
+        "denominations": null,
+        "variance": null,
+        "varianceReason": null,
+        "varianceNote": null,
+        "acknowledgedByUserId": null,
+        "leftInDrawer": null,
+        "createdAt": "2026-11-03T05:00:00.000Z",
+        "businessDate": "2026-11-03",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
       "name": "close by its cashier: the expected cash is recorded",
       "input": {
         "close": {
@@ -180,16 +308,31 @@
             "status": "open"
           },
           "handovers": [
-            { "kind": "in", "amount": 432000 },
-            { "kind": "payout", "amount": 45000 }
+            {
+              "kind": "in",
+              "amount": 432000
+            },
+            {
+              "kind": "payout",
+              "amount": 45000
+            }
           ],
           "userId": "019a0000-0000-7000-8000-0000000000a5",
           "seq": 4,
-          "createdAt": "2026-11-02T10:00:00.000Z"
+          "createdAt": "2026-11-02T10:00:00.000Z",
+          "count": {
+            "counts": {
+              "100000": 8,
+              "50000": 1,
+              "10000": 3,
+              "5000": 1,
+              "2000": 1
+            }
+          }
         }
       },
       "expected": {
-        "version": 1,
+        "version": 2,
         "id": "019a6000-0000-7000-8000-000000000081",
         "family": "Z",
         "seq": 4,
@@ -201,6 +344,20 @@
         "userId": "019a0000-0000-7000-8000-0000000000a5",
         "openingFloat": null,
         "expectedCash": 887000,
+        "floatExpected": null,
+        "countedCash": 887000,
+        "denominations": {
+          "100000": 8,
+          "50000": 1,
+          "10000": 3,
+          "5000": 1,
+          "2000": 1
+        },
+        "variance": 0,
+        "varianceReason": null,
+        "varianceNote": null,
+        "acknowledgedByUserId": null,
+        "leftInDrawer": 887000,
         "createdAt": "2026-11-02T10:00:00.000Z",
         "businessDate": "2026-11-02",
         "clientVersion": "0.8.0"
@@ -219,11 +376,16 @@
           "handovers": [],
           "userId": "019a0000-0000-7000-8000-0000000000a2",
           "seq": 4,
-          "createdAt": "2026-11-02T15:00:00.000Z"
+          "createdAt": "2026-11-02T15:00:00.000Z",
+          "count": {
+            "counts": {
+              "100000": 5
+            }
+          }
         }
       },
       "expected": {
-        "version": 1,
+        "version": 2,
         "id": "019a6000-0000-7000-8000-000000000081",
         "family": "Z",
         "seq": 4,
@@ -235,6 +397,16 @@
         "userId": "019a0000-0000-7000-8000-0000000000a2",
         "openingFloat": null,
         "expectedCash": 500000,
+        "floatExpected": null,
+        "countedCash": 500000,
+        "denominations": {
+          "100000": 5
+        },
+        "variance": 0,
+        "varianceReason": null,
+        "varianceNote": null,
+        "acknowledgedByUserId": null,
+        "leftInDrawer": 500000,
         "createdAt": "2026-11-02T15:00:00.000Z",
         "businessDate": "2026-11-02",
         "clientVersion": "0.8.0"
@@ -253,7 +425,12 @@
           "handovers": [],
           "userId": "019a0000-0000-7000-8000-0000000000a1",
           "seq": 4,
-          "createdAt": "2026-11-02T15:00:00.000Z"
+          "createdAt": "2026-11-02T15:00:00.000Z",
+          "count": {
+            "counts": {
+              "100000": 5
+            }
+          }
         }
       },
       "error": "not_permitted"
@@ -266,7 +443,12 @@
           "handovers": [],
           "userId": "019a0000-0000-7000-8000-0000000000a5",
           "seq": 4,
-          "createdAt": "2026-11-02T15:00:00.000Z"
+          "createdAt": "2026-11-02T15:00:00.000Z",
+          "count": {
+            "counts": {
+              "100000": 5
+            }
+          }
         }
       },
       "error": "no_session"
@@ -284,10 +466,152 @@
           "handovers": [],
           "userId": "019a0000-0000-7000-8000-0000000000a5",
           "seq": 4,
-          "createdAt": "2026-11-02T15:00:00.000Z"
+          "createdAt": "2026-11-02T15:00:00.000Z",
+          "count": {
+            "counts": {
+              "100000": 5
+            }
+          }
         }
       },
       "error": "no_session"
+    },
+    {
+      "name": "close Rs 300 short with every kind of document, acknowledged, Rs 5,000 left in the drawer",
+      "input": {
+        "close": {
+          "current": {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+            "openingFloat": 500000,
+            "status": "open"
+          },
+          "handovers": [
+            {
+              "kind": "in",
+              "amount": 1029700
+            },
+            {
+              "kind": "payout",
+              "amount": 45000
+            }
+          ],
+          "collections": [
+            {
+              "cash": true,
+              "amount": 500000
+            },
+            {
+              "cash": false,
+              "amount": 900000
+            }
+          ],
+          "movements": [
+            {
+              "kind": "expense",
+              "amount": 20000
+            },
+            {
+              "kind": "to_safe",
+              "amount": 400000
+            }
+          ],
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "count": {
+            "counts": {
+              "500000": 2,
+              "100000": 5,
+              "10000": 3,
+              "1000": 4,
+              "100": 7
+            },
+            "reason": "change_error",
+            "acknowledgerId": "019a0000-0000-7000-8000-0000000000a2",
+            "leftInDrawer": 500000
+          },
+          "seq": 7,
+          "createdAt": "2026-11-02T15:30:00.000Z"
+        }
+      },
+      "expected": {
+        "version": 2,
+        "id": "019a6000-0000-7000-8000-000000000081",
+        "family": "Z",
+        "seq": 7,
+        "number": "D01-Z000007",
+        "event": "close",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "userId": "019a0000-0000-7000-8000-0000000000a5",
+        "openingFloat": null,
+        "expectedCash": 1564700,
+        "floatExpected": null,
+        "countedCash": 1534700,
+        "denominations": {
+          "500000": 2,
+          "100000": 5,
+          "10000": 3,
+          "1000": 4,
+          "100": 7
+        },
+        "variance": -30000,
+        "varianceReason": "change_error",
+        "varianceNote": null,
+        "acknowledgedByUserId": "019a0000-0000-7000-8000-0000000000a2",
+        "leftInDrawer": 500000,
+        "createdAt": "2026-11-02T15:30:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "a close short without a reason is refused",
+      "input": {
+        "close": {
+          "current": {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+            "openingFloat": 500000,
+            "status": "open"
+          },
+          "handovers": [],
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "count": {
+            "counts": {
+              "100000": 4
+            }
+          },
+          "seq": 7,
+          "createdAt": "2026-11-02T15:30:00.000Z"
+        }
+      },
+      "error": "reason_required"
+    },
+    {
+      "name": "a senior cashier acknowledging their own variance is refused",
+      "input": {
+        "close": {
+          "current": {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a7",
+            "openingFloat": 500000,
+            "status": "open"
+          },
+          "handovers": [],
+          "userId": "019a0000-0000-7000-8000-0000000000a7",
+          "count": {
+            "counts": {
+              "100000": 4
+            },
+            "reason": "unknown",
+            "acknowledgerId": "019a0000-0000-7000-8000-0000000000a7"
+          },
+          "seq": 7,
+          "createdAt": "2026-11-02T15:30:00.000Z"
+        }
+      },
+      "error": "own_variance"
     }
   ]
 }

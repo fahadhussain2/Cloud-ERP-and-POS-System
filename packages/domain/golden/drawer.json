@@ -1,0 +1,277 @@
+{
+  "description": "The drawer close by denomination (CSH-07, PRD W10.1, owner answers 1–3 to W1-11): the notes and coins of a currency, the count, and the check before the close. Counts are keyed by the denomination in minor units (PKR, Rs 1 = 100). Session …51 of the cashier …a5 (testing/desk.ts); the closer is …a5 unless a case says otherwise. A variance (counted − expected) other than 0 needs a reason, and `other` a note. The acknowledger needs cash.variance.approve and is never the session's own cashier; null = acknowledge later. What stays in the drawer (default: all of the count) is whole rupees from 0 to the count; the rest goes to the safe. The first problem, in order: no_session, not_permitted, invalid_count, left_invalid, reason_required, note_required, note_too_long, own_variance, not_acknowledger.",
+  "cases": [
+    {
+      "name": "the Pakistani rupee: 5000 down to 1 (the Rs 10 note and coin are one row)",
+      "input": { "denominations": "PKR" },
+      "expected": [500000, 100000, 50000, 10000, 5000, 2000, 1000, 500, 200, 100]
+    },
+    {
+      "name": "a currency without denominations",
+      "input": { "denominations": "AED" },
+      "error": "invalid_currency"
+    },
+    {
+      "name": "2 × 5000 + 5 × 1000 + 3 × 100 + 4 × 10 + 7 × 1 = Rs 15,347",
+      "input": {
+        "count": {
+          "currency": "PKR",
+          "counts": { "500000": 2, "100000": 5, "10000": 3, "1000": 4, "100": 7 }
+        }
+      },
+      "expected": 1534700
+    },
+    {
+      "name": "zero counts and nothing counted",
+      "input": { "count": { "currency": "PKR", "counts": { "500000": 0 } } },
+      "expected": 0
+    },
+    {
+      "name": "a denomination the currency doesn't have (Rs 75)",
+      "input": { "count": { "currency": "PKR", "counts": { "7500": 1 } } },
+      "error": "invalid_count"
+    },
+    {
+      "name": "a negative count",
+      "input": { "count": { "currency": "PKR", "counts": { "100000": -1 } } },
+      "error": "invalid_count"
+    },
+    {
+      "name": "half a note",
+      "input": { "count": { "currency": "PKR", "counts": { "100000": 1.5 } } },
+      "error": "invalid_count"
+    },
+    {
+      "name": "exact: no reason, everything stays in the drawer",
+      "input": {
+        "close": {
+          "counts": { "500000": 2, "100000": 5, "10000": 3, "1000": 4, "100": 7 },
+          "expected": 1534700
+        }
+      },
+      "expected": {
+        "ok": true,
+        "counted": 1534700,
+        "variance": 0,
+        "varianceReason": null,
+        "varianceNote": null,
+        "acknowledgedByUserId": null,
+        "leftInDrawer": 1534700,
+        "toSafe": 0
+      }
+    },
+    {
+      "name": "exact: a reason or acknowledger given anyway is dropped",
+      "input": {
+        "close": {
+          "counts": { "500000": 2, "100000": 5, "10000": 3, "1000": 4, "100": 7 },
+          "expected": 1534700,
+          "reason": "unknown",
+          "note": "x",
+          "acknowledgerId": "019a0000-0000-7000-8000-0000000000a2"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "counted": 1534700,
+        "variance": 0,
+        "varianceReason": null,
+        "varianceNote": null,
+        "acknowledgedByUserId": null,
+        "leftInDrawer": 1534700,
+        "toSafe": 0
+      }
+    },
+    {
+      "name": "Rs 300 short, wrong change, acknowledged by the manager; Rs 5,000 stays, the rest to the safe",
+      "input": {
+        "close": {
+          "counts": { "500000": 2, "100000": 5, "10000": 3, "1000": 4, "100": 7 },
+          "expected": 1564700,
+          "reason": "change_error",
+          "acknowledgerId": "019a0000-0000-7000-8000-0000000000a2",
+          "leftInDrawer": 500000
+        }
+      },
+      "expected": {
+        "ok": true,
+        "counted": 1534700,
+        "variance": -30000,
+        "varianceReason": "change_error",
+        "varianceNote": null,
+        "acknowledgedByUserId": "019a0000-0000-7000-8000-0000000000a2",
+        "leftInDrawer": 500000,
+        "toSafe": 1034700
+      }
+    },
+    {
+      "name": "Rs 50 over, reason unknown, acknowledged later",
+      "input": {
+        "close": {
+          "counts": { "500000": 2, "100000": 5, "10000": 3, "1000": 4, "100": 7 },
+          "expected": 1529700,
+          "reason": "unknown",
+          "note": "  counted twice  ",
+          "acknowledgerId": null
+        }
+      },
+      "expected": {
+        "ok": true,
+        "counted": 1534700,
+        "variance": 5000,
+        "varianceReason": "unknown",
+        "varianceNote": "counted twice",
+        "acknowledgedByUserId": null,
+        "leftInDrawer": 1534700,
+        "toSafe": 0
+      }
+    },
+    {
+      "name": "other, with its note",
+      "input": {
+        "close": {
+          "counts": { "100000": 1 },
+          "expected": 120000,
+          "reason": "other",
+          "note": "Rs 200 lent to the guard",
+          "acknowledgerId": "019a0000-0000-7000-8000-0000000000a2"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "counted": 100000,
+        "variance": -20000,
+        "varianceReason": "other",
+        "varianceNote": "Rs 200 lent to the guard",
+        "acknowledgedByUserId": "019a0000-0000-7000-8000-0000000000a2",
+        "leftInDrawer": 100000,
+        "toSafe": 0
+      }
+    },
+    {
+      "name": "a manager closes the cashier's session and acknowledges it",
+      "input": {
+        "close": {
+          "userId": "019a0000-0000-7000-8000-0000000000a2",
+          "counts": { "100000": 1 },
+          "expected": 110000,
+          "reason": "counterfeit_note",
+          "acknowledgerId": "019a0000-0000-7000-8000-0000000000a2"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "counted": 100000,
+        "variance": -10000,
+        "varianceReason": "counterfeit_note",
+        "varianceNote": null,
+        "acknowledgedByUserId": "019a0000-0000-7000-8000-0000000000a2",
+        "leftInDrawer": 100000,
+        "toSafe": 0
+      }
+    },
+    {
+      "name": "nothing stays: all of it to the safe",
+      "input": { "close": { "counts": { "100000": 3 }, "expected": 300000, "leftInDrawer": 0 } },
+      "expected": {
+        "ok": true,
+        "counted": 300000,
+        "variance": 0,
+        "varianceReason": null,
+        "varianceNote": null,
+        "acknowledgedByUserId": null,
+        "leftInDrawer": 0,
+        "toSafe": 300000
+      }
+    },
+    {
+      "name": "no session",
+      "input": { "close": { "session": null, "counts": { "100000": 1 }, "expected": 100000 } },
+      "expected": { "ok": false, "problem": "no_session" }
+    },
+    {
+      "name": "a salesman can't close",
+      "input": {
+        "close": {
+          "userId": "019a0000-0000-7000-8000-0000000000a1",
+          "counts": { "100000": 1 },
+          "expected": 100000
+        }
+      },
+      "expected": { "ok": false, "problem": "not_permitted", "permission": "cash.session.close" }
+    },
+    {
+      "name": "a count that isn't one",
+      "input": { "close": { "counts": { "7500": 1 }, "expected": 100000 } },
+      "expected": { "ok": false, "problem": "invalid_count" }
+    },
+    {
+      "name": "more stays in the drawer than was counted",
+      "input": { "close": { "counts": { "100000": 1 }, "expected": 100000, "leftInDrawer": 100100 } },
+      "expected": { "ok": false, "problem": "left_invalid" }
+    },
+    {
+      "name": "paisa stay in the drawer",
+      "input": { "close": { "counts": { "100000": 1 }, "expected": 100000, "leftInDrawer": 50050 } },
+      "expected": { "ok": false, "problem": "left_invalid" }
+    },
+    {
+      "name": "a negative amount stays",
+      "input": { "close": { "counts": { "100000": 1 }, "expected": 100000, "leftInDrawer": -100 } },
+      "expected": { "ok": false, "problem": "left_invalid" }
+    },
+    {
+      "name": "short without a reason",
+      "input": { "close": { "counts": { "100000": 1 }, "expected": 130000 } },
+      "expected": { "ok": false, "problem": "reason_required" }
+    },
+    {
+      "name": "other without a note",
+      "input": { "close": { "counts": { "100000": 1 }, "expected": 130000, "reason": "other", "note": " " } },
+      "expected": { "ok": false, "problem": "note_required" }
+    },
+    {
+      "name": "a note of 201 characters",
+      "input": {
+        "close": {
+          "counts": { "100000": 1 },
+          "expected": 130000,
+          "reason": "unknown",
+          "note": "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901"
+        }
+      },
+      "expected": { "ok": false, "problem": "note_too_long" }
+    },
+    {
+      "name": "a senior cashier can't acknowledge their own variance",
+      "input": {
+        "close": {
+          "session": {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a7",
+            "openingFloat": 0,
+            "status": "open"
+          },
+          "userId": "019a0000-0000-7000-8000-0000000000a7",
+          "counts": { "100000": 1 },
+          "expected": 130000,
+          "reason": "unknown",
+          "acknowledgerId": "019a0000-0000-7000-8000-0000000000a7"
+        }
+      },
+      "expected": { "ok": false, "problem": "own_variance" }
+    },
+    {
+      "name": "a salesman can't acknowledge",
+      "input": {
+        "close": {
+          "counts": { "100000": 1 },
+          "expected": 130000,
+          "reason": "unknown",
+          "acknowledgerId": "019a0000-0000-7000-8000-0000000000a1"
+        }
+      },
+      "expected": { "ok": false, "problem": "not_acknowledger" }
+    }
+  ]
+}

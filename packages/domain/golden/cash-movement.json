@@ -1,0 +1,243 @@
+{
+  "description": "Cash-out and safe movements at the desk (CSH-06, PRD W9, owner answer 3 to W1-11): the check before one is recorded. Session …51 of the cashier …a5 (testing/desk.ts); unit Rs 1 = 100; the drawer should hold Rs 10,000 unless a case says otherwise. Expense categories: tea (…201, Tea), old (…202, inactive). Supplier: …c2 S0007 Addi Traders. Bank accounts: soneri (…301, a bank), jazzcash (…302, a wallet), closed (…303, an inactive bank). Each kind needs exactly its own field: an expense its category, a supplier payment its supplier, a bank deposit a bank of kind bank; to_safe and from_safe neither. The first problem, in order: no_session, not_session_cashier, not_permitted, amount_not_positive, amount_not_rounded, missing_target, extra_target, note_required (not for the safe), note_too_long, reference_too_long, over_drawer (money out above the expected cash, until confirmed).",
+  "cases": [
+    {
+      "name": "Rs 200 for tea",
+      "input": { "kind": "expense", "amount": 20000, "category": "tea", "note": " tea for the staff " },
+      "expected": {
+        "ok": true,
+        "kind": "expense",
+        "amount": 20000,
+        "expenseCategoryId": "019a1000-0000-7000-8000-000000000201",
+        "partyId": null,
+        "bankAccountId": null,
+        "targetName": "Tea",
+        "note": "tea for the staff",
+        "reference": null
+      }
+    },
+    {
+      "name": "Rs 8,000 to Addi Traders' runner, with the supplier's bill number",
+      "input": {
+        "kind": "supplier_payment",
+        "amount": 800000,
+        "supplier": true,
+        "note": "runner Bilal",
+        "reference": "INV-778"
+      },
+      "expected": {
+        "ok": true,
+        "kind": "supplier_payment",
+        "amount": 800000,
+        "expenseCategoryId": null,
+        "partyId": "019a3000-0000-7000-8000-0000000000c2",
+        "bankAccountId": null,
+        "targetName": "Addi Traders",
+        "note": "runner Bilal",
+        "reference": "INV-778"
+      }
+    },
+    {
+      "name": "Rs 50,000 deposited at Soneri",
+      "input": {
+        "kind": "bank_deposit",
+        "amount": 5000000,
+        "bank": "soneri",
+        "note": "evening deposit",
+        "reference": "SL-1192",
+        "expected": 6000000
+      },
+      "expected": {
+        "ok": true,
+        "kind": "bank_deposit",
+        "amount": 5000000,
+        "expenseCategoryId": null,
+        "partyId": null,
+        "bankAccountId": "019a1000-0000-7000-8000-000000000301",
+        "targetName": "Soneri",
+        "note": "evening deposit",
+        "reference": "SL-1192"
+      }
+    },
+    {
+      "name": "Rs 5,000 to the safe needs no note",
+      "input": { "kind": "to_safe", "amount": 500000 },
+      "expected": {
+        "ok": true,
+        "kind": "to_safe",
+        "amount": 500000,
+        "expenseCategoryId": null,
+        "partyId": null,
+        "bankAccountId": null,
+        "targetName": null,
+        "note": null,
+        "reference": null
+      }
+    },
+    {
+      "name": "from the safe with an empty drawer: money in is never over the drawer",
+      "input": { "kind": "from_safe", "amount": 200000, "note": "change for the morning", "expected": 0 },
+      "expected": {
+        "ok": true,
+        "kind": "from_safe",
+        "amount": 200000,
+        "expenseCategoryId": null,
+        "partyId": null,
+        "bankAccountId": null,
+        "targetName": null,
+        "note": "change for the morning",
+        "reference": null
+      }
+    },
+    {
+      "name": "more than the drawer should hold: asks first",
+      "input": { "kind": "expense", "amount": 1500000, "category": "tea", "note": "generator diesel" },
+      "expected": { "ok": false, "problem": "over_drawer", "expected": 1000000 }
+    },
+    {
+      "name": "more than the drawer should hold, confirmed",
+      "input": {
+        "kind": "expense",
+        "amount": 1500000,
+        "category": "tea",
+        "note": "generator diesel",
+        "confirmed": true
+      },
+      "expected": {
+        "ok": true,
+        "kind": "expense",
+        "amount": 1500000,
+        "expenseCategoryId": "019a1000-0000-7000-8000-000000000201",
+        "partyId": null,
+        "bankAccountId": null,
+        "targetName": "Tea",
+        "note": "generator diesel",
+        "reference": null
+      }
+    },
+    {
+      "name": "exactly what the drawer should hold is not over it",
+      "input": { "kind": "to_safe", "amount": 1000000 },
+      "expected": {
+        "ok": true,
+        "kind": "to_safe",
+        "amount": 1000000,
+        "expenseCategoryId": null,
+        "partyId": null,
+        "bankAccountId": null,
+        "targetName": null,
+        "note": null,
+        "reference": null
+      }
+    },
+    {
+      "name": "no session",
+      "input": { "session": null, "kind": "expense", "amount": 20000, "category": "tea", "note": "tea" },
+      "expected": { "ok": false, "problem": "no_session" }
+    },
+    {
+      "name": "another cashier's session",
+      "input": {
+        "cashierId": "019a0000-0000-7000-8000-0000000000a7",
+        "kind": "expense",
+        "amount": 20000,
+        "category": "tea",
+        "note": "tea"
+      },
+      "expected": { "ok": false, "problem": "not_session_cashier" }
+    },
+    {
+      "name": "the session's cashier without cash.movement.create",
+      "input": {
+        "session": {
+          "id": "019a6000-0000-7000-8000-000000000051",
+          "cashierId": "019a0000-0000-7000-8000-0000000000a6",
+          "openingFloat": 0,
+          "status": "open"
+        },
+        "cashierId": "019a0000-0000-7000-8000-0000000000a6",
+        "kind": "expense",
+        "amount": 20000,
+        "category": "tea",
+        "note": "tea"
+      },
+      "expected": { "ok": false, "problem": "not_permitted", "permission": "cash.movement.create" }
+    },
+    {
+      "name": "nothing paid out",
+      "input": { "kind": "expense", "amount": 0, "category": "tea", "note": "tea" },
+      "expected": { "ok": false, "problem": "amount_not_positive" }
+    },
+    {
+      "name": "paisa in cash",
+      "input": { "kind": "expense", "amount": 20050, "category": "tea", "note": "tea" },
+      "expected": { "ok": false, "problem": "amount_not_rounded" }
+    },
+    {
+      "name": "an expense without its category",
+      "input": { "kind": "expense", "amount": 20000, "note": "tea" },
+      "expected": { "ok": false, "problem": "missing_target" }
+    },
+    {
+      "name": "an inactive category",
+      "input": { "kind": "expense", "amount": 20000, "category": "old", "note": "tea" },
+      "expected": { "ok": false, "problem": "missing_target" }
+    },
+    {
+      "name": "a supplier payment without a supplier",
+      "input": { "kind": "supplier_payment", "amount": 20000, "note": "runner" },
+      "expected": { "ok": false, "problem": "missing_target" }
+    },
+    {
+      "name": "a deposit to a wallet is not a bank deposit",
+      "input": { "kind": "bank_deposit", "amount": 20000, "bank": "jazzcash", "note": "deposit" },
+      "expected": { "ok": false, "problem": "missing_target" }
+    },
+    {
+      "name": "a deposit to an inactive bank",
+      "input": { "kind": "bank_deposit", "amount": 20000, "bank": "closed", "note": "deposit" },
+      "expected": { "ok": false, "problem": "missing_target" }
+    },
+    {
+      "name": "an expense naming a bank too",
+      "input": { "kind": "expense", "amount": 20000, "category": "tea", "bank": "soneri", "note": "tea" },
+      "expected": { "ok": false, "problem": "extra_target" }
+    },
+    {
+      "name": "to the safe naming a category",
+      "input": { "kind": "to_safe", "amount": 20000, "category": "tea" },
+      "expected": { "ok": false, "problem": "extra_target" }
+    },
+    {
+      "name": "an expense without a note",
+      "input": { "kind": "expense", "amount": 20000, "category": "tea", "note": "   " },
+      "expected": { "ok": false, "problem": "note_required" }
+    },
+    {
+      "name": "a supplier payment without a note",
+      "input": { "kind": "supplier_payment", "amount": 20000, "supplier": true },
+      "expected": { "ok": false, "problem": "note_required" }
+    },
+    {
+      "name": "a note of 201 characters",
+      "input": {
+        "kind": "expense",
+        "amount": 20000,
+        "category": "tea",
+        "note": "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901"
+      },
+      "expected": { "ok": false, "problem": "note_too_long" }
+    },
+    {
+      "name": "a reference of 41 characters",
+      "input": {
+        "kind": "expense",
+        "amount": 20000,
+        "category": "tea",
+        "note": "tea",
+        "reference": "12345678901234567890123456789012345678901"
+      },
+      "expected": { "ok": false, "problem": "reference_too_long" }
+    }
+  ]
+}

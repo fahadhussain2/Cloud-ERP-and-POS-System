@@ -1,0 +1,489 @@
+{
+  "description": "The business-day reconciliation (CSH-08, RPT-02, PRD W10.2, W1-11): one branch and business date, from what the server holds. Unless a case says otherwise (reconciliation.test.ts): business date 2026-11-02, the day ends at 2026-11-02T23:00Z (04:00 Karachi the next morning, D-056), now is 2026-11-03T05:00Z, handover confirmation Required, and no devices, gaps, sessions, pending bills, unmatched scans or exceptions, cash in transit 0. Final = the day is over, every active device was heard from after it ended with nothing older unsynced, no open sequence gap, no session still open. The expected cash is recomputed from the session's documents on the server; the desk's figure is shown beside it. Missing handovers (Required only) are grouped by salesman like the desk's queue.",
+  "cases": [
+    {
+      "name": "a final day with one exact session",
+      "input": {
+        "devices": [
+          { "code": "D01", "lastContactAt": "2026-11-03T04:12:00.000Z", "oldestUnsyncedAt": null },
+          { "code": "C03", "lastContactAt": "2026-11-03T04:10:00.000Z", "oldestUnsyncedAt": null }
+        ],
+        "sessions": [
+          {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "number": "D01-Z000001",
+            "deviceCode": "D01",
+            "cashierName": "Ali",
+            "status": "closed",
+            "openingFloat": 500000,
+            "deskExpected": 1492000,
+            "countedCash": 1492000,
+            "variance": 0,
+            "varianceReason": null,
+            "acknowledgedByName": null,
+            "handovers": [
+              { "kind": "in", "amount": 432000 },
+              { "kind": "in", "amount": 125000 },
+              { "kind": "payout", "amount": 45000 }
+            ],
+            "collections": [
+              { "cash": true, "amount": 500000 },
+              { "cash": false, "amount": 900000 }
+            ],
+            "movements": [{ "kind": "expense", "amount": 20000 }]
+          }
+        ]
+      },
+      "expected": {
+        "businessDate": "2026-11-02",
+        "status": "final",
+        "holds": [],
+        "sessions": [
+          {
+            "id": "019a6000-0000-7000-8000-000000000051",
+            "number": "D01-Z000001",
+            "deviceCode": "D01",
+            "cashierName": "Ali",
+            "status": "closed",
+            "openingFloat": 500000,
+            "handedIn": 557000,
+            "paidOut": 45000,
+            "cashCollections": 500000,
+            "cashOuts": {
+              "expense": 20000,
+              "supplier_payment": 0,
+              "bank_deposit": 0,
+              "to_safe": 0,
+              "from_safe": 0
+            },
+            "expected": 1492000,
+            "deskExpected": 1492000,
+            "expectedDiffers": false,
+            "counted": 1492000,
+            "variance": 0,
+            "varianceReason": null,
+            "acknowledgement": "exact",
+            "acknowledgedByName": null
+          }
+        ],
+        "missingHandovers": [],
+        "unmatchedScans": [],
+        "exceptions": [],
+        "cashInTransit": 0,
+        "totalVariance": 0
+      }
+    },
+    {
+      "name": "today is not over yet",
+      "input": { "now": "2026-11-02T12:00:00.000Z" },
+      "expected": {
+        "businessDate": "2026-11-02",
+        "status": "provisional",
+        "holds": [{ "kind": "day_not_over", "dayEndsAt": "2026-11-02T23:00:00.000Z" }],
+        "sessions": [],
+        "missingHandovers": [],
+        "unmatchedScans": [],
+        "exceptions": [],
+        "cashInTransit": 0,
+        "totalVariance": 0
+      }
+    },
+    {
+      "name": "what holds a day: devices not heard from or not synced, a gap, an open session (devices by code)",
+      "input": {
+        "devices": [
+          { "code": "D01", "lastContactAt": null, "oldestUnsyncedAt": null },
+          {
+            "code": "C05",
+            "lastContactAt": "2026-11-03T04:00:00.000Z",
+            "oldestUnsyncedAt": "2026-11-03T03:00:00.000Z"
+          },
+          { "code": "C04", "lastContactAt": "2026-11-02T09:05:00.000Z", "oldestUnsyncedAt": null },
+          {
+            "code": "C03",
+            "lastContactAt": "2026-11-03T04:00:00.000Z",
+            "oldestUnsyncedAt": "2026-11-02T15:00:00.000Z"
+          }
+        ],
+        "gaps": [{ "deviceCode": "C03", "family": "S", "fromSeq": 410, "toSeq": 411 }],
+        "sessions": [
+          {
+            "id": "019a6000-0000-7000-8000-000000000059",
+            "number": "D01-Z000009",
+            "deviceCode": "D01",
+            "cashierName": "Ali",
+            "status": "open",
+            "openingFloat": 500000,
+            "deskExpected": null,
+            "countedCash": null,
+            "variance": null,
+            "varianceReason": null,
+            "acknowledgedByName": null,
+            "handovers": [],
+            "collections": [],
+            "movements": []
+          }
+        ]
+      },
+      "expected": {
+        "businessDate": "2026-11-02",
+        "status": "provisional",
+        "holds": [
+          { "kind": "device_unsynced", "deviceCode": "C03", "oldestUnsyncedAt": "2026-11-02T15:00:00.000Z" },
+          { "kind": "device_not_heard", "deviceCode": "C04", "lastContactAt": "2026-11-02T09:05:00.000Z" },
+          { "kind": "device_not_heard", "deviceCode": "D01", "lastContactAt": null },
+          { "kind": "sequence_gap", "deviceCode": "C03", "family": "S", "fromSeq": 410, "toSeq": 411 },
+          { "kind": "session_open", "number": "D01-Z000009", "deviceCode": "D01", "cashierName": "Ali" }
+        ],
+        "sessions": [
+          {
+            "id": "019a6000-0000-7000-8000-000000000059",
+            "number": "D01-Z000009",
+            "deviceCode": "D01",
+            "cashierName": "Ali",
+            "status": "open",
+            "openingFloat": 500000,
+            "handedIn": 0,
+            "paidOut": 0,
+            "cashCollections": 0,
+            "cashOuts": {
+              "expense": 0,
+              "supplier_payment": 0,
+              "bank_deposit": 0,
+              "to_safe": 0,
+              "from_safe": 0
+            },
+            "expected": 500000,
+            "deskExpected": null,
+            "expectedDiffers": false,
+            "counted": null,
+            "variance": null,
+            "varianceReason": null,
+            "acknowledgement": "open",
+            "acknowledgedByName": null
+          }
+        ],
+        "missingHandovers": [],
+        "unmatchedScans": [],
+        "exceptions": [],
+        "cashInTransit": 0,
+        "totalVariance": 0
+      }
+    },
+    {
+      "name": "missing handovers by salesman, unmatched scans, the day's exceptions by severity",
+      "input": {
+        "pendingBills": [
+          {
+            "number": "C03-S000415",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "sellerName": "Usman",
+            "createdAt": "2026-11-02T10:00:00.000Z",
+            "cashDue": -45000
+          },
+          {
+            "number": "C03-S000412",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "sellerName": "Usman",
+            "createdAt": "2026-11-02T09:00:00.000Z",
+            "cashDue": 432000
+          },
+          {
+            "number": "C04-S000077",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a3",
+            "sellerName": null,
+            "createdAt": "2026-11-02T11:00:00.000Z",
+            "cashDue": 125000
+          },
+          {
+            "number": "C03-S000420",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a4",
+            "sellerName": "Asad",
+            "createdAt": "2026-11-02T12:00:00.000Z",
+            "cashDue": 200000
+          }
+        ],
+        "unmatched": [
+          {
+            "number": "D01-H000040",
+            "billNumber": "C06-S000003",
+            "kind": "in",
+            "amount": 150000,
+            "createdAt": "2026-11-02T13:00:00.000Z"
+          },
+          {
+            "number": "D01-H000035",
+            "billNumber": "C06-S000001",
+            "kind": "in",
+            "amount": 99000,
+            "createdAt": "2026-11-02T11:00:00.000Z"
+          }
+        ],
+        "exceptions": [
+          { "kind": "negative_stock", "severity": "low", "count": 3 },
+          { "kind": "offline_cap_exceeded", "severity": "medium", "count": 1 },
+          { "kind": "below_floor_no_override", "severity": "high", "count": 2 },
+          { "kind": "handover_amount_mismatch", "severity": "medium", "count": 1 }
+        ],
+        "cashInTransit": 463000
+      },
+      "expected": {
+        "businessDate": "2026-11-02",
+        "status": "final",
+        "holds": [],
+        "sessions": [],
+        "missingHandovers": [
+          {
+            "sellerId": "019a0000-0000-7000-8000-0000000000a4",
+            "sellerName": "Asad",
+            "bills": [
+              {
+                "number": "C03-S000420",
+                "createdAt": "2026-11-02T12:00:00.000Z",
+                "kind": "in",
+                "amount": 200000
+              }
+            ],
+            "toCollect": 200000,
+            "toPayOut": 0
+          },
+          {
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "sellerName": "Usman",
+            "bills": [
+              {
+                "number": "C03-S000412",
+                "createdAt": "2026-11-02T09:00:00.000Z",
+                "kind": "in",
+                "amount": 432000
+              },
+              {
+                "number": "C03-S000415",
+                "createdAt": "2026-11-02T10:00:00.000Z",
+                "kind": "payout",
+                "amount": 45000
+              }
+            ],
+            "toCollect": 432000,
+            "toPayOut": 45000
+          },
+          {
+            "sellerId": "019a0000-0000-7000-8000-0000000000a3",
+            "sellerName": null,
+            "bills": [
+              {
+                "number": "C04-S000077",
+                "createdAt": "2026-11-02T11:00:00.000Z",
+                "kind": "in",
+                "amount": 125000
+              }
+            ],
+            "toCollect": 125000,
+            "toPayOut": 0
+          }
+        ],
+        "unmatchedScans": [
+          {
+            "number": "D01-H000035",
+            "billNumber": "C06-S000001",
+            "kind": "in",
+            "amount": 99000,
+            "createdAt": "2026-11-02T11:00:00.000Z"
+          },
+          {
+            "number": "D01-H000040",
+            "billNumber": "C06-S000003",
+            "kind": "in",
+            "amount": 150000,
+            "createdAt": "2026-11-02T13:00:00.000Z"
+          }
+        ],
+        "exceptions": [
+          { "kind": "below_floor_no_override", "severity": "high", "count": 2 },
+          { "kind": "handover_amount_mismatch", "severity": "medium", "count": 1 },
+          { "kind": "offline_cap_exceeded", "severity": "medium", "count": 1 },
+          { "kind": "negative_stock", "severity": "low", "count": 3 }
+        ],
+        "cashInTransit": 463000,
+        "totalVariance": 0
+      }
+    },
+    {
+      "name": "handover confirmation Off: no missing handovers list",
+      "input": {
+        "handoverMode": "off",
+        "pendingBills": [
+          {
+            "number": "C03-S000412",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "sellerName": "Usman",
+            "createdAt": "2026-11-02T09:00:00.000Z",
+            "cashDue": 432000
+          }
+        ]
+      },
+      "expected": {
+        "businessDate": "2026-11-02",
+        "status": "final",
+        "holds": [],
+        "sessions": [],
+        "missingHandovers": null,
+        "unmatchedScans": [],
+        "exceptions": [],
+        "cashInTransit": 0,
+        "totalVariance": 0
+      }
+    },
+    {
+      "name": "variances: acknowledged, waiting, not counted (a W1-10 close), and a desk figure the server's documents don't reach",
+      "input": {
+        "sessions": [
+          {
+            "id": "019a6000-0000-7000-8000-000000000063",
+            "number": "D01-Z000013",
+            "deviceCode": "D01",
+            "cashierName": "Sara",
+            "status": "closed",
+            "openingFloat": 500000,
+            "deskExpected": 600000,
+            "countedCash": 605000,
+            "variance": 5000,
+            "varianceReason": "unknown",
+            "acknowledgedByName": null,
+            "handovers": [{ "kind": "in", "amount": 100000 }],
+            "collections": [],
+            "movements": []
+          },
+          {
+            "id": "019a6000-0000-7000-8000-000000000061",
+            "number": "D01-Z000011",
+            "deviceCode": "D01",
+            "cashierName": "Ali",
+            "status": "closed",
+            "openingFloat": 500000,
+            "deskExpected": 1564700,
+            "countedCash": 1534700,
+            "variance": -30000,
+            "varianceReason": "change_error",
+            "acknowledgedByName": "Imran",
+            "handovers": [
+              { "kind": "in", "amount": 929700 },
+              { "kind": "payout", "amount": 45000 }
+            ],
+            "collections": [{ "cash": true, "amount": 500000 }],
+            "movements": [
+              { "kind": "expense", "amount": 20000 },
+              { "kind": "to_safe", "amount": 400000 }
+            ]
+          },
+          {
+            "id": "019a6000-0000-7000-8000-000000000060",
+            "number": "D01-Z000009",
+            "deviceCode": "D01",
+            "cashierName": "Ali",
+            "status": "closed",
+            "openingFloat": 500000,
+            "deskExpected": 500000,
+            "countedCash": null,
+            "variance": null,
+            "varianceReason": null,
+            "acknowledgedByName": null,
+            "handovers": [],
+            "collections": [],
+            "movements": []
+          }
+        ]
+      },
+      "expected": {
+        "businessDate": "2026-11-02",
+        "status": "final",
+        "holds": [],
+        "sessions": [
+          {
+            "id": "019a6000-0000-7000-8000-000000000060",
+            "number": "D01-Z000009",
+            "deviceCode": "D01",
+            "cashierName": "Ali",
+            "status": "closed",
+            "openingFloat": 500000,
+            "handedIn": 0,
+            "paidOut": 0,
+            "cashCollections": 0,
+            "cashOuts": {
+              "expense": 0,
+              "supplier_payment": 0,
+              "bank_deposit": 0,
+              "to_safe": 0,
+              "from_safe": 0
+            },
+            "expected": 500000,
+            "deskExpected": 500000,
+            "expectedDiffers": false,
+            "counted": null,
+            "variance": null,
+            "varianceReason": null,
+            "acknowledgement": "not_counted",
+            "acknowledgedByName": null
+          },
+          {
+            "id": "019a6000-0000-7000-8000-000000000061",
+            "number": "D01-Z000011",
+            "deviceCode": "D01",
+            "cashierName": "Ali",
+            "status": "closed",
+            "openingFloat": 500000,
+            "handedIn": 929700,
+            "paidOut": 45000,
+            "cashCollections": 500000,
+            "cashOuts": {
+              "expense": 20000,
+              "supplier_payment": 0,
+              "bank_deposit": 0,
+              "to_safe": 400000,
+              "from_safe": 0
+            },
+            "expected": 1464700,
+            "deskExpected": 1564700,
+            "expectedDiffers": true,
+            "counted": 1534700,
+            "variance": -30000,
+            "varianceReason": "change_error",
+            "acknowledgement": "acknowledged",
+            "acknowledgedByName": "Imran"
+          },
+          {
+            "id": "019a6000-0000-7000-8000-000000000063",
+            "number": "D01-Z000013",
+            "deviceCode": "D01",
+            "cashierName": "Sara",
+            "status": "closed",
+            "openingFloat": 500000,
+            "handedIn": 100000,
+            "paidOut": 0,
+            "cashCollections": 0,
+            "cashOuts": {
+              "expense": 0,
+              "supplier_payment": 0,
+              "bank_deposit": 0,
+              "to_safe": 0,
+              "from_safe": 0
+            },
+            "expected": 600000,
+            "deskExpected": 600000,
+            "expectedDiffers": false,
+            "counted": 605000,
+            "variance": 5000,
+            "varianceReason": "unknown",
+            "acknowledgement": "waiting",
+            "acknowledgedByName": null
+          }
+        ],
+        "missingHandovers": [],
+        "unmatchedScans": [],
+        "exceptions": [],
+        "cashInTransit": 0,
+        "totalVariance": -25000
+      }
+    }
+  ]
+}
