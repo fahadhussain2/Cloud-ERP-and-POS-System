@@ -8,9 +8,11 @@ ALTER TABLE erp.accounts ADD CONSTRAINT accounts_system_role_check CHECK (system
   'CASH_DRAWER', 'CASH_IN_TRANSIT', 'AR_CONTROL', 'AP_CONTROL', 'INVENTORY', 'COGS', 'SALES', 'SALES_RETURNS',
   'SALES_DISCOUNT', 'ROUNDING', 'CASH_SHORT_OVER', 'INVENTORY_ADJUSTMENT', 'PURCHASE_PRICE_VARIANCE',
   'OPENING_BALANCE_EQUITY', 'RETAINED_EARNINGS', 'TAX_PAYABLE', 'TAX_RECOVERABLE', 'SUSPENSE', 'CASH_SAFE'));
+-- BEGIN cash-safe-role
 UPDATE erp.accounts a SET system_role = 'CASH_SAFE'
 WHERE a.code = '1130' AND a.is_postable AND a.system_role IS NULL
   AND NOT EXISTS (SELECT 1 FROM erp.accounts b WHERE b.tenant_id = a.tenant_id AND b.system_role = 'CASH_SAFE');
+-- END cash-safe-role
 
 -- A customer collection at the desk (family R, CSH-05). The back office's bank receipts and payments join it later
 -- (W1-16, W1-19); a desk's supplier payment is a cash movement. Never changed once stored.
