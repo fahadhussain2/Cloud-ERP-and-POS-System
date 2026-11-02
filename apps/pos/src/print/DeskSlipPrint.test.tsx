@@ -86,7 +86,7 @@ describe('the desk slips', () => {
         varianceReason: 'change_error',
         varianceNote: null,
         leftInDrawer: money(500000),
-      } as CashSessionDocument,
+      } as unknown as CashSessionDocument,
       acknowledgedByName: null,
       toSafe: 530000,
     });
