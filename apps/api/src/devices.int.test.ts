@@ -176,10 +176,15 @@ describe('enrollment', () => {
 
     const { rows } = await admin.query<{ action: string; by: string }>(
       `SELECT a.action, u.username AS by FROM erp.audit_log a JOIN erp.users u ON u.id = a.user_id
-       WHERE a.entity = 'devices' AND a.entity_id = $1 ORDER BY a.at`,
+       WHERE a.entity = 'devices' AND a.entity_id = $1 ORDER BY a.action`,
       [first.res.json<{ deviceId: string }>().deviceId],
     );
-    expect(rows[0]).toEqual({ action: 'create', by: 'maria' });
+    // The trigger's row and the API's are written in one transaction, so they share `at` (now() is the
+    // transaction's start): compare them as a set, never by their order in time.
+    expect(rows).toEqual([
+      { action: 'create', by: 'maria' },
+      { action: 'device.enrolled', by: 'maria' },
+    ]);
   });
 
   it('refuses a wrong code, an expired code and a forged proof of key, all the same way', async () => {
