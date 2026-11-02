@@ -13,6 +13,7 @@ import { openEventStream } from './sync/events';
 import { changePin } from './sync/pin';
 import { datasetsFor, pullAll, type PullResult } from './sync/pull';
 import { pushAll, type PushOutcome } from './sync/push';
+import { singleFlight } from './sync/single-flight';
 import { CLIENT_VERSION } from './version';
 
 // The real counter: the database worker, the key in IndexedDB and the API on the same origin (D-065).
@@ -63,9 +64,9 @@ export function browserCounter(): Counter {
     const createdAtMs = Date.now();
     return { id: uuidv7(createdAtMs), createdAtMs, clientVersion: CLIENT_VERSION };
   };
-  // One pull at a time: the first catalog load takes longer than the 60-second timer (W1-03). A caller joining a
-  // running pull still hears about its remaining pages.
-  let pulling: Promise<PullResult> | null = null;
+  // One pull at a time: the first catalog load takes longer than the 60-second timer (W1-03). A pull asked for while
+  // one runs (a nudge for a new bill) gets one more pull after it, never a share of one that may have passed the
+  // change; callers hear about the pages until the pulls stop.
   const listeners = new Set<() => void>();
   const pullOnce = async () => {
     const started = Date.now();
@@ -82,6 +83,10 @@ export function browserCounter(): Counter {
     await db.log('sync.pull', { ...r, ms: Date.now() - started });
     return r;
   };
+  const pullFlight = singleFlight<PullResult>(
+    () => pullOnce(),
+    () => listeners.clear(),
+  );
   // One push at a time too (sync spec §6.2); the scheduler in the app decides when.
   let pushing: Promise<PushOutcome> | null = null;
   const pushOnce = async () => {
@@ -122,11 +127,7 @@ export function browserCounter(): Counter {
     enroll: (input) => enroll(input, { api, keys, setDevice: (d) => db.setDevice(d) }),
     pull: (onPage) => {
       if (onPage) listeners.add(onPage);
-      pulling ??= pullOnce().finally(() => {
-        pulling = null;
-        listeners.clear();
-      });
-      return pulling;
+      return pullFlight();
     },
     push: () =>
       (pushing ??= pushOnce().finally(() => {
