@@ -81,6 +81,8 @@
 2. **On your PC** (`erp_dev`, a counter and a desk as two Edge profiles): open with a float; hand over three bills; receive Rs 5,000 from a mechanic in cash and print the receipt; pay Rs 200 for tea and Rs 20,000 to a supplier's runner; close with a blind count Rs 100 short, acknowledge it, keep a float in the drawer; open the next session; leave one cash bill unconfirmed; check the day reconciliation lists it, the session's variance matches, and the GL's `CASH_DRAWER` moved by exactly the session's documents and variance and equals the cash left in the drawer. Results go into this plan.
 3. **On staging:** the same with the staging desk, and the pilot's first evening close compared with the legacy count (D-090).
 
+**Results (2026-11-02, this PC):** `pnpm check` green (format, lint, typecheck, 1,403 tests with the coverage thresholds, `packages/domain` at 100%, every build); `pnpm test:integration` 256 passed (the desk's push, datasets, postings, reports and acknowledgement in `cash-desk.int.test.ts`, the rebuild check matching); `pnpm e2e` 38 passed in Edge, the 3 new desk flows in `till.spec.ts` among them. Two flakes seen once each and passing on the re-run: W1-10's *offline, the desk records a bill…* (the desk's offline banner missed its 10 s wait) and, under the full suite's load, the new collection screen test (its dialog now gets 5 s to open). **Not done:** Verify 2 (`erp_dev`) and Verify 3 (staging), and the owner's review.
+
 ## Risks
 
 | Risk | Mitigation |

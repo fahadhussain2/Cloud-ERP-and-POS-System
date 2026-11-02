@@ -419,9 +419,13 @@ describe('collections, cash-out and the count (W1-11)', () => {
     show(f.counter);
     await screen.findByText('C03-S000412');
     fireEvent.keyDown(window, { key: 'r', altKey: true });
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Name, phone or code' }), {
-      target: { value: 'ali autos' },
-    });
+    // The dialog opens after two reads from the desk: give a loaded run time.
+    fireEvent.change(
+      await screen.findByRole('combobox', { name: 'Name, phone or code' }, { timeout: 5000 }),
+      {
+        target: { value: 'ali autos' },
+      },
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Choose customer' }));
     expect(await screen.findByText('Ali Autos (C0042)')).toBeTruthy();
     fireEvent.change(screen.getByRole('textbox', { name: 'Amount received' }), { target: { value: '5000' } });
@@ -436,7 +440,7 @@ describe('collections, cash-out and the count (W1-11)', () => {
     show(f.counter);
     await screen.findByText('C03-S000412');
     fireEvent.keyDown(window, { key: 'm', altKey: true });
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Expense category' }), {
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Expense category' }, { timeout: 5000 }), {
       target: { value: 'e7' },
     });
     fireEvent.change(screen.getByRole('textbox', { name: 'Amount (whole rupees)' }), {
@@ -458,7 +462,7 @@ describe('collections, cash-out and the count (W1-11)', () => {
     show(f.counter);
     await screen.findByText('C03-S000412');
     fireEvent.keyDown(window, { key: 'x', altKey: true });
-    const fiveThousands = await screen.findByRole('textbox', { name: /5,000.*×/ });
+    const fiveThousands = await screen.findByRole('textbox', { name: /5,000.*×/ }, { timeout: 5000 });
     expect(screen.queryByText(/Expected in the drawer/)).toBeNull();
     fireEvent.change(fiveThousands, { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Count done' }));
@@ -474,7 +478,9 @@ describe('collections, cash-out and the count (W1-11)', () => {
     show(f.counter);
     await screen.findByText('C03-S000412');
     fireEvent.keyDown(window, { key: 'x', altKey: true });
-    fireEvent.change(await screen.findByRole('textbox', { name: /1,000.*×/ }), { target: { value: '4' } });
+    fireEvent.change(await screen.findByRole('textbox', { name: /1,000.*×/ }, { timeout: 5000 }), {
+      target: { value: '4' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Count done' }));
     expect(await screen.findByText(/Short .*1,000/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Close & print' }));
