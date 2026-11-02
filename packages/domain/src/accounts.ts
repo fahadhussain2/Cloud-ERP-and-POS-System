@@ -21,6 +21,8 @@ export const SYSTEM_ROLES = [
   'TAX_RECOVERABLE',
   // The difference of a bill that doesn't add up, until the accountant clears it (owner answer 3 to W1-08).
   'SUSPENSE',
+  // 1130 Cash in safe: what leaves the drawer at close, and the safe movements (owner answer 3 to W1-11).
+  'CASH_SAFE',
 ] as const;
 
 export type SystemRole = (typeof SYSTEM_ROLES)[number];

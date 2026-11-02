@@ -148,12 +148,12 @@ interface ReviewCase {
 runGolden(reviewCases as unknown as GoldenFile<ReviewCase>, (i) => {
   const doc = { ...BASES[i.doc], ...i.changes };
   if (doc.family === 'Z')
-    return reviewSession(doc as CashSessionDocument, {
+    return reviewSession(doc, {
       grantsOf,
       sessionCashierId: i.sessionCashierId === undefined ? CASHIER : i.sessionCashierId,
       branchId: BRANCH,
     });
-  return reviewDeskDocument(doc as CustomerCollectionDocument | CashMovementDocument, {
+  return reviewDeskDocument(doc, {
     grants: grantsOf((doc as { cashierId: string }).cashierId),
     branchId: BRANCH,
   });

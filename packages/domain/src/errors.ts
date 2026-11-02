@@ -41,7 +41,24 @@ export type DomainErrorCode =
   | 'received_not_rounded'
   | 'received_short'
   | 'session_open'
-  | 'invalid_float';
+  | 'invalid_float'
+  // Collections, cash-out and the drawer close (cash desk spec, W1-11)
+  | 'no_customer'
+  | 'invalid_method'
+  | 'amount_not_positive'
+  | 'amount_not_rounded'
+  | 'reference_required'
+  | 'reference_too_long'
+  | 'note_too_long'
+  | 'missing_target'
+  | 'extra_target'
+  | 'over_drawer'
+  | 'invalid_currency'
+  | 'invalid_count'
+  | 'left_invalid'
+  | 'reason_required'
+  | 'own_variance'
+  | 'not_acknowledger';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;
