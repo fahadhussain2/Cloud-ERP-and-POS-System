@@ -5,6 +5,8 @@ import {
   signCanonical,
   TenantSpec,
   uuidv7,
+  type CashVarianceResponse,
+  type DayReconciliationResponse,
   type DocumentFamily,
   type PullResponse,
   type PushDocument,
@@ -19,6 +21,7 @@ import {
   buildHandoverDocument,
   buildSaleDocument,
   buildSessionDocument,
+  businessDate,
   money,
   type Bill,
   type CashHandoverDocument,
@@ -980,5 +983,87 @@ describe('collections, cash-out and the counted close (W1-11)', () => {
 
   it('keeps every desk document in the rebuild check', async () => {
     expect((await checkRebuild(pool, shop.tenantId)).differences).toEqual([]);
+  });
+});
+
+// The cash reports (CSH-08, RPT-02, W1-11): computed on request from the day's documents above.
+describe('the day reconciliation and the cash variance (W1-11)', () => {
+  let cookie: string;
+  const today = () => businessDate(Date.now() - 1000, 'Asia/Karachi', 4);
+  const get = (url: string, as = cookie) =>
+    app().inject({
+      method: 'GET',
+      url,
+      headers: { origin: ORIGIN, host: HOST },
+      cookies: { erp_session: as },
+    });
+  const login = async (username: string) =>
+    (await httpPost('/api/auth/login', { tenantCode: shop.code, username, password: PASSWORD })).cookies.find(
+      (x) => x.name === 'erp_session',
+    )!.value;
+
+  beforeAll(async () => {
+    cookie = await login('fahad');
+  });
+
+  it("lists the day's sessions, the cash bills never handed over by salesman, and stays provisional", async () => {
+    const res = await get(`/api/reports/day-reconciliation?branchId=${shop.branchId}&date=${today()}`);
+    expect(res.statusCode, res.body).toBe(200);
+    const r = res.json<DayReconciliationResponse>();
+    expect(r.status).toBe('provisional');
+    expect(r.holds.map((h) => h.kind)).toContain('day_not_over');
+    const counted = r.sessions.filter((s) => s.counted !== null);
+    // The W1-10 close (exact), then the two W1-11 closes.
+    expect(counted.map((s) => [s.variance, s.acknowledgement])).toEqual([
+      [0, 'exact'],
+      [-30000, 'acknowledged'],
+      [-80000, 'waiting'],
+    ]);
+    expect(r.missingHandovers!.flatMap((g) => g.bills).length).toBeGreaterThan(0);
+    expect(r.missingHandovers!.every((g) => g.sellerName === 'sara')).toBe(true);
+    expect(r.cashInTransit).toBe(240000 + 120000 + 10000);
+    expect(r.totalVariance).toBe(-110000);
+  });
+
+  it('exports it as CSV', async () => {
+    const res = await get(
+      `/api/reports/day-reconciliation?branchId=${shop.branchId}&date=${today()}&format=csv`,
+    );
+    expect(res.headers['content-type']).toMatch(/^text\/csv/);
+    expect(res.body.split('\r\n')[0]).toBe('section,number,device,person,amount,detail');
+  });
+
+  it('lists the cash variance by session and cashier', async () => {
+    const res = await get(`/api/reports/cash-variance?from=${today()}&to=${today()}`);
+    expect(res.statusCode, res.body).toBe(200);
+    const r = res.json<CashVarianceResponse>();
+    expect(r.byCashier).toEqual([{ cashierName: 'ali', sessions: 3, variance: -110000 }]);
+    expect(r.sessions.find((s) => s.acknowledgement === 'not_counted')).toBeUndefined();
+  });
+
+  it('lets a manager acknowledge a waiting variance once, audited; never the cashier', async () => {
+    const waiting = (await get(`/api/reports/cash-variance?from=${today()}&to=${today()}`))
+      .json<CashVarianceResponse>()
+      .sessions.find((s) => s.acknowledgement === 'waiting')!;
+    const url = `/api/reports/cash-sessions/${waiting.sessionId}/acknowledge`;
+    expect((await httpPost(url, {}, await login('ali'))).statusCode).toBe(403);
+    expect((await httpPost(url, {}, cookie)).statusCode).toBe(200);
+    expect((await httpPost(url, {}, cookie)).json()).toEqual({ error: 'already_acknowledged' });
+    const audit = await q<{ action: string }>('SELECT action FROM erp.audit_log WHERE entity_id = $1', [
+      waiting.sessionId,
+    ]);
+    expect(audit.map((a) => a.action)).toEqual(['cash.variance.acknowledged']);
+  });
+
+  it('refuses a request without a date, and someone without reports.view', async () => {
+    expect((await get(`/api/reports/day-reconciliation?branchId=${shop.branchId}`)).statusCode).toBe(400);
+    expect(
+      (
+        await get(
+          `/api/reports/day-reconciliation?branchId=${shop.branchId}&date=${today()}`,
+          await login('sara'),
+        )
+      ).statusCode,
+    ).toBe(403);
   });
 });

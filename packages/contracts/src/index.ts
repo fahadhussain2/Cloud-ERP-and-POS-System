@@ -85,3 +85,12 @@ export {
   type PullDataset,
   type PullResponse,
 } from './sync';
+export type {
+  AcknowledgementStatus,
+  CashMovementKindName,
+  CashVarianceResponse,
+  CashVarianceRow,
+  DayHoldResponse,
+  DayReconciliationResponse,
+  DaySessionResponse,
+} from './reports';

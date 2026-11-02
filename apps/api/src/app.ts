@@ -8,6 +8,7 @@ import { registerUsers } from './admin/users';
 import { registerAuth } from './auth/routes';
 import { registerDevices } from './devices/routes';
 import { registerEvents } from './sync/events';
+import { registerReports } from './reports/routes';
 import { registerPush } from './sync/push';
 import { registerSync } from './sync/routes';
 
@@ -83,6 +84,7 @@ export function buildApp({
         registerEvents(api, { feed, requireDevice });
         registerAdmin(api, { pool, requireAuth });
         registerUsers(api, { pool, now, requireAuth });
+        registerReports(api, { pool, now, requireAuth });
       },
       { prefix: '/api' },
     );
