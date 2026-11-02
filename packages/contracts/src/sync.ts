@@ -113,8 +113,9 @@ export type CustomerDataset = keyof typeof CUSTOMER_COLUMNS;
 export const CUSTOMER_DATASETS = Object.keys(CUSTOMER_COLUMNS) as CustomerDataset[];
 
 /**
- * The cash desk's live queue (sync spec §3, CSH-02, W1-10): the branch's bills with cash to take in or pay out,
- * pulled only by cash desks. No lines, customer or payload.
+ * Pulled only by cash desks (sync spec §3): the live queue (CSH-02, W1-10), the branch's bills with cash to take in or
+ * pay out, with no lines, customer or payload; and what cash-out names (CSH-06, W1-11): suppliers and their balances,
+ * expense categories and bank accounts, never their GL accounts or a supplier's contact details.
  */
 export const CASH_DESK_COLUMNS = {
   cash_queue: {
@@ -130,6 +131,10 @@ export const CASH_DESK_COLUMNS = {
     handover_status: 'text',
     status: 'text',
   },
+  suppliers: { id: 'text', code: 'text', name: 'text', phones: 'json', city: 'text', status: 'text' },
+  supplier_balances: { party_id: 'text', balance: 'money', updated_at: 'text' },
+  expense_categories: { id: 'text', code: 'text', name: 'text', is_active: 'bool' },
+  bank_accounts: { id: 'text', code: 'text', name: 'text', kind: 'text', is_active: 'bool' },
 } as const satisfies Record<string, Record<string, ColumnType>>;
 
 export type CashDeskDataset = keyof typeof CASH_DESK_COLUMNS;

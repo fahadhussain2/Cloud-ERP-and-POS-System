@@ -26,7 +26,7 @@ import { mayGivePin } from '../admin/users';
 import { requirePermission } from '../auth/routes';
 import { recordPull } from './push';
 
-// Counter sync (sync spec v1, W1-02, W1-03, W1-06, W1-09, W1-10, D-089): pull with per-dataset column lists, and the
+// Counter sync (sync spec v1, W1-02, W1-03, W1-06, W1-09, W1-10, W1-11, D-089): pull with per-dataset column lists, and the
 // counter PIN change.
 
 interface Deps {
@@ -55,6 +55,18 @@ const CUSTOMER_SOURCES: Record<CustomerDataset, Omit<PullSource, 'columns'>> = {
   customer_balances: { table: 'party_balances', where: "role = 'customer'" },
 };
 
+/** What a desk's cash-out names (W1-11): suppliers with a live supplier account and their balances; the rest by table. */
+const DESK_SOURCES: Record<Exclude<CashDeskDataset, 'cash_queue'>, Omit<PullSource, 'columns'>> = {
+  suppliers: {
+    table: 'parties',
+    where: `EXISTS (SELECT 1 FROM erp.supplier_accounts a
+                    WHERE a.party_id = parties.id AND a.tenant_id = parties.tenant_id AND a.deleted_at IS NULL)`,
+  },
+  supplier_balances: { table: 'party_balances', where: "role = 'supplier'" },
+  expense_categories: { table: 'expense_categories' },
+  bank_accounts: { table: 'bank_accounts' },
+};
+
 /** Each dataset's source and the only columns that may leave the server (sync spec §3). */
 function datasetSource(dataset: PullDataset, branchId: string, deviceId: string): PullSource {
   // The catalog (W1-03): the shared column list, tenant-wide; each table is named like its dataset.
@@ -73,6 +85,11 @@ function datasetSource(dataset: PullDataset, branchId: string, deviceId: string)
     return {
       ...CUSTOMER_SOURCES[dataset],
       columns: [...Object.keys(CUSTOMER_COLUMNS[dataset]), 'row_version', 'deleted_at'],
+    };
+  if (isCashDesk(dataset) && dataset !== 'cash_queue')
+    return {
+      ...DESK_SOURCES[dataset],
+      columns: [...Object.keys(CASH_DESK_COLUMNS[dataset]), 'row_version', 'deleted_at'],
     };
   switch (dataset) {
     // The cash desk's queue (W1-10): the branch's bills with cash to move, pending or of the last 7 days, so a received

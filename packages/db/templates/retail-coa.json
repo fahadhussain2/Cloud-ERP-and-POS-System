@@ -39,7 +39,7 @@
       "type": "asset",
       "parentCode": "1100",
       "isPostable": true,
-      "systemRole": null
+      "systemRole": "CASH_SAFE"
     },
     {
       "code": "1190",

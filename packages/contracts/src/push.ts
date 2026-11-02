@@ -37,9 +37,12 @@ export const EXCEPTION_KINDS = [
   'clock_skew',
   'revoked_device_doc',
   'bad_signature',
-  // The cash desk (W1-10): a second handover of one bill, and a cashier the server says may not take cash.
+  // The cash desk (W1-10): a second handover of one bill, and a cashier the server says may not take cash; (W1-11) a
+  // collection, cash-out or close by someone without the permission, and a float other than what stayed at close.
   'duplicate_handover',
   'handover_not_permitted',
+  'cash_not_permitted',
+  'float_mismatch',
 ] as const;
 export type ExceptionKind = (typeof EXCEPTION_KINDS)[number];
 

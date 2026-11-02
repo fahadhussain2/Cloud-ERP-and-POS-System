@@ -761,6 +761,15 @@ export const partyBalances = erp.table('party_balances', {
   ...syncColumns,
 });
 
+const VARIANCE_REASONS = [
+  'change_error',
+  'wrong_bill_confirmed',
+  'unrecorded_cash_out',
+  'counterfeit_note',
+  'unknown',
+  'other',
+] as const;
+
 /** A cash desk's session (W1-10, data model §6): opened by its open document, closed by its close document. */
 export const cashSessions = erp.table('cash_sessions', {
   id: uuid('id').primaryKey(),
@@ -783,6 +792,16 @@ export const cashSessions = erp.table('cash_sessions', {
   closePayload: jsonb('close_payload'),
   closeSignature: bytea('close_signature'),
   clientVersion: text('client_version').notNull(),
+  // The counted close (W1-11): only the acknowledgement may be set later, from the back office.
+  floatExpected: bigint('float_expected', { mode: 'number' }),
+  countedCash: bigint('counted_cash', { mode: 'number' }),
+  denominations: jsonb('denominations'),
+  variance: bigint('variance', { mode: 'number' }),
+  varianceReasonCode: text('variance_reason_code', { enum: VARIANCE_REASONS }),
+  varianceNote: text('variance_note'),
+  leftInDrawer: bigint('left_in_drawer', { mode: 'number' }),
+  acknowledgedByUserId: uuid('acknowledged_by_user_id'),
+  acknowledgedAt: timestamp('acknowledged_at', { withTimezone: true }),
   ...syncColumns,
   ...auditColumns,
 });
@@ -809,6 +828,65 @@ export const cashHandovers = erp.table('cash_handovers', {
   businessDate: date('business_date').notNull(),
   receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
   duplicateOfId: uuid('duplicate_of_id'),
+  payload: jsonb('payload').notNull(),
+  payloadHash: bytea('payload_hash').notNull(),
+  signature: bytea('signature').notNull(),
+  clientVersion: text('client_version').notNull(),
+  exceptionCount: integer('exception_count').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+/** A customer collection a desk pushed (W1-11, data model §6); bank receipts and payments join it later. */
+export const payments = erp.table('payments', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  number: text('number').notNull(),
+  seq: integer('seq').notNull(),
+  direction: text('direction', { enum: ['in', 'out'] }).notNull(),
+  partyId: uuid('party_id').notNull(),
+  methodId: uuid('method_id').notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  reference: text('reference'),
+  note: text('note'),
+  sessionId: uuid('session_id').notNull(),
+  cashierUserId: uuid('cashier_user_id').notNull(),
+  atDevice: timestamp('at_device', { withTimezone: true }).notNull(),
+  businessDate: date('business_date').notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  payload: jsonb('payload').notNull(),
+  payloadHash: bytea('payload_hash').notNull(),
+  signature: bytea('signature').notNull(),
+  clientVersion: text('client_version').notNull(),
+  exceptionCount: integer('exception_count').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+/** A cash-out or safe movement a desk pushed (W1-11, data model §6). */
+export const cashMovements = erp.table('cash_movements', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  number: text('number').notNull(),
+  seq: integer('seq').notNull(),
+  kind: text('kind', {
+    enum: ['expense', 'supplier_payment', 'bank_deposit', 'to_safe', 'from_safe'],
+  }).notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  expenseCategoryId: uuid('expense_category_id'),
+  partyId: uuid('party_id'),
+  bankAccountId: uuid('bank_account_id'),
+  note: text('note'),
+  reference: text('reference'),
+  sessionId: uuid('session_id').notNull(),
+  cashierUserId: uuid('cashier_user_id').notNull(),
+  atDevice: timestamp('at_device', { withTimezone: true }).notNull(),
+  businessDate: date('business_date').notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
   payload: jsonb('payload').notNull(),
   payloadHash: bytea('payload_hash').notNull(),
   signature: bytea('signature').notNull(),

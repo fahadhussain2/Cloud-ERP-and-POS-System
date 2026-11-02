@@ -7,7 +7,6 @@ import { postCashMovement, postCollection, postSession } from './cash';
 import { postHandover } from './handover';
 import { runGolden, type GoldenFile } from './testing/golden';
 import type {
-  JournalLine,
   PostingCashMovement,
   PostingCollection,
   PostingContext,
@@ -49,7 +48,7 @@ runGolden(cashCases as unknown as GoldenFile<Input>, (i) => {
   const context = contextOf(i.context);
   if (i.collection) return postCollection(i.collection, context);
   if (i.movement) return postCashMovement(i.movement, context);
-  return postSession(i.session, context);
+  return postSession(i.session!, context);
 });
 
 // Posting rules §4.5 and owner answer 3 to W1-11: after a day of desk documents and a counted close, the drawer's
