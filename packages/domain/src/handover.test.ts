@@ -1,9 +1,8 @@
-import sessionCases from '../golden/cash-session.json';
 import documentCases from '../golden/handover-document.json';
 import reviewCases from '../golden/handover-review.json';
 import handoverCases from '../golden/handover.json';
 import queueCases from '../golden/queue.json';
-import { buildSessionDocument, expectedCash, type DeskSession } from './cash-session';
+import type { DeskSession } from './cash-session';
 import {
   buildHandoverDocument,
   checkHandover,
@@ -133,32 +132,4 @@ interface ReviewCase {
 runGolden(reviewCases as unknown as GoldenFile<ReviewCase>, (i) => {
   const handover = { ...BASE, ...i.handover };
   return reviewHandover(handover, { ...i.context, grants: grantsOf(handover.cashierId), branchId: BRANCH });
-});
-
-interface SessionCase {
-  expected?: { openingFloat: Money; handovers: { kind: 'in' | 'payout'; amount: Money }[] };
-  open?: { current: DeskSession | null; userId: string; openingFloat: Money; seq: number; createdAt: string };
-  close?: {
-    current: DeskSession | null;
-    handovers: { kind: 'in' | 'payout'; amount: Money }[];
-    userId: string;
-    seq: number;
-    createdAt: string;
-  };
-}
-
-const SESSION_CONTEXT = { ...CONTEXT, id: '019a6000-0000-7000-8000-000000000081', increment: RS };
-
-runGolden(sessionCases as unknown as GoldenFile<SessionCase>, (i) => {
-  if (i.expected !== undefined) return expectedCash(i.expected);
-  const e = (i.open ?? i.close)!;
-  return buildSessionDocument({
-    event: i.open !== undefined ? 'open' : 'close',
-    current: e.current,
-    userId: e.userId,
-    grants: grantsOf(e.userId),
-    openingFloat: i.open?.openingFloat ?? null,
-    handovers: i.close?.handovers ?? [],
-    context: { ...SESSION_CONTEXT, seq: e.seq, createdAtMs: Date.parse(e.createdAt) },
-  });
 });

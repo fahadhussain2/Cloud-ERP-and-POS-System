@@ -121,8 +121,9 @@ const TYPED_DATASETS: TypedDataset[] = [
   ...CUSTOMER_DATASETS,
   ...CASH_DESK_DATASETS,
 ];
-/** Each row's key: `id`, except a customer's balance, one per party. */
-const keyOf = (d: TypedDataset) => (d === 'customer_balances' ? 'party_id' : 'id');
+/** Each row's key: `id`, except a customer's or supplier's balance, one per party. */
+const keyOf = (d: TypedDataset) =>
+  d === 'customer_balances' || d === 'supplier_balances' ? 'party_id' : 'id';
 
 const UPSERT = Object.fromEntries(
   TYPED_DATASETS.map((d) => {

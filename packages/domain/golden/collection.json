@@ -1,0 +1,174 @@
+{
+  "description": "A customer collection at the desk (CSH-05, PRD W8, W1-11): the check before it is recorded. Desk D01 in branch …e1, session …51 of the cashier …a5 (testing/desk.ts); unit Rs 1 = 100. Customers: ali = C0042 Ali Autos owing Rs 12,500; bilal = C0051 Bilal Motors with Rs 1,000 in advance (balance −Rs 1,000). Methods: cash, raast (needs a reference), on_account, card (inactive). The first problem, in order: no_session, not_session_cashier, not_permitted, no_customer, invalid_method, amount_not_positive, amount_not_rounded (cash only), reference_required, reference_too_long (40), note_too_long (200).",
+  "cases": [
+    {
+      "name": "Rs 5,000 in cash",
+      "input": { "method": "cash", "amount": 500000 },
+      "expected": {
+        "ok": true,
+        "amount": 500000,
+        "reference": null,
+        "note": null,
+        "balanceAfter": 750000,
+        "advance": 0
+      }
+    },
+    {
+      "name": "the whole balance by Raast, the reference trimmed",
+      "input": { "method": "raast", "amount": 1250000, "reference": "  TX-55120  " },
+      "expected": {
+        "ok": true,
+        "amount": 1250000,
+        "reference": "TX-55120",
+        "note": null,
+        "balanceAfter": 0,
+        "advance": 0
+      }
+    },
+    {
+      "name": "a bank amount with paisa is fine",
+      "input": { "method": "raast", "amount": 500050, "reference": "TX-1" },
+      "expected": {
+        "ok": true,
+        "amount": 500050,
+        "reference": "TX-1",
+        "note": null,
+        "balanceAfter": 749950,
+        "advance": 0
+      }
+    },
+    {
+      "name": "more than the balance: allowed, the rest kept as an advance",
+      "input": { "method": "cash", "amount": 1500000, "note": "  paid by his son  " },
+      "expected": {
+        "ok": true,
+        "amount": 1500000,
+        "reference": null,
+        "note": "paid by his son",
+        "balanceAfter": -250000,
+        "advance": 250000
+      }
+    },
+    {
+      "name": "a customer already in advance: all of it is advance",
+      "input": { "customer": "bilal", "method": "cash", "amount": 100000 },
+      "expected": {
+        "ok": true,
+        "amount": 100000,
+        "reference": null,
+        "note": null,
+        "balanceAfter": -200000,
+        "advance": 100000
+      }
+    },
+    {
+      "name": "a blank reference and note are none",
+      "input": { "method": "cash", "amount": 100000, "reference": "   ", "note": "" },
+      "expected": {
+        "ok": true,
+        "amount": 100000,
+        "reference": null,
+        "note": null,
+        "balanceAfter": 1150000,
+        "advance": 0
+      }
+    },
+    {
+      "name": "no session open",
+      "input": { "session": null, "method": "cash", "amount": 500000 },
+      "expected": { "ok": false, "problem": "no_session" }
+    },
+    {
+      "name": "a closed session",
+      "input": {
+        "session": {
+          "id": "019a6000-0000-7000-8000-000000000051",
+          "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+          "openingFloat": 500000,
+          "status": "closed"
+        },
+        "method": "cash",
+        "amount": 500000
+      },
+      "expected": { "ok": false, "problem": "no_session" }
+    },
+    {
+      "name": "another cashier's session",
+      "input": { "cashierId": "019a0000-0000-7000-8000-0000000000a7", "method": "cash", "amount": 500000 },
+      "expected": { "ok": false, "problem": "not_session_cashier" }
+    },
+    {
+      "name": "the session's cashier without cash.collection.receive",
+      "input": {
+        "session": {
+          "id": "019a6000-0000-7000-8000-000000000051",
+          "cashierId": "019a0000-0000-7000-8000-0000000000a6",
+          "openingFloat": 0,
+          "status": "open"
+        },
+        "cashierId": "019a0000-0000-7000-8000-0000000000a6",
+        "method": "cash",
+        "amount": 500000
+      },
+      "expected": { "ok": false, "problem": "not_permitted", "permission": "cash.collection.receive" }
+    },
+    {
+      "name": "no customer chosen",
+      "input": { "customer": null, "method": "cash", "amount": 500000 },
+      "expected": { "ok": false, "problem": "no_customer" }
+    },
+    {
+      "name": "no method chosen",
+      "input": { "method": null, "amount": 500000 },
+      "expected": { "ok": false, "problem": "invalid_method" }
+    },
+    {
+      "name": "on account is not a payment",
+      "input": { "method": "on_account", "amount": 500000 },
+      "expected": { "ok": false, "problem": "invalid_method" }
+    },
+    {
+      "name": "an inactive method",
+      "input": { "method": "card", "amount": 500000, "reference": "SLIP-9" },
+      "expected": { "ok": false, "problem": "invalid_method" }
+    },
+    {
+      "name": "nothing to collect",
+      "input": { "method": "cash", "amount": 0 },
+      "expected": { "ok": false, "problem": "amount_not_positive" }
+    },
+    {
+      "name": "a negative amount",
+      "input": { "method": "cash", "amount": -100000 },
+      "expected": { "ok": false, "problem": "amount_not_positive" }
+    },
+    {
+      "name": "cash with paisa",
+      "input": { "method": "cash", "amount": 500050 },
+      "expected": { "ok": false, "problem": "amount_not_rounded" }
+    },
+    {
+      "name": "Raast without its reference",
+      "input": { "method": "raast", "amount": 500000, "reference": " " },
+      "expected": { "ok": false, "problem": "reference_required" }
+    },
+    {
+      "name": "a reference of 41 characters",
+      "input": {
+        "method": "raast",
+        "amount": 500000,
+        "reference": "12345678901234567890123456789012345678901"
+      },
+      "expected": { "ok": false, "problem": "reference_too_long" }
+    },
+    {
+      "name": "a note of 201 characters",
+      "input": {
+        "method": "cash",
+        "amount": 500000,
+        "note": "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901"
+      },
+      "expected": { "ok": false, "problem": "note_too_long" }
+    }
+  ]
+}

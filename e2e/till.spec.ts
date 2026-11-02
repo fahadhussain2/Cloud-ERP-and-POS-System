@@ -23,7 +23,7 @@ import {
 // The desk is a second PC, so a second browser profile. A session with a float; a counter's cash bill in the queue
 // within 5 s under its salesman, confirmed with Enter; a corrected cash received; a scan of a queued bill; offline, a
 // scan of a bill whose counter hasn't synced, matched by the server once both are back; a second scan refused; a
-// sale on the desk handed over by itself; the session closed.
+// sale on the desk handed over by itself. W1-11 adds a collection, a cash-out offline and the counted close (below).
 
 const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
 const POS = `http://localhost:${POS_PORT}`;
@@ -157,7 +157,11 @@ test('the cash desk PC is set up; the cashier chooses a PIN, lands on the cash d
   await desk.addInitScript(() => {
     navigator.storage.persisted = () => Promise.resolve(true);
     navigator.storage.persist = () => Promise.resolve(true);
-    window.print = () => undefined;
+    // Counted, so a flow can tell a receipt or slip was printed (W1-11).
+    window.print = () => {
+      const w = window as unknown as { prints?: number };
+      w.prints = (w.prints ?? 0) + 1;
+    };
   });
   till = await desk.newPage();
   await till.goto(POS);
@@ -267,7 +271,7 @@ test("offline, the desk records a bill whose counter hasn't synced from its code
     .toMatchObject({ method: 'scan', linked: true, status: 'received', exceptions: 0 });
 });
 
-test('a cash sale on the desk itself is handed over by itself; then the session closes', async () => {
+test('a cash sale on the desk itself is handed over by itself', async () => {
   await till.keyboard.press('Alt+Q');
   const box = till.getByRole('combobox');
   await box.fill('FNBL002');
@@ -289,12 +293,129 @@ test('a cash sale on the desk itself is handed over by itself; then the session 
   await expect(queue()).toBeVisible();
   // The desk reads its session again when the screen comes back: wait for the bar, as the cashier sees it.
   await expect(till.getByText(pos.desk.expected)).toBeVisible();
-  await till.keyboard.press('Alt+X');
-  await till.getByRole('dialog').getByRole('button', { name: pos.desk.close.action }).click();
-  await expect(deskNotice()).toHaveText(/Session D01-Z000002 closed/);
+});
+
+/** How many times the desk has printed (a bill, a receipt, a voucher or a slip). */
+const prints = () => till.evaluate(() => (window as unknown as { prints?: number }).prints ?? 0);
+
+/** The lines a document of `type` posted, as [account, debit, credit]. */
+const journalOf = async (type: string) =>
+  (
+    await sql<{ code: string; debit: string; credit: string }>(
+      `SELECT a.code, l.debit, l.credit FROM erp.journal_entries e JOIN erp.journal_lines l ON l.entry_id = e.id
+       JOIN erp.accounts a ON a.id = l.account_id WHERE e.source_type = $1 ORDER BY e.posting_seq, l.line_no`,
+      [type],
+    )
+  ).map((l) => [l.code, Number(l.debit), Number(l.credit)]);
+
+// W1-11 plan scope 8: a customer's payment with its receipt, a cash-out written offline, and the drawer counted blind,
+// short, acknowledged later, then acknowledged by the owner on the day reconciliation.
+
+test('a customer pays at the desk: the receipt prints and the payment posts to their account', async () => {
+  const before = await prints();
+  await till.keyboard.press('Alt+R');
+  const dialog = till.getByRole('dialog');
+  await dialog.getByRole('combobox').fill('Khan');
+  await dialog.getByRole('button', { name: pos.desk.collect.pick }).click();
+  await expect(dialog).toContainText('Khan Motors (C0042)');
+  await dialog.getByLabel(pos.desk.collect.amount).fill('2000');
+  await dialog.getByRole('button', { name: pos.desk.collect.action }).click();
+  await expect(deskNotice()).toHaveText(/Received Rs\s?2,000 from Khan Motors · D01-R000001/);
+  expect(await prints()).toBe(before + 1);
   await expect
-    .poll(async () => (await sql<{ status: string }>('SELECT status FROM erp.cash_sessions'))[0]?.status, {
-      timeout: 15_000,
-    })
-    .toBe('closed');
+    .poll(() => journalOf('payment'), { timeout: 15_000 })
+    .toEqual([
+      ['1110', 200000, 0],
+      ['1200', 0, 200000],
+    ]);
+});
+
+test('offline, a cash-out is written and printed at the desk; it reaches the server once the desk is back', async () => {
+  test.setTimeout(90_000);
+  await desk.setOffline(true);
+  await expect(till.getByText(/queue is not updating · scan each bill/)).toBeVisible({ timeout: 10_000 });
+  const before = await prints();
+  await till.keyboard.press('Alt+M');
+  const dialog = till.getByRole('dialog');
+  await dialog.getByLabel(pos.desk.cashOut.target.expense).selectOption({ label: 'General expenses' });
+  await dialog.getByLabel(pos.desk.cashOut.amount).fill('200');
+  await dialog.getByLabel(pos.desk.cashOut.note).fill('tea for the staff');
+  await dialog.getByRole('button', { name: pos.desk.cashOut.action }).click();
+  await expect(deskNotice()).toHaveText(/Paid out Rs\s?200 · D01-M000001/);
+  expect(await prints()).toBe(before + 1);
+  expect(await sql('SELECT 1 FROM erp.cash_movements')).toHaveLength(0);
+
+  await desk.setOffline(false);
+  await expect
+    .poll(
+      async () => (await sql<{ kind: string }>('SELECT kind FROM erp.cash_movements')).map((r) => r.kind),
+      {
+        timeout: 30_000,
+      },
+    )
+    .toEqual(['expense']);
+  await expect
+    .poll(() => journalOf('cash_movement'))
+    .toEqual([
+      ['6310', 20000, 0],
+      ['1110', 0, 20000],
+    ]);
+});
+
+test('the drawer is counted blind, short, acknowledged later; the owner acknowledges it on the day reconciliation', async ({
+  page,
+}) => {
+  await till.keyboard.press('Alt+X');
+  const dialog = till.getByRole('dialog');
+  // Blind (owner answer 2): the expected cash shows nowhere while counting.
+  await expect(till.getByText(pos.desk.expected)).toBeHidden();
+  await dialog.getByRole('textbox', { name: /5,000.*×/ }).fill('1');
+  await dialog.getByRole('button', { name: pos.desk.count.done }).click();
+  await expect(dialog.getByText(/^Short Rs/)).toBeVisible();
+  await dialog.getByLabel(pos.desk.count.reason.unknown).check();
+  await dialog.getByLabel(pos.desk.count.later).check();
+  await dialog.getByRole('button', { name: pos.desk.count.action }).click();
+  await expect(deskNotice()).toHaveText(/Session D01-Z000002 closed, variance/);
+  const closed = async () =>
+    (
+      await sql<{
+        counted_cash: string | null;
+        variance: string | null;
+        acknowledged_by_user_id: string | null;
+      }>(
+        "SELECT counted_cash, variance, acknowledged_by_user_id FROM erp.cash_sessions WHERE close_number = 'D01-Z000002'",
+      )
+    )[0] ?? null;
+  await expect
+    .poll(closed, { timeout: 15_000 })
+    .toMatchObject({ counted_cash: '500000', acknowledged_by_user_id: null });
+  expect(Number((await closed())!.variance)).toBeLessThan(0);
+
+  // The owner, in the back office, on today's business day (Karachi, 04:00 cutoff).
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(
+    new Date(Date.now() - 4 * 3_600_000),
+  );
+  await page.goto(BACKOFFICE);
+  const signOut = page.getByRole('button', { name: bo.nav.signOut });
+  await expect(signOut.or(page.getByLabel(bo.login.shopCode))).toBeVisible();
+  if (!(await signOut.isVisible())) {
+    await page.getByLabel(bo.login.shopCode).fill(SHOP);
+    await page.getByLabel(bo.login.username).fill(OWNER.username);
+    await page.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
+    await page.getByRole('button', { name: bo.login.submit }).click();
+  }
+  await page
+    .getByRole('navigation', { name: bo.nav.menu })
+    .getByRole('link', { name: bo.nav.dayReconciliation })
+    .click();
+  await page.getByLabel(bo.reports.day.date).fill(today);
+  await expect(page.getByText(bo.reports.day.provisional)).toBeVisible();
+  // The earlier flows left cash bills nobody handed over: they are listed under their salesman.
+  await expect(page.getByText(new RegExp(`${SALESMAN.fullName} ·`))).toBeVisible();
+  // A session goes by its open document's number; D01-Z000002 is its close.
+  const row = page.getByRole('row', { name: /D01-Z000001/ });
+  await expect(row).toContainText(bo.reports.ack.waiting);
+  await row.getByRole('button', { name: bo.reports.ack.action }).click();
+  await expect(row).toContainText(`By ${OWNER.fullName}`);
+  await expect.poll(async () => (await closed())?.acknowledged_by_user_id ?? null).not.toBeNull();
 });

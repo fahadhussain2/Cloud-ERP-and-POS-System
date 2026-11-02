@@ -829,3 +829,20 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Matching by bill number is what makes an offline scan work before the counter syncs; linking later, and posting the handover's own amount, keeps the books right whichever arrives first.
   - A stray scan must not record cash that can't be taken back: documents are immutable (rule 3).
 - **Status:** Accepted (with the W1-10 plan, owner answers 1–4)
+
+### D-098 Cash desk 2: collections and cash-outs are desk documents, the close is a blind count with the safe, the day is reconciled on request (2026-11-02)
+- **Decision:**
+  - **A collection (`R`) and a cash-out (`M`) are desk documents** like a handover: local-first, in the desk's outbox, pushed only by a cash desk, reviewed and never refused (rule 7). A collection is any active method except on account, with its reference; paying more than the balance is kept as an advance. A cash-out is an expense (by category), a supplier payment, a bank deposit, or a move **to or from the safe**; one above the expected cash asks for a second Enter.
+  - **Each desk family has its own table:** collections in `payments` (direction `in`; the back office's receipts and payments join it later), every cash movement in `cash_movements`, **supplier payments included** (data model §6 had them in `payments`). The supplier ledger reads `party_ledger_entries`.
+  - **The close is a blind count by denomination** (owner answer 2): the expected cash shows only after the count, on the desk and in its session bar. A variance needs a reason and **a manager's PIN, or *Acknowledge later*** in the back office (owner answer 1); never the session's own cashier. The server keeps an acknowledgement only when it allows it. **The variance posts when the close arrives**, acknowledged or not.
+  - **What doesn't stay in the drawer goes to the safe with the close** (owner answer 3): the close carries what stays, and posts the rest `Dr CASH_SAFE / Cr CASH_DRAWER`; **1130 Cash in safe gets the `CASH_SAFE` role**. The next open's float is filled in with what stayed; a different float posts the difference to `CASH_SHORT_OVER` and is flagged `float_mismatch`. So 1110 equals the cash in the drawer after every count.
+  - **`CashSessionV2`** carries the count; push still takes W1-10's `CashSessionV1` closes, as *not counted*.
+  - **The day reconciliation is computed on request** (`reconcileDay`), never stored: *Final* only when the day is over, every active device has been heard from since with nothing older unsynced, no gap is open and no session of the day is open. With handover confirmation Required it lists the cash bills never handed over by salesman. The missing handovers are not raised as exceptions: the bills and handovers already say it.
+  - **A desk pulls four more datasets** (`suppliers`, `supplier_balances`, `expense_categories`, `bank_accounts`), never their GL accounts or a supplier's contacts.
+  - **Customer ageing at the desk waits for W1-20** (owner answer 4); the desk shows the balance and the last collection.
+- **Why:**
+  - One trust path for every desk document; a cashier's record is kept and judged on the server (D-011).
+  - Seeing the target while counting nudges the count towards it.
+  - Without the safe, the drawer's account would drift from the drawer every time the cash left it at night.
+  - A report computed from the documents can't go stale when a counter syncs late.
+- **Status:** Accepted (with the W1-11 plan, owner answers 1–5)

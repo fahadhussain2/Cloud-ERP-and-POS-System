@@ -1,0 +1,82 @@
+{
+  "description": "The collection document (CustomerCollectionV1, family R, W1-11): desk D01, session …51 of the cashier …a5, document id …71, Asia/Karachi with the 04:00 cutoff, client 0.8.0 (testing/desk.ts). Customers and methods as in collection.json; cash is method …101, Raast …102. The check's problem is raised as its DomainError code.",
+  "cases": [
+    {
+      "name": "Rs 5,000 in cash from Ali Autos: D01-R000001",
+      "input": { "method": "cash", "amount": 500000, "seq": 1, "createdAt": "2026-11-02T10:30:00.000Z" },
+      "expected": {
+        "version": 1,
+        "id": "019a7000-0000-7000-8000-000000000071",
+        "family": "R",
+        "seq": 1,
+        "number": "D01-R000001",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+        "partyId": "019a3000-0000-7000-8000-0000000000c1",
+        "customerCode": "C0042",
+        "customerName": "Ali Autos",
+        "methodId": "019a1000-0000-7000-8000-000000000101",
+        "methodCode": "cash",
+        "amount": 500000,
+        "reference": null,
+        "note": null,
+        "balanceBefore": 1250000,
+        "createdAt": "2026-11-02T10:30:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "by Raast at 03:30 Karachi: still the day before (04:00 cutoff)",
+      "input": {
+        "method": "raast",
+        "amount": 1250000,
+        "reference": "TX-55120",
+        "note": "full settlement",
+        "seq": 12,
+        "createdAt": "2026-11-02T22:30:00.000Z"
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a7000-0000-7000-8000-000000000071",
+        "family": "R",
+        "seq": 12,
+        "number": "D01-R000012",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d9",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "sessionId": "019a6000-0000-7000-8000-000000000051",
+        "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+        "partyId": "019a3000-0000-7000-8000-0000000000c1",
+        "customerCode": "C0042",
+        "customerName": "Ali Autos",
+        "methodId": "019a1000-0000-7000-8000-000000000102",
+        "methodCode": "raast",
+        "amount": 1250000,
+        "reference": "TX-55120",
+        "note": "full settlement",
+        "balanceBefore": 1250000,
+        "createdAt": "2026-11-02T22:30:00.000Z",
+        "businessDate": "2026-11-02",
+        "clientVersion": "0.8.0"
+      }
+    },
+    {
+      "name": "Raast without a reference is refused",
+      "input": { "method": "raast", "amount": 500000, "seq": 2, "createdAt": "2026-11-02T10:30:00.000Z" },
+      "error": "reference_required"
+    },
+    {
+      "name": "without a session",
+      "input": {
+        "session": null,
+        "method": "cash",
+        "amount": 500000,
+        "seq": 2,
+        "createdAt": "2026-11-02T10:30:00.000Z"
+      },
+      "error": "no_session"
+    }
+  ]
+}

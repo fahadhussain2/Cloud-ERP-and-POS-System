@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 with the [W1-10 plan](plans/W1-10-cash-desk-handover.md) and owner answers 1–4 (2026-11-01), D-097: session, live queue, scan handover, refund payout. Collections, cash-out, the denomination close and the day reconciliation come with W1-11. |
-| **Refs** | CSH-01, CSH-02, CSH-03, CSH-04; PRD W4, W7, W15; architecture §4.4–§4.7; data model §6, §12; posting rules §4.5; sync spec §3, §6.2, §8; CLAUDE.md rules 1, 3, 6, 7, 9, 10; D-001, D-024, D-047, D-049, D-055, D-059, D-097 |
+| **Status** | Accepted v1 with the [W1-10 plan](plans/W1-10-cash-desk-handover.md) and owner answers 1–4 (2026-11-01), D-097: session, live queue, scan handover, refund payout. v2 with the [W1-11 plan](plans/W1-11-collections-cash-out-close.md) and owner answers 1–5 (2026-11-02), D-098: collections, cash-out and the safe, the counted close, the day reconciliation and the cash variance. |
+| **Refs** | CSH-01…CSH-08, RPT-02; PRD W4, W7–W10, W15; architecture §4.4–§4.7; data model §6, §12; posting rules §4.5; sync spec §3, §6.2, §8; CLAUDE.md rules 1, 3, 6, 7, 9, 10; D-001, D-024, D-025, D-047, D-049, D-055, D-059, D-097, D-098 |
 
-The PRD (W4, W7) says what the cash desk does; this spec fixes how it behaves, precisely enough to build and test. The rules are `checkHandover`, `buildHandoverDocument`, `reviewHandover`, `queueGroups`, `expectedCash` and `buildSessionDocument` in `packages/domain`; the desk and the server use the same functions (rule 2).
+The PRD (W4, W7–W10) says what the cash desk does; this spec fixes how it behaves, precisely enough to build and test. The rules are `checkHandover`, `buildHandoverDocument`, `reviewHandover`, `queueGroups`, `expectedCash`, `buildSessionDocument`, `checkCollection`, `checkCashMovement`, `countDrawer`, `checkClose`, `reviewDeskDocument`, `reviewSession` and `reconcileDay` in `packages/domain`; the desk and the server use the same functions (rule 2).
 
 ## 1. The desk is the POS app
 
@@ -13,10 +13,10 @@ A device of kind `cash_desk` (`D01…`, platform spec §1) runs the same app as 
 
 ## 2. The session (CSH-01)
 
-- **Open** (`Alt+O`, needs `cash.handover.receive`): the **opening float**, whole rupees, 0 or more: the cash already in the drawer. One open session per desk; it belongs to the cashier who opened it.
-- **While open**, only its cashier takes cash. Another cashier who unlocks sees *Ali's session is open since 10:02* and can only sell.
-- **Close** (`Alt+X`, anyone with `cash.session.close`, owner answer 1): shows the **expected cash** = float + handovers in − payouts, and closes the session so the next cashier opens their own. No count yet: the denomination close, the variance and its acknowledgement come with W1-11 (CSH-07). Until then the drawer is counted the legacy way (D-090).
-- **The float posts nothing**: it is cash already in the drawer. Moving cash from the safe is a cash movement (W1-11).
+- **Open** (`Alt+O`, needs `cash.handover.receive`): the **opening float**, whole rupees, 0 or more: the cash already in the drawer. It is filled in with what stayed in the drawer at this desk's last counted close (`floatExpected` on the document). One open session per desk; it belongs to the cashier who opened it.
+- **While open**, only its cashier takes cash. Another cashier who unlocks sees *Ali's session is open since 10:02* and can only sell. The session bar shows the float, handed in, paid out, collected, cash out and the **expected cash** (§9).
+- **Close** (`Alt+X`, anyone with `cash.session.close`, owner answer 1 to W1-10): the drawer count, §10. The next cashier opens their own.
+- **The float posts nothing** when it is what stayed (or on a desk's first session). A float typed differently posts the difference between `CASH_SHORT_OVER` and `CASH_DRAWER` and is flagged `float_mismatch` (owner answer 3 to W1-11).
 
 ## 3. The live queue (CSH-02)
 
@@ -60,15 +60,56 @@ A bill with cash due < 0 is a refund: in the queue in orange, recorded as a **pa
 
 A cash sale (or refund) finalized on the desk itself is **handed over automatically** (method `auto`) in the same local transaction as the bill, to the open session and its cashier, whoever sold (owner answer 4). With no open session the bill waits in the queue like any other.
 
-## 8. The documents
+## 8. Collections (CSH-05, `Alt+R`)
+
+Needs `cash.collection.receive` and the open session's cashier. Find the customer (the same search as `F4`: code, phone, name or city); the dialog shows what they **owe** as this desk knows it (the last synced balance, plus this desk's unsynced bills on account, minus its unsynced collections) and their last collection here. Type the amount and pick the method: any active method except on account; a method with `requiresReference` needs its reference (40 characters at most). Cash is whole rupees. Paying more than the balance is allowed: the rest is an **advance**. *Receive & print (Enter)* writes the document and prints the **receipt** (customer, amount, method and reference, balance before and after *as of the last sync*, cashier). Customer ageing at the desk comes with W1-20 (owner answer 4).
+
+`checkCollection`'s first problem, as `collection.<code>`: `no_session`, `not_session_cashier`, `not_permitted`, `no_customer`, `invalid_method`, `amount_not_positive`, `amount_not_rounded`, `reference_required`, `reference_too_long`, `note_too_long`. Only cash collections count in the expected cash.
+
+## 9. Cash-out and the safe (CSH-06, `Alt+M`)
+
+Needs `cash.movement.create` and the open session's cashier. Five kinds, each naming exactly what it needs:
+
+| Kind | Names | Note |
+|---|---|---|
+| `expense` | an active expense category | required |
+| `supplier_payment` | a supplier (shown with what we owe them) | required |
+| `bank_deposit` | an active bank account of kind `bank` | required |
+| `to_safe`, `from_safe` | nothing | optional |
+
+Amounts are whole rupees; a reference is optional. Money out above the **expected cash** asks for a second Enter (*Only Rs 3,200 should be in the drawer*), it never refuses: the figure may be what is wrong. The **voucher** prints for the three cash-outs, with a line for the receiver to sign. `checkCashMovement`'s problems, as `cashOut.<code>`: `no_session`, `not_session_cashier`, `not_permitted`, `amount_not_positive`, `amount_not_rounded`, `missing_target`, `extra_target`, `note_required`, `note_too_long`, `reference_too_long`, `over_drawer`.
+
+**Expected cash** = float + handovers in − payouts + cash collections − expenses − supplier payments − bank deposits − to safe + from safe.
+
+## 10. The drawer close (CSH-07, `Alt+X`)
+
+1. **The count, blind** (owner answer 2): a row per note and coin of the currency (PKR 5000 … 1; the Rs 10 note and coin are one row), count × note = line total, the counted total below. The expected cash shows nowhere meanwhile, not even in the session bar. *Count done (Enter)*.
+2. **The variance** = counted − expected: *Exact* (green), *Short Rs 300* (red), *Over Rs 50* (orange). A variance needs a **reason** (`change_error`, `wrong_bill_confirmed`, `unrecorded_cash_out`, `counterfeit_note`, `unknown`, `other` with a note) and a **manager's acknowledgement** (owner answer 1): a person with `cash.variance.approve`, never the session's cashier, picks their name and enters their PIN (checked offline like an approval, POS spec §10); or *Acknowledge later*, which closes anyway and leaves the variance *waiting* for the back office.
+3. **What stays in the drawer** for the next session (default: all of the count, whole rupees, 0 to the count); the rest goes to the safe with the close (owner answer 3).
+4. *Close & print (Enter)* writes the close and prints the **close slip** (the count by note, expected, variance and reason, what stayed, what went to the safe, the cashier, who acknowledged or *to acknowledge*, signature lines).
+
+`checkClose`'s problems, as `close.<code>`: `no_session`, `not_permitted`, `invalid_count`, `left_invalid`, `reason_required`, `note_required`, `note_too_long`, `own_variance`, `not_acknowledger`. An exact count carries no reason and no acknowledgement.
+
+## 11. The day reconciliation and the cash variance (CSH-08, RPT-02)
+
+Back office, *Reports*, with `reports.view`; each with a CSV.
+
+- **Day reconciliation** (one branch and business date, computed on request by `reconcileDay`): **Final** when the day is over (the next day's 04:00), every active device has been heard from since with nothing older unsynced, no sequence gap is open and no session of the day is open; otherwise **Provisional**, saying what holds it. Then each session (float, handed in, collected, out, expected from the server's documents, the desk's figure if it differs, counted, variance with its reason, acknowledgement); with handover confirmation Required, **the cash bills never handed over, by salesman**; the scans whose bill never arrived; the day's open exceptions by kind and severity; cash in transit at the end of the day (0 when every bill reached the drawer). A waiting variance has **Acknowledge** for `cash.variance.approve` (never the session's cashier; audited, `cash.variance.acknowledged`).
+- **Cash variance** (a date range): one row per session, and each cashier's total.
+
+## 12. The documents
 
 Each is written with its outbox row in **one local transaction** (rule 6), signed after the commit like a bill (POS spec §12), and pushed at once. Contracts: `CashHandoverV1`, `CashSessionV1` in `@erp/contracts`.
 
 **Handover** (family `H`, `D01-H000001`): `id` (UUIDv7), `seq`, `number`, `kind` (`in` | `payout`), `deviceId`, `branchId`, `sessionId`, `cashierId`, `billNumber`, `saleDocumentId` (null when known only from the code), `amount` (the cash due or the refund, positive: **the posted figure**), `cashReceived`, `changeGiven`, `correctedFrom`, `method` (`queue` | `scan` | `auto`), `createdAt`, `businessDate` (04:00 cutoff, D-056), `clientVersion`.
 
-**Session** (family `Z`, `D01-Z000001`): `event` (`open` | `close`), `sessionId` (the open document's id), `userId` (who opened or closed), `openingFloat` (open only), `expectedCash` (close only), and the same identity, time and version fields.
+**Session** (family `Z`, `D01-Z000001`, `CashSessionV2`): `event` (`open` | `close`), `sessionId` (the open document's id), `userId` (who opened or closed); an open carries `openingFloat` and `floatExpected`; a close carries `expectedCash`, `countedCash`, `denominations` (count per note, keyed by minor units), `variance`, `varianceReason`, `varianceNote`, `acknowledgedByUserId` (null = later) and `leftInDrawer`; and the same identity, time and version fields. Push still takes a W1-10 close (`CashSessionV1`, no count).
 
-## 9. On the server
+**Collection** (family `R`, `D01-R000001`, `CustomerCollectionV1`): `partyId`, `customerCode`, `customerName` (for a reprint), `methodId`, `methodCode`, `amount`, `reference`, `note`, `balanceBefore` (printed, never posted), with the session, cashier, identity, time and version fields.
+
+**Cash movement** (family `M`, `D01-M000001`, `CashMovementV1`): `kind`, `amount`, exactly one of `expenseCategoryId`, `partyId` (the supplier) and `bankAccountId` (none for the safe), `targetName` (for a reprint), `note`, `reference`, and the same fields.
+
+## 13. On the server
 
 Push (sync spec §6.2) takes `H` and `Z` only from a cash desk. A handover is **linked to its bill by number**, now or when the bill arrives, and the bill becomes `received` or `paid_out`. A bill's cash and its handovers are judged one transaction at a time (a per-bill lock), because a scan and its bill often arrive together. Findings, never refusals (D-011):
 
@@ -80,6 +121,15 @@ Push (sync spec §6.2) takes `H` and `Z` only from a cash desk. A handover is **
 
 Each handover posts `Dr CASH_DRAWER / Cr CASH_IN_TRANSIT` (a payout the reverse) for its own amount (posting rules §4.5), so its order against the bill doesn't matter. Cash received, corrections and change never post.
 
-## 10. Not built yet
+**Collections and cash movements** (W1-11) come only from a cash desk, are stored in `payments` and `cash_movements`, and posted in the accepting transaction (posting rules §4.5). **A session's open and close** set its `cash_sessions` row and post too: the open a float other than what stayed, the close its variance and what went to the safe. Findings, never refusals:
 
-Collections, cash-out, the denomination close and the day reconciliation with its missing handovers (W1-11); `cash_handover_mode = off` (CSH-09, Wave 2: the desk shows the queue regardless); voids before the handover and `cash_received_for_void` (W1-12); undoing a handover confirmed by mistake (it shows in the drawer variance); a printed handover slip.
+| Exception | Severity | When |
+|---|---|---|
+| `cash_not_permitted` | low | the server says the cashier lacks the permission (collection, cash-out, open or close), or the acknowledger lacks `cash.variance.approve`, or is the session's own cashier (`ownVariance`): that acknowledgement isn't stored, so the variance waits |
+| `float_mismatch` | medium | an open's float differs from what stayed at the desk's last close |
+
+A collection for a customer, or a cash-out naming a category, supplier or bank the server doesn't have, is stored and fails to post (`posting_failed`, D-095) until it can.
+
+## 14. Not built yet
+
+`cash_handover_mode = off` and its provisional drawer variance (CSH-09, Wave 2: the desk shows the queue regardless); voids before the handover and `cash_received_for_void` (W1-12); customer ageing at the desk (W1-20); undoing a handover, collection or cash-out recorded by mistake (it shows in the drawer variance, or the accountant reverses it, W1-19); a printed handover slip; amounts in words on the slips.

@@ -76,6 +76,16 @@ The ledgers come only from postings: costs set any other way (a test, a manual f
 
 Because it posts its own amount, its order against its bill doesn't change the books: an offline scan often arrives first. Once every cash bill is handed over, `CASH_IN_TRANSIT` is back to 0 (posting rules §4.5's control property; tested in `handover.test.ts` and `cash-desk.int.test.ts`).
 
+## 5b. The desk's collections, cash movements and sessions (posting rules §4.5, W1-11)
+
+`packages/posting/src/cash.ts`, each for its own amount, dated its business date (or the day after the lock date), memo its number, no stock:
+
+- **`postCollection`** (source `payment`): cash → `Dr CASH_DRAWER`, any other method → the method's account (`method_unmapped` without one); `Cr AR_CONTROL` with the customer, and a customer ledger entry of −amount.
+- **`postCashMovement`** (source `cash_movement`): `expense` and `bank_deposit` → `Dr` the category's or bank's account (`context.accounts.targets`, loaded for that one id; `target_unmapped` without it) / `Cr CASH_DRAWER`; `supplier_payment` → `Dr AP_CONTROL` with the supplier and a supplier ledger entry of −amount (`party_missing` without one); `to_safe` → `Dr CASH_SAFE / Cr CASH_DRAWER`, `from_safe` the reverse.
+- **`postSession`** (source `cash_session`; the open posts under the session's id, the close under its close document's id): an open whose float differs from `floatExpected` moves the difference between `CASH_SHORT_OVER` and `CASH_DRAWER`; a close moves its variance the same way, then counted − left in the drawer to `CASH_SAFE`. A desk's first open, an open with the float that stayed and a close without a count (W1-10) post no lines.
+
+Push posts each in the accepting transaction, the catch-up posts what push couldn't (`postPending` reads all five sources), and the rebuild check replays them. After a day of desk documents and a counted close, `CASH_DRAWER` moved by exactly what the drawer did (tested in `cash.test.ts`).
+
 ## 6. Known limits
 
 - **Arrival order** sets the cost of a late offline sale (D-017): recorded and reproducible, not re-costed (re-costing is Phase 2).

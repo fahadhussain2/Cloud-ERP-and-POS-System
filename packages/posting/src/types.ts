@@ -1,4 +1,4 @@
-import type { Money, PaymentMethodCode, Qty, SystemRole } from '@erp/domain';
+import type { CashMovementKind, Money, PaymentMethodCode, Qty, SystemRole } from '@erp/domain';
 
 // What the posting engine reads and writes (posting rules §1–§4, data model §3, §7, §9, W1-08). Pure data: the
 // database layer loads it, the engine computes the ledger rows, the database layer writes them.
@@ -32,6 +32,48 @@ export interface PostingHandover {
   amount: Money;
 }
 
+/** A stored customer collection as posting needs it (posting rules §4.5, W1-11). */
+export interface PostingCollection {
+  id: string;
+  /** e.g. `D01-R000001`. */
+  number: string;
+  branchId: string;
+  businessDate: string;
+  partyId: string;
+  method: PaymentMethodCode;
+  amount: Money;
+}
+
+/** A stored cash-out or safe movement as posting needs it (posting rules §4.5, W1-11). */
+export interface PostingCashMovement {
+  id: string;
+  number: string;
+  branchId: string;
+  businessDate: string;
+  kind: CashMovementKind;
+  amount: Money;
+  /** The supplier, for a supplier payment. */
+  partyId: string | null;
+  /** The expense category or bank account whose account it goes to (`PostingContext.accounts.targets`). */
+  targetId: string | null;
+}
+
+/** A stored session open or close as posting needs it (posting rules §4.5, owner answer 3 to W1-11). */
+export interface PostingSessionEvent {
+  id: string;
+  number: string;
+  branchId: string;
+  businessDate: string;
+  event: 'open' | 'close';
+  /** An open's float, and what stayed at the desk's last close (null for its first session). */
+  openingFloat: Money | null;
+  floatExpected: Money | null;
+  /** A close's counted − expected; null without a count (W1-10). */
+  variance: Money | null;
+  /** What the close sent to the safe; 0 on an open. */
+  toSafe: Money;
+}
+
 export interface PostingSaleLine {
   id: string;
   lineNo: number;
@@ -52,6 +94,8 @@ export interface PostingContext {
   accounts: {
     roles: Partial<Record<PostingRole, string>>;
     methods: Partial<Record<PaymentMethodCode, string | null>>;
+    /** Expense categories and bank accounts by id, to their account (desk cash-outs, W1-11). */
+    targets?: Partial<Record<string, string>>;
   };
   /** Nothing posts on or before it (posting rules §1.6). */
   lockDate: string | null;
@@ -125,6 +169,8 @@ export interface Posting {
 export type PostingError =
   | { code: 'method_unmapped'; method: PaymentMethodCode }
   | { code: 'role_unmapped'; role: PostingRole }
-  | { code: 'on_account_without_customer' };
+  | { code: 'on_account_without_customer' }
+  | { code: 'target_unmapped'; targetId: string | null }
+  | { code: 'party_missing' };
 
 export type PostingResult = { ok: true; posting: Posting } | { ok: false; error: PostingError };

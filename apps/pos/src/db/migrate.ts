@@ -201,6 +201,34 @@ export const MIGRATIONS: readonly Migration[] = [
       "CREATE INDEX local_documents_bill ON local_documents (json_extract(payload, '$.billNumber')) WHERE family = 'H'",
     ],
   },
+  {
+    // Cash desk 2 (W1-11, cash desk spec, sync spec §3): what a cash-out names, exactly the pulled columns (a supplier's
+    // balance is keyed by its party); the count on this desk's sessions. Collections (R) and cash movements (M) live
+    // in local_documents and the outbox like handovers. A counter has these tables too and leaves them empty.
+    version: 9,
+    statements: [
+      `CREATE TABLE suppliers (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, phones TEXT NOT NULL, city TEXT,
+        status TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE supplier_balances (
+        party_id TEXT PRIMARY KEY, balance INTEGER NOT NULL, updated_at TEXT NOT NULL, row_version TEXT NOT NULL,
+        deleted_at TEXT
+      )`,
+      `CREATE TABLE expense_categories (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, is_active INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE bank_accounts (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, is_active INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'ALTER TABLE cash_sessions ADD COLUMN counted_cash INTEGER',
+      'ALTER TABLE cash_sessions ADD COLUMN variance INTEGER',
+      'ALTER TABLE cash_sessions ADD COLUMN left_in_drawer INTEGER',
+      "CREATE INDEX local_documents_session ON local_documents (json_extract(payload, '$.sessionId')) WHERE family IN ('H', 'R', 'M')",
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

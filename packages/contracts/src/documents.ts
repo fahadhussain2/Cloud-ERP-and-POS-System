@@ -148,8 +148,13 @@ export type SaleDocumentV1 = z.infer<typeof SaleDocumentV1>;
 
 // The cash desk's documents (W1-10, cash desk spec): a handover or refund payout (family H) and a session's open or
 // close (family Z). What `buildHandoverDocument` and `buildSessionDocument` in `@erp/domain` make.
-const DESK_NUMBER = { H: /^[A-Z]\d{2,}-H\d{6,}$/, Z: /^[A-Z]\d{2,}-Z\d{6,}$/ } as const;
-const DeskNumber = (family: 'H' | 'Z') => z.string().regex(DESK_NUMBER[family]);
+const DESK_NUMBER = {
+  H: /^[A-Z]\d{2,}-H\d{6,}$/,
+  R: /^[A-Z]\d{2,}-R\d{6,}$/,
+  M: /^[A-Z]\d{2,}-M\d{6,}$/,
+  Z: /^[A-Z]\d{2,}-Z\d{6,}$/,
+} as const;
+const DeskNumber = (family: keyof typeof DESK_NUMBER) => z.string().regex(DESK_NUMBER[family]);
 const BillNumber = z.string().regex(/^[A-Z]\d{2,}-S\d{6,}$/);
 
 /** A cash handover in, or a refund paid out: its own document; the sale is never touched (rule 3). */
@@ -213,3 +218,148 @@ export const CashSessionV1 = z
     { message: 'an open carries its float and is its own session; a close carries the expected cash' },
   );
 export type CashSessionV1 = z.infer<typeof CashSessionV1>;
+
+// The desk's other documents (W1-11, cash desk spec): a customer collection (family R), a cash-out or safe movement
+// (family M), and the counted session close (CashSessionV2). What `buildCollectionDocument`, `buildCashMovementDocument`
+// and `buildSessionDocument` in `@erp/domain` make.
+const Note = z.string().min(1).max(200).nullable();
+const Reference = z.string().min(1).max(40).nullable();
+
+/** A customer paying what they owe at the desk (CSH-05). */
+export const CustomerCollectionV1 = z.strictObject({
+  version: z.literal(1),
+  id: z.uuid(),
+  family: z.literal('R'),
+  seq: z.int().positive(),
+  number: DeskNumber('R'),
+  deviceId: z.uuid(),
+  branchId: z.uuid(),
+  sessionId: z.uuid(),
+  cashierId: z.uuid(),
+  partyId: z.uuid(),
+  customerCode: z.string().min(1),
+  customerName: z.string().min(1),
+  methodId: z.uuid(),
+  methodCode: PaymentMethod.exclude(['on_account']),
+  amount: z.int().positive(),
+  reference: Reference,
+  note: Note,
+  /** The desk's figure, printed on the receipt; never posted. */
+  balanceBefore: Money,
+  createdAt: Instant,
+  businessDate: z.iso.date(),
+  clientVersion: z.string().min(1),
+});
+export type CustomerCollectionV1 = z.infer<typeof CustomerCollectionV1>;
+
+const MOVEMENT_TARGET = {
+  expense: 'expenseCategoryId',
+  supplier_payment: 'partyId',
+  bank_deposit: 'bankAccountId',
+  to_safe: null,
+  from_safe: null,
+} as const;
+
+/** Cash out of the drawer (CSH-06), or between the drawer and the safe (owner answer 3 to W1-11). */
+export const CashMovementV1 = z
+  .strictObject({
+    version: z.literal(1),
+    id: z.uuid(),
+    family: z.literal('M'),
+    seq: z.int().positive(),
+    number: DeskNumber('M'),
+    kind: z.enum(['expense', 'supplier_payment', 'bank_deposit', 'to_safe', 'from_safe']),
+    deviceId: z.uuid(),
+    branchId: z.uuid(),
+    sessionId: z.uuid(),
+    cashierId: z.uuid(),
+    amount: z.int().positive(),
+    expenseCategoryId: z.uuid().nullable(),
+    partyId: z.uuid().nullable(),
+    bankAccountId: z.uuid().nullable(),
+    targetName: z.string().min(1).nullable(),
+    note: Note,
+    reference: Reference,
+    createdAt: Instant,
+    businessDate: z.iso.date(),
+    clientVersion: z.string().min(1),
+  })
+  .refine(
+    (d) =>
+      (['expenseCategoryId', 'partyId', 'bankAccountId'] as const).every(
+        (field) => (d[field] !== null) === (MOVEMENT_TARGET[d.kind] === field),
+      ),
+    { message: 'each kind names exactly its own category, supplier or bank account' },
+  )
+  .refine((d) => d.note !== null || MOVEMENT_TARGET[d.kind] === null, {
+    message: 'a cash-out needs a note',
+  });
+export type CashMovementV1 = z.infer<typeof CashMovementV1>;
+
+/** Counts per denomination, keyed by the denomination in minor units. */
+const Denominations = z.record(z.string().regex(/^[1-9]\d*$/), z.int().nonnegative());
+
+/** A session's open (with its float and what stayed at the last close) or its counted close (CSH-07). */
+export const CashSessionV2 = z
+  .strictObject({
+    version: z.literal(2),
+    id: z.uuid(),
+    family: z.literal('Z'),
+    seq: z.int().positive(),
+    number: DeskNumber('Z'),
+    event: z.enum(['open', 'close']),
+    sessionId: z.uuid(),
+    deviceId: z.uuid(),
+    branchId: z.uuid(),
+    userId: z.uuid(),
+    openingFloat: NonNegativeMoney.nullable(),
+    expectedCash: Money.nullable(),
+    floatExpected: NonNegativeMoney.nullable(),
+    countedCash: NonNegativeMoney.nullable(),
+    denominations: Denominations.nullable(),
+    variance: Money.nullable(),
+    varianceReason: z
+      .enum([
+        'change_error',
+        'wrong_bill_confirmed',
+        'unrecorded_cash_out',
+        'counterfeit_note',
+        'unknown',
+        'other',
+      ])
+      .nullable(),
+    varianceNote: Note,
+    acknowledgedByUserId: z.uuid().nullable(),
+    leftInDrawer: NonNegativeMoney.nullable(),
+    createdAt: Instant,
+    businessDate: z.iso.date(),
+    clientVersion: z.string().min(1),
+  })
+  .refine(
+    (d) =>
+      d.event === 'open'
+        ? d.openingFloat !== null &&
+          d.sessionId === d.id &&
+          [d.expectedCash, d.countedCash, d.denominations, d.variance, d.leftInDrawer].every(
+            (v) => v === null,
+          ) &&
+          d.varianceReason === null &&
+          d.acknowledgedByUserId === null
+        : d.openingFloat === null &&
+          d.floatExpected === null &&
+          d.sessionId !== d.id &&
+          d.expectedCash !== null &&
+          d.countedCash !== null &&
+          d.denominations !== null &&
+          d.variance === d.countedCash - d.expectedCash &&
+          d.leftInDrawer !== null &&
+          d.leftInDrawer <= d.countedCash &&
+          (d.variance === 0
+            ? d.varianceReason === null && d.acknowledgedByUserId === null
+            : d.varianceReason !== null),
+    {
+      message:
+        'an open carries its float and is its own session; a close carries its count, its variance (with a reason when not 0) and what stayed',
+    },
+  );
+export type CashSessionV2 = z.infer<typeof CashSessionV2>;

@@ -278,6 +278,36 @@ describe('migrations', () => {
     expect(db.selectValue('SELECT count(*) FROM cash_sessions')).toBe(0);
   });
 
+  it("schema 9 adds what a desk's cash-out names and the count (W1-11), and keeps a W1-10 desk's rows", () => {
+    const db = fresh();
+    migrate(db, MIGRATIONS.slice(0, 8));
+    db.exec(
+      `INSERT INTO cash_sessions (id, number, cashier_user_id, opened_at, opening_float, status)
+       VALUES ('z1', 'D01-Z000001', 'ali', 'now', 500000, 'open')`,
+    );
+    db.exec(
+      `INSERT INTO local_documents (id, family, seq, number, kind, business_date, payload, created_at)
+       VALUES ('h1', 'H', 1, 'D01-H000001', 'handover', '2026-11-02', '{"sessionId":"z1","amount":100}', 'now')`,
+    );
+    db.exec(
+      `INSERT INTO outbox (id, family, seq, payload, signature, status, attempts, created_at)
+       VALUES ('h1', 'H', 1, '{}', null, 'pending', 0, 'now'), ('z1', 'Z', 1, '{}', 'sig', 'quarantined', 1, 'now')`,
+    );
+    migrate(db);
+    expect(LATEST_VERSION).toBeGreaterThanOrEqual(9);
+    expect(db.selectObjects('SELECT id, status FROM outbox ORDER BY id')).toEqual([
+      { id: 'h1', status: 'pending' },
+      { id: 'z1', status: 'quarantined' },
+    ]);
+    expect(db.selectObjects('SELECT id, status, counted_cash, left_in_drawer FROM cash_sessions')).toEqual([
+      { id: 'z1', status: 'open', counted_cash: null, left_in_drawer: null },
+    ]);
+    const columns = (table: string) =>
+      db.selectObjects(`PRAGMA table_info(${table})`).map((r) => String(r['name']));
+    for (const table of ['suppliers', 'supplier_balances', 'expense_categories', 'bank_accounts'] as const)
+      expect(columns(table)).toEqual([...Object.keys(CASH_DESK_COLUMNS[table]), 'row_version', 'deleted_at']);
+  });
+
   it('roll back a migration that fails and leave the previous schema', () => {
     const db = fresh();
     const v1 = MIGRATIONS.slice(0, 1);

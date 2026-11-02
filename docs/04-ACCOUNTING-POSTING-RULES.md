@@ -27,7 +27,7 @@ New tenants get this tree. Delux's legacy accounts are mapped into it ([migratio
 | **1000** | **Assets** | asset | |
 | 1110 | Cash drawer (cash desk) | asset | `CASH_DRAWER` |
 | 1120 | Cash in transit, counters (awaiting handover / payout) | asset | `CASH_IN_TRANSIT` |
-| 1130 | Cash in safe | asset | |
+| 1130 | Cash in safe | asset | `CASH_SAFE` (W1-11) |
 | 1140 | Cheques in hand | asset | |
 | 1150 | Bank: Soneri | asset | (bank_accounts) |
 | 1160 | Bank: HBL | asset | (bank_accounts) |
@@ -112,9 +112,11 @@ A reversing journal entry with every line of the original entry swapped, dated t
 | Supplier payment from the drawer | `Dr AP_CONTROL (party) / Cr CASH_DRAWER` |
 | Expense from the drawer | `Dr <expense category account> / Cr CASH_DRAWER` |
 | Bank deposit | `Dr <bank account> / Cr CASH_DRAWER` |
-| Float in / out | `Dr CASH_DRAWER / Cr CASH (safe)`, or reversed |
-| Drawer close, shortage | `Dr CASH_SHORT_OVER / Cr CASH_DRAWER`: variance |
+| From / to the safe | `Dr CASH_DRAWER / Cr CASH_SAFE`, or reversed (cash movements `from_safe`, `to_safe`, W1-11) |
+| Session open, float below what stayed at the last close | `Dr CASH_SHORT_OVER / Cr CASH_DRAWER`: the difference (above: reversed); the float itself posts nothing (W1-11, owner answer 3) |
+| Drawer close, shortage | `Dr CASH_SHORT_OVER / Cr CASH_DRAWER`: variance, when the close arrives, acknowledged or not |
 | Drawer close, overage | `Dr CASH_DRAWER / Cr CASH_SHORT_OVER`: variance |
+| Drawer close, what doesn't stay in the drawer | `Dr CASH_SAFE / Cr CASH_DRAWER`: counted − left in the drawer (W1-11) |
 
 With `cash_handover_mode = off`, the automatic handover posts the same entry in the same transaction as the sale, so the posting logic is the same in both modes.
 

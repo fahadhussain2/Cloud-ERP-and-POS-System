@@ -1,10 +1,11 @@
 import pg from 'pg';
 
 import { emptyState, withChanges } from '../replay';
+import { postCashMovement, postCollection, postSession } from '../cash';
 import { postHandover } from '../handover';
 import { postSale } from '../sale';
 import type { LedgerState, Posting, PostingContext, PostingResult } from '../types';
-import { loadHandover, loadSale } from './load';
+import { loadCashMovement, loadCollection, loadHandover, loadSale, loadSessionEvent } from './load';
 import type { SourceType } from './post';
 import { writePosting } from './write';
 
@@ -51,6 +52,15 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
     if (r.source_type === 'cash_handover') {
       const handover = await loadHandover(c, r.source_id);
       result = handover ? postHandover(handover, r.context) : null;
+    } else if (r.source_type === 'payment') {
+      const doc = await loadCollection(c, r.source_id);
+      result = doc ? postCollection(doc, r.context) : null;
+    } else if (r.source_type === 'cash_movement') {
+      const doc = await loadCashMovement(c, r.source_id);
+      result = doc ? postCashMovement(doc, r.context) : null;
+    } else if (r.source_type === 'cash_session') {
+      const doc = await loadSessionEvent(c, r.source_id);
+      result = doc ? postSession(doc, r.context) : null;
     } else {
       const loaded = await loadSale(c, r.source_id);
       result = loaded ? postSale(loaded.sale, r.context, state) : null;

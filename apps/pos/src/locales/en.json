@@ -347,7 +347,32 @@
     "total": "TOTAL",
     "cashReceived": "Cash received",
     "change": "CHANGE",
-    "policy": "Exchange or return within 30 days with this bill."
+    "policy": "Exchange or return within 30 days with this bill.",
+    "desk": {
+      "receipt": "PAYMENT RECEIPT",
+      "voucher": "CASH VOUCHER",
+      "closeSlip": "DRAWER CLOSE",
+      "cashier": "Cashier",
+      "received": "Received",
+      "method": "Paid by",
+      "balanceBefore": "Balance before",
+      "balanceAfter": "Balance after (as of the last sync)",
+      "note": "Note",
+      "kind": "For",
+      "to": "To",
+      "paid": "Paid out",
+      "reference": "Reference",
+      "counted": "Counted",
+      "expected": "Expected",
+      "variance": "Variance",
+      "reason": "Reason",
+      "left": "Stays in the drawer",
+      "toSafe": "To the safe",
+      "acknowledged": "Acknowledged by",
+      "toAcknowledge": "to acknowledge",
+      "receiverSigns": "Received by (signature)",
+      "cashierSigns": "Cashier and manager (signatures)"
+    }
   },
   "health": {
     "title": "Counter health",
@@ -476,10 +501,8 @@
       "opened": "Session {{number}} opened with {{amount}}"
     },
     "close": {
-      "title": "Close this session?",
-      "body": "The drawer should hold {{amount}}. Count it the usual way: counting by note comes later. The next cashier opens their own session.",
-      "action": "Close session",
-      "closed": "Session {{number}} closed"
+      "closed": "Session {{number}} closed",
+      "closedVariance": "Session {{number}} closed, variance {{amount}}"
     },
     "correct": {
       "title": "Cash received for {{number}}",
@@ -498,7 +521,80 @@
       "correct": "Correct cash",
       "select": "Select",
       "open": "Open session",
-      "close": "Close session"
+      "close": "Count and close",
+      "collect": "Receive payment",
+      "cashOut": "Cash out"
+    },
+    "collected": "Collected",
+    "cashOutTotal": "Cash out",
+    "note": "Note (optional)",
+    "collect": {
+      "title": "Receive a customer payment",
+      "help": "Find the customer by name, phone or code, then press Enter.",
+      "pick": "Choose customer",
+      "customer": "Customer",
+      "balance": "Owes (as of the last sync)",
+      "last": "Last paid here",
+      "after": "Owes after this",
+      "amount": "Amount received",
+      "method": "Paid by",
+      "reference": "Reference (transaction ID or slip)",
+      "action": "Receive & print",
+      "done": "Received {{amount}} from {{name}} · {{number}}"
+    },
+    "cashOut": {
+      "title": "Cash out of the drawer",
+      "help": "The drawer should hold {{amount}}.",
+      "kindLabel": "What for",
+      "kind": {
+        "expense": "Shop expense",
+        "supplier_payment": "Supplier payment",
+        "bank_deposit": "Bank deposit",
+        "to_safe": "To the safe",
+        "from_safe": "From the safe"
+      },
+      "target": {
+        "expense": "Expense category",
+        "supplier_payment": "Supplier",
+        "bank_deposit": "Bank account",
+        "to_safe": "",
+        "from_safe": ""
+      },
+      "choose": "Choose…",
+      "owed": "owed {{amount}}",
+      "amount": "Amount (whole rupees)",
+      "note": "Note: what it was for, who took it",
+      "reference": "Reference (optional: bill, slip or voucher number)",
+      "action": "Pay out & print",
+      "actionAnyway": "Pay out anyway",
+      "done": "Paid out {{amount}} · {{number}}"
+    },
+    "count": {
+      "title": "Count the drawer",
+      "help": "Count each note and coin. The expected cash shows after the count.",
+      "done": "Count done",
+      "counted": "Counted: {{amount}}",
+      "countedLabel": "Counted",
+      "exact": "Exact",
+      "short": "Short {{amount}}",
+      "over": "Over {{amount}}",
+      "reasonLabel": "Why",
+      "reason": {
+        "change_error": "Wrong change given",
+        "wrong_bill_confirmed": "Wrong bill confirmed",
+        "unrecorded_cash_out": "Cash out not recorded",
+        "counterfeit_note": "Counterfeit note",
+        "unknown": "Not known",
+        "other": "Other (say what in the note)"
+      },
+      "ackLabel": "A manager acknowledges the variance with their PIN",
+      "pin": "{{name}}’s PIN",
+      "later": "Acknowledge later (in the back office)",
+      "ackNeeded": "A manager enters their PIN, or tick Acknowledge later.",
+      "notAcknowledger": "That person can’t acknowledge a variance on this session.",
+      "acknowledgedBy": "Acknowledged by {{name}}",
+      "left": "Stays in the drawer for the next session (the rest goes to the safe)",
+      "action": "Close & print"
     }
   },
   "handover": {
@@ -513,5 +609,41 @@
     "session_open": "A session is already open on this desk.",
     "invalid_float": "Type the float in whole rupees, 0 or more.",
     "failed": "The handover was not saved: {{message}}"
+  },
+  "collection": {
+    "no_session": "Open a session first (Alt+O).",
+    "not_session_cashier": "Only the cashier of the open session takes cash.",
+    "not_permitted": "Your role can’t receive customer payments.",
+    "no_customer": "Choose the customer first.",
+    "invalid_method": "Choose how they paid.",
+    "amount_not_positive": "Type the amount received.",
+    "amount_not_rounded": "Cash is whole rupees.",
+    "reference_required": "This method needs its reference.",
+    "reference_too_long": "The reference is at most 40 characters.",
+    "note_too_long": "The note is at most 200 characters."
+  },
+  "cashOut": {
+    "no_session": "Open a session first (Alt+O).",
+    "not_session_cashier": "Only the cashier of the open session pays out cash.",
+    "not_permitted": "Your role can’t pay cash out of the drawer.",
+    "amount_not_positive": "Type the amount.",
+    "amount_not_rounded": "Type whole rupees.",
+    "missing_target": "Choose what it is for.",
+    "extra_target": "Choose only what this kind needs.",
+    "note_required": "Say what it was for, and who took it.",
+    "note_too_long": "The note is at most 200 characters.",
+    "reference_too_long": "The reference is at most 40 characters.",
+    "over_drawer": "Only {{amount}} should be in the drawer. Pay out anyway? Press Enter again."
+  },
+  "close": {
+    "no_session": "No session is open on this desk.",
+    "not_permitted": "Your role can’t close a session.",
+    "invalid_count": "Type whole numbers of notes and coins.",
+    "left_invalid": "What stays is whole rupees, from 0 to the count.",
+    "reason_required": "Choose why the drawer is short or over.",
+    "note_required": "Say what happened in the note.",
+    "note_too_long": "The note is at most 200 characters.",
+    "own_variance": "The session’s own cashier can’t acknowledge its variance.",
+    "not_acknowledger": "That person can’t acknowledge a variance."
   }
 }

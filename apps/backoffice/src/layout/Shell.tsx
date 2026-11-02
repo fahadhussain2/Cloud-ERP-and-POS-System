@@ -9,7 +9,7 @@ import { href, type Route } from '../router';
 // each later task adds its entry here.
 
 export interface MenuItem {
-  key: 'staff' | 'counters';
+  key: 'staff' | 'counters' | 'dayReconciliation' | 'cashVariance';
   href: string;
   /** Any of these permissions opens the screen. */
   needs: readonly string[];
@@ -17,7 +17,7 @@ export interface MenuItem {
   screens: readonly Route['screen'][];
 }
 
-export const MENU: readonly { group: 'people' | 'shop'; items: readonly MenuItem[] }[] = [
+export const MENU: readonly { group: 'people' | 'shop' | 'reports'; items: readonly MenuItem[] }[] = [
   {
     group: 'people',
     items: [
@@ -32,6 +32,19 @@ export const MENU: readonly { group: 'people' | 'shop'; items: readonly MenuItem
   {
     group: 'shop',
     items: [{ key: 'counters', href: href.counters, needs: ['admin.devices'], screens: ['counters'] }],
+  },
+  {
+    // The cash reports (W1-11, CSH-08, RPT-02).
+    group: 'reports',
+    items: [
+      {
+        key: 'dayReconciliation',
+        href: href.dayReconciliation,
+        needs: ['reports.view'],
+        screens: ['dayReconciliation'],
+      },
+      { key: 'cashVariance', href: href.cashVariance, needs: ['reports.view'], screens: ['cashVariance'] },
+    ],
   },
 ];
 

@@ -22,7 +22,14 @@ export {
   SetPinRequest,
   TokenRequest,
 } from './devices';
-export { CashHandoverV1, CashSessionV1, SaleDocumentV1 } from './documents';
+export {
+  CashHandoverV1,
+  CashMovementV1,
+  CashSessionV1,
+  CashSessionV2,
+  CustomerCollectionV1,
+  SaleDocumentV1,
+} from './documents';
 export {
   EXCEPTION_KINDS,
   PUSH_BATCH_MAX,
@@ -78,3 +85,13 @@ export {
   type PullDataset,
   type PullResponse,
 } from './sync';
+export type {
+  AcknowledgementStatus,
+  CashMovementKindName,
+  CashVarianceResponse,
+  CashVarianceRow,
+  DayHoldResponse,
+  DayReconciliationResponse,
+  DaySessionResponse,
+  ReportMoney,
+} from './reports';

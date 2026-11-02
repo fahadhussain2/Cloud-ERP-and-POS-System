@@ -9,7 +9,9 @@ import { pullAll, type PullDeps } from './pull';
 // the last page of a complete pull says so (the first catalog load, W1-03).
 
 // Every dataset but the cash desk's queue, which only a cash desk may pull (W1-10).
-const DATASETS = encodeURIComponent(PULL_DATASETS.filter((d) => d !== 'cash_queue').join(','));
+// A counter leaves out what only a cash desk pulls: the queue (W1-10) and what cash-out names (W1-11).
+const DESK_ONLY = ['cash_queue', 'suppliers', 'supplier_balances', 'expense_categories', 'bank_accounts'];
+const DATASETS = encodeURIComponent(PULL_DATASETS.filter((d) => !DESK_ONLY.includes(d)).join(','));
 
 const page = (n: number, hasMore: boolean): PullResponse => ({
   changes: { users: [{ id: `u${n}` }] },

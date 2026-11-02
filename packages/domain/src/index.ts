@@ -51,8 +51,49 @@ export {
   type CashSessionDocument,
   type DeskContext,
   type DeskSession,
+  type SessionCash,
+  type SessionCloseInput,
+  type SessionCollection,
   type SessionHandover,
 } from './cash-session';
+export {
+  buildCashMovementDocument,
+  checkCashMovement,
+  isMoneyOut,
+  type CashMovementCheck,
+  type CashMovementDocument,
+  type CashMovementInput,
+  type CashMovementKind,
+  type CashMovementProblem,
+  type MovementBankAccount,
+  type MovementCategory,
+  type MovementSupplier,
+  type SessionMovement,
+} from './cash-movement';
+export {
+  buildCollectionDocument,
+  checkCollection,
+  type CollectionCheck,
+  type CollectionCustomer,
+  type CollectionInput,
+  type CollectionMethod,
+  type CollectionProblem,
+  type CustomerCollectionDocument,
+} from './collection';
+export { MAX_NOTE_LENGTH } from './desk-text';
+export {
+  checkClose,
+  countDrawer,
+  denominations,
+  reviewDeskDocument,
+  reviewSession,
+  VARIANCE_REASONS,
+  type CashFinding,
+  type CloseCheck,
+  type CloseInput,
+  type CloseProblem,
+  type VarianceReason,
+} from './drawer';
 export {
   checkCredit,
   CREDIT_REASONS,
@@ -122,6 +163,17 @@ export {
 export { normalizePhone } from './phone';
 export { parseQty, qty, QTY_SCALE, type Qty } from './quantity';
 export { roundCash, type CashRounding } from './rounding';
+export {
+  reconcileDay,
+  type Acknowledgement,
+  type DayDevice,
+  type DayHold,
+  type DayInput,
+  type DayReconciliation,
+  type DaySession,
+  type DaySessionSummary,
+  type MissingHandoverGroup,
+} from './reconciliation';
 export {
   reviewSale,
   type ApprovalCause,
