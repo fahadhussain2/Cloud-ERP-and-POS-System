@@ -34,12 +34,15 @@
     "menu": "Menu",
     "groups": {
       "people": "People",
-      "shop": "Shop"
+      "shop": "Shop",
+      "reports": "Reports"
     },
     "staff": "Staff",
     "counters": "Counters",
     "signOut": "Sign out",
-    "signedIn": "Signed in"
+    "signedIn": "Signed in",
+    "dayReconciliation": "Day reconciliation",
+    "cashVariance": "Cash variance"
   },
   "home": {
     "nothing": "There is nothing here for your role yet."
@@ -182,5 +185,90 @@
     "gapsOpen_other": "{{count}} gaps",
     "attention_one": "{{count}} refused",
     "attention_other": "{{count}} refused"
+  },
+  "reports": {
+    "branch": "Branch",
+    "csv": "Download CSV",
+    "failed": "The report could not be read. Try again; if it stays, tell the support team.",
+    "never": "never",
+    "unknownSeller": "Unknown salesman",
+    "day": {
+      "title": "Day reconciliation",
+      "help": "One business day of a branch: is it final, how each cash session closed, and every cash bill that never reached the drawer.",
+      "date": "Business date",
+      "status": "Status",
+      "final": "Final",
+      "provisional": "Provisional",
+      "transit": "Cash in transit at the end of the day: {{amount}} (0 when every cash bill reached the drawer)",
+      "sessions": "Cash sessions",
+      "noSessions": "No cash session on this day.",
+      "deskSaid": "the desk counted against {{amount}}: some documents haven’t arrived",
+      "missing": "Cash bills never handed over",
+      "noMissing": "Every cash bill reached the drawer.",
+      "toCollect": "{{amount}} not handed over",
+      "toPayOut": "{{amount}} not paid out",
+      "unmatched": "Scans whose bill never arrived",
+      "unmatchedRow": "{{number}} for {{bill}} · {{amount}}",
+      "exceptions": "Exceptions of the day",
+      "noExceptions": "No open exceptions."
+    },
+    "hold": {
+      "day_not_over": "The day isn’t over yet: it ends at {{time}}.",
+      "device_not_heard": "{{device}} hasn’t been heard from since the day ended (last: {{time}}).",
+      "device_unsynced": "{{device}} still has documents of the day to send (oldest {{time}}).",
+      "sequence_gap": "{{device}} is missing documents {{from}} to {{to}}.",
+      "session_open": "{{name}}’s session {{number}} is still open."
+    },
+    "col": {
+      "date": "Date",
+      "session": "Session",
+      "cashier": "Cashier",
+      "float": "Float",
+      "in": "Handed in",
+      "collected": "Collected",
+      "out": "Out",
+      "expected": "Expected",
+      "counted": "Counted",
+      "variance": "Variance",
+      "acknowledgement": "Acknowledged"
+    },
+    "reason": {
+      "change_error": "Wrong change given",
+      "wrong_bill_confirmed": "Wrong bill confirmed",
+      "unrecorded_cash_out": "Cash out not recorded",
+      "counterfeit_note": "Counterfeit note",
+      "unknown": "Not known",
+      "other": "Other"
+    },
+    "ack": {
+      "open": "Open",
+      "not_counted": "Not counted",
+      "exact": "Exact",
+      "waiting": "Waiting",
+      "acknowledged": "Acknowledged",
+      "by": "By {{name}}",
+      "action": "Acknowledge",
+      "own_variance": "You can’t acknowledge the variance of your own session.",
+      "already_acknowledged": "Someone acknowledged it already.",
+      "nothing_to_acknowledge": "There is no variance to acknowledge.",
+      "forbidden": "Your role can’t acknowledge a variance.",
+      "failed": "The acknowledgement was not saved."
+    },
+    "severity": {
+      "low": "low",
+      "medium": "medium",
+      "high": "high"
+    },
+    "variance": {
+      "title": "Cash variance",
+      "help": "Every counted cash session in the dates, and each cashier’s total.",
+      "from": "From",
+      "to": "To",
+      "byCashier": "By cashier",
+      "none": "No counted session in these dates.",
+      "sessions_one": "{{count}} session",
+      "sessions_other": "{{count}} sessions",
+      "sessionsTitle": "Sessions"
+    }
   }
 }

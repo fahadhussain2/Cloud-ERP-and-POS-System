@@ -2,6 +2,13 @@
 // date, and the cash variance by session over a date range. Amounts are whole minor units (CLAUDE.md rule 1). The
 // day reconciliation is what `reconcileDay` in `@erp/domain` returns.
 
+/** How the tenant writes money: the reports' amounts are in its minor units. */
+export interface ReportMoney {
+  locale: string;
+  currency: string;
+  minorUnits: number;
+}
+
 export type CashMovementKindName = 'expense' | 'supplier_payment' | 'bank_deposit' | 'to_safe' | 'from_safe';
 
 export type DayHoldResponse =
@@ -36,6 +43,7 @@ export interface DaySessionResponse {
 }
 
 export interface DayReconciliationResponse {
+  money: ReportMoney;
   branchId: string;
   businessDate: string;
   status: 'final' | 'provisional';
@@ -79,6 +87,7 @@ export interface CashVarianceRow {
 }
 
 export interface CashVarianceResponse {
+  money: ReportMoney;
   from: string;
   to: string;
   sessions: CashVarianceRow[];

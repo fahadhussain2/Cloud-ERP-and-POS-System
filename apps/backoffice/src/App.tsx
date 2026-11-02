@@ -8,6 +8,7 @@ import { useRoute, type Route } from './router';
 import { CountersScreen } from './screens/CountersScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { PasswordScreen } from './screens/PasswordScreen';
+import { CashVarianceScreen, DayReconciliationScreen } from './screens/ReportsScreens';
 import { PersonScreen } from './staff/PersonScreen';
 import { StaffScreen } from './staff/StaffScreen';
 
@@ -72,6 +73,10 @@ export function App({ api }: { api: Api }) {
         <PersonScreen key={shown.id} api={api} id={shown.id} permissions={me.permissions} />
       ) : shown.screen === 'counters' ? (
         <CountersScreen api={api} />
+      ) : shown.screen === 'dayReconciliation' ? (
+        <DayReconciliationScreen api={api} permissions={me.permissions} />
+      ) : shown.screen === 'cashVariance' ? (
+        <CashVarianceScreen api={api} />
       ) : (
         <StaffScreen api={api} permissions={me.permissions} />
       )}

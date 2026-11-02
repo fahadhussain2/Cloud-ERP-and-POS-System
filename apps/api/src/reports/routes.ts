@@ -1,4 +1,9 @@
-import type { CashVarianceResponse, CashVarianceRow, DayReconciliationResponse } from '@erp/contracts';
+import type {
+  CashVarianceResponse,
+  CashVarianceRow,
+  DayReconciliationResponse,
+  ReportMoney,
+} from '@erp/contracts';
 import { withTenant } from '@erp/db';
 import { money, reconcileDay, type CashMovementKind, type DayInput, type DaySession } from '@erp/domain';
 import type { FastifyInstance, FastifyReply, preHandlerAsyncHookHandler } from 'fastify';
@@ -201,6 +206,15 @@ async function dayInput(
   };
 }
 
+/** How the tenant writes money (the back office has no other way to know). */
+async function moneyOf(c: pg.ClientBase): Promise<ReportMoney> {
+  const { rows } = await c.query<{ locale: string; base_currency: string; currency_minor_units: number }>(
+    'SELECT locale, base_currency, currency_minor_units FROM erp.tenants',
+  );
+  const t = rows[0]!;
+  return { locale: t.locale, currency: t.base_currency, minorUnits: t.currency_minor_units };
+}
+
 function dayCsv(r: DayReconciliationResponse): string {
   const rows: Cell[][] = [];
   rows.push(['status', r.status, '', '', '', r.holds.map((h) => h.kind).join(' ')]);
@@ -244,9 +258,12 @@ export function registerReports(scope: FastifyInstance, { pool, now, requireAuth
       const { branchId, date, format } = req.query;
       if (!branchId || !UUID.test(branchId) || !date || !DATE.test(date))
         return reply.code(400).send({ error: 'bad_request' });
-      const input = await withTenant(pool, ctx(req), (_db, c) => dayInput(c, branchId, date, now()));
+      const { input, moneyFormat } = await withTenant(pool, ctx(req), async (_db, c) => ({
+        input: await dayInput(c, branchId, date, now()),
+        moneyFormat: await moneyOf(c),
+      }));
       if (input === null) return reply.code(404).send({ error: 'not_found' });
-      const result: DayReconciliationResponse = { branchId, ...reconcileDay(input) };
+      const result: DayReconciliationResponse = { money: moneyFormat, branchId, ...reconcileDay(input) };
       if (format === 'csv') return sendCsv(reply, `day-reconciliation-${date}.csv`, dayCsv(result));
       return result;
     },
@@ -296,6 +313,7 @@ export function registerReports(scope: FastifyInstance, { pool, now, requireAuth
             )
           ).rows,
       );
+      const moneyFormat = await withTenant(pool, ctx(req), (_db, c) => moneyOf(c));
       const num = (v: string | null) => (v === null ? null : Number(v));
       const sessions: CashVarianceRow[] = rows.map((s) => ({
         sessionId: s.id,
@@ -327,6 +345,7 @@ export function registerReports(scope: FastifyInstance, { pool, now, requireAuth
           totals.set(s.cashierName, { sessions: t.sessions + 1, variance: t.variance + s.variance });
         }
       const result: CashVarianceResponse = {
+        money: moneyFormat,
         from,
         to,
         sessions,

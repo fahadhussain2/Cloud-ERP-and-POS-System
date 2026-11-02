@@ -93,4 +93,5 @@ export type {
   DayHoldResponse,
   DayReconciliationResponse,
   DaySessionResponse,
+  ReportMoney,
 } from './reports';
