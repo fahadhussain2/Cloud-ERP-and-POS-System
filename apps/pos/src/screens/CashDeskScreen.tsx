@@ -1,4 +1,5 @@
 import {
+  denominations,
   DomainError,
   money,
   parseBillCode,
@@ -22,24 +23,55 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 're
 import { useTranslation } from 'react-i18next';
 
 import type { Counter } from '../counter';
-import type { DeskState } from '../db/desk';
+import type { CounterCustomer } from '../db/customers';
+import type { DeskLookups, DeskState } from '../db/desk';
+import type { DeskSlip } from '../print/DeskSlipPrint';
+import { checkVarianceApprover } from '../unlock/approve';
 import type { StaffUser } from '../unlock/unlock';
 import { ConfirmDialog, EntryDialog } from './BillDialogs';
+import {
+  CashOutDialog,
+  CollectionDialog,
+  CountDialog,
+  type AcknowledgeAttempt,
+  type CashOutInputUi,
+  type CloseInputUi,
+  type CollectionInputUi,
+} from './DeskDialogs';
 
 // The cash desk (W1-10, cash desk spec, CSH-01…CSH-04, PRD W4, W7): the session bar on top, the live queue grouped by
 // salesman, and the scan field, which always has the focus. Enter confirms the selected bill as shown; E corrects the
 // cash received first; a scan selects its bill, or, for a bill not in the queue yet (its counter hasn't synced, or
 // this desk is offline), asks before recording it from the code (owner answer 2). Every confirmation is a document
-// in this desk's outbox, written before anything else happens (rule 6).
+// in this desk's outbox, written before anything else happens (rule 6). W1-11 adds a customer's collection (Alt+R), a
+// cash-out or safe movement (Alt+M), and the close by denomination (Alt+X), each printed after it is written.
 
 export type CashDeskCounter = Pick<
   Counter,
-  'deskState' | 'openSession' | 'closeSession' | 'confirmHandover' | 'grants' | 'log'
+  | 'deskState'
+  | 'openSession'
+  | 'closeSession'
+  | 'confirmHandover'
+  | 'grants'
+  | 'log'
+  | 'deskLookups'
+  | 'deskCustomer'
+  | 'receiveCollection'
+  | 'recordCashMovement'
+  | 'printDesk'
+  | 'customers'
+  | 'checkout'
+  | 'getPinState'
+  | 'setPinState'
+  | 'verifyPin'
+  | 'recordPinEvent'
 >;
 
 type Dialog =
   | { kind: 'open' }
-  | { kind: 'close' }
+  | { kind: 'count'; currency: string }
+  | { kind: 'collect'; customers: CounterCustomer[]; lookups: DeskLookups }
+  | { kind: 'cashOut'; lookups: DeskLookups }
   | { kind: 'correct'; bill: QueueBill }
   | { kind: 'unknown'; number: string; cashDue: Money };
 
@@ -53,6 +85,8 @@ export function CashDeskScreen({
   money: fmt,
   user,
   staff,
+  branchId,
+  shopName = '',
   timeZone,
   offline,
   offlineSince,
@@ -65,8 +99,10 @@ export function CashDeskScreen({
   money: MoneyFormat;
   user: StaffUser;
   staff: readonly StaffUser[];
-  /** Kept for the shell; the worker checks the permissions (W1-10). */
+  /** For the manager's PIN at the close; the worker checks every other permission (W1-10). */
   branchId: string | null;
+  /** On the printed slips. */
+  shopName?: string;
   timeZone: string;
   offline: boolean;
   offlineSince: Date | null;
@@ -240,23 +276,140 @@ export function CashDeskScreen({
     }
   };
 
-  const closeSession = async () => {
+  /** Prints a slip after its document is written; a failed print never undoes it (POS spec §13). */
+  const printSlip = async (slip: DeskSlip) => {
     try {
-      const doc = await counter.closeSession({ userId: user.id });
-      setMessage({ tone: 'ok', text: t('desk.close.closed', { number: doc.number }) });
-      await reload();
-      onSaved();
+      const settings = await counter.checkout();
+      counter.printDesk({
+        slip,
+        profile: settings?.printProfile ?? null,
+        shopName,
+        headerLines: [...(settings?.receiptHeader ?? []), ...(settings?.printProfile?.headerLines ?? [])],
+        cashierName: user.fullName,
+        money: fmt,
+        timeZone,
+        reprint: null,
+      });
     } catch (err) {
-      fail(err);
+      await counter.log('desk.print_failed', {
+        kind: slip.kind,
+        number: slip.doc.number,
+        error: String(err),
+      });
     }
   };
+
+  /** A refused document's i18n key: `<prefix>.<code>`, or the failure with its message. */
+  const problemOf = (prefix: string, err: unknown) =>
+    err instanceof DomainError
+      ? `${prefix}.${err.code}`
+      : t('handover.failed', { message: (err as Error).message });
+
+  const written = async (text: string) => {
+    setDialog(null);
+    setMessage({ tone: 'ok', text });
+    await reload();
+    onSaved();
+  };
+
+  const receive = async (input: CollectionInputUi): Promise<string | null> => {
+    try {
+      const doc = await counter.receiveCollection({ userId: user.id, ...input });
+      const methodName =
+        (dialog?.kind === 'collect'
+          ? dialog.lookups.methods.find((x) => x.id === doc.methodId)?.name
+          : undefined) ?? doc.methodCode;
+      await written(
+        t('desk.collect.done', { amount: rs(doc.amount), name: doc.customerName, number: doc.number }),
+      );
+      await printSlip({
+        kind: 'collection',
+        doc,
+        methodName,
+        balanceAfter: doc.balanceBefore - doc.amount,
+      });
+      return null;
+    } catch (err) {
+      return problemOf('collection', err);
+    }
+  };
+
+  const recordOut = async (input: CashOutInputUi): Promise<string | null> => {
+    try {
+      const doc = await counter.recordCashMovement({ userId: user.id, ...input });
+      await written(t('desk.cashOut.done', { amount: rs(doc.amount), number: doc.number }));
+      if (doc.kind !== 'to_safe' && doc.kind !== 'from_safe') await printSlip({ kind: 'cash_out', doc });
+      return null;
+    } catch (err) {
+      return problemOf('cashOut', err);
+    }
+  };
+
+  const acknowledge: AcknowledgeAttempt = async (approver, pin) => {
+    const [before, grants] = await Promise.all([
+      counter.getPinState(approver.id),
+      counter.grants(approver.id),
+    ]);
+    const r = await checkVarianceApprover({
+      approver,
+      approverState: before,
+      approverGrants: grants,
+      branchId,
+      sessionCashierId: open?.cashierId ?? user.id,
+      pin,
+      verify: (v, x) => counter.verifyPin(v, x),
+    });
+    await counter.setPinState(approver.id, r.approverState);
+    if (!before.locked && r.approverState.locked)
+      await counter.recordPinEvent({
+        kind: 'locked',
+        userId: approver.id,
+        byUserId: null,
+        at: new Date().toISOString(),
+      });
+    await counter.log(`approval.variance.${r.result}`, {
+      cashierId: open?.cashierId,
+      approverId: approver.id,
+    });
+    return { result: r.result, failures: r.approverState.failures };
+  };
+
+  const closeSession = async (input: CloseInputUi): Promise<string | null> => {
+    try {
+      const doc = await counter.closeSession({ userId: user.id, ...input });
+      await written(
+        doc.variance === 0
+          ? t('desk.close.closed', { number: doc.number })
+          : t('desk.close.closedVariance', { number: doc.number, amount: rs(doc.variance ?? 0) }),
+      );
+      await printSlip({
+        kind: 'close',
+        doc,
+        acknowledgedByName: staff.find((s) => s.id === doc.acknowledgedByUserId)?.fullName ?? null,
+        toSafe: (doc.countedCash ?? 0) - (doc.leftInDrawer ?? 0),
+      });
+      return null;
+    } catch (err) {
+      return problemOf('close', err);
+    }
+  };
+
+  const openCollect = async () => {
+    const [customers, lookups] = await Promise.all([counter.customers(), counter.deskLookups()]);
+    setDialog({ kind: 'collect', customers, lookups });
+  };
+  const openCashOut = async () => setDialog({ kind: 'cashOut', lookups: await counter.deskLookups() });
+  const openCount = async () =>
+    setDialog({ kind: 'count', currency: (await counter.deskLookups()).currency });
 
   useShortcuts(
     {
       // Not gated on the roles, which load after the screen: the worker refuses without the permission
       // (`not_permitted`), and the message says so.
       'Alt+O': () => open === null && setDialog({ kind: 'open' }),
-      'Alt+X': () => open !== null && setDialog({ kind: 'close' }),
+      'Alt+X': () => open !== null && void openCount(),
+      'Alt+R': () => open !== null && void openCollect(),
+      'Alt+M': () => open !== null && void openCashOut(),
       'Alt+Q': onSell,
       'Alt+L': onLock,
     },
@@ -271,9 +424,13 @@ export function CashDeskScreen({
       run: () => current?.kind === 'in' && setDialog({ kind: 'correct', bill: current }),
     },
     { keys: '↑ ↓', label: t('desk.keys.select'), run: () => scan.current?.focus() },
-    open === null
-      ? { keys: 'Alt+O', label: t('desk.keys.open'), run: () => setDialog({ kind: 'open' }) }
-      : { keys: 'Alt+X', label: t('desk.keys.close'), run: () => setDialog({ kind: 'close' }) },
+    ...(open === null
+      ? [{ keys: 'Alt+O', label: t('desk.keys.open'), run: () => setDialog({ kind: 'open' }) }]
+      : [
+          { keys: 'Alt+R', label: t('desk.keys.collect'), run: () => void openCollect() },
+          { keys: 'Alt+M', label: t('desk.keys.cashOut'), run: () => void openCashOut() },
+          { keys: 'Alt+X', label: t('desk.keys.close'), run: () => void openCount() },
+        ]),
     { keys: 'Alt+Q', label: t('keys.sell'), run: onSell },
     { keys: 'Alt+L', label: t('keys.lock'), run: onLock },
   ];
@@ -298,7 +455,12 @@ export function CashDeskScreen({
             <Figure label={t('desk.float')} value={rs(open.openingFloat)} />
             <Figure label={t('desk.handedIn')} value={rs(open.handedIn)} />
             <Figure label={t('desk.paidOut')} value={rs(open.paidOut)} />
-            <Figure label={t('desk.expected')} value={rs(open.expected)} strong />
+            <Figure label={t('desk.collected')} value={rs(open.collected)} />
+            <Figure label={t('desk.cashOutTotal')} value={rs(open.cashOut - open.fromSafe)} />
+            {/* A blind count (owner answer 2 to W1-11): the figure to reach is hidden while the drawer is counted. */}
+            {dialog?.kind !== 'count' && (
+              <Figure label={t('desk.expected')} value={rs(open.expected)} strong />
+            )}
           </>
         ) : (
           <span className="font-semibold text-warn">
@@ -425,7 +587,7 @@ export function CashDeskScreen({
           title={t('desk.open.title')}
           description={t('desk.open.help')}
           label={t('desk.open.label')}
-          initial="0"
+          initial={plainAmount(session?.leftInDrawer ?? 0, fmt.minorUnits)}
           actionLabel={t('desk.open.action')}
           onSubmit={(value) => {
             let float: Money;
@@ -441,15 +603,33 @@ export function CashDeskScreen({
           onClose={() => setDialog(null)}
         />
       )}
-      {dialog?.kind === 'close' && open && (
-        <ConfirmDialog
-          title={t('desk.close.title')}
-          body={t('desk.close.body', { amount: rs(open.expected) })}
-          actionLabel={t('desk.close.action')}
-          onConfirm={() => {
-            setDialog(null);
-            void closeSession();
-          }}
+      {dialog?.kind === 'count' && open && (
+        <CountDialog
+          denominations={denominations(dialog.currency)}
+          expected={open.expected}
+          money={fmt}
+          staff={staff.filter((s) => s.id !== open.cashierId)}
+          onAcknowledge={acknowledge}
+          onCloseSession={closeSession}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'collect' && (
+        <CollectionDialog
+          customers={dialog.customers}
+          lookups={dialog.lookups}
+          money={fmt}
+          load={(id) => counter.deskCustomer(id)}
+          onReceive={receive}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'cashOut' && open && (
+        <CashOutDialog
+          lookups={dialog.lookups}
+          expected={open.expected}
+          money={fmt}
+          onRecord={recordOut}
           onClose={() => setDialog(null)}
         />
       )}

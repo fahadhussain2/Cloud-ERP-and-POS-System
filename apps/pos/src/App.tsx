@@ -432,6 +432,7 @@ export function App({ counter }: { counter: Counter }) {
             user={phase.user}
             staff={staff}
             branchId={device?.branchId ?? null}
+            shopName={settings?.name ?? ''}
             timeZone={settings?.timeZone ?? 'Asia/Karachi'}
             offline={connection.state !== 'online'}
             offlineSince={connection.offlineSince}

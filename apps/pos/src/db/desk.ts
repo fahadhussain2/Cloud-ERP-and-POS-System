@@ -1,13 +1,27 @@
 import {
+  buildCashMovementDocument,
+  buildCollectionDocument,
   buildHandoverDocument,
   buildSessionDocument,
+  businessDate,
   DomainError,
   expectedCash,
+  isMoneyOut,
   money,
   sum,
   type CashHandoverDocument,
+  type CashMovementDocument,
+  type CashMovementKind,
   type CashSessionDocument,
+  type CollectionCustomer,
+  type CollectionMethod,
+  type CustomerCollectionDocument,
   type DeskSession,
+  type MovementBankAccount,
+  type MovementCategory,
+  type MovementSupplier,
+  type SessionCash,
+  type SessionCloseInput,
   type HandoverMethod,
   type HandoverStatus,
   type HandoverTarget,
@@ -15,17 +29,17 @@ import {
   type Money,
   type QueueEntry,
   type SaleDocument,
-  type SessionHandover,
 } from '@erp/domain';
 import { uuidv7 } from '@erp/contracts';
 
 import { checkoutSettings, type CheckoutSettings } from './checkout';
-import { getDevice, grantsFor, type DeviceInfo } from './repo';
+import { creditFigures, getCustomer } from './customers';
+import { getDevice, getSync, grantsFor, type DeviceInfo } from './repo';
 import type { SqlDb } from './sql';
 
-// The cash desk on its own PC (W1-10, cash desk spec, CSH-01…CSH-04): the pulled queue, this desk's session, and its
-// handovers. Every handover and session event is a document written with its outbox row in one transaction (rule 6),
-// signed after the commit like a bill. Runs in the database worker.
+// The cash desk on its own PC (W1-10, W1-11, cash desk spec, CSH-01…CSH-07): the pulled queue, this desk's session,
+// its handovers, collections and cash-outs, and the counted close. Every one is a document written with its outbox
+// row in one transaction (rule 6), signed after the commit like a bill. Runs in the database worker.
 
 /** How long this desk remembers its own handovers for the duplicate check and the queue (the queue's 7 days). */
 const LOCAL_DAYS = 7;
@@ -35,8 +49,17 @@ export interface DeskSessionView extends DeskSession {
   openedAt: string;
   handedIn: Money;
   paidOut: Money;
-  /** float + handed in − paid out. */
+  /** Cash collections only: the others don't reach the drawer. */
+  collected: Money;
+  /** Every cash-out and what went to the safe. */
+  cashOut: Money;
+  fromSafe: Money;
+  /** What the drawer should hold (`expectedCash`). */
   expected: Money;
+  /** On a closed session: its count and what stayed in the drawer (null for a close without a count, W1-10). */
+  countedCash: Money | null;
+  variance: Money | null;
+  leftInDrawer: Money | null;
 }
 
 export interface DeskState {
@@ -51,10 +74,18 @@ export interface DeskState {
 const amount = (v: unknown): Money | null => (v === null || v === undefined ? null : money(Number(v)));
 
 /** This desk's newest session, open or closed; null before its first. */
-function lastSession(db: SqlDb): (DeskSession & { number: string; openedAt: string }) | null {
+function lastSession(db: SqlDb):
+  | (DeskSession & {
+      number: string;
+      openedAt: string;
+      countedCash: Money | null;
+      variance: Money | null;
+      leftInDrawer: Money | null;
+    })
+  | null {
   const [r] = db.selectObjects(
-    `SELECT id, number, cashier_user_id, opened_at, opening_float, status FROM cash_sessions
-     ORDER BY opened_at DESC, id DESC LIMIT 1`,
+    `SELECT id, number, cashier_user_id, opened_at, opening_float, status, counted_cash, variance, left_in_drawer
+     FROM cash_sessions ORDER BY opened_at DESC, id DESC LIMIT 1`,
   );
   if (r === undefined) return null;
   return {
@@ -64,18 +95,37 @@ function lastSession(db: SqlDb): (DeskSession & { number: string; openedAt: stri
     openedAt: String(r['opened_at']),
     openingFloat: money(Number(r['opening_float'])),
     status: r['status'] === 'open' ? 'open' : 'closed',
+    countedCash: amount(r['counted_cash']),
+    variance: amount(r['variance']),
+    leftInDrawer: amount(r['left_in_drawer']),
   };
 }
 
-/** The handovers of a session, for its expected cash (posting rules §4.5). Duplicates can't exist on one desk. */
-const sessionHandovers = (db: SqlDb, sessionId: string): SessionHandover[] =>
-  db
-    .selectObjects(
-      `SELECT json_extract(payload, '$.kind') AS kind, json_extract(payload, '$.amount') AS amount
-       FROM local_documents WHERE family = 'H' AND json_extract(payload, '$.sessionId') = ?`,
-      [sessionId],
-    )
-    .map((r) => ({ kind: r['kind'] === 'payout' ? 'payout' : 'in', amount: money(Number(r['amount'])) }));
+/**
+ * A session's handovers, collections and cash movements, for its expected cash (posting rules §4.5). Duplicates
+ * can't exist on one desk; only cash collections reach the drawer.
+ */
+function sessionCash(db: SqlDb, sessionId: string): Required<SessionCash> {
+  const rows = db.selectObjects(
+    `SELECT family, json_extract(payload, '$.kind') AS kind, json_extract(payload, '$.amount') AS amount,
+       json_extract(payload, '$.methodCode') AS method
+     FROM local_documents WHERE family IN ('H', 'R', 'M') AND json_extract(payload, '$.sessionId') = ?
+     ORDER BY created_at`,
+    [sessionId],
+  );
+  const of = (family: string) => rows.filter((r) => r['family'] === family);
+  return {
+    handovers: of('H').map((r) => ({
+      kind: r['kind'] === 'payout' ? 'payout' : 'in',
+      amount: money(Number(r['amount'])),
+    })),
+    collections: of('R').map((r) => ({ cash: r['method'] === 'cash', amount: money(Number(r['amount'])) })),
+    movements: of('M').map((r) => ({
+      kind: String(r['kind']) as CashMovementKind,
+      amount: money(Number(r['amount'])),
+    })),
+  };
+}
 
 function localHandovers(db: SqlDb, nowMs: number): LocalHandover[] {
   const since = new Date(nowMs - LOCAL_DAYS * 86_400_000).toISOString();
@@ -115,14 +165,17 @@ export function deskState(db: SqlDb, nowMs = Date.now()): DeskState {
   const s = lastSession(db);
   let session: DeskSessionView | null = null;
   if (s !== null) {
-    const handovers = sessionHandovers(db, s.id);
+    const cash = sessionCash(db, s.id);
     const total = (kind: 'in' | 'payout') =>
-      sum(handovers.filter((h) => h.kind === kind).map((h) => h.amount));
+      sum(cash.handovers.filter((h) => h.kind === kind).map((h) => h.amount));
     session = {
       ...s,
       handedIn: total('in'),
       paidOut: total('payout'),
-      expected: expectedCash({ openingFloat: s.openingFloat, handovers }),
+      collected: sum(cash.collections.filter((c) => c.cash).map((c) => c.amount)),
+      cashOut: sum(cash.movements.filter((m) => isMoneyOut(m.kind)).map((m) => m.amount)),
+      fromSafe: sum(cash.movements.filter((m) => !isMoneyOut(m.kind)).map((m) => m.amount)),
+      expected: expectedCash({ ...cash, openingFloat: s.openingFloat }),
     };
   }
   return {
@@ -159,7 +212,11 @@ function nextSeq(db: SqlDb, family: 'H' | 'Z'): number {
 }
 
 /** The document in local_documents and the outbox, unsigned (signed after the commit, POS spec §12). */
-function store(db: SqlDb, doc: CashHandoverDocument | CashSessionDocument, kind: string): void {
+function store(
+  db: SqlDb,
+  doc: CashHandoverDocument | CashSessionDocument | CustomerCollectionDocument | CashMovementDocument,
+  kind: string,
+): void {
   const payload = JSON.stringify(doc);
   db.exec(
     `INSERT INTO local_documents (id, family, seq, number, kind, business_date, payload, created_at)
@@ -198,17 +255,22 @@ export interface DeskRequest {
   clientVersion: string;
 }
 
-/** Opens a session with its float (CSH-01); refused while one is open, or without `cash.handover.receive`. */
+/**
+ * Opens a session with its float (CSH-01); refused while one is open, or without `cash.handover.receive`. What stayed
+ * in the drawer at this desk's last counted close goes on the document, so a different float shows (owner answer 3).
+ */
 export function openSession(db: SqlDb, req: DeskRequest & { openingFloat: Money }): CashSessionDocument {
   const r = ready(db);
   const grants = grantsFor(db, req.userId);
   return db.transaction(() => {
+    const current = lastSession(db);
     const doc = buildSessionDocument({
       event: 'open',
-      current: lastSession(db),
+      current,
       userId: req.userId,
       grants,
       openingFloat: req.openingFloat,
+      floatExpected: current?.leftInDrawer ?? null,
       handovers: [],
       context: { ...contextOf(r, nextSeq(db, 'Z'), req), increment: r.settings.increment },
     });
@@ -222,8 +284,21 @@ export function openSession(db: SqlDb, req: DeskRequest & { openingFloat: Money 
   });
 }
 
-/** Closes the open session, by anyone with `cash.session.close` (owner answer 1 to W1-10); no count until W1-11. */
-export function closeSession(db: SqlDb, req: DeskRequest): CashSessionDocument {
+export interface CloseRequest extends DeskRequest {
+  counts: Record<string, number>;
+  reason: SessionCloseInput['reason'];
+  note: string | null;
+  /** The manager whose PIN the dialog verified; null = acknowledge later (owner answer 1). */
+  acknowledgerId: string | null;
+  /** null = all of the count stays. */
+  leftInDrawer: Money | null;
+}
+
+/**
+ * Closes the open session with its count (CSH-07), by anyone with `cash.session.close` (owner answer 1 to W1-10);
+ * refused with the close check's problem as a DomainError.
+ */
+export function closeSession(db: SqlDb, req: CloseRequest): CashSessionDocument {
   const r = ready(db);
   const grants = grantsFor(db, req.userId);
   return db.transaction(() => {
@@ -234,15 +309,26 @@ export function closeSession(db: SqlDb, req: DeskRequest): CashSessionDocument {
       userId: req.userId,
       grants,
       openingFloat: null,
-      handovers: s === null ? [] : sessionHandovers(db, s.id),
+      ...(s === null ? { handovers: [] } : sessionCash(db, s.id)),
+      close: {
+        currency: currencyOf(db),
+        counts: req.counts,
+        reason: req.reason,
+        note: req.note,
+        acknowledger:
+          req.acknowledgerId === null
+            ? null
+            : { userId: req.acknowledgerId, grants: grantsFor(db, req.acknowledgerId) },
+        leftInDrawer: req.leftInDrawer,
+      },
       context: { ...contextOf(r, nextSeq(db, 'Z'), req), increment: r.settings.increment },
     });
     store(db, doc, 'session_close');
-    db.exec(`UPDATE cash_sessions SET status = 'closed', closed_at = ?, closed_by_user_id = ? WHERE id = ?`, [
-      doc.createdAt,
-      req.userId,
-      doc.sessionId,
-    ]);
+    db.exec(
+      `UPDATE cash_sessions SET status = 'closed', closed_at = ?, closed_by_user_id = ?, counted_cash = ?, variance = ?,
+         left_in_drawer = ? WHERE id = ?`,
+      [doc.createdAt, req.userId, doc.countedCash, doc.variance, doc.leftInDrawer, doc.sessionId],
+    );
     return doc;
   });
 }
@@ -345,4 +431,196 @@ export function autoHandover(
   });
   store(db, doc, doc.kind === 'in' ? 'handover' : 'payout');
   return doc;
+}
+
+/** The tenant's currency, for the denominations of the count. */
+function currencyOf(db: SqlDb): string {
+  const data = db.selectValue('SELECT data FROM tenant WHERE deleted_at IS NULL LIMIT 1');
+  const t = typeof data === 'string' ? (JSON.parse(data) as Record<string, unknown>) : {};
+  return typeof t['base_currency'] === 'string' ? t['base_currency'] : 'PKR';
+}
+
+export interface DeskCustomer extends CollectionCustomer {
+  phones: string[];
+  /** This desk's last collection from them, if it still has it. */
+  lastCollection: { number: string; amount: Money; at: string } | null;
+}
+
+/** This desk's collections from a customer the pulled balance can't include yet (as unsynced bills, POS spec §15). */
+function unsyncedCollections(db: SqlDb, partyId: string): Money {
+  const asOf = getSync(db, 'complete_pull_started_at') ?? '';
+  return money(
+    Number(
+      db.selectValue(
+        `SELECT coalesce(sum(json_extract(payload, '$.amount')), 0) FROM local_documents
+         WHERE family = 'R' AND json_extract(payload, '$.partyId') = ?
+           AND (id IN (SELECT id FROM outbox) OR accepted_at > ?)`,
+        [partyId, asOf],
+      ),
+    ),
+  );
+}
+
+/**
+ * What the collection dialog shows (CSH-05): the customer's balance as this desk knows it, the last synced one plus
+ * its unsynced bills on account, minus its unsynced collections; and the last collection here.
+ */
+export function deskCustomer(db: SqlDb, partyId: string, nowMs = Date.now()): DeskCustomer | null {
+  const c = getCustomer(db, partyId);
+  const s = checkoutSettings(db);
+  if (c === null || s === null) return null;
+  const today = businessDate(nowMs, s.timeZone, s.cutoffHour);
+  const figures = creditFigures(db, partyId, false, today);
+  const [last] = db.selectObjects(
+    `SELECT number, json_extract(payload, '$.amount') AS amount, created_at FROM local_documents
+     WHERE family = 'R' AND json_extract(payload, '$.partyId') = ? ORDER BY created_at DESC LIMIT 1`,
+    [partyId],
+  );
+  return {
+    partyId: c.id,
+    code: c.code,
+    name: c.name,
+    phones: c.phones,
+    balance: money(figures.balance + figures.unsynced - unsyncedCollections(db, partyId)),
+    lastCollection:
+      last === undefined
+        ? null
+        : {
+            number: String(last['number']),
+            amount: money(Number(last['amount'])),
+            at: String(last['created_at']),
+          },
+  };
+}
+
+export interface DeskLookups {
+  /** Active methods a customer can pay by: not on account. */
+  methods: (CollectionMethod & { name: string })[];
+  categories: MovementCategory[];
+  suppliers: (MovementSupplier & { balance: Money })[];
+  /** Banks a deposit can go to. */
+  banks: MovementBankAccount[];
+  currency: string;
+}
+
+/** What the collection and cash-out dialogs offer (sync spec §3: the desk's own datasets). */
+export function deskLookups(db: SqlDb): DeskLookups {
+  return {
+    methods: db
+      .selectObjects(
+        `SELECT id, code, name, is_cash, requires_reference FROM payment_methods
+         WHERE is_active = 1 AND deleted_at IS NULL AND code <> 'on_account' ORDER BY sort, code`,
+      )
+      .map((r) => ({
+        id: String(r['id']),
+        code: String(r['code']) as CollectionMethod['code'],
+        name: String(r['name']),
+        isCash: Number(r['is_cash']) === 1,
+        requiresReference: Number(r['requires_reference']) === 1,
+        isActive: true,
+      })),
+    categories: db
+      .selectObjects('SELECT id, name FROM expense_categories WHERE is_active = 1 ORDER BY name')
+      .map((r) => ({ id: String(r['id']), name: String(r['name']), isActive: true })),
+    suppliers: db
+      .selectObjects(
+        `SELECT s.id, s.code, s.name, coalesce(b.balance, 0) AS balance FROM suppliers s
+         LEFT JOIN supplier_balances b ON b.party_id = s.id WHERE s.status = 'active' ORDER BY s.name, s.code`,
+      )
+      .map((r) => ({
+        partyId: String(r['id']),
+        code: String(r['code']),
+        name: String(r['name']),
+        balance: money(Number(r['balance'])),
+      })),
+    banks: db
+      .selectObjects("SELECT id, name FROM bank_accounts WHERE is_active = 1 AND kind = 'bank' ORDER BY name")
+      .map((r) => ({ id: String(r['id']), name: String(r['name']), kind: 'bank' as const, isActive: true })),
+    currency: currencyOf(db),
+  };
+}
+
+function nextDeskSeq(db: SqlDb, family: 'R' | 'M'): number {
+  const seq = Number(db.selectValue('SELECT next_seq FROM local_series WHERE family = ?', [family]) ?? 1);
+  db.exec(
+    `INSERT INTO local_series (family, next_seq) VALUES (?, ?)
+     ON CONFLICT (family) DO UPDATE SET next_seq = excluded.next_seq`,
+    [family, seq + 1],
+  );
+  return seq;
+}
+
+export interface CollectionRequest extends DeskRequest {
+  partyId: string;
+  methodId: string;
+  amount: Money;
+  reference: string | null;
+  note: string | null;
+}
+
+/** Records a customer's payment (CSH-05): refused with the check's problem as a DomainError. */
+export function receiveCollection(db: SqlDb, req: CollectionRequest): CustomerCollectionDocument {
+  const r = ready(db);
+  const grants = grantsFor(db, req.userId);
+  return db.transaction(() => {
+    const doc = buildCollectionDocument({
+      session: lastSession(db),
+      cashierId: req.userId,
+      grants,
+      branchId: r.device.branchId,
+      increment: r.settings.increment,
+      customer: deskCustomer(db, req.partyId, req.createdAtMs),
+      method: deskLookups(db).methods.find((m) => m.id === req.methodId) ?? null,
+      amount: req.amount,
+      reference: req.reference,
+      note: req.note,
+      context: contextOf(r, nextDeskSeq(db, 'R'), req),
+    });
+    store(db, doc, 'collection');
+    return doc;
+  });
+}
+
+export interface CashMovementRequest extends DeskRequest {
+  kind: CashMovementKind;
+  amount: Money;
+  expenseCategoryId: string | null;
+  supplierId: string | null;
+  bankAccountId: string | null;
+  note: string | null;
+  reference: string | null;
+  /** The cashier confirmed a cash-out above what the drawer should hold. */
+  overDrawerConfirmed: boolean;
+}
+
+/** Records a cash-out or a safe movement (CSH-06): refused with the check's problem as a DomainError. */
+export function recordCashMovement(db: SqlDb, req: CashMovementRequest): CashMovementDocument {
+  const r = ready(db);
+  const grants = grantsFor(db, req.userId);
+  return db.transaction(() => {
+    const session = lastSession(db);
+    const lookups = deskLookups(db);
+    const doc = buildCashMovementDocument({
+      session,
+      cashierId: req.userId,
+      grants,
+      branchId: r.device.branchId,
+      increment: r.settings.increment,
+      kind: req.kind,
+      amount: req.amount,
+      expenseCategory: lookups.categories.find((c) => c.id === req.expenseCategoryId) ?? null,
+      supplier: lookups.suppliers.find((s) => s.partyId === req.supplierId) ?? null,
+      bankAccount: lookups.banks.find((b) => b.id === req.bankAccountId) ?? null,
+      note: req.note,
+      reference: req.reference,
+      expected:
+        session === null
+          ? money(0)
+          : expectedCash({ ...sessionCash(db, session.id), openingFloat: session.openingFloat }),
+      overDrawerConfirmed: req.overDrawerConfirmed,
+      context: contextOf(r, nextDeskSeq(db, 'M'), req),
+    });
+    store(db, doc, doc.kind);
+    return doc;
+  });
 }

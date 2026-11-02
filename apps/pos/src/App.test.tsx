@@ -153,6 +153,11 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
     openSession: () => Promise.reject(new Error('not a cash desk')),
     closeSession: () => Promise.reject(new Error('not a cash desk')),
     confirmHandover: () => Promise.reject(new Error('not a cash desk')),
+    deskLookups: () => Promise.reject(new Error('not a cash desk')),
+    deskCustomer: () => Promise.resolve(null),
+    receiveCollection: () => Promise.reject(new Error('not a cash desk')),
+    recordCashMovement: () => Promise.reject(new Error('not a cash desk')),
+    printDesk: () => {},
     ...over,
   };
   return { counter, calls, pushes, setDevice: (d: DeviceInfo | null) => (device = d) };

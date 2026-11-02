@@ -6,6 +6,7 @@ import { LATEST_VERSION } from './db/migrate';
 import { indexedDbKeys } from './device/keys';
 import { createTokenSource, enroll } from './device/session';
 import { httpApi } from './net/api';
+import { printDeskSlip } from './print/DeskSlipPrint';
 import { printBill } from './print/print-bill';
 import { browserStorage, runStorageChecks } from './storage/checks';
 import { openEventStream } from './sync/events';
@@ -203,5 +204,10 @@ export function browserCounter(): Counter {
     openSession: async (req) => signStored(await db.openSession({ ...req, ...made() })),
     closeSession: async (req) => signStored(await db.closeSession({ ...req, ...made() })),
     confirmHandover: async (req) => signStored(await db.confirmHandover({ ...req, ...made() })),
+    deskLookups: () => db.deskLookups(),
+    deskCustomer: (partyId) => db.deskCustomer(partyId),
+    receiveCollection: async (req) => signStored(await db.receiveCollection({ ...req, ...made() })),
+    recordCashMovement: async (req) => signStored(await db.recordCashMovement({ ...req, ...made() })),
+    printDesk: (job) => printDeskSlip(job),
   };
 }

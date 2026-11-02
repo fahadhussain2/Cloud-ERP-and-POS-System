@@ -131,3 +131,14 @@
   font-size: 11pt;
   font-weight: 700;
 }
+/* The desk's slips (W1-11): one column of figures, and a line to sign under. */
+.desk-slip {
+  max-inline-size: 110mm;
+  margin-block: 3mm;
+}
+.desk-sign {
+  margin-block-start: 14mm;
+  padding-block-start: 1mm;
+  border-block-start: 0.3mm solid #000;
+  max-inline-size: 70mm;
+}

@@ -1,7 +1,9 @@
 import type { CounterPinChangeRequest } from '@erp/contracts';
 import type {
   CashHandoverDocument,
+  CashMovementDocument,
   CashSessionDocument,
+  CustomerCollectionDocument,
   CreditView,
   Money,
   PinState,
@@ -12,10 +14,19 @@ import type {
 import type { OpenBill } from './bill/open-bill';
 import type { CheckoutSettings, DocumentSummary, FinalizeRequest, Finalized, Reprint } from './db/checkout';
 import type { CounterCustomer } from './db/customers';
-import type { DeskState, HandoverRequest } from './db/desk';
+import type {
+  CashMovementRequest,
+  CloseRequest,
+  CollectionRequest,
+  DeskCustomer,
+  DeskLookups,
+  DeskState,
+  HandoverRequest,
+} from './db/desk';
 import type { LocalHealth, QuarantinedRow } from './db/outbox';
 import type { DeviceInfo, PinEvent, TenantSettings } from './db/repo';
 import type { EnrollResult } from './device/session';
+import type { DeskPrintJob } from './print/DeskSlipPrint';
 import type { PrintJob } from './print/print-job';
 import type { BillItem, SearchOptions, SearchResult, Tier } from './search/search-index';
 import type { CheckResult } from './storage/checks';
@@ -110,9 +121,22 @@ export interface Counter {
   deskState(): Promise<DeskState>;
   /** Opens a session with its float; the document is written with its outbox row, then signed. */
   openSession(req: { userId: string; openingFloat: Money }): Promise<CashSessionDocument>;
-  closeSession(req: { userId: string }): Promise<CashSessionDocument>;
+  /** Closes it with the drawer count (W1-11); refused with the close check's problem as a DomainError. */
+  closeSession(req: Omit<CloseRequest, 'id' | 'createdAtMs' | 'clientVersion'>): Promise<CashSessionDocument>;
   /** Records a handover or a payout; refused with the check's problem as a DomainError. */
   confirmHandover(
     req: Omit<HandoverRequest, 'id' | 'createdAtMs' | 'clientVersion'>,
   ): Promise<CashHandoverDocument>;
+  /** What the collection and cash-out dialogs offer (W1-11). */
+  deskLookups(): Promise<DeskLookups>;
+  /** A customer's balance as this desk knows it, and the last collection here. */
+  deskCustomer(partyId: string): Promise<DeskCustomer | null>;
+  receiveCollection(
+    req: Omit<CollectionRequest, 'id' | 'createdAtMs' | 'clientVersion'>,
+  ): Promise<CustomerCollectionDocument>;
+  recordCashMovement(
+    req: Omit<CashMovementRequest, 'id' | 'createdAtMs' | 'clientVersion'>,
+  ): Promise<CashMovementDocument>;
+  /** Prints a receipt, voucher or close slip like a bill. */
+  printDesk(job: DeskPrintJob): void;
 }

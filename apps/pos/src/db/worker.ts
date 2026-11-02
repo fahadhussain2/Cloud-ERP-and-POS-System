@@ -89,11 +89,15 @@ const ops = {
     const today = businessDate(Date.now(), s.timeZone, s.cutoffHour);
     return customers.creditFigures(open(), customerId, offline, today);
   },
-  /** The cash desk (W1-10): its session, the pulled queue, its handovers; each write is one transaction. */
+  /** The cash desk (W1-10, W1-11): its session, the pulled queue, its documents; each write is one transaction. */
   deskState: () => desk.deskState(open()),
   openSession: (req: desk.DeskRequest & { openingFloat: Money }) => desk.openSession(open(), req),
-  closeSession: (req: desk.DeskRequest) => desk.closeSession(open(), req),
+  closeSession: (req: desk.CloseRequest) => desk.closeSession(open(), req),
   confirmHandover: (req: desk.HandoverRequest) => desk.confirmHandover(open(), req),
+  deskLookups: () => desk.deskLookups(open()),
+  deskCustomer: (partyId: string) => desk.deskCustomer(open(), partyId),
+  receiveCollection: (req: desk.CollectionRequest) => desk.receiveCollection(open(), req),
+  recordCashMovement: (req: desk.CashMovementRequest) => desk.recordCashMovement(open(), req),
   /** Push (sync spec §6.2–§7, W1-07): the outbox, the answer, re-queue after a restore, audit events, health. */
   outboxBatch: () => outbox.outboxBatch(open()),
   ackPush: (results: PushResult[], at: string) => outbox.ackPush(open(), results, at),

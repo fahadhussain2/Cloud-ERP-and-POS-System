@@ -48,6 +48,26 @@ export function checkManager(opts: {
   return checkStaffPin({ ...opts, allowed: (grants) => can(grants, 'admin.devices', opts.branchId) });
 }
 
+/**
+ * A manager acknowledging a drawer variance at the close (CSH-07, owner answer 1 to W1-11): `cash.variance.approve`,
+ * and never the session's own cashier (PRD §4).
+ */
+export function checkVarianceApprover(opts: {
+  approver: StaffUser;
+  approverState: PinState;
+  approverGrants: readonly RoleGrant[];
+  branchId: string | null;
+  sessionCashierId: string;
+  pin: string;
+  verify: (verifier: string, pin: string) => Promise<boolean>;
+}): Promise<{ result: ApproverResult; approverState: PinState }> {
+  return checkStaffPin({
+    ...opts,
+    allowed: (grants) =>
+      opts.approver.id !== opts.sessionCashierId && can(grants, 'cash.variance.approve', opts.branchId),
+  });
+}
+
 async function checkStaffPin(opts: {
   approver: StaffUser;
   approverState: PinState;
