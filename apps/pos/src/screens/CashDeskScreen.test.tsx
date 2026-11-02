@@ -312,6 +312,21 @@ describe('the cash desk screen', () => {
     }
   });
 
+  it('scrolls only the rows of a long queue: its heading and column headings stay in place', async () => {
+    const queue = Array.from({ length: 30 }, (_, i) =>
+      bill(`C03-S0005${String(i).padStart(2, '0')}`, 'imran', 10000 + i * 100),
+    );
+    show(fakeDesk({ queue }).counter);
+    await screen.findByText('C03-S000529');
+    const panel = screen.getByRole('region', { name: 'Waiting for the cash desk' });
+    // jsdom has no layout: the scrolling box is the one with overflow-y-auto.
+    const scroller = panel.querySelector('.overflow-y-auto');
+    expect(scroller).not.toBeNull();
+    expect(scroller!.contains(within(panel).getByRole('heading', { level: 2 }))).toBe(false);
+    expect(scroller!.contains(within(panel).getByRole('table'))).toBe(true);
+    expect(panel.querySelector('thead')!.className).toContain('sticky');
+  });
+
   it('offline, says the queue is not updating and to scan each bill', async () => {
     show(fakeDesk().counter, { offline: true });
     expect(await screen.findByText(/queue is not updating · scan each bill/)).toBeTruthy();
