@@ -4,7 +4,7 @@ import {
   money,
   type CashDeskStatus,
   type Money,
-  type SaleDocument,
+  type AnySaleDocument,
   type SaleVoidDocument,
   type VoidReason,
 } from '@erp/domain';
@@ -117,7 +117,7 @@ function nextVoidSeq(db: SqlDb): number {
 }
 
 /** Voids one of this counter's bills; refused with checkVoid's problem as a DomainError, writing nothing. */
-export function voidBill(db: SqlDb, req: VoidRequest): { void: SaleVoidDocument; sale: SaleDocument } {
+export function voidBill(db: SqlDb, req: VoidRequest): { void: SaleVoidDocument; sale: AnySaleDocument } {
   const device = getDevice(db);
   const settings = checkoutSettings(db);
   if (device === null || settings === null) throw new Error('this counter is not set up yet');

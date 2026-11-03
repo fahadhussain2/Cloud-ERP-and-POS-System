@@ -386,7 +386,17 @@
       "cashierSigns": "Cashier and manager (signatures)"
     },
     "void": "VOID {{number}} · {{at}} · by {{by}}, approved by {{approvedBy}} · {{reason}}",
-    "reissueOf": "Reissue of {{number}}"
+    "reissueOf": "Reissue of {{number}}",
+    "returnBill": "RETURN",
+    "exchangeBill": "EXCHANGE",
+    "returnedFrom": "Returned from {{number}} ({{date}})",
+    "noReceipt": "No receipt",
+    "noReceiptRef": "No receipt · old bill {{ref}}",
+    "returnedLine": "{{reason}}, {{condition}}",
+    "returned": "Returned",
+    "refundAtDesk": "Refund due {{amount}}, collect at the cash desk",
+    "creditedToAccount": "Credited to account",
+    "refundedBy": "Refunded by {{method}}"
   },
   "health": {
     "title": "Counter health",

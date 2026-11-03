@@ -206,6 +206,7 @@ export {
   returnedOf,
   returnNeeds,
   reviewReturn,
+  type AnySaleDocument,
   type ItemPolicy,
   type OriginalLine,
   type PricedLine,

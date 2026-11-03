@@ -31,6 +31,7 @@ import {
   type PendingApproval,
   type Qty,
   type RoleGrant,
+  type AnySaleDocument,
   type SaleDocument,
   type Tender,
   type SaleVoidDocument,
@@ -483,7 +484,7 @@ export function CounterScreen({
 
   /** Sends a bill to the printer; a print that fails changes nothing, and Alt+P prints it again (POS spec §13). */
   const printDocument = (
-    document: SaleDocument,
+    document: AnySaleDocument,
     items: PrintJob['items'],
     reprint: PrintJob['reprint'],
     voided: SaleVoidDocument | null = null,
@@ -516,7 +517,7 @@ export function CounterScreen({
     }
   };
 
-  const describe = (d: SaleDocument) => {
+  const describe = (d: AnySaleDocument) => {
     const cash = d.payments.find((p) => p.changeDue !== null);
     if (!cash)
       return t('pay.doneNoCash', {
@@ -591,7 +592,7 @@ export function CounterScreen({
   };
 
   /** The code and name of each item on a stored bill, from the local catalog (an item gone from it shows its id). */
-  const itemsOf = async (document: SaleDocument) => {
+  const itemsOf = async (document: AnySaleDocument) => {
     const ids = [...new Set(document.lines.map((l) => l.itemId))];
     const found = await Promise.all(ids.map((id) => counter.billItem(id, null)));
     return {
@@ -778,7 +779,12 @@ export function CounterScreen({
         setMessage(null);
         setNotice(t('void.done', { number: bill.number, void: done.void.number }));
         onSaved?.();
-        setDialog({ kind: 'reissue', sale: done.sale });
+        // A voided return isn't reissued: the return is started again with F3 (W1-13).
+        if (done.sale.version === 1) setDialog({ kind: 'reissue', sale: done.sale });
+        else {
+          setDialog(null);
+          focusSearch();
+        }
       } catch (err) {
         setDialog(null);
         if (err instanceof DomainError) setMessage(t(voidErrorKey(err.code)));

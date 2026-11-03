@@ -32,6 +32,7 @@ import {
   walkinPhoneOf,
   type SaleContext,
   type SaleCustomer,
+  type SaleDocument,
   type SaleDocumentCredit,
   type SaleDocumentLine,
   type SaleDocumentOverride,
@@ -397,6 +398,9 @@ export interface ReturnDocument {
   noReceipt?: { ref: string | null };
   clientVersion: string;
 }
+
+/** A stored `S` document: a sale (version 1) or a return or exchange (version 2). */
+export type AnySaleDocument = SaleDocument | ReturnDocument;
 
 export const isReturnedLine = (l: ReturnDocumentLine | SaleDocumentLine): l is ReturnDocumentLine =>
   'returnOf' in l;

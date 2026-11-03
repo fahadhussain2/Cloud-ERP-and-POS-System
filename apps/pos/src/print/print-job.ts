@@ -1,4 +1,4 @@
-import type { SaleDocument } from '@erp/domain';
+import type { AnySaleDocument } from '@erp/domain';
 import type { MoneyFormat } from '@erp/ui';
 
 import type { PrintProfile } from '../db/checkout';
@@ -7,7 +7,7 @@ import type { PrintProfile } from '../db/checkout';
 // names. Made by the counter screen at finalize and at reprint.
 
 export interface PrintJob {
-  document: SaleDocument;
+  document: AnySaleDocument;
   /** null before the first pull: the A5 layout, one copy. */
   profile: PrintProfile | null;
   shopName: string;

@@ -8,7 +8,8 @@ import type {
   Money,
   PinState,
   RoleGrant,
-  SaleDocument,
+  AnySaleDocument,
+  ItemPolicy,
   SaleVoidDocument,
 } from '@erp/domain';
 
@@ -25,6 +26,7 @@ import type {
   HandoverRequest,
 } from './db/desk';
 import type { HeldBill } from './db/held';
+import type { FoundBill, ReturnableBill } from './db/returns';
 import type { LocalHealth, QuarantinedRow } from './db/outbox';
 import type { VoidListBill, VoidRequest } from './db/void';
 import type { DeviceInfo, PinEvent, TenantSettings } from './db/repo';
@@ -121,16 +123,24 @@ export interface Counter {
   /** Voids a bill in one local transaction, then signs the void; refused with checkVoid's problem as a DomainError. */
   voidBill(
     req: Omit<VoidRequest, 'id' | 'createdAtMs' | 'clientVersion'>,
-  ): Promise<{ void: SaleVoidDocument; sale: SaleDocument }>;
+  ): Promise<{ void: SaleVoidDocument; sale: AnySaleDocument }>;
   /** The void of a bill on this counter, for its prints, or null. */
   voidOf(saleId: string): Promise<SaleVoidDocument | null>;
+  /** The bills a return search finds: by scanned code or number, date, or phone digits (POS spec §19, W1-13). */
+  findBills(query: string): Promise<FoundBill[]>;
+  /** A bill with what each of its lines can still give back; null when this counter doesn't have it. */
+  returnableBill(id: string): Promise<ReturnableBill | null>;
+  /** The refund per unit suggested without a receipt: the lowest price of the last 90 days, else today's price. */
+  noReceiptPrice(itemId: string): Promise<Money | null>;
+  /** The tenant's return window and each item's category policy. */
+  returnPolicy(itemIds: string[]): Promise<{ windowDays: number; items: ItemPolicy[] }>;
   /** Rounding, business day, payment methods and the print profile; null before the first pull (POS spec §12). */
   checkout(): Promise<CheckoutSettings | null>;
   /** Finalizes the person's open bill in one local transaction, then signs it (POS spec §12). */
   finalize(req: FinalizeRequest): Promise<Finalized>;
   /** This counter's bills since `since`, newest first, for the reprint list (POS spec §13). */
   recentBills(since: string, filter: string): Promise<DocumentSummary[]>;
-  bill(id: string): Promise<SaleDocument | null>;
+  bill(id: string): Promise<AnySaleDocument | null>;
   recordReprint(r: Omit<Reprint, 'id' | 'pushedAt'>): Promise<Reprint>;
   /** The customers the F4 dialog can pick, with their accounts and pulled balances (POS spec §15). */
   customers(): Promise<CounterCustomer[]>;

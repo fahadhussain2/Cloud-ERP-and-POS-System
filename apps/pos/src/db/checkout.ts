@@ -1,5 +1,6 @@
 import { uuidv7 } from '@erp/contracts';
 import {
+  buildReturnDocument,
   buildSaleDocument,
   businessDate,
   DomainError,
@@ -10,6 +11,8 @@ import {
   type Money,
   type PaymentMethodCode,
   type PaymentMethodInfo,
+  type ReturnApprovalBy,
+  type ReturnDocument,
   type SaleDocument,
   type Tender,
 } from '@erp/domain';
@@ -18,6 +21,7 @@ import { parseOpenBill } from '../bill/open-bill';
 import { creditFigures } from './customers';
 import { autoHandover } from './desk';
 import { getDevice, grantsFor, log } from './repo';
+import { recheckReturn } from './returns';
 import type { SqlDb } from './sql';
 
 // Paying, finalizing and reprinting on the counter (POS spec §12–§13, data model §12). Runs in the database worker.
@@ -65,10 +69,13 @@ export interface FinalizeRequest {
   offline: boolean;
   /** An approval to go over the customer's limit or the offline cap, given in the payment popup. */
   creditApproval: CreditApproval | null;
+  /** A refund by transfer's approval, given in the refund popup (W1-13, owner answer 1). */
+  refundApproval?: ReturnApprovalBy | null;
 }
 
 export interface Finalized {
-  document: SaleDocument;
+  /** A sale, or a return or exchange (W1-13). */
+  document: SaleDocument | ReturnDocument;
   /** True when there was no open bill and this is the person's last bill again (a second Enter): don't print it. */
   repeated: boolean;
   /** On a cash desk with an open session, the bill's automatic handover (W1-10), written in the same transaction. */
@@ -162,10 +169,10 @@ function printProfile(db: SqlDb): PrintProfile | null {
 }
 
 const parseDocument = (payload: string | null) =>
-  payload === null ? null : (JSON.parse(payload) as SaleDocument);
+  payload === null ? null : (JSON.parse(payload) as SaleDocument | ReturnDocument);
 
 /** The person's last bill on this counter: what a second Enter gets back. */
-const lastDocumentOf = (db: SqlDb, userId: string): SaleDocument | null =>
+const lastDocumentOf = (db: SqlDb, userId: string): SaleDocument | ReturnDocument | null =>
   parseDocument(
     text(
       db.selectValue(
@@ -203,7 +210,7 @@ export function finalizeSale(db: SqlDb, req: FinalizeRequest): Finalized {
     );
     const customerId = open.customer?.id ?? null;
     const today = businessDate(req.createdAtMs, settings.timeZone, settings.cutoffHour);
-    const document = buildSaleDocument({
+    const common = {
       bill: open.bill,
       tender: req.tender,
       methods: settings.methods,
@@ -212,7 +219,6 @@ export function finalizeSale(db: SqlDb, req: FinalizeRequest): Finalized {
       // Read in this transaction, so two bills for one customer can't both use the same room (POS spec §15).
       credit: customerId === null ? null : creditFigures(db, customerId, req.offline, today),
       creditApproval: req.creditApproval,
-      reissueOf: open.reissueOf ?? null,
       context: {
         id: req.id,
         seq,
@@ -225,12 +231,18 @@ export function finalizeSale(db: SqlDb, req: FinalizeRequest): Finalized {
         increment: settings.increment,
         clientVersion: req.clientVersion,
       },
-    });
+    };
+    let document: SaleDocument | ReturnDocument;
+    if ((open.bill.returns ?? null) !== null) {
+      // A return (W1-13): its lines are checked again here, so two returns of one line can't both pass (POS spec §19).
+      recheckReturn(db, open.bill);
+      document = buildReturnDocument({ ...common, refundApproval: req.refundApproval ?? null });
+    } else document = buildSaleDocument({ ...common, reissueOf: open.reissueOf ?? null });
     const payload = JSON.stringify(document);
     db.exec(
       `INSERT INTO local_documents (id, family, seq, number, kind, business_date, payload, created_at)
-       VALUES (?, 'S', ?, ?, 'sale', ?, ?, ?)`,
-      [document.id, seq, document.number, document.businessDate, payload, document.createdAt],
+       VALUES (?, 'S', ?, ?, ?, ?, ?, ?)`,
+      [document.id, seq, document.number, document.kind, document.businessDate, payload, document.createdAt],
     );
     db.exec(
       `INSERT INTO outbox (id, family, seq, payload, status, attempts, created_at)
@@ -269,7 +281,7 @@ export const recentDocuments = (db: SqlDb, since: string, filter = ''): Document
       voidNumber: text(r['void_number']),
     }));
 
-export const loadDocument = (db: SqlDb, id: string): SaleDocument | null =>
+export const loadDocument = (db: SqlDb, id: string): SaleDocument | ReturnDocument | null =>
   parseDocument(text(db.selectValue('SELECT payload FROM local_documents WHERE id = ?', [id])));
 
 /** Keeps a reprint for the audit log (pushed with W1-07) and the diagnostic log. */

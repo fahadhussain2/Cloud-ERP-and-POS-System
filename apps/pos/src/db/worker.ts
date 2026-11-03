@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import { verifyPin, type PushResult, type SeriesState } from '@erp/contracts';
-import { businessDate, type Money } from '@erp/domain';
+import { businessDate, money, type Money } from '@erp/domain';
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 
 import type { OpenBill } from '../bill/open-bill';
@@ -9,6 +9,7 @@ import * as checkout from './checkout';
 import * as customers from './customers';
 import * as desk from './desk';
 import * as held from './held';
+import * as returns from './returns';
 import * as voids from './void';
 import { currentVersion, migrate } from './migrate';
 import * as outbox from './outbox';
@@ -119,7 +120,25 @@ const ops = {
   localHealth: () => outbox.localHealth(open()),
   quarantinedRows: () => outbox.quarantinedRows(open()),
   retryQuarantined: (id: string) => outbox.retryQuarantined(open(), id),
-  pruneDocuments: () => outbox.pruneDocuments(open(), Date.now()),
+  // The 90-day bills (W1-13) go with the 30-day documents, at start-up.
+  pruneDocuments: () => {
+    const pruned = outbox.pruneDocuments(open(), Date.now());
+    const s = checkout.checkoutSettings(open());
+    if (s !== null) returns.pruneBills(open(), businessDate(Date.now(), s.timeZone, s.cutoffHour));
+    return pruned;
+  },
+  /** Returns (W1-13, POS spec §19): the bill search, what a bill can give back, the no-receipt price, the policy. */
+  findBills: (query: string) => {
+    const t = repo.tenantSettings(open());
+    return returns.findBills(open(), query, money(10 ** (t?.minorUnits ?? 2)));
+  },
+  returnableBill: (id: string) => returns.returnableBill(open(), id),
+  noReceiptPrice: (itemId: string) => {
+    const s = checkout.checkoutSettings(open());
+    if (s === null) throw new Error('this counter is not set up yet');
+    return returns.noReceiptPrice(open(), itemId, businessDate(Date.now(), s.timeZone, s.cutoffHour));
+  },
+  returnPolicy: (itemIds: string[]) => returns.returnPolicy(open(), itemIds),
   /** Items in the index, and whether a complete pull has loaded the catalog (POS spec §9). */
   catalogStatus: () => ({ items: index.size, ready: repo.getSync(open(), 'pull_complete_at') !== null }),
   listStaff: () => repo.listStaff(open()),
