@@ -16,11 +16,12 @@ const MANAGES = [
   'pos.return.no_receipt',
   'pos.return.outside_policy',
   'pos.override.approve',
+  'pos.price.below_floor',
 ];
 
 /**
  * …f1 a salesman who may process returns (the Delux default, D-051); …f2 a salesman who may not; …f3 a manager
- * (returns, no receipt, out of policy, override approval); …f4 a senior salesman (returns only); …f5 a manager of
+ * (returns, no receipt, out of policy, override approval, below the floor); …f4 a senior salesman (returns only); …f5 a manager of
  * another branch only; …f6 a cashier (returns and the cash desk, no override approval).
  */
 export const RETURN_STAFF: Record<string, readonly RoleGrant[]> = {

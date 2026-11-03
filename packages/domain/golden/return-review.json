@@ -1770,6 +1770,117 @@
       ]
     },
     {
+      "name": "an approver the server doesn't know",
+      "input": {
+        "document": {
+          "version": 2,
+          "id": "019a6000-0000-7000-8000-000000000415",
+          "family": "S",
+          "seq": 415,
+          "number": "C03-S000415",
+          "kind": "return",
+          "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "createdAt": "2026-11-12T05:00:00.000Z",
+          "businessDate": "2026-11-12",
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "customerId": null,
+          "walkinPhone": null,
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": -1000,
+              "listPrice": null,
+              "floorPrice": null,
+              "unitPrice": 435000,
+              "lineDiscount": 0,
+              "billShare": 0,
+              "lineTotal": -435000,
+              "returnOf": {
+                "documentId": "019a5000-0000-7000-8000-000000000412",
+                "number": "C03-S000412",
+                "lineNo": 1
+              },
+              "reason": "wrong_part",
+              "condition": "resellable",
+              "note": null
+            }
+          ],
+          "amounts": {
+            "subtotal": 0,
+            "lineDiscountTotal": 0,
+            "billDiscount": 0,
+            "returnTotal": 435000,
+            "rounding": 0,
+            "taxTotal": 0,
+            "total": -435000
+          },
+          "payments": [
+            {
+              "method": "raast",
+              "amount": -435000,
+              "cashReceived": null,
+              "changeDue": null,
+              "reference": "RAAST-7781"
+            }
+          ],
+          "cashDue": 0,
+          "handoverStatus": "not_applicable",
+          "overrides": [
+            {
+              "kind": "refund_transfer",
+              "lineNo": null,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000f1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000f9",
+              "reason": "regular_customer",
+              "note": null,
+              "at": "2026-11-12T05:00:00.000Z",
+              "values": {
+                "method": "raast",
+                "amount": 435000
+              }
+            }
+          ],
+          "returnOf": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "number": "C03-S000412",
+            "businessDate": "2026-11-02"
+          },
+          "clientVersion": "0.10.0"
+        },
+        "original": {
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "status": "finalized",
+          "businessDate": "2026-11-02",
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "lineTotal": 435000,
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              },
+              "isReturn": false
+            }
+          ]
+        },
+        "windowDays": 30,
+        "items": {}
+      },
+      "expected": [
+        {
+          "kind": "return_not_permitted",
+          "cause": "transfer",
+          "approval": "not_permitted"
+        }
+      ]
+    },
+    {
       "name": "a refund by transfer without an approval",
       "input": {
         "document": {

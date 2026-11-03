@@ -9,11 +9,12 @@ import {
   type PendingApproval,
 } from './bill';
 import { businessDate } from './business-date';
-import { money, mulQty, sub, sum, type Money } from './money';
+import { money, mulQty, negate, sub, sum, type Money } from './money';
 import { effectiveLimits, type RoleGrant } from './permissions';
 import type { Qty } from './quantity';
 import { roundCash } from './rounding';
-import { documentNumber, type SaleDocument } from './sale-document';
+import { isReturnedLine, type ReturnDocument } from './return';
+import { documentNumber, type SaleDocument, type SaleDocumentLine } from './sale-document';
 import {
   checkTender,
   settleTender,
@@ -79,7 +80,7 @@ const lineId = (i: number) => `l${i}`;
  * The findings on a synced sale: consistency first, in `InconsistencyCode` order, then prices (lines, then the bill).
  * The document has passed `SaleDocumentV1`, and the context comes from the server's own settings.
  */
-export function reviewSale(document: SaleDocument, context: ReviewContext): SaleFinding[] {
+export function reviewSale(document: SaleDocument | ReturnDocument, context: ReviewContext): SaleFinding[] {
   const d = document;
   const findings: SaleFinding[] = [];
   const odd = (code: InconsistencyCode, lineNo: number | null = null, problem: TenderProblem | null = null) =>
@@ -90,8 +91,17 @@ export function reviewSale(document: SaleDocument, context: ReviewContext): Sale
     odd('business_date');
   if (d.lines.some((l, i) => l.lineNo !== i + 1)) odd('line_numbers');
 
-  // The lines' figures again, from quantity and price; the bill discount split as the counter splits it.
-  const figures = d.lines.map((l) => {
+  // A return's lines (W1-13) carry their refund; whether it is the right one is reviewReturn's question. Here only
+  // their shape: negative, with no discount or share of the bill discount.
+  const returned = d.version === 2 ? d.lines.filter(isReturnedLine) : [];
+  for (const l of returned)
+    if (l.qty >= 0 || l.lineTotal >= 0 || l.lineDiscount !== 0 || l.billShare !== 0)
+      odd('line_amounts', l.lineNo);
+  const returnTotal = negate(sum(returned.map((l) => l.lineTotal)));
+  const sold = d.lines.filter((l): l is SaleDocumentLine => !('returnOf' in l));
+
+  // The sold lines' figures again, from quantity and price; the bill discount split as the counter splits it.
+  const figures = sold.map((l) => {
     const amount = mulQty(l.qty, l.unitPrice);
     return { amount, listAmount: hasListPrice(l.listPrice) ? mulQty(l.qty, l.listPrice) : amount };
   });
@@ -99,8 +109,11 @@ export function reviewSale(document: SaleDocument, context: ReviewContext): Sale
   const linesTotal = sum(amounts);
   const billDiscount = d.amounts.billDiscount;
   const fits = billDiscount <= linesTotal;
-  const shares = billDiscount === 0 || !fits ? amounts.map(() => money(0)) : allocate(billDiscount, amounts);
-  d.lines.forEach((l, i) => {
+  const shares =
+    billDiscount === 0 || !fits || amounts.length === 0
+      ? amounts.map(() => money(0))
+      : allocate(billDiscount, amounts);
+  sold.forEach((l, i) => {
     const { amount, listAmount } = figures[i]!;
     const share = shares[i]!;
     if (
@@ -115,10 +128,11 @@ export function reviewSale(document: SaleDocument, context: ReviewContext): Sale
     d.amounts.subtotal !== subtotal ||
     d.amounts.lineDiscountTotal !== sub(subtotal, linesTotal) ||
     d.amounts.taxTotal !== 0 ||
+    (d.version === 2 && d.amounts.returnTotal !== returnTotal) ||
     !fits
   )
     odd('amounts');
-  const rounded = roundCash(sub(linesTotal, billDiscount), context.increment);
+  const rounded = roundCash(sub(sub(linesTotal, billDiscount), returnTotal), context.increment);
   if (d.amounts.rounding !== rounded.adjustment || d.amounts.total !== rounded.rounded) odd('rounding');
 
   // The payments against the document's own total: a wrong total is the rounding finding above.
@@ -132,6 +146,8 @@ export function reviewSale(document: SaleDocument, context: ReviewContext): Sale
       cashReceived: cashRow?.cashReceived ?? null,
     },
     hasCreditCustomer: d.customerId !== null,
+    hasReturns: d.version === 2,
+    hasCustomerAccount: d.customerId !== null,
   };
   const problem = checkTender(tenderInput);
   let cashDue = d.cashDue;
@@ -142,9 +158,10 @@ export function reviewSale(document: SaleDocument, context: ReviewContext): Sale
     if (settled.cashDue !== d.cashDue) odd('cash_due');
     cashDue = settled.cashDue;
   }
-  if (d.handoverStatus !== (cashDue > 0 ? 'pending' : 'not_applicable')) odd('handover_status');
+  const pending = d.version === 2 ? cashDue !== 0 : cashDue > 0;
+  if (d.handoverStatus !== (pending ? 'pending' : 'not_applicable')) odd('handover_status');
 
-  findings.push(...reviewPrices(d, context, fits));
+  findings.push(...reviewPrices(d, sold, context, fits));
   return findings;
 }
 
@@ -165,14 +182,19 @@ const samePayments = (a: readonly SettledPayment[], b: readonly SettledPayment[]
  * The prices the seller couldn't give alone, and whether an approval on the document covers each one and was given
  * by someone the server says may give it. A bill discount larger than the lines (already a finding) is left out.
  */
-function reviewPrices(d: SaleDocument, context: ReviewContext, fits: boolean): SaleFinding[] {
+function reviewPrices(
+  d: SaleDocument | ReturnDocument,
+  lines: readonly SaleDocumentLine[],
+  context: ReviewContext,
+  fits: boolean,
+): SaleFinding[] {
   const grantsOf = (userId: string) => context.grants[userId] ?? [];
-  const index = new Map(d.lines.map((l, i) => [l.lineNo, i]));
+  const index = new Map(lines.map((l, i) => [l.lineNo, i]));
   const bare: Bill = {
     version: 1,
     sellerId: d.sellerId,
     tierId: d.tierId,
-    lines: d.lines.map((l, i) => ({
+    lines: lines.map((l, i) => ({
       id: lineId(i),
       itemId: l.itemId,
       qty: l.qty,
@@ -187,8 +209,8 @@ function reviewPrices(d: SaleDocument, context: ReviewContext, fits: boolean): S
   };
   const approved: Bill = { ...bare, lines: bare.lines.map((l) => ({ ...l })) };
   for (const o of d.overrides) {
-    // Credit approvals (W1-09) are judged by reviewCredit, not here.
-    if (o.kind === 'credit_limit' || o.kind === 'offline_cap') continue;
+    // Credit approvals (W1-09) are judged by reviewCredit, a return's (W1-13) by reviewReturn, not here.
+    if (o.kind !== 'below_list' && o.kind !== 'below_floor') continue;
     const base = {
       kind: o.kind,
       requestedBy: o.requestedBy,
@@ -234,7 +256,7 @@ function reviewPrices(d: SaleDocument, context: ReviewContext, fits: boolean): S
     return [
       {
         kind: need.need === 'below_floor' ? 'below_floor_no_override' : 'discount_over_limit',
-        lineNo: i === null ? null : d.lines[i]!.lineNo,
+        lineNo: i === null ? null : lines[i]!.lineNo,
         discountBp: need.discountBp,
         cause,
       },

@@ -29,6 +29,7 @@ export {
   CashSessionV2,
   CustomerCollectionV1,
   SaleDocumentV1,
+  SaleDocumentV2,
   SaleVoidV1,
 } from './documents';
 export {

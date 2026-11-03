@@ -375,6 +375,78 @@
       "error": "bill_not_empty"
     },
     {
+      "name": "a note is kept trimmed",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "changed_mind",
+            "note": "  fits another car  ",
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              }
+            },
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "expected": {
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "originalLineNo": 1,
+            "refund": 435000,
+            "unitPrice": 435000,
+            "suggested": null,
+            "reason": "changed_mind",
+            "note": "fits another car",
+            "condition": "resellable"
+          }
+        ],
+        "approval": null
+      }
+    },
+    {
       "name": "nothing to return",
       "input": {
         "bill": {
@@ -397,6 +469,132 @@
         "approval": null
       },
       "error": "empty_return"
+    },
+    {
+      "name": "an unknown condition",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "broken",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              }
+            },
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "error": "invalid_condition"
+    },
+    {
+      "name": "a negative price without a receipt",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "none",
+          "ref": "023956 (old system)"
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": null,
+            "price": -100,
+            "suggested": null
+          }
+        ],
+        "needs": ["no_receipt_return"],
+        "approval": {
+          "approvedBy": "019a0000-0000-7000-8000-0000000000f3",
+          "reason": "before_go_live",
+          "note": null,
+          "at": "2026-11-12T05:00:00.000Z"
+        }
+      },
+      "error": "price_required"
+    },
+    {
+      "name": "an unknown approval reason",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "none",
+          "ref": "023956 (old system)"
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": null,
+            "price": 400000,
+            "suggested": 420000
+          }
+        ],
+        "needs": ["no_receipt_return"],
+        "approval": {
+          "approvedBy": "019a0000-0000-7000-8000-0000000000f3",
+          "reason": "manager_said",
+          "note": null,
+          "at": "2026-11-12T05:00:00.000Z"
+        }
+      },
+      "error": "invalid_reason"
     },
     {
       "name": "half a pad is refused",

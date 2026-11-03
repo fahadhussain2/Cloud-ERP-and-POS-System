@@ -733,6 +733,170 @@
       }
     },
     {
+      "name": "Khan Motors exchanges a pad and pays the Rs 450 on account: the credit block, no approval needed",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c2",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 480000,
+              "floor": 450000,
+              "unitPrice": 480000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null,
+          "returns": {
+            "source": {
+              "kind": "bill",
+              "id": "019a5000-0000-7000-8000-000000000412",
+              "number": "C03-S000412",
+              "businessDate": "2026-11-02",
+              "customerId": "019a0000-0000-7000-8000-00000000c042"
+            },
+            "lines": [
+              {
+                "id": "r1",
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "allowsFraction": false,
+                "originalLineNo": 1,
+                "refund": 435000,
+                "unitPrice": 435000,
+                "suggested": null,
+                "reason": "wrong_part",
+                "note": null,
+                "condition": "resellable"
+              }
+            ],
+            "approval": null
+          }
+        },
+        "tender": {
+          "payments": [
+            {
+              "method": "on_account",
+              "amount": 45000,
+              "reference": null
+            }
+          ],
+          "cashReceived": null
+        },
+        "sellerMaxDiscountBp": 10000,
+        "context": {
+          "id": "019a6000-0000-7000-8000-000000000415",
+          "seq": 415,
+          "createdAtMs": 1794459600000
+        },
+        "customer": {
+          "id": "019a0000-0000-7000-8000-00000000c042",
+          "walkinPhone": null
+        },
+        "credit": {
+          "account": {
+            "creditAllowed": true,
+            "creditLimit": 10000000,
+            "offlineDailyCap": 0
+          },
+          "balance": 4500000,
+          "balanceAsOf": "2026-11-12T04:30:00.000Z",
+          "unsynced": 0,
+          "offline": false,
+          "offlineToday": 0
+        },
+        "refundApproval": null
+      },
+      "expected": {
+        "version": 2,
+        "id": "019a6000-0000-7000-8000-000000000415",
+        "family": "S",
+        "seq": 415,
+        "number": "C03-S000415",
+        "kind": "exchange",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "createdAt": "2026-11-12T05:00:00.000Z",
+        "businessDate": "2026-11-12",
+        "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+        "tierId": "019a0000-0000-7000-8000-0000000000b1",
+        "customerId": "019a0000-0000-7000-8000-00000000c042",
+        "walkinPhone": null,
+        "lines": [
+          {
+            "lineNo": 1,
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": -1000,
+            "listPrice": null,
+            "floorPrice": null,
+            "unitPrice": 435000,
+            "lineDiscount": 0,
+            "billShare": 0,
+            "lineTotal": -435000,
+            "returnOf": {
+              "documentId": "019a5000-0000-7000-8000-000000000412",
+              "number": "C03-S000412",
+              "lineNo": 1
+            },
+            "reason": "wrong_part",
+            "condition": "resellable",
+            "note": null
+          },
+          {
+            "lineNo": 2,
+            "itemId": "019a0000-0000-7000-8000-0000000000c2",
+            "qty": 1000,
+            "listPrice": 480000,
+            "floorPrice": 450000,
+            "unitPrice": 480000,
+            "lineDiscount": 0,
+            "billShare": 0,
+            "lineTotal": 480000
+          }
+        ],
+        "amounts": {
+          "subtotal": 480000,
+          "lineDiscountTotal": 0,
+          "billDiscount": 0,
+          "returnTotal": 435000,
+          "rounding": 0,
+          "taxTotal": 0,
+          "total": 45000
+        },
+        "payments": [
+          {
+            "method": "on_account",
+            "amount": 45000,
+            "cashReceived": null,
+            "changeDue": null,
+            "reference": null
+          }
+        ],
+        "cashDue": 0,
+        "handoverStatus": "not_applicable",
+        "overrides": [],
+        "returnOf": {
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02"
+        },
+        "credit": {
+          "offline": false,
+          "balance": 4500000,
+          "balanceAsOf": "2026-11-12T04:30:00.000Z",
+          "unsynced": 0,
+          "offlineToday": 0
+        },
+        "clientVersion": "0.10.0"
+      }
+    },
+    {
       "name": "a refund by Raast with the manager's approval (owner answer 1)",
       "input": {
         "bill": {

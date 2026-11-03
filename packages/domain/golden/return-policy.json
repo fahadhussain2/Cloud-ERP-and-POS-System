@@ -304,6 +304,24 @@
       }
     },
     {
+      "name": "someone unknown may not approve",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": null,
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}],
+        "approver": "019a0000-0000-7000-8000-0000000000f9"
+      },
+      "expected": {
+        "needs": ["no_receipt_return"],
+        "daysSince": null,
+        "outsideWindow": false,
+        "nonReturnable": false,
+        "approverMay": false
+      }
+    },
+    {
       "name": "nothing needed: anyone may",
       "input": {
         "seller": "019a0000-0000-7000-8000-0000000000f1",
@@ -320,6 +338,17 @@
         "nonReturnable": false,
         "approverMay": true
       }
+    },
+    {
+      "name": "a date that isn't a business date is refused",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": "2 Nov 2026",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}]
+      },
+      "error": "invalid_date"
     }
   ]
 }

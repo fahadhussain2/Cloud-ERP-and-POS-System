@@ -42,7 +42,12 @@ export type TenderProblem =
   | 'reference_too_long'
   | 'sum_mismatch'
   | 'cash_received_without_cash'
-  | 'cash_received_short';
+  | 'cash_received_short'
+  // A bill with returned lines (W1-13, POS spec §19): one refund row, or none for an even exchange.
+  | 'refund_one_method'
+  | 'refund_needs_account'
+  | 'cash_received_on_refund'
+  | 'even_takes_no_payment';
 
 /** At most this many characters in a payment reference. */
 export const MAX_REFERENCE_LENGTH = 40;
@@ -77,6 +82,10 @@ interface TenderInput {
   methods: readonly PaymentMethodInfo[];
   tender: Tender;
   hasCreditCustomer: boolean;
+  /** The bill has returned lines (W1-13): its total may be 0 (an even exchange) or negative (a refund). */
+  hasReturns?: boolean;
+  /** The bill's customer has a customer account, so a refund may go on account (credit allowed or not). */
+  hasCustomerAccount?: boolean;
 }
 
 /** The first problem with a tender in the order of POS spec §12, or null when it is valid. */
@@ -85,6 +94,7 @@ export function checkTender(input: TenderInput): TenderProblem | null {
   if (increment <= 0)
     throw new DomainError('invalid_increment', `the rounding increment must be positive: ${increment}`);
   const rows = tender.payments;
+  if (input.hasReturns === true && total <= 0) return checkRefund(input);
   if (rows.length === 0) return 'no_payment';
   const info = rows.map((r) => methods.find((m) => m.code === r.method));
   if (info.some((m) => m === undefined)) return 'unknown_method';
@@ -107,11 +117,52 @@ export function checkTender(input: TenderInput): TenderProblem | null {
   return null;
 }
 
+/**
+ * A bill with returned lines whose total is 0 or below (POS spec §19, PRD W7, D-007): an even exchange takes no
+ * payment; a refund is one row for the whole (negative) total: cash at the desk, on account for a customer with a
+ * customer account, or a transfer to a bank or wallet method with its reference (owner answer 1 to W1-13).
+ */
+function checkRefund(input: TenderInput): TenderProblem | null {
+  const { total, increment, methods, tender } = input;
+  const rows = tender.payments;
+  if (total === 0) return rows.length === 0 ? null : 'even_takes_no_payment';
+  if (rows.length === 0) return 'no_payment';
+  if (rows.length > 1) return 'refund_one_method';
+  const row = rows[0]!;
+  const info = methods.find((m) => m.code === row.method);
+  if (info === undefined) return 'unknown_method';
+  if (row.method === 'on_account' && input.hasCustomerAccount !== true) return 'refund_needs_account';
+  if (row.amount % increment !== 0) return 'amount_not_rounded';
+  if (info.requiresReference && trimmed(row.reference) === '') return 'reference_required';
+  if (!info.isCash && trimmed(row.reference).length > MAX_REFERENCE_LENGTH) return 'reference_too_long';
+  if (row.amount !== total) return 'sum_mismatch';
+  if (tender.cashReceived !== null) return 'cash_received_on_refund';
+  return null;
+}
+
 /** The payments as the document keeps them, the cash due and the change. Refuses a tender `checkTender` refuses. */
 export function settleTender(input: TenderInput): Settlement {
   const problem = checkTender(input);
   if (problem !== null) throw new DomainError('invalid_tender', `the tender is not valid: ${problem}`);
   const { methods, tender } = input;
+  if (input.hasReturns === true && input.total <= 0) {
+    // A refund records no cash received or change; its cash row is a payout at the desk (cash due below 0).
+    const payments = tender.payments.map((r): SettledPayment => {
+      const cash = isCashRow(methods, r);
+      const reference = cash ? '' : trimmed(r.reference);
+      return {
+        method: r.method as PaymentMethodCode,
+        amount: r.amount,
+        cashReceived: null,
+        changeDue: null,
+        reference: reference || null,
+      };
+    });
+    const cash = payments.find((p) =>
+      isCashRow(methods, { method: p.method, amount: p.amount, reference: null }),
+    );
+    return { payments, cashDue: cash?.amount ?? money(0), change: money(0) };
+  }
   let cashDue = money(0);
   let change = money(0);
   const payments = tender.payments.map((r): SettledPayment => {

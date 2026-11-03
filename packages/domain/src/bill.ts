@@ -69,7 +69,75 @@ export interface Bill {
   lines: BillLine[];
   billDiscount: Money;
   billApproval: Approval<BillApprovalValues> | null;
+  /** What comes back on this bill (W1-13, POS spec §19); absent or null on a plain sale, and on every bill before. */
+  returns?: BillReturn | null;
 }
+
+/** Why a part comes back (PRD W6 step 2); the labels are i18n keys `return.reason.<code>`. */
+export const RETURN_REASONS = ['wrong_part', 'unused_option', 'defective', 'changed_mind', 'other'] as const;
+export type ReturnReason = (typeof RETURN_REASONS)[number];
+
+/** Resellable goes back to Shop, defective to Damaged (D-008). */
+export const RETURN_CONDITIONS = ['resellable', 'defective'] as const;
+export type ReturnCondition = (typeof RETURN_CONDITIONS)[number];
+
+/** What a return can need an approver for (data model §5 override kinds, D-051, owner answer 1 to W1-13). */
+export type ReturnApprovalKind =
+  'return_permission' | 'return_outside_policy' | 'no_receipt_return' | 'refund_transfer';
+
+/** Why an approver allowed it (owner answer 3 to W1-13); the labels are i18n keys `return.approval.<code>`. */
+export const RETURN_APPROVAL_REASONS = [
+  'regular_customer',
+  'manufacturer_defect',
+  'lost_bill',
+  'before_go_live',
+  'owner_instruction',
+  'other',
+] as const;
+export type ReturnApprovalReason = (typeof RETURN_APPROVAL_REASONS)[number];
+
+/** Where the returned lines come from: one bill of this system, or no receipt (with what the customer remembers). */
+export type ReturnSource =
+  | { kind: 'bill'; id: string; number: string; businessDate: string; customerId: string | null }
+  | { kind: 'none'; ref: string | null };
+
+export interface BillReturnLine {
+  id: string;
+  itemId: string;
+  /** What comes back, above 0 (the document stores it negative). */
+  qty: Qty;
+  allowsFraction: boolean;
+  /** The original bill's line; null without a receipt. */
+  originalLineNo: number | null;
+  /** What goes back to the customer for this line, above 0. */
+  refund: Money;
+  /** The refund per whole unit, shown and printed. */
+  unitPrice: Money;
+  /** Without a receipt: the price the counter suggested (lowestPrice90); null otherwise or when it had none. */
+  suggested: Money | null;
+  reason: ReturnReason;
+  note: string | null;
+  condition: ReturnCondition;
+}
+
+export interface ReturnApproval {
+  kinds: ReturnApprovalKind[];
+  requestedBy: string;
+  approvedBy: string;
+  reason: ReturnApprovalReason;
+  note: string | null;
+  at: string;
+}
+
+export interface BillReturn {
+  source: ReturnSource;
+  lines: BillReturnLine[];
+  /** One approver covers every need (null when none was needed). */
+  approval: ReturnApproval | null;
+}
+
+/** The refunds on the bill, above 0 (0 without returned lines). */
+export const returnTotal = (bill: Bill): Money => sum((bill.returns?.lines ?? []).map((l) => l.refund));
 
 /** An item as it is added: its price in the bill's tier and its floor. */
 export interface NewLine {

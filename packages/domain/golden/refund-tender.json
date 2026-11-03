@@ -265,6 +265,25 @@
       }
     },
     {
+      "name": "a refund reference over 40 characters",
+      "input": {
+        "total": -435000,
+        "payments": [
+          {
+            "method": "raast",
+            "amount": -435000,
+            "reference": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": "reference_too_long",
+        "settlement": null
+      }
+    },
+    {
       "name": "an even exchange takes no payment",
       "input": {
         "total": 0,

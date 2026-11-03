@@ -46,6 +46,12 @@ export const EXCEPTION_KINDS = [
   // Voids (W1-12): an approver or a day the rules don't allow, and a second void of one bill.
   'void_not_permitted',
   'duplicate_void',
+  // Returns (W1-13): more back than sold, an original that can't be returned, a refund other than the rules give, an
+  // approval missing or from someone without the permission.
+  'return_over_quantity',
+  'return_original_invalid',
+  'return_price_mismatch',
+  'return_not_permitted',
 ] as const;
 export type ExceptionKind = (typeof EXCEPTION_KINDS)[number];
 

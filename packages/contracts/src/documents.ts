@@ -148,6 +148,148 @@ export const SaleDocumentV1 = z
   });
 export type SaleDocumentV1 = z.infer<typeof SaleDocumentV1>;
 
+const BillNumber = z.string().regex(/^[A-Z]\d{2,}-S\d{6,}$/);
+const ReturnReason = z.enum(['wrong_part', 'unused_option', 'defective', 'changed_mind', 'other']);
+/** Why an approver allowed a return or a refund by transfer (owner answer 3 to W1-13). */
+const ReturnApprovalReason = z.enum([
+  'regular_customer',
+  'manufacturer_defect',
+  'lost_bill',
+  'before_go_live',
+  'owner_instruction',
+  'other',
+]);
+
+/** A returned line (W1-13): negative, with its refund, what it returns and why; no list, floor or discount. */
+const ReturnedLine = z.strictObject({
+  lineNo: z.int().positive(),
+  itemId: z.uuid(),
+  qty: z.int().negative(),
+  listPrice: z.null(),
+  floorPrice: z.null(),
+  unitPrice: NonNegativeMoney,
+  lineDiscount: z.literal(0),
+  billShare: z.literal(0),
+  lineTotal: z.int().negative(),
+  /** The original bill's line; null without a receipt. */
+  returnOf: z
+    .strictObject({ documentId: z.uuid(), number: BillNumber, lineNo: z.int().positive() })
+    .nullable(),
+  reason: ReturnReason,
+  condition: z.enum(['resellable', 'defective']),
+  note: z.string().min(1).max(200).nullable(),
+});
+
+const returnApprovalFields = {
+  lineNo: z.null(),
+  reason: ReturnApprovalReason,
+  ...approvalFields,
+};
+const ReturnOverride = z.union([
+  z.strictObject({
+    kind: z.enum(['return_permission', 'return_outside_policy']),
+    ...returnApprovalFields,
+    values: z.strictObject({}),
+  }),
+  z.strictObject({
+    kind: z.literal('no_receipt_return'),
+    ...returnApprovalFields,
+    values: z.strictObject({
+      lines: z
+        .array(
+          z.strictObject({
+            lineNo: z.int().positive(),
+            suggested: NonNegativeMoney.nullable(),
+            price: NonNegativeMoney,
+          }),
+        )
+        .min(1),
+    }),
+  }),
+  z.strictObject({
+    kind: z.literal('refund_transfer'),
+    ...returnApprovalFields,
+    values: z.strictObject({ method: PaymentMethod, amount: z.int().positive() }),
+  }),
+]);
+
+/** A payment on a return or exchange: as on a sale, or one refund row (negative) with no cash received or change. */
+const ReturnPayment = z.strictObject({
+  method: PaymentMethod,
+  amount: z.int().refine((a) => a !== 0, { message: 'a payment is never 0' }),
+  cashReceived: NonNegativeMoney.nullable(),
+  changeDue: NonNegativeMoney.nullable(),
+  reference: z.string().min(1).max(40).nullable(),
+});
+
+/**
+ * A finalized return or exchange, version 2 (sync spec §6.1, POS spec §19, D-006, W1-13): what `buildReturnDocument`
+ * in `@erp/domain` makes. The returned lines come first, then the sold ones (as on a sale). The total and cash due may
+ * be negative (a refund, paid out at the desk) or 0 (an even exchange, with no payment). A plain sale stays version 1.
+ */
+export const SaleDocumentV2 = z
+  .strictObject({
+    version: z.literal(2),
+    id: z.uuid(),
+    family: z.literal('S'),
+    seq: z.int().positive(),
+    number: BillNumber,
+    kind: z.enum(['return', 'exchange']),
+    deviceId: z.uuid(),
+    branchId: z.uuid(),
+    createdAt: Instant,
+    businessDate: z.iso.date(),
+    sellerId: z.uuid(),
+    tierId: z.uuid(),
+    customerId: z.uuid().nullable(),
+    walkinPhone: z.string().nullable(),
+    lines: z.array(z.union([SaleLine, ReturnedLine])).min(1),
+    amounts: z.strictObject({
+      subtotal: NonNegativeMoney,
+      lineDiscountTotal: Money,
+      billDiscount: NonNegativeMoney,
+      returnTotal: z.int().positive(),
+      rounding: Money,
+      taxTotal: NonNegativeMoney,
+      total: Money,
+    }),
+    payments: z.array(ReturnPayment),
+    cashDue: Money,
+    handoverStatus: z.enum(['pending', 'not_applicable']),
+    overrides: z.array(z.union([Override, ReturnOverride])),
+    credit: Credit.optional(),
+    returnOf: z.strictObject({ id: z.uuid(), number: BillNumber, businessDate: z.iso.date() }).optional(),
+    noReceipt: z.strictObject({ ref: z.string().min(1).max(40).nullable() }).optional(),
+    clientVersion: z.string().min(1),
+  })
+  .refine((d) => d.customerId === null || d.walkinPhone === null, {
+    message: 'a walk-in phone only goes on a walk-in bill',
+  })
+  .refine((d) => (d.returnOf === undefined) !== (d.noReceipt === undefined), {
+    message: 'a return names its original bill or says it has no receipt, never both',
+  })
+  .refine(
+    (d) => {
+      const returned = d.lines.filter((l) => 'returnOf' in l);
+      const sold = d.lines.filter((l) => !('returnOf' in l));
+      // Returned lines first; a return has only them, an exchange both.
+      return (
+        returned.length > 0 &&
+        d.lines.slice(0, returned.length).every((l) => 'returnOf' in l) &&
+        (d.kind === 'return') === (sold.length === 0)
+      );
+    },
+    { message: 'the returned lines come first, and the kind follows from the lines' },
+  )
+  .refine(
+    (d) =>
+      d.lines
+        .filter((l) => 'returnOf' in l)
+        .every((l) => ((l as { returnOf: unknown }).returnOf === null) === (d.noReceipt !== undefined)),
+    { message: 'every returned line names its original line, unless there is no receipt' },
+  );
+export type SaleDocumentV2 = z.infer<typeof SaleDocumentV2>;
+
 /**
  * A void of a finalized bill, version 1 (family V, sync spec §6.2, POS spec §18, W1-12): what `buildVoidDocument` in
  * `@erp/domain` makes. The bill is never changed (rule 3); the void names it by id and number.
@@ -198,7 +340,6 @@ const DESK_NUMBER = {
   Z: /^[A-Z]\d{2,}-Z\d{6,}$/,
 } as const;
 const DeskNumber = (family: keyof typeof DESK_NUMBER) => z.string().regex(DESK_NUMBER[family]);
-const BillNumber = z.string().regex(/^[A-Z]\d{2,}-S\d{6,}$/);
 
 /** A cash handover in, or a refund paid out: its own document; the sale is never touched (rule 3). */
 export const CashHandoverV1 = z

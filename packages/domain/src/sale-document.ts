@@ -3,6 +3,7 @@ import {
   pendingApprovals,
   type Approval,
   type ApprovalKind,
+  returnTotal,
   type Bill,
   type OverrideReason,
 } from './bill';
@@ -139,9 +140,12 @@ const DEVICE_CODE = /^[A-Z]\d{2,}$/;
 const DOCUMENT_NUMBER = /^[A-Z]\d{2,}-[A-Z]\d{6,}$/;
 const SCANNED_BILL_CODE = /^([A-Z]\d{2,}-[A-Z]\d{6,}) (-?\d+)$/;
 
-/** The bill's total rounded to the tenant's increment, for every tender (POS-15, owner answer 4 to W1-06). */
+/**
+ * The bill's total rounded to the tenant's increment, for every tender (POS-15, owner answer 4 to W1-06): sold lines −
+ * bill discount − refunds (W1-13), so a negative total is a refund and 0 an even exchange.
+ */
 export function saleTotal(bill: Bill, increment: Money): SaleTotal {
-  const beforeRounding = billAmounts(bill).total;
+  const beforeRounding = sub(billAmounts(bill).total, returnTotal(bill));
   const { rounded, adjustment } = roundCash(beforeRounding, increment);
   return { beforeRounding, rounding: adjustment, total: rounded };
 }
@@ -203,14 +207,7 @@ export function buildSaleDocument(input: {
   if (bill.lines.length === 0) throw new DomainError('empty_bill', 'a bill needs at least one line');
   if (pendingApprovals(bill, input.sellerMaxDiscountBp).length > 0)
     throw new DomainError('approval_pending', 'a price on this bill still needs an approval');
-  let walkinPhone: string | null = null;
-  if (customer.walkinPhone !== null) {
-    if (customer.id !== null)
-      throw new DomainError('invalid_customer', "a customer's bill doesn't take a walk-in phone");
-    walkinPhone = normalizePhone(customer.walkinPhone);
-    if (walkinPhone === null)
-      throw new DomainError('invalid_phone', `not a phone number: "${customer.walkinPhone}"`);
-  }
+  const walkinPhone = walkinPhoneOf(customer);
   const total = saleTotal(bill, c.increment);
   const settlement = settleTender({
     total: total.total,
@@ -223,23 +220,7 @@ export function buildSaleDocument(input: {
   // settleTender has refused on account without a credit customer, so the view is there when it's needed.
   const creditOverrides = onAccount > 0 ? creditOverridesOf(onAccount, credit!, input.creditApproval) : [];
   const amounts = billAmounts(bill);
-  const lineNo = new Map(bill.lines.map((l, i) => [l.id, i + 1]));
-  const overrides: SaleDocumentOverride[] = [];
-  bill.lines.forEach((l, i) => {
-    if (l.approval !== null)
-      overrides.push({ ...overrideOf(l.approval), lineNo: i + 1, values: l.approval.values });
-  });
-  if (bill.billApproval !== null) {
-    const v = bill.billApproval.values;
-    overrides.push({
-      ...overrideOf(bill.billApproval),
-      lineNo: null,
-      values: {
-        billDiscount: v.billDiscount,
-        lines: v.lines.map((l) => ({ lineNo: lineNo.get(l.id)!, qty: l.qty, unitPrice: l.unitPrice })),
-      },
-    });
-  }
+  const overrides = priceOverridesOf(bill, 0);
   return {
     version: 1,
     id: c.id,
@@ -255,20 +236,7 @@ export function buildSaleDocument(input: {
     tierId: bill.tierId,
     customerId: customer.id,
     walkinPhone,
-    lines: bill.lines.map((l, i) => {
-      const a = amounts.lines[i]!;
-      return {
-        lineNo: i + 1,
-        itemId: l.itemId,
-        qty: l.qty,
-        listPrice: l.list,
-        floorPrice: l.floor,
-        unitPrice: l.unitPrice,
-        lineDiscount: sub(a.listAmount, a.amount),
-        billShare: a.billShare,
-        lineTotal: a.net,
-      };
-    }),
+    lines: soldLinesOf(bill, 0),
     amounts: {
       subtotal: amounts.subtotal,
       lineDiscountTotal: amounts.lineDiscountTotal,
@@ -287,7 +255,58 @@ export function buildSaleDocument(input: {
   };
 }
 
-const creditBlock = (v: CreditView): SaleDocumentCredit => ({
+/** The walk-in's phone, normalized; refused on a customer's bill and when it isn't a phone (POS spec §15). */
+export function walkinPhoneOf(customer: SaleCustomer): string | null {
+  if (customer.walkinPhone === null) return null;
+  if (customer.id !== null)
+    throw new DomainError('invalid_customer', "a customer's bill doesn't take a walk-in phone");
+  const phone = normalizePhone(customer.walkinPhone);
+  if (phone === null) throw new DomainError('invalid_phone', `not a phone number: "${customer.walkinPhone}"`);
+  return phone;
+}
+
+/** The sold lines as the document carries them, numbered from `offset + 1` (after a return's lines, W1-13). */
+export function soldLinesOf(bill: Bill, offset: number): SaleDocumentLine[] {
+  const amounts = billAmounts(bill);
+  return bill.lines.map((l, i) => {
+    const a = amounts.lines[i]!;
+    return {
+      lineNo: offset + i + 1,
+      itemId: l.itemId,
+      qty: l.qty,
+      listPrice: l.list,
+      floorPrice: l.floor,
+      unitPrice: l.unitPrice,
+      lineDiscount: sub(a.listAmount, a.amount),
+      billShare: a.billShare,
+      lineTotal: a.net,
+    };
+  });
+}
+
+/** The price approvals on the sold lines and the bill discount, as overrides, lines numbered from `offset + 1`. */
+export function priceOverridesOf(bill: Bill, offset: number): SaleDocumentOverride[] {
+  const lineNo = new Map(bill.lines.map((l, i) => [l.id, offset + i + 1]));
+  const overrides: SaleDocumentOverride[] = [];
+  bill.lines.forEach((l, i) => {
+    if (l.approval !== null)
+      overrides.push({ ...overrideOf(l.approval), lineNo: offset + i + 1, values: l.approval.values });
+  });
+  if (bill.billApproval !== null) {
+    const v = bill.billApproval.values;
+    overrides.push({
+      ...overrideOf(bill.billApproval),
+      lineNo: null,
+      values: {
+        billDiscount: v.billDiscount,
+        lines: v.lines.map((l) => ({ lineNo: lineNo.get(l.id)!, qty: l.qty, unitPrice: l.unitPrice })),
+      },
+    });
+  }
+  return overrides;
+}
+
+export const creditBlock = (v: CreditView): SaleDocumentCredit => ({
   offline: v.offline,
   balance: v.balance,
   balanceAsOf: v.balanceAsOf,
@@ -296,7 +315,7 @@ const creditBlock = (v: CreditView): SaleDocumentCredit => ({
 });
 
 /** The approvals an on-account part needs, as overrides (the limit first); refused when the approval is missing. */
-function creditOverridesOf(
+export function creditOverridesOf(
   amount: Money,
   credit: CreditView,
   approval: CreditApproval | null,

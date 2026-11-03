@@ -18,6 +18,7 @@ import {
   canApproveReturn,
   lowestPrice90,
   refundFor,
+  removeReturn,
   returnable,
   returnedOf,
   returnNeeds,
@@ -196,5 +197,29 @@ describe('returnedOf', () => {
   });
   it('is nothing for no returns', () => {
     expect(returnedOf([])).toStrictEqual({ qty: 0, refund: 0 });
+  });
+});
+
+describe('removeReturn', () => {
+  it('takes the returned lines off the bill again', () => {
+    const bill = documents.cases[0]!.input.bill;
+    expect(removeReturn(bill)).toStrictEqual({ ...bill, returns: null });
+  });
+});
+
+describe('reviewSale on a return', () => {
+  it('flags a returned line that adds money instead of refunding it', () => {
+    const d = build(documents.cases[0]!.input);
+    const odd = { ...d, lines: [{ ...d.lines[0]!, lineTotal: money(435000) }] };
+    expect(
+      reviewSale(odd, {
+        deviceCode: 'C03',
+        timeZone: 'Asia/Karachi',
+        cutoffHour: 4,
+        increment: RS,
+        methods: DELUX_METHODS,
+        grants: RETURN_STAFF,
+      }),
+    ).toContainEqual({ kind: 'document_inconsistent', lineNo: 1, code: 'line_amounts', problem: null });
   });
 });
