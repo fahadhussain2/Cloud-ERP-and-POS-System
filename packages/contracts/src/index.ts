@@ -70,6 +70,9 @@ export {
 export {
   CASH_DESK_COLUMNS,
   CASH_DESK_DATASETS,
+  RETURN_BILL_DAYS,
+  RETURN_COLUMNS,
+  RETURN_DATASETS,
   CATALOG_COLUMNS,
   CATALOG_DATASETS,
   CHECKOUT_COLUMNS,
@@ -82,6 +85,7 @@ export {
   PULL_LIMIT_MAX,
   TemporaryPinRequest,
   type CashDeskDataset,
+  type ReturnDataset,
   type CatalogDataset,
   type CheckoutDataset,
   type CustomerDataset,

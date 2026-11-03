@@ -10,6 +10,7 @@ import {
   fromBase64Url,
   PushRequestSchema,
   SaleDocumentV1,
+  SaleDocumentV2,
   SaleVoidV1,
   toBase64Url,
   verifyCanonical,
@@ -27,9 +28,11 @@ import {
   businessDate,
   money,
   onAccountAmount,
+  qty,
   reviewCredit,
   reviewDeskDocument,
   reviewHandover,
+  reviewReturn,
   reviewSale,
   reviewSession,
   reviewVoid,
@@ -42,6 +45,10 @@ import {
   type CreditFinding,
   type DeviceKind,
   type HandoverFinding,
+  type ItemPolicy,
+  type ReturnDocument,
+  type ReturnFinding,
+  type ReturnReviewOriginal,
   type PaymentMethodCode,
   type PaymentMethodInfo,
   type RoleGrant,
@@ -51,7 +58,13 @@ import {
   type SaleVoidDocument,
   type VoidFinding,
 } from '@erp/domain';
-import { holdPostingOrder, postDocument, type PostOutcome, type SourceType } from '@erp/posting';
+import {
+  holdPostingOrder,
+  postDocument,
+  waitingReturns,
+  type PostOutcome,
+  type SourceType,
+} from '@erp/posting';
 import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import type pg from 'pg';
 
@@ -83,7 +96,7 @@ interface Device {
 
 /** A pushed document that can be trusted and stored, by family. */
 type Trusted =
-  | { family: 'S'; doc: SaleDocument }
+  | { family: 'S'; doc: SaleDocument | ReturnDocument }
   | { family: 'H'; doc: CashHandoverDocument }
   | { family: 'R'; doc: CustomerCollectionDocument }
   | { family: 'M'; doc: CashMovementDocument }
@@ -100,6 +113,10 @@ interface Setting {
   reenabledAt: Date | null;
   methods: (PaymentMethodInfo & { id: string })[];
   shopLocation: string | null;
+  /** Where a defective returned line goes (W1-13, D-008); SHOP when the branch has none. */
+  damagedLocation: string | null;
+  /** The tenant's return window (W1-13, PRD Q3). */
+  returnWindowDays: number;
   /** For items without their own tax code (ACC-09). */
   defaultTaxCode: string | null;
 }
@@ -126,6 +143,11 @@ const SEVERITY: Partial<Record<ExceptionKind, 'low' | 'medium' | 'high'>> = {
   cash_received_for_void: 'high',
   void_not_permitted: 'medium',
   duplicate_void: 'medium',
+  // Returns (W1-13): goods that may not exist came back, or a refund nobody could check.
+  return_over_quantity: 'high',
+  return_original_invalid: 'medium',
+  return_price_mismatch: 'medium',
+  return_not_permitted: 'medium',
 };
 
 const sha256 = (value: unknown) => createHash('sha256').update(canonicalJson(value)).digest();
@@ -202,9 +224,12 @@ export function registerPush(scope: FastifyInstance, { pool, now, requireDevice 
 }
 
 async function loadSetting(c: pg.ClientBase, device: Device): Promise<Setting> {
-  const t = await c.query<{ timezone: string; day_cutoff_hour: number; cash_rounding_increment: string }>(
-    'SELECT timezone, day_cutoff_hour, cash_rounding_increment FROM erp.tenants',
-  );
+  const t = await c.query<{
+    timezone: string;
+    day_cutoff_hour: number;
+    cash_rounding_increment: string;
+    return_window_days: number;
+  }>('SELECT timezone, day_cutoff_hour, cash_rounding_increment, return_window_days FROM erp.tenants');
   const dev = await c.query<{ public_key: Buffer; last_revoked_at: Date | null; reenabled_at: Date | null }>(
     'SELECT public_key, last_revoked_at, reenabled_at FROM erp.devices WHERE id = $1',
     [device.deviceId],
@@ -223,6 +248,11 @@ async function loadSetting(c: pg.ClientBase, device: Device): Promise<Setting> {
     `SELECT id FROM erp.locations WHERE branch_id = $1 AND kind = 'shop' AND deleted_at IS NULL ORDER BY code LIMIT 1`,
     [device.branchId],
   );
+  const damaged = await c.query<{ id: string }>(
+    `SELECT id FROM erp.locations WHERE branch_id = $1 AND kind = 'damaged' AND deleted_at IS NULL
+     ORDER BY code LIMIT 1`,
+    [device.branchId],
+  );
   return {
     timeZone: t.rows[0]!.timezone,
     cutoffHour: t.rows[0]!.day_cutoff_hour,
@@ -237,6 +267,8 @@ async function loadSetting(c: pg.ClientBase, device: Device): Promise<Setting> {
       requiresReference: r.requires_reference,
     })),
     shopLocation: shop.rows[0]?.id ?? null,
+    damagedLocation: damaged.rows[0]?.id ?? shop.rows[0]?.id ?? null,
+    returnWindowDays: t.rows[0]!.return_window_days,
     defaultTaxCode: tax.rows[0]?.id ?? null,
   };
 }
@@ -289,11 +321,14 @@ async function pushOne(
     let post: SourceType | null = null;
     /** Voids that were waiting for this bill: posted after it (W1-12). */
     let voids: string[] = [];
+    /** Returns that were waiting for this bill to post: posted after it (W1-13). */
+    let returns: string[] = [];
     if (t.family === 'S') {
       const stored = await accept(c, device, s, t.doc, doc, received);
       result = stored.result;
       voids = stored.voids;
-      post = 'sale';
+      // A return posts once the bill it returns has (it comes back at that bill's costs).
+      if (stored.originalPosted) post = 'sale';
     } else if (t.family === 'V') {
       const stored = await acceptVoid(c, device, t.doc, doc, received);
       result = stored.result;
@@ -318,9 +353,13 @@ async function pushOne(
       const started = performance.now();
       posting = await postDocument(c, { tenantId: device.tenantId, type: post, id: doc.id, now: received });
       // A void can only swap a posted bill: one whose bill failed to post waits for the catch-up.
-      if (posting.status === 'posted')
+      if (posting.status === 'posted') {
         for (const id of voids)
           await postDocument(c, { tenantId: device.tenantId, type: 'sales_void', id, now: received });
+        if (post === 'sale') returns = await waitingReturns(c, doc.id);
+        for (const id of returns)
+          await postDocument(c, { tenantId: device.tenantId, type: 'sale', id, now: received });
+      }
       postingMs = Math.round(performance.now() - started);
     }
   } catch (err) {
@@ -367,9 +406,11 @@ async function trusted(c: pg.ClientBase, device: Device, s: Setting, doc: PushDo
   if (doc.family === 'R') return { family: 'R', doc: await trustedCollection(c, device, s, doc) };
   if (doc.family === 'M') return { family: 'M', doc: await trustedMovement(c, device, doc) };
   if (doc.family === 'V') return { family: 'V', doc: await trustedVoid(c, device, doc) };
-  const parsed = SaleDocumentV1.safeParse(doc.payload);
+  // A return or exchange is version 2 (W1-13); a plain sale stays version 1.
+  const version = (doc.payload as { version?: unknown } | null)?.version;
+  const parsed = (version === 2 ? SaleDocumentV2 : SaleDocumentV1).safeParse(doc.payload);
   if (!parsed.success) throw new Rejected('bad_schema');
-  const d = parsed.data as unknown as SaleDocument;
+  const d = parsed.data as unknown as SaleDocument | ReturnDocument;
   if (d.id !== doc.id || d.seq !== doc.seq || doc.family !== 'S') throw new Rejected('bad_schema');
   if (d.branchId !== device.branchId) throw new Rejected('wrong_device');
 
@@ -542,12 +583,14 @@ async function accept(
   c: pg.ClientBase,
   device: Device,
   s: Setting,
-  d: SaleDocument,
+  d: SaleDocument | ReturnDocument,
   doc: PushDocument,
   received: Date,
-): Promise<{ result: PushResult; voids: string[] }> {
+): Promise<{ result: PushResult; voids: string[]; originalPosted: boolean }> {
   // First, before the posting order lock a sale on account takes: the same order as a handover's and a void's push.
   await holdBill(c, d.number);
+  // A return also holds its original bill, so returns of one line are judged one after the other (W1-13).
+  const ret = d.version === 2 ? await returnReview(c, s, d) : null;
   const grants = await grantsOf(c, [d.sellerId, ...d.overrides.map((o) => o.approvedBy)]);
   const findings = reviewSale(d, {
     deviceCode: device.code,
@@ -571,15 +614,22 @@ async function accept(
   for (const { kind, ...figures } of credit)
     exceptions.push({ kind, details: { ...figures, counter: d.credit ?? null } });
   if (whileRevoked) exceptions.push({ kind: 'revoked_device_doc', details: { revokedAt: s.lastRevokedAt } });
+  for (const f of ret?.findings ?? []) {
+    const { kind, ...details } = f;
+    exceptions.push({ kind, details });
+  }
   const cash = d.payments.find((p) => p.method === 'cash');
+  const returnOf = d.version === 2 ? (d.returnOf ?? null) : null;
+  const noReceipt = d.version === 2 && d.noReceipt !== undefined;
 
   await c.query(
     `INSERT INTO erp.sales_documents (id, tenant_id, branch_id, device_id, number, seq, kind, business_date,
        created_at_device, received_at, salesperson_user_id, customer_party_id, walkin_phone, price_tier_id, subtotal,
        line_discount_total, bill_discount, rounding, tax_total, total, cash_due, handover_status, payload, payload_hash,
-       signature, client_version, exception_count, cash_received, change_due, reissue_of_id, reissue_of_number)
+       signature, client_version, exception_count, cash_received, change_due, reissue_of_id, reissue_of_number,
+       return_of_id, return_of_number, no_receipt, no_receipt_ref)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
-       $24, $25, $26, $27, $28, $29, $30, $31)`,
+       $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35)`,
     [
       d.id,
       device.tenantId,
@@ -612,8 +662,13 @@ async function accept(
       cash?.cashReceived ?? null,
       cash?.changeDue ?? null,
       // The voided bill this one reissues (W1-12), as the counter named it.
-      d.reissueOf?.id ?? null,
-      d.reissueOf?.number ?? null,
+      d.version === 1 ? (d.reissueOf?.id ?? null) : null,
+      d.version === 1 ? (d.reissueOf?.number ?? null) : null,
+      // The bill this return is of, or none (W1-13).
+      returnOf?.id ?? null,
+      returnOf?.number ?? null,
+      noReceipt,
+      d.version === 2 ? (d.noReceipt?.ref ?? null) : null,
     ],
   );
   // Each line says which tax code applied, at 0% for now (ACC-09): the item's own, or the tenant's default.
@@ -629,8 +684,10 @@ async function accept(
   for (const l of d.lines) {
     const r = await c.query<{ id: string }>(
       `INSERT INTO erp.sales_lines (tenant_id, document_id, line_no, item_id, qty, list_price, unit_price, line_discount,
-         bill_share, line_total, floor_price_at_sale, location_id, tax_code_id)
-       VALUES ($1, $2, $3, $4, $5::numeric / 1000, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+         bill_share, line_total, floor_price_at_sale, location_id, tax_code_id, original_line_id, return_reason_code,
+         return_condition, return_note)
+       VALUES ($1, $2, $3, $4, $5::numeric / 1000, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       RETURNING id`,
       [
         device.tenantId,
         d.id,
@@ -643,8 +700,13 @@ async function accept(
         l.billShare,
         l.lineTotal,
         l.floorPrice,
-        s.shopLocation,
+        // A defective returned line goes to Damaged (D-008); everything else is in the Shop.
+        'returnOf' in l && l.condition === 'defective' ? s.damagedLocation : s.shopLocation,
         taxCodes.get(l.itemId) ?? null,
+        'returnOf' in l ? (ret?.links.get(l.lineNo) ?? null) : null,
+        'returnOf' in l ? l.reason : null,
+        'returnOf' in l ? l.condition : null,
+        'returnOf' in l ? l.note : null,
       ],
     );
     lineIds.set(l.lineNo, r.rows[0]!.id);
@@ -701,14 +763,106 @@ async function accept(
       error: null,
     },
     voids,
+    originalPosted: ret?.originalPosted ?? true,
   };
+}
+
+/**
+ * A return's review against its original bill as the server holds it (W1-13, sync spec §6.2): the original's lines
+ * with what other returns took of each, the categories' return policies, the roles. Holds the original's per-bill lock
+ * first. `links` gives each returned line the original line to store (only one that is that item and not itself a
+ * return), and `originalPosted` says whether the return can post now.
+ */
+async function returnReview(
+  c: pg.ClientBase,
+  s: Setting,
+  d: ReturnDocument,
+): Promise<{ findings: ReturnFinding[]; links: Map<number, string>; originalPosted: boolean }> {
+  if (d.returnOf !== undefined) await holdBill(c, d.returnOf.number);
+  let original: ReturnReviewOriginal | null = null;
+  const lineIds = new Map<number, string>();
+  let originalPosted = true;
+  if (d.returnOf !== undefined) {
+    const doc = await c.query<{
+      status: 'finalized' | 'voided';
+      business_date: string;
+      number: string;
+      posted: boolean;
+    }>(
+      `SELECT status, business_date::text, number,
+         EXISTS (SELECT 1 FROM erp.postings p WHERE p.source_type = 'sale' AND p.source_id = d.id) AS posted
+       FROM erp.sales_documents d WHERE id = $1`,
+      [d.returnOf.id],
+    );
+    const o = doc.rows[0];
+    if (o) {
+      originalPosted = o.posted;
+      const lines = await c.query<{
+        id: string;
+        line_no: number;
+        item_id: string;
+        qty: string;
+        line_total: string;
+        returned_qty: string;
+        returned_refund: string;
+      }>(
+        `SELECT l.id, l.line_no, l.item_id, (l.qty * 1000)::bigint AS qty, l.line_total,
+           coalesce((SELECT -sum(r.qty * 1000)::bigint FROM erp.sales_lines r WHERE r.original_line_id = l.id), 0)
+             AS returned_qty,
+           coalesce((SELECT -sum(r.line_total) FROM erp.sales_lines r WHERE r.original_line_id = l.id), 0)
+             AS returned_refund
+         FROM erp.sales_lines l WHERE l.document_id = $1 ORDER BY l.line_no`,
+        [d.returnOf.id],
+      );
+      original = {
+        id: d.returnOf.id,
+        number: o.number,
+        status: o.status,
+        businessDate: o.business_date,
+        lines: lines.rows.map((l) => ({
+          lineNo: l.line_no,
+          itemId: l.item_id,
+          qty: qty(Number(l.qty)),
+          lineTotal: money(l.line_total),
+          returned: { qty: qty(Number(l.returned_qty)), refund: money(l.returned_refund) },
+          isReturn: Number(l.qty) < 0,
+        })),
+      };
+      for (const l of lines.rows) lineIds.set(l.line_no, l.id);
+    }
+  }
+  const items = await c.query<{ id: string; return_policy: ItemPolicy | null }>(
+    `SELECT i.id, c.return_policy FROM erp.items i LEFT JOIN erp.categories c ON c.id = i.category_id
+     WHERE i.id = ANY($1)`,
+    [d.lines.map((l) => l.itemId)],
+  );
+  const grants = await grantsOf(c, [d.sellerId, ...d.overrides.map((o) => o.approvedBy)]);
+  const findings = reviewReturn(d, {
+    original,
+    windowDays: s.returnWindowDays,
+    items: Object.fromEntries(items.rows.map((r) => [r.id, r.return_policy ?? {}])),
+    grants,
+  });
+  // A returned line is linked to its original only when that is the same item and a sold line: its cost comes back.
+  const links = new Map<number, string>();
+  for (const l of d.lines)
+    if ('returnOf' in l && l.returnOf !== null && original !== null) {
+      const sold = original.lines.find((x) => x.lineNo === l.returnOf!.lineNo);
+      const id = lineIds.get(l.returnOf.lineNo);
+      if (sold && id && sold.itemId === l.itemId && !sold.isReturn) links.set(l.lineNo, id);
+    }
+  return { findings, links, originalPosted: originalPosted || links.size === 0 };
 }
 
 /**
  * Voids that arrived before their bill (W1-12): linked now, and the bill marked voided. They were reviewed at their
  * own arrival against the bill number and the document's dates, so nothing new is found. Returns the ones to post.
  */
-async function linkWaitingVoids(c: pg.ClientBase, device: Device, bill: SaleDocument): Promise<string[]> {
+async function linkWaitingVoids(
+  c: pg.ClientBase,
+  device: Device,
+  bill: SaleDocument | ReturnDocument,
+): Promise<string[]> {
   const { rows } = await c.query<{ id: string; payload: SaleVoidDocument; duplicate_of_id: string | null }>(
     `SELECT id, payload, duplicate_of_id FROM erp.sales_voids
      WHERE sale_number = $1 AND sale_document_id IS NULL ORDER BY received_at, id`,
@@ -895,7 +1049,7 @@ function settledStatus(h: { kind: 'in' | 'payout' }, cashDue: number): 'received
  * Handovers the desk recorded from the bill's code before the bill arrived (an offline scan, PRD W4): linked now, the
  * bill marked received, and the amount compared (D-059). They were posted at their own arrival.
  */
-async function linkWaitingHandovers(c: pg.ClientBase, tenantId: string, bill: SaleDocument) {
+async function linkWaitingHandovers(c: pg.ClientBase, tenantId: string, bill: SaleDocument | ReturnDocument) {
   const { rows } = await c.query<{
     id: string;
     device_id: string;
@@ -1301,10 +1455,11 @@ async function addCashException(
 async function creditFindings(
   c: pg.ClientBase,
   device: Device,
-  d: SaleDocument,
+  d: SaleDocument | ReturnDocument,
   grants: Record<string, RoleGrant[]>,
 ): Promise<CreditFinding[]> {
-  if (d.customerId === null || onAccountAmount(d.payments) === 0) return [];
+  // A refund to account (W1-13) isn't a sale on credit.
+  if (d.customerId === null || onAccountAmount(d.payments) <= 0) return [];
   await holdPostingOrder(c, device.tenantId);
   const { rows } = await c.query<{
     credit_allowed: boolean | null;

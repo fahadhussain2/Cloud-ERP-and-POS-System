@@ -1,7 +1,14 @@
 // Posting engine: document -> stock, party and GL entries (server only, CLAUDE.md rule 4).
 export { postCashMovement, postCollection, postSession } from './cash';
 export { averageAfterReceipt } from './cost';
-export { holdPostingOrder, postDocument, postPending, type PostOutcome, type SourceType } from './db/post';
+export {
+  holdPostingOrder,
+  postDocument,
+  postPending,
+  waitingReturns,
+  type PostOutcome,
+  type SourceType,
+} from './db/post';
 export { applyRebuild, checkRebuild, RebuildRefused, type RebuildCheck } from './db/rebuild';
 export { postHandover } from './handover';
 export { emptyState, replay, type ReplayStep } from './replay';

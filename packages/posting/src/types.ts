@@ -89,11 +89,16 @@ export interface PostingSaleLine {
   lineNo: number;
   itemId: string;
   locationId: string;
-  /** Thousandths, above 0 for a sold line. */
+  /** Thousandths: above 0 for a sold line, below 0 for a returned one (W1-13). */
   qty: Qty;
-  /** After the line discount, before the bill discount. */
+  /** After the line discount, before the bill discount; for a returned line −its refund. */
   lineTotal: Money;
   taxAmount: Money;
+  /**
+   * Returned lines only: the original line's unit cost from its stock movement (D-044), or null for the current
+   * average (no receipt, or an original that left with no cost). Absent on a sold line.
+   */
+  returnUnitCost?: Money | null;
 }
 
 /**
@@ -183,6 +188,8 @@ export type PostingError =
   | { code: 'target_unmapped'; targetId: string | null }
   | { code: 'party_missing' }
   /** A void whose sale has no posting yet: it waits for it (W1-12). */
-  | { code: 'sale_not_posted' };
+  | { code: 'sale_not_posted' }
+  /** A return whose original bill has no posting yet: it waits for it (W1-13). */
+  | { code: 'original_not_posted' };
 
 export type PostingResult = { ok: true; posting: Posting } | { ok: false; error: PostingError };

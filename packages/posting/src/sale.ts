@@ -1,6 +1,6 @@
-import { add, money, negate, qty, sum, type Money, type PaymentMethodCode, type Qty } from '@erp/domain';
+import { add, money, negate, qty, sub, sum, type Money, type PaymentMethodCode, type Qty } from '@erp/domain';
 
-import { costOf } from './cost';
+import { averageAfterReceipt, costOf } from './cost';
 import { addDays, entryDateOf } from './dates';
 import type {
   CostState,
@@ -13,6 +13,7 @@ import type {
   PostingResult,
   PostingRole,
   PostingSale,
+  PostingSaleLine,
   StockMovement,
 } from './types';
 
@@ -105,7 +106,11 @@ function post(sale: PostingSale, context: PostingContext, state: LedgerState) {
       dueDate: addDays(entryDate, context.customer?.paymentTermsDays ?? 0),
     });
 
-  entry.add(role('SALES'), negate(sum(sale.lines.map((l) => l.lineTotal))));
+  // Sold lines credit SALES; returned lines (W1-13, posting rules §4.2) debit SALES_RETURNS at their refund.
+  const soldTotal = sum(sale.lines.filter((l) => l.qty > 0).map((l) => l.lineTotal));
+  const refunds = negate(sum(sale.lines.filter((l) => l.qty < 0).map((l) => l.lineTotal)));
+  if (soldTotal !== 0 || refunds === 0) entry.add(role('SALES'), negate(soldTotal));
+  if (refunds !== 0) entry.add(role('SALES_RETURNS'), refunds);
   if (sale.amounts.billDiscount !== 0) entry.add(role('SALES_DISCOUNT'), sale.amounts.billDiscount);
   if (sale.amounts.rounding !== 0) entry.add(role('ROUNDING'), negate(sale.amounts.rounding));
   if (sale.amounts.taxTotal !== 0) entry.add(role('TAX_PAYABLE'), negate(sale.amounts.taxTotal));
@@ -121,7 +126,42 @@ function post(sale: PostingSale, context: PostingContext, state: LedgerState) {
     balances[loc]?.[item] ?? state.balances[loc]?.[item] ?? qty(0);
   const movements: StockMovement[] = [];
   const noCost = new Set<string>();
+  /**
+   * A returned line comes back as a receipt at the original line's cost (D-044), or the current average when there is
+   * none; with no cost at all it comes back at 0, leaves the average unknown and is flagged no_cost (W1-13).
+   */
+  const comeBack = (l: PostingSaleLine): Money => {
+    const back = qty(0 - l.qty);
+    const before = costNow(l.itemId);
+    const unit = l.returnUnitCost ?? before.avgCost;
+    const after =
+      unit === null
+        ? { avgCost: before.avgCost, onHand: qty(before.onHand + back) }
+        : averageAfterReceipt(before, { qty: back, netUnitCost: unit });
+    costs[l.itemId] = after;
+    (balances[l.locationId] ??= {})[l.itemId] = qty(balanceNow(l.locationId, l.itemId) + back);
+    const value = costOf(back, unit);
+    movements.push({
+      sourceLineId: l.id,
+      itemId: l.itemId,
+      locationId: l.locationId,
+      qtyDelta: back,
+      unitCost: unit ?? money(0),
+      valueDelta: value,
+      avgCostAfter: after.avgCost,
+    });
+    if (unit === null && !noCost.has(l.itemId)) {
+      noCost.add(l.itemId);
+      exceptions.push({ kind: 'no_cost', details: { itemId: l.itemId } });
+    }
+    return value;
+  };
+  let returnedCost = money(0);
   for (const l of sale.lines) {
+    if (l.qty < 0) {
+      returnedCost = add(returnedCost, comeBack(l));
+      continue;
+    }
     const before = costNow(l.itemId);
     const value = costOf(l.qty, before.avgCost);
     costs[l.itemId] = { avgCost: before.avgCost, onHand: qty(before.onHand - l.qty) };
@@ -148,7 +188,11 @@ function post(sale: PostingSale, context: PostingContext, state: LedgerState) {
         details: { itemId: l.itemId, locationId: l.locationId, balance: after },
       });
   }
-  const cost = sum(movements.map((m) => negate(m.valueDelta)));
+  // COGS nets the sold lines' cost against the returned lines' (posting rules §4.3: one entry for an exchange).
+  const cost = sub(
+    sum(movements.filter((m) => m.qtyDelta < 0).map((m) => negate(m.valueDelta))),
+    returnedCost,
+  );
   if (cost !== 0) {
     entry.add(role('COGS'), cost);
     entry.add(role('INVENTORY'), negate(cost));

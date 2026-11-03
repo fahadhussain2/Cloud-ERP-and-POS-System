@@ -2,8 +2,11 @@ import { z } from 'zod';
 
 // Counter sync contracts (sync spec v1, W1-02, W1-03, D-089). Shared by the API and the POS.
 
-/** How a pulled column is stored on the counter: money is whole minor units (CLAUDE.md rule 1). */
-export type ColumnType = 'text' | 'int' | 'bool' | 'json' | 'money';
+/**
+ * How a pulled column is stored on the counter: money is whole minor units, a quantity whole thousandths (CLAUDE.md
+ * rule 1).
+ */
+export type ColumnType = 'text' | 'int' | 'bool' | 'json' | 'money' | 'qty';
 
 /**
  * The catalog datasets and the only columns each may send (sync spec §3, W1-03). A column not listed never leaves
@@ -140,6 +143,43 @@ export const CASH_DESK_COLUMNS = {
 export type CashDeskDataset = keyof typeof CASH_DESK_COLUMNS;
 export const CASH_DESK_DATASETS = Object.keys(CASH_DESK_COLUMNS) as CashDeskDataset[];
 
+/**
+ * The branch's bills of the last 90 days, for returns on every counter (SYN-01, sync spec §3, W1-13): headers, lines
+ * and payments. Never the payload, signature, cost, cash figures or a payment's reference. The walk-in phone is
+ * personal data: pulled for the lookup by phone, never logged or printed.
+ */
+export const RETURN_COLUMNS = {
+  bills: {
+    id: 'text',
+    number: 'text',
+    device_id: 'text',
+    kind: 'text',
+    status: 'text',
+    business_date: 'text',
+    created_at_device: 'text',
+    customer_party_id: 'text',
+    walkin_phone: 'text',
+    total: 'money',
+    return_of_id: 'text',
+  },
+  bill_lines: {
+    id: 'text',
+    document_id: 'text',
+    line_no: 'int',
+    item_id: 'text',
+    qty: 'qty',
+    unit_price: 'money',
+    line_total: 'money',
+    original_line_id: 'text',
+  },
+  bill_payments: { id: 'text', document_id: 'text', method_id: 'text', amount: 'money' },
+} as const satisfies Record<string, Record<string, ColumnType>>;
+
+export type ReturnDataset = keyof typeof RETURN_COLUMNS;
+export const RETURN_DATASETS = Object.keys(RETURN_COLUMNS) as ReturnDataset[];
+/** How far back the bills go (SYN-01). */
+export const RETURN_BILL_DAYS = 90;
+
 export const PULL_DATASETS = [
   'tenant',
   'branch',
@@ -150,6 +190,7 @@ export const PULL_DATASETS = [
   ...(Object.keys(CHECKOUT_COLUMNS) as CheckoutDataset[]),
   ...(Object.keys(CUSTOMER_COLUMNS) as CustomerDataset[]),
   ...(Object.keys(CASH_DESK_COLUMNS) as CashDeskDataset[]),
+  ...(Object.keys(RETURN_COLUMNS) as ReturnDataset[]),
 ] as const;
 export type PullDataset =
   | 'tenant'
@@ -160,7 +201,8 @@ export type PullDataset =
   | CatalogDataset
   | CheckoutDataset
   | CustomerDataset
-  | CashDeskDataset;
+  | CashDeskDataset
+  | ReturnDataset;
 
 export const PULL_LIMIT_DEFAULT = 500;
 export const PULL_LIMIT_MAX = 1000;

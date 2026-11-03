@@ -6,7 +6,16 @@ import { postHandover } from '../handover';
 import { postSale } from '../sale';
 import { postVoid } from '../void';
 import type { LedgerState, Posting, PostingContext, PostingResult } from '../types';
-import { loadCashMovement, loadCollection, loadHandover, loadSale, loadSessionEvent, loadVoid } from './load';
+import {
+  loadCashMovement,
+  loadCollection,
+  loadHandover,
+  loadSale,
+  loadSessionEvent,
+  loadVoid,
+  withReturnCosts,
+  type LineCost,
+} from './load';
 import type { SourceType } from './post';
 import { writePosting } from './write';
 
@@ -50,6 +59,8 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
   const steps: Replayed[] = [];
   // Each sale's replayed posting, for its void to swap (W1-12).
   const sales = new Map<string, Posting>();
+  // How each sold line left the stock, for a return of it (W1-13).
+  const lineCosts = new Map<string, LineCost>();
   for (const r of rows.rows) {
     let result: PostingResult | null;
     if (r.source_type === 'cash_handover') {
@@ -70,10 +81,17 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
       result = v && original ? postVoid(v.void, original, r.context, state) : null;
     } else {
       const loaded = await loadSale(c, r.source_id);
-      result = loaded ? postSale(loaded.sale, r.context, state) : null;
+      // A return takes its original lines' costs from their replayed movements (W1-13).
+      const sale = loaded && withReturnCosts(loaded.sale, loaded.originals, (line) => lineCosts.get(line));
+      result = sale ? postSale(sale, r.context, state) : null;
     }
     const posting = result?.ok ? result.posting : null;
-    if (posting && r.source_type === 'sale') sales.set(r.source_id, posting);
+    if (posting && r.source_type === 'sale') {
+      sales.set(r.source_id, posting);
+      for (const m of posting.movements)
+        if (m.qtyDelta < 0)
+          lineCosts.set(m.sourceLineId, { unitCost: m.unitCost, avgCostAfter: m.avgCostAfter });
+    }
     if (posting) state = withChanges(state, posting.state);
     const journalNumber =
       posting && posting.journal.lines.length > 0 ? `J${String((journals += 1)).padStart(6, '0')}` : null;

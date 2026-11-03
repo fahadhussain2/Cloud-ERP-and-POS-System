@@ -57,6 +57,8 @@ export const tenants = erp.table('tenants', {
   /** Hours without reaching the server before the counter warns, and warns strongly (SYN-06, W1-07). */
   offlineWarningHours: smallint('offline_warning_hours').notNull(),
   offlineStrongWarningHours: smallint('offline_strong_warning_hours').notNull(),
+  /** Days a sale may be returned without an approval (PRD Q3, W1-13); a category may set its own. */
+  returnWindowDays: integer('return_window_days').notNull(),
   ...syncColumns,
   ...auditColumns,
 });
@@ -518,6 +520,11 @@ export const salesDocuments = erp.table('sales_documents', {
   voidApprovedByUserId: uuid('void_approved_by_user_id'),
   reissueOfId: uuid('reissue_of_id'),
   reissueOfNumber: text('reissue_of_number'),
+  // The bill a return is of, or none (W1-13).
+  returnOfId: uuid('return_of_id'),
+  returnOfNumber: text('return_of_number'),
+  noReceipt: boolean('no_receipt').notNull(),
+  noReceiptRef: text('no_receipt_ref'),
   ...syncColumns,
   ...auditColumns,
 });
@@ -576,6 +583,13 @@ export const salesLines = erp.table('sales_lines', {
   taxCodeId: uuid('tax_code_id'),
   taxAmount: bigint('tax_amount', { mode: 'number' }).notNull(),
   locationId: uuid('location_id'),
+  // A returned line (W1-13): the line it returns, why, and in what condition.
+  originalLineId: uuid('original_line_id'),
+  returnReasonCode: text('return_reason_code', {
+    enum: ['wrong_part', 'unused_option', 'defective', 'changed_mind', 'other'],
+  }),
+  returnCondition: text('return_condition', { enum: ['resellable', 'defective'] }),
+  returnNote: text('return_note'),
   ...syncColumns,
   ...auditColumns,
 });
@@ -611,6 +625,7 @@ export const overrides = erp.table('overrides', {
       'return_outside_policy',
       'void',
       'reprint',
+      'refund_transfer',
     ],
   }).notNull(),
   requestedByUserId: uuid('requested_by_user_id').notNull(),

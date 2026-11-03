@@ -9,7 +9,7 @@ import lineCases from '../golden/return-lines.json';
 import policyCases from '../golden/return-policy.json';
 import reviewCases from '../golden/return-review.json';
 import type { Bill } from './bill';
-import type { CreditView } from './credit';
+import { reviewCredit, type CreditView } from './credit';
 import { money, type Money } from './money';
 import { qty, type Qty } from './quantity';
 import {
@@ -221,5 +221,19 @@ describe('reviewSale on a return', () => {
         grants: RETURN_STAFF,
       }),
     ).toContainEqual({ kind: 'document_inconsistent', lineNo: 1, code: 'line_amounts', problem: null });
+  });
+});
+
+describe('reviewCredit on a return', () => {
+  it('leaves a refund to account alone: it lowers the balance, it is no sale on credit', () => {
+    const credited = documents.cases.find((c) => c.name.startsWith("Khan Motors' bill credited"))!;
+    expect(
+      reviewCredit(build(credited.input), {
+        account: null,
+        balanceBefore: money(0),
+        offlineTodayBefore: money(0),
+        grants: {},
+      }),
+    ).toStrictEqual([]);
   });
 });
