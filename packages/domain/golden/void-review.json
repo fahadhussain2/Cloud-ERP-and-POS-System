@@ -1,0 +1,310 @@
+{
+  "description": "The server's review of a pushed void (sync spec §6.2, D-011, D-059, W1-12): findings, never a refusal. Each case changes the base void (void.test.ts: C03-V000001, the salesman …a1 voids C03-S000412 with the manager …a2's PIN at 09:20 UTC on 2026-11-03, the desk pending) and gives what the server holds: the bill (null until it arrives), a handover in of that bill number (null when none; it may be an offline scan whose bill hasn't arrived), and an earlier void of the bill (null when none). The approver is judged on the roles the server holds now (testing/counter.ts). Findings in order: duplicate_void (alone: a second void is never posted), void_not_permitted (cause not_permitted, window_none or other_day: the bill's business date, or the document's when the bill hasn't arrived), cash_received_for_void (the cash is in the drawer for a voided bill, D-059; order: whether the handover was made before or after the void).",
+  "cases": [
+    {
+      "name": "before the handover, by a manager",
+      "input": {
+        "void": {},
+        "context": {
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "businessDate": "2026-11-03",
+            "cashDue": 432000
+          },
+          "handover": null,
+          "existing": null
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "the bill hasn't arrived yet",
+      "input": {
+        "void": {},
+        "context": {
+          "bill": null,
+          "handover": null,
+          "existing": null
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "the approver no longer holds pos.void",
+      "input": {
+        "void": {
+          "approvedBy": "019a0000-0000-7000-8000-0000000000a1"
+        },
+        "context": {
+          "bill": null,
+          "handover": null,
+          "existing": null
+        }
+      },
+      "expected": [
+        {
+          "kind": "void_not_permitted",
+          "cause": "not_permitted"
+        }
+      ]
+    },
+    {
+      "name": "an approver the server doesn't know as one",
+      "input": {
+        "void": {
+          "approvedBy": "019a0000-0000-7000-8000-0000000000a9"
+        },
+        "context": {
+          "bill": null,
+          "handover": null,
+          "existing": null
+        }
+      },
+      "expected": [
+        {
+          "kind": "void_not_permitted",
+          "cause": "not_permitted"
+        }
+      ]
+    },
+    {
+      "name": "the approver's window is none",
+      "input": {
+        "void": {
+          "approvedBy": "019a0000-0000-7000-8000-0000000000a3"
+        },
+        "context": {
+          "bill": null,
+          "handover": null,
+          "existing": null
+        }
+      },
+      "expected": [
+        {
+          "kind": "void_not_permitted",
+          "cause": "window_none"
+        }
+      ]
+    },
+    {
+      "name": "the stored bill is of the day before",
+      "input": {
+        "void": {},
+        "context": {
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "businessDate": "2026-11-02",
+            "cashDue": 432000
+          },
+          "handover": null,
+          "existing": null
+        }
+      },
+      "expected": [
+        {
+          "kind": "void_not_permitted",
+          "cause": "other_day"
+        }
+      ]
+    },
+    {
+      "name": "before the bill arrives, the document's own dates",
+      "input": {
+        "void": {
+          "saleBusinessDate": "2026-11-02"
+        },
+        "context": {
+          "bill": null,
+          "handover": null,
+          "existing": null
+        }
+      },
+      "expected": [
+        {
+          "kind": "void_not_permitted",
+          "cause": "other_day"
+        }
+      ]
+    },
+    {
+      "name": "the desk took the cash before the void (the counter was offline)",
+      "input": {
+        "void": {
+          "handoverSeen": "unknown"
+        },
+        "context": {
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "businessDate": "2026-11-03",
+            "cashDue": 432000
+          },
+          "handover": {
+            "id": "019a7000-0000-7000-8000-000000000071",
+            "number": "D01-H000031",
+            "at": "2026-11-03T09:10:00.000Z"
+          },
+          "existing": null
+        }
+      },
+      "expected": [
+        {
+          "kind": "cash_received_for_void",
+          "handoverId": "019a7000-0000-7000-8000-000000000071",
+          "handoverNumber": "D01-H000031",
+          "handoverAt": "2026-11-03T09:10:00.000Z",
+          "order": "before_void"
+        }
+      ]
+    },
+    {
+      "name": "the desk scanned the bill offline after it was voided",
+      "input": {
+        "void": {},
+        "context": {
+          "bill": null,
+          "handover": {
+            "id": "019a7000-0000-7000-8000-000000000071",
+            "number": "D01-H000031",
+            "at": "2026-11-03T09:25:00.000Z"
+          },
+          "existing": null
+        }
+      },
+      "expected": [
+        {
+          "kind": "cash_received_for_void",
+          "handoverId": "019a7000-0000-7000-8000-000000000071",
+          "handoverNumber": "D01-H000031",
+          "handoverAt": "2026-11-03T09:25:00.000Z",
+          "order": "after_void"
+        }
+      ]
+    },
+    {
+      "name": "a handover at the void's very second counts as before it",
+      "input": {
+        "void": {},
+        "context": {
+          "bill": null,
+          "handover": {
+            "id": "019a7000-0000-7000-8000-000000000071",
+            "number": "D01-H000031",
+            "at": "2026-11-03T09:20:00.000Z"
+          },
+          "existing": null
+        }
+      },
+      "expected": [
+        {
+          "kind": "cash_received_for_void",
+          "handoverId": "019a7000-0000-7000-8000-000000000071",
+          "handoverNumber": "D01-H000031",
+          "handoverAt": "2026-11-03T09:20:00.000Z",
+          "order": "before_void"
+        }
+      ]
+    },
+    {
+      "name": "a bill without cash has no handover to find",
+      "input": {
+        "void": {
+          "saleCashDue": 0,
+          "handoverSeen": "not_applicable"
+        },
+        "context": {
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "businessDate": "2026-11-03",
+            "cashDue": 0
+          },
+          "handover": null,
+          "existing": null
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "every finding but the duplicate at once",
+      "input": {
+        "void": {
+          "approvedBy": "019a0000-0000-7000-8000-0000000000a3"
+        },
+        "context": {
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "businessDate": "2026-11-02",
+            "cashDue": 432000
+          },
+          "handover": {
+            "id": "019a7000-0000-7000-8000-000000000071",
+            "number": "D01-H000031",
+            "at": "2026-11-03T09:10:00.000Z"
+          },
+          "existing": null
+        }
+      },
+      "expected": [
+        {
+          "kind": "void_not_permitted",
+          "cause": "window_none"
+        },
+        {
+          "kind": "cash_received_for_void",
+          "handoverId": "019a7000-0000-7000-8000-000000000071",
+          "handoverNumber": "D01-H000031",
+          "handoverAt": "2026-11-03T09:10:00.000Z",
+          "order": "before_void"
+        }
+      ]
+    },
+    {
+      "name": "a second void of the bill: only the duplicate",
+      "input": {
+        "void": {
+          "id": "019a8000-0000-7000-8000-000000000082",
+          "seq": 2,
+          "number": "C03-V000002",
+          "approvedBy": "019a0000-0000-7000-8000-0000000000a1"
+        },
+        "context": {
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "businessDate": "2026-11-03",
+            "cashDue": 432000
+          },
+          "handover": {
+            "id": "019a7000-0000-7000-8000-000000000071",
+            "number": "D01-H000031",
+            "at": "2026-11-03T09:10:00.000Z"
+          },
+          "existing": {
+            "id": "019a8000-0000-7000-8000-000000000081",
+            "number": "C03-V000001"
+          }
+        }
+      },
+      "expected": [
+        {
+          "kind": "duplicate_void",
+          "duplicateOf": "019a8000-0000-7000-8000-000000000081",
+          "duplicateOfNumber": "C03-V000001"
+        }
+      ]
+    },
+    {
+      "name": "the earlier void is this one (reviewed again): not a duplicate",
+      "input": {
+        "void": {},
+        "context": {
+          "bill": null,
+          "handover": null,
+          "existing": {
+            "id": "019a8000-0000-7000-8000-000000000081",
+            "number": "C03-V000001"
+          }
+        }
+      },
+      "expected": []
+    }
+  ]
+}

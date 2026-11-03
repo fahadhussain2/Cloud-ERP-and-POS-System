@@ -56,8 +56,9 @@ runGolden(
     customer?: { id: string | null; walkinPhone: string | null };
     credit?: CreditView | null;
     creditApproval?: CreditApproval | null;
+    reissueOf?: { id: string; number: string } | null;
   }>,
-  // Cases from before W1-09 are walk-in bills with no phone.
+  // Cases from before W1-09 are walk-in bills with no phone; cases from before W1-12 reissue nothing.
   (i) =>
     buildSaleDocument({
       bill: i.bill,
@@ -67,6 +68,7 @@ runGolden(
       customer: i.customer ?? { id: null, walkinPhone: null },
       credit: i.credit ?? null,
       creditApproval: i.creditApproval ?? null,
+      reissueOf: i.reissueOf ?? null,
       context: { ...COUNTER, ...i.context },
     }),
 );

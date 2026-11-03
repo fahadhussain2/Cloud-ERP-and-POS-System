@@ -1,0 +1,61 @@
+{
+  "description": "When a held bill expires (POS-08: \"held bills expire at day close\", owner answer 4 to W1-12): once its business day is over, at the next day's 04:00 cutoff in the tenant's time zone (D-056). Asia/Karachi is UTC+5, so 04:00 local is 23:00 UTC the day before. Expired = the business date now is after the held bill's.",
+  "cases": [
+    {
+      "name": "held today, at 14:00",
+      "input": {
+        "heldBusinessDate": "2026-11-03",
+        "now": "2026-11-03T09:00:00.000Z"
+      },
+      "expected": false
+    },
+    {
+      "name": "03:59 the next morning: still the same business day",
+      "input": {
+        "heldBusinessDate": "2026-11-03",
+        "now": "2026-11-03T22:59:59.000Z"
+      },
+      "expected": false
+    },
+    {
+      "name": "04:00 the next morning: expired",
+      "input": {
+        "heldBusinessDate": "2026-11-03",
+        "now": "2026-11-03T23:00:00.000Z"
+      },
+      "expected": true
+    },
+    {
+      "name": "held at 23:50, ten past midnight: not yet (the day ends at 04:00, not at midnight)",
+      "input": {
+        "heldBusinessDate": "2026-11-03",
+        "now": "2026-11-03T19:10:00.000Z"
+      },
+      "expected": false
+    },
+    {
+      "name": "held yesterday, looked at today",
+      "input": {
+        "heldBusinessDate": "2026-11-02",
+        "now": "2026-11-03T06:00:00.000Z"
+      },
+      "expected": true
+    },
+    {
+      "name": "held days ago",
+      "input": {
+        "heldBusinessDate": "2026-10-28",
+        "now": "2026-11-03T06:00:00.000Z"
+      },
+      "expected": true
+    },
+    {
+      "name": "a held bill dated after now (the PC's clock was set back) is kept",
+      "input": {
+        "heldBusinessDate": "2026-11-04",
+        "now": "2026-11-03T06:00:00.000Z"
+      },
+      "expected": false
+    }
+  ]
+}

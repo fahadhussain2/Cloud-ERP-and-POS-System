@@ -7,9 +7,9 @@
       "expected": { "maxDiscountBp": 10000, "voidWindow": "none" }
     },
     {
-      "name": "Manager voids on the same business day",
+      "name": "Manager voids on the same business day, before the handover (owner answer 1 to W1-12)",
       "input": { "grants": [{ "template": "manager", "branchId": null }], "branchId": "b1" },
-      "expected": { "maxDiscountBp": 10000, "voidWindow": "same_day" }
+      "expected": { "maxDiscountBp": 10000, "voidWindow": "same_day_before_handover" }
     },
     {
       "name": "Accountant has no selling limits",
@@ -25,7 +25,7 @@
         ],
         "branchId": "b1"
       },
-      "expected": { "maxDiscountBp": 10000, "voidWindow": "same_day" }
+      "expected": { "maxDiscountBp": 10000, "voidWindow": "same_day_before_handover" }
     },
     {
       "name": "A Manager role for another branch doesn't count here",
@@ -47,7 +47,7 @@
         ],
         "branchId": "b1"
       },
-      "expected": { "maxDiscountBp": 10000, "voidWindow": "same_day" }
+      "expected": { "maxDiscountBp": 10000, "voidWindow": "same_day_before_handover" }
     },
     {
       "name": "No roles: no limits at all",
@@ -67,6 +67,11 @@
         "branchId": "b1"
       },
       "expected": { "maxDiscountBp": 500, "voidWindow": "same_day_before_handover" }
+    },
+    {
+      "name": "Owner voids on the same business day, before the handover too (owner answer 1 to W1-12)",
+      "input": { "grants": [{ "template": "owner", "branchId": null }], "branchId": "b1" },
+      "expected": { "maxDiscountBp": 10000, "voidWindow": "same_day_before_handover" }
     }
   ]
 }

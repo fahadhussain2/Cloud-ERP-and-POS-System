@@ -1,0 +1,154 @@
+{
+  "description": "Holding the open bill (POS-08, POS spec §17, W1-12): may this person park it, and with what label. Counter C03 in branch …e1; staff as in testing/counter.ts (…a1 a salesman, …a2 a manager, …a6 sells but lacks pos.sale.hold). At most 20 bills held on a counter; a label is trimmed, blank = none, at most 40 characters. The first problem, in order: not_permitted, empty_bill, too_many, label_too_long.",
+  "cases": [
+    {
+      "name": "a salesman holds a bill of 3 lines with a label, trimmed",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "lineCount": 3,
+        "heldCount": 0,
+        "label": "  Blue Suzuki  "
+      },
+      "expected": {
+        "ok": true,
+        "label": "Blue Suzuki"
+      }
+    },
+    {
+      "name": "no label",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "lineCount": 1,
+        "heldCount": 2
+      },
+      "expected": {
+        "ok": true,
+        "label": null
+      }
+    },
+    {
+      "name": "a blank label is none",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a2",
+        "lineCount": 1,
+        "heldCount": 0,
+        "label": "   "
+      },
+      "expected": {
+        "ok": true,
+        "label": null
+      }
+    },
+    {
+      "name": "the 20th held bill is fine",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "lineCount": 2,
+        "heldCount": 19
+      },
+      "expected": {
+        "ok": true,
+        "label": null
+      }
+    },
+    {
+      "name": "a 21st is refused",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "lineCount": 2,
+        "heldCount": 20
+      },
+      "expected": {
+        "ok": false,
+        "problem": "too_many"
+      }
+    },
+    {
+      "name": "an empty bill can't be held",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "lineCount": 0,
+        "heldCount": 0
+      },
+      "expected": {
+        "ok": false,
+        "problem": "empty_bill"
+      }
+    },
+    {
+      "name": "without pos.sale.hold",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a6",
+        "lineCount": 3,
+        "heldCount": 0
+      },
+      "expected": {
+        "ok": false,
+        "problem": "not_permitted"
+      }
+    },
+    {
+      "name": "without the permission comes before an empty bill",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a6",
+        "lineCount": 0,
+        "heldCount": 25
+      },
+      "expected": {
+        "ok": false,
+        "problem": "not_permitted"
+      }
+    },
+    {
+      "name": "an empty bill comes before the cap",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "lineCount": 0,
+        "heldCount": 20
+      },
+      "expected": {
+        "ok": false,
+        "problem": "empty_bill"
+      }
+    },
+    {
+      "name": "a label of exactly 40 characters",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "lineCount": 1,
+        "heldCount": 0,
+        "label": "Blue Suzuki Mehran, waiting for old part"
+      },
+      "expected": {
+        "ok": true,
+        "label": "Blue Suzuki Mehran, waiting for old part"
+      }
+    },
+    {
+      "name": "a label of 41 characters is refused",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "lineCount": 1,
+        "heldCount": 0,
+        "label": "Blue Suzuki Mehran, waiting for old part!"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "label_too_long"
+      }
+    },
+    {
+      "name": "spaces around a 40-character label don't count",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "lineCount": 1,
+        "heldCount": 0,
+        "label": "  Blue Suzuki Mehran, waiting for old part  "
+      },
+      "expected": {
+        "ok": true,
+        "label": "Blue Suzuki Mehran, waiting for old part"
+      }
+    }
+  ]
+}

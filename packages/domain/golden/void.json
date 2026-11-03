@@ -1,0 +1,356 @@
+{
+  "description": "May this bill be voided now, on this counter, with this approver (POS-11, PRD W5, D-002, owner answers 1 and 2 to W1-12)? Unless a case says otherwise: bill C03-S000412 (Rs 4,320 cash due) finalized on this counter (C03, …d1) today, 2026-11-03; the cash desk says it is still pending; the approver is the manager …a2 (pos.void, window same_day_before_handover); the reason is wrong_price with no note. Staff as in testing/counter.ts. The cash desk status is what the counter knows: the live check online (pending, received, paid_out, not_applicable) or unknown. A bill without cash due needs nothing from the desk. No window allows a void after the handover (owner answer 1): same_day behaves as same_day_before_handover. The first problem, in order: other_device, already_voided, other_day, handed_over, not_permitted, window_none, reason_required, note_required, note_too_long (200). handoverSeen is what the void document records; warning desk_unknown when the desk couldn't be asked about a bill with cash.",
+  "cases": [
+    {
+      "name": "the manager voids a cash bill before its handover",
+      "input": {},
+      "expected": {
+        "ok": true,
+        "reason": "wrong_price",
+        "note": null,
+        "handoverSeen": "pending",
+        "warning": null
+      }
+    },
+    {
+      "name": "a bill paid by Raast needs nothing from the desk",
+      "input": {
+        "bill": {
+          "cashDue": 0
+        },
+        "deskStatus": "not_applicable"
+      },
+      "expected": {
+        "ok": true,
+        "reason": "wrong_price",
+        "note": null,
+        "handoverSeen": "not_applicable",
+        "warning": null
+      }
+    },
+    {
+      "name": "a bill without cash, offline: still nothing from the desk, no warning",
+      "input": {
+        "bill": {
+          "cashDue": 0
+        },
+        "deskStatus": "unknown"
+      },
+      "expected": {
+        "ok": true,
+        "reason": "wrong_price",
+        "note": null,
+        "handoverSeen": "not_applicable",
+        "warning": null
+      }
+    },
+    {
+      "name": "offline: the desk can't be asked, allowed with a warning",
+      "input": {
+        "deskStatus": "unknown"
+      },
+      "expected": {
+        "ok": true,
+        "reason": "wrong_price",
+        "note": null,
+        "handoverSeen": "unknown",
+        "warning": "desk_unknown"
+      }
+    },
+    {
+      "name": "the desk has taken the cash: use a return",
+      "input": {
+        "deskStatus": "received"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "handed_over"
+      }
+    },
+    {
+      "name": "paid out at the desk: use a return",
+      "input": {
+        "deskStatus": "paid_out"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "handed_over"
+      }
+    },
+    {
+      "name": "already voided",
+      "input": {
+        "bill": {
+          "status": "voided"
+        }
+      },
+      "expected": {
+        "ok": false,
+        "problem": "already_voided"
+      }
+    },
+    {
+      "name": "another counter's bill (owner answer 2)",
+      "input": {
+        "bill": {
+          "deviceId": "019a0000-0000-7000-8000-0000000000d2",
+          "number": "C04-S000077"
+        }
+      },
+      "expected": {
+        "ok": false,
+        "problem": "other_device"
+      }
+    },
+    {
+      "name": "yesterday's bill",
+      "input": {
+        "bill": {
+          "businessDate": "2026-11-02"
+        }
+      },
+      "expected": {
+        "ok": false,
+        "problem": "other_day"
+      }
+    },
+    {
+      "name": "at 03:59 the bill of the day before is still today's",
+      "input": {
+        "bill": {
+          "businessDate": "2026-11-03"
+        },
+        "today": "2026-11-03"
+      },
+      "expected": {
+        "ok": true,
+        "reason": "wrong_price",
+        "note": null,
+        "handoverSeen": "pending",
+        "warning": null
+      }
+    },
+    {
+      "name": "approved by a salesman: no pos.void",
+      "input": {
+        "approverId": "019a0000-0000-7000-8000-0000000000a1"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "not_permitted"
+      }
+    },
+    {
+      "name": "approved by a cashier: no pos.void",
+      "input": {
+        "approverId": "019a0000-0000-7000-8000-0000000000a5"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "not_permitted"
+      }
+    },
+    {
+      "name": "approved by someone unknown",
+      "input": {
+        "approverId": "019a0000-0000-7000-8000-0000000000a9"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "not_permitted"
+      }
+    },
+    {
+      "name": "a manager of another branch only",
+      "input": {
+        "approverId": "019a0000-0000-7000-8000-0000000000a8"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "not_permitted"
+      }
+    },
+    {
+      "name": "pos.void with the window none",
+      "input": {
+        "approverId": "019a0000-0000-7000-8000-0000000000a3"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "window_none"
+      }
+    },
+    {
+      "name": "the window same_day before the handover",
+      "input": {
+        "approverId": "019a0000-0000-7000-8000-0000000000a4"
+      },
+      "expected": {
+        "ok": true,
+        "reason": "wrong_price",
+        "note": null,
+        "handoverSeen": "pending",
+        "warning": null
+      }
+    },
+    {
+      "name": "the window same_day after the handover: refused all the same (owner answer 1)",
+      "input": {
+        "approverId": "019a0000-0000-7000-8000-0000000000a4",
+        "deskStatus": "received"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "handed_over"
+      }
+    },
+    {
+      "name": "no reason",
+      "input": {
+        "reason": null
+      },
+      "expected": {
+        "ok": false,
+        "problem": "reason_required"
+      }
+    },
+    {
+      "name": "other without a note",
+      "input": {
+        "reason": "other"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "note_required"
+      }
+    },
+    {
+      "name": "other with a blank note",
+      "input": {
+        "reason": "other",
+        "note": "   "
+      },
+      "expected": {
+        "ok": false,
+        "problem": "note_required"
+      }
+    },
+    {
+      "name": "other with a note, trimmed",
+      "input": {
+        "reason": "other",
+        "note": "  invoice in the company's name  "
+      },
+      "expected": {
+        "ok": true,
+        "reason": "other",
+        "note": "invoice in the company's name",
+        "handoverSeen": "pending",
+        "warning": null
+      }
+    },
+    {
+      "name": "a note with another reason is kept",
+      "input": {
+        "reason": "duplicate_bill",
+        "note": "printed twice"
+      },
+      "expected": {
+        "ok": true,
+        "reason": "duplicate_bill",
+        "note": "printed twice",
+        "handoverSeen": "pending",
+        "warning": null
+      }
+    },
+    {
+      "name": "a blank note with another reason is none",
+      "input": {
+        "reason": "customer_cancelled",
+        "note": " "
+      },
+      "expected": {
+        "ok": true,
+        "reason": "customer_cancelled",
+        "note": null,
+        "handoverSeen": "pending",
+        "warning": null
+      }
+    },
+    {
+      "name": "a note of 200 characters",
+      "input": {
+        "reason": "wrong_item",
+        "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expected": {
+        "ok": true,
+        "reason": "wrong_item",
+        "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "handoverSeen": "pending",
+        "warning": null
+      }
+    },
+    {
+      "name": "a note of 201 characters is refused",
+      "input": {
+        "reason": "wrong_item",
+        "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "note_too_long"
+      }
+    },
+    {
+      "name": "another counter's bill comes before everything else",
+      "input": {
+        "bill": {
+          "deviceId": "019a0000-0000-7000-8000-0000000000d2",
+          "status": "voided",
+          "businessDate": "2026-11-01"
+        },
+        "approverId": "019a0000-0000-7000-8000-0000000000a1"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "other_device"
+      }
+    },
+    {
+      "name": "another day comes before the approver",
+      "input": {
+        "bill": {
+          "businessDate": "2026-11-02"
+        },
+        "approverId": "019a0000-0000-7000-8000-0000000000a1"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "other_day"
+      }
+    },
+    {
+      "name": "the handover comes before the approver",
+      "input": {
+        "deskStatus": "received",
+        "approverId": "019a0000-0000-7000-8000-0000000000a3"
+      },
+      "expected": {
+        "ok": false,
+        "problem": "handed_over"
+      }
+    },
+    {
+      "name": "the approver comes before the reason",
+      "input": {
+        "approverId": "019a0000-0000-7000-8000-0000000000a1",
+        "reason": null
+      },
+      "expected": {
+        "ok": false,
+        "problem": "not_permitted"
+      }
+    }
+  ]
+}
