@@ -91,6 +91,8 @@
 2. **On your PC** (a copy of `erp_dev`, a counter and a desk as two Edge profiles): the first pull's time with the 90-day bills; return a cash bill and pay it out at the desk; an exchange; a no-receipt return with a price you set; check the GL (4110, 1120, inventory at the original cost) and the stock in Shop and Damaged. Results go into this plan.
 3. **On staging** before the go/no-go (18 Dec, D-090).
 
+**Results (2026-11-03, this container):** `pnpm check` green (format, lint, typecheck, 1,741 tests with the coverage thresholds, `packages/domain` at 100%, every build). `pnpm test:integration` 281 of 282 passed; the one failure is the PostgreSQL 17 version check, as in W1-12: no Docker here, so a local PostgreSQL 16 (CI uses 17). `return.int.test.ts` covers acceptance, Shop and Damaged, the exchange, the transfer refund, `return_over_quantity`, the no-receipt approval, the wait for an unposted original, the 90-day datasets and the rebuild. `pnpm e2e` 47 passed on Playwright's Chromium (this container has Chromium build 1243 and the repo's Playwright asks for 1248, so the run pointed `PLAYWRIGHT_BROWSERS_PATH` at a folder mapping one to the other; nothing in the repo changed). **A bug found by e2e, fixed test-first:** pull sent a `date` column as a JS `Date`, so the counter got the bills' business dates as timestamps (a day off on a server not in UTC) and the no-receipt price failed; `pullColumns` now keeps a date as its text. **Not done:** Verify 2 (your PC) and Verify 3 (staging), and the owner's review.
+
 ## Risks
 
 | Risk | Mitigation |
