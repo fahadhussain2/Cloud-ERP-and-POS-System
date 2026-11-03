@@ -1,0 +1,910 @@
+{
+  "description": "Putting returned lines on an empty open bill (POS-12, PRD W6, D-006, POS spec §19): from one original bill (source kind `bill`, with each line's original as sold and what was returned of it before) or without a receipt (source kind `none`, with the price the approver set and what the counter suggested). Each returned line has a quantity, a reason (wrong_part, unused_option, defective, changed_mind, other) and a condition (resellable, defective). `needs` is what returnNeeds said; an approval (approver, reason, note, time) is required when it isn't empty, and covers every need, requested by the bill's seller. A linked line's refund is refundFor's; its unitPrice is that refund per whole unit (refund × 1 / qty, half away from zero). A no-receipt line's refund is qty × price. The result is the bill's `returns`. Errors, in order: bill_not_empty (lines or a return already there), empty_return, invalid_quantity, invalid_reason, note_required (other without a note), note_too_long (over 200), original_required (a linked line without its original), other_item, duplicate_line (one original line twice), return_over_quantity, price_required, return_approval_pending, and note_required for an approval with the reason other and no note. The seller is …f1.",
+  "cases": [
+    {
+      "name": "one pad back from bill C03-S000412",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              }
+            },
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "expected": {
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "originalLineNo": 1,
+            "refund": 435000,
+            "unitPrice": 435000,
+            "suggested": null,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable"
+          }
+        ],
+        "approval": null
+      }
+    },
+    {
+      "name": "two lines, the second partly returned before",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              }
+            },
+            "price": null,
+            "suggested": null
+          },
+          {
+            "id": "r2",
+            "itemId": "019a0000-0000-7000-8000-0000000000c3",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "unused_option",
+            "note": null,
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 2,
+                "itemId": "019a0000-0000-7000-8000-0000000000c3",
+                "qty": 3000,
+                "lineTotal": 1000000
+              },
+              "returned": {
+                "qty": 1000,
+                "refund": 333333
+              }
+            },
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "expected": {
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "originalLineNo": 1,
+            "refund": 435000,
+            "unitPrice": 435000,
+            "suggested": null,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable"
+          },
+          {
+            "id": "r2",
+            "itemId": "019a0000-0000-7000-8000-0000000000c3",
+            "qty": 1000,
+            "allowsFraction": false,
+            "originalLineNo": 2,
+            "refund": 333334,
+            "unitPrice": 333334,
+            "suggested": null,
+            "reason": "unused_option",
+            "note": null,
+            "condition": "resellable"
+          }
+        ],
+        "approval": null
+      }
+    },
+    {
+      "name": "without a receipt: the manager's price, and the counter's suggestion kept",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "none",
+          "ref": "023956 (old system)"
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": null,
+            "price": 400000,
+            "suggested": 420000
+          }
+        ],
+        "needs": ["no_receipt_return"],
+        "approval": {
+          "approvedBy": "019a0000-0000-7000-8000-0000000000f3",
+          "reason": "before_go_live",
+          "note": null,
+          "at": "2026-11-12T05:00:00.000Z"
+        }
+      },
+      "expected": {
+        "source": {
+          "kind": "none",
+          "ref": "023956 (old system)"
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "originalLineNo": null,
+            "refund": 400000,
+            "unitPrice": 400000,
+            "suggested": 420000,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable"
+          }
+        ],
+        "approval": {
+          "kinds": ["no_receipt_return"],
+          "requestedBy": "019a0000-0000-7000-8000-0000000000f1",
+          "approvedBy": "019a0000-0000-7000-8000-0000000000f3",
+          "reason": "before_go_live",
+          "note": null,
+          "at": "2026-11-12T05:00:00.000Z"
+        }
+      }
+    },
+    {
+      "name": "a defective metre and a half of hose, without a receipt",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "none",
+          "ref": "023956 (old system)"
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c4",
+            "qty": 1500,
+            "allowsFraction": true,
+            "reason": "defective",
+            "note": null,
+            "condition": "defective",
+            "original": null,
+            "price": 33300,
+            "suggested": 33300
+          }
+        ],
+        "needs": ["no_receipt_return"],
+        "approval": {
+          "approvedBy": "019a0000-0000-7000-8000-0000000000f3",
+          "reason": "before_go_live",
+          "note": null,
+          "at": "2026-11-12T05:00:00.000Z"
+        }
+      },
+      "expected": {
+        "source": {
+          "kind": "none",
+          "ref": "023956 (old system)"
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c4",
+            "qty": 1500,
+            "allowsFraction": true,
+            "originalLineNo": null,
+            "refund": 49950,
+            "unitPrice": 33300,
+            "suggested": 33300,
+            "reason": "defective",
+            "note": null,
+            "condition": "defective"
+          }
+        ],
+        "approval": {
+          "kinds": ["no_receipt_return"],
+          "requestedBy": "019a0000-0000-7000-8000-0000000000f1",
+          "approvedBy": "019a0000-0000-7000-8000-0000000000f3",
+          "reason": "before_go_live",
+          "note": null,
+          "at": "2026-11-12T05:00:00.000Z"
+        }
+      }
+    },
+    {
+      "name": "a bill with lines already is refused: hold it first",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c2",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 480000,
+              "floor": 450000,
+              "unitPrice": 480000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              }
+            },
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "error": "bill_not_empty"
+    },
+    {
+      "name": "nothing to return",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [],
+        "needs": [],
+        "approval": null
+      },
+      "error": "empty_return"
+    },
+    {
+      "name": "half a pad is refused",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 500,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              }
+            },
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "error": "invalid_quantity"
+    },
+    {
+      "name": "an unknown reason",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "lost",
+            "note": null,
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              }
+            },
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "error": "invalid_reason"
+    },
+    {
+      "name": "other needs a note",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "other",
+            "note": null,
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              }
+            },
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "error": "note_required"
+    },
+    {
+      "name": "a note over 200 characters",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "other",
+            "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              }
+            },
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "error": "note_too_long"
+    },
+    {
+      "name": "a line from a bill needs its original",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": null,
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "error": "original_required"
+    },
+    {
+      "name": "the original must be the same item",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c2",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              }
+            },
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "error": "other_item"
+    },
+    {
+      "name": "one original line twice",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              }
+            },
+            "price": null,
+            "suggested": null
+          },
+          {
+            "id": "r2",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 0,
+                "refund": 0
+              }
+            },
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "error": "duplicate_line"
+    },
+    {
+      "name": "more than is left",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "bill",
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "number": "C03-S000412",
+          "businessDate": "2026-11-02",
+          "customerId": null
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": {
+              "line": {
+                "lineNo": 1,
+                "itemId": "019a0000-0000-7000-8000-0000000000c1",
+                "qty": 1000,
+                "lineTotal": 435000
+              },
+              "returned": {
+                "qty": 1000,
+                "refund": 435000
+              }
+            },
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": [],
+        "approval": null
+      },
+      "error": "return_over_quantity"
+    },
+    {
+      "name": "without a receipt a price is needed",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "none",
+          "ref": "023956 (old system)"
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": null,
+            "price": null,
+            "suggested": null
+          }
+        ],
+        "needs": ["no_receipt_return"],
+        "approval": {
+          "approvedBy": "019a0000-0000-7000-8000-0000000000f3",
+          "reason": "before_go_live",
+          "note": null,
+          "at": "2026-11-12T05:00:00.000Z"
+        }
+      },
+      "error": "price_required"
+    },
+    {
+      "name": "a needed approval missing",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "none",
+          "ref": "023956 (old system)"
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": null,
+            "price": 400000,
+            "suggested": 420000
+          }
+        ],
+        "needs": ["no_receipt_return"],
+        "approval": null
+      },
+      "error": "return_approval_pending"
+    },
+    {
+      "name": "an approval for other needs a note",
+      "input": {
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000f1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [],
+          "billDiscount": 0,
+          "billApproval": null
+        },
+        "source": {
+          "kind": "none",
+          "ref": "023956 (old system)"
+        },
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "reason": "wrong_part",
+            "note": null,
+            "condition": "resellable",
+            "original": null,
+            "price": 400000,
+            "suggested": 420000
+          }
+        ],
+        "needs": ["no_receipt_return"],
+        "approval": {
+          "approvedBy": "019a0000-0000-7000-8000-0000000000f3",
+          "reason": "other",
+          "note": null,
+          "at": "2026-11-12T05:00:00.000Z"
+        }
+      },
+      "error": "note_required"
+    }
+  ]
+}

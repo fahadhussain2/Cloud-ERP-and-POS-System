@@ -1,0 +1,194 @@
+{
+  "description": "How much of a sold line may come back, and its refund (POS-12, PRD W6 steps 2 and 4, D-005, posting rules §4.2). A line is the original as sold: its quantity (thousandths, above 0) and its lineTotal (what the customer paid for it, after its share of the bill discount). `returned` is what earlier returns of that line took (quantity and refund, both positive). Returnable = sold − returned, worth lineTotal − refunds so far. The refund for k of the r units left is round(value × k / r), half away from zero; all that is left refunds exactly what is left, so a line returned in parts adds up to what was paid. Errors: invalid_quantity (0 or less), return_over_quantity (more than is left).",
+  "cases": [
+    {
+      "name": "the whole line comes back: what was paid",
+      "input": {
+        "line": {
+          "lineNo": 1,
+          "itemId": "019a0000-0000-7000-8000-0000000000c1",
+          "qty": 1000,
+          "lineTotal": 435000
+        },
+        "returned": {
+          "qty": 0,
+          "refund": 0
+        },
+        "qty": 1000
+      },
+      "expected": {
+        "returnable": {
+          "qty": 1000,
+          "value": 435000
+        },
+        "refund": 435000
+      }
+    },
+    {
+      "name": "2 of 3 filters (Rs 10,000 for 3): Rs 6,666.67",
+      "input": {
+        "line": {
+          "lineNo": 2,
+          "itemId": "019a0000-0000-7000-8000-0000000000c3",
+          "qty": 3000,
+          "lineTotal": 1000000
+        },
+        "returned": {
+          "qty": 0,
+          "refund": 0
+        },
+        "qty": 2000
+      },
+      "expected": {
+        "returnable": {
+          "qty": 3000,
+          "value": 1000000
+        },
+        "refund": 666667
+      }
+    },
+    {
+      "name": "then the last one: Rs 3,333.33, so the parts add up to Rs 10,000",
+      "input": {
+        "line": {
+          "lineNo": 2,
+          "itemId": "019a0000-0000-7000-8000-0000000000c3",
+          "qty": 3000,
+          "lineTotal": 1000000
+        },
+        "returned": {
+          "qty": 2000,
+          "refund": 666667
+        },
+        "qty": 1000
+      },
+      "expected": {
+        "returnable": {
+          "qty": 1000,
+          "value": 333333
+        },
+        "refund": 333333
+      }
+    },
+    {
+      "name": "1 of 3, then 1 of the 2 left: Rs 6,666.67 / 2 rounds half away from zero",
+      "input": {
+        "line": {
+          "lineNo": 2,
+          "itemId": "019a0000-0000-7000-8000-0000000000c3",
+          "qty": 3000,
+          "lineTotal": 1000000
+        },
+        "returned": {
+          "qty": 1000,
+          "refund": 333333
+        },
+        "qty": 1000
+      },
+      "expected": {
+        "returnable": {
+          "qty": 2000,
+          "value": 666667
+        },
+        "refund": 333334
+      }
+    },
+    {
+      "name": "a line that took a share of the bill discount refunds its net, not its price",
+      "input": {
+        "line": {
+          "lineNo": 3,
+          "itemId": "019a0000-0000-7000-8000-0000000000c2",
+          "qty": 2000,
+          "lineTotal": 869999
+        },
+        "returned": {
+          "qty": 0,
+          "refund": 0
+        },
+        "qty": 1000
+      },
+      "expected": {
+        "returnable": {
+          "qty": 2000,
+          "value": 869999
+        },
+        "refund": 435000
+      }
+    },
+    {
+      "name": "half a metre of 1.5 m of hose (Rs 499.50)",
+      "input": {
+        "line": {
+          "lineNo": 4,
+          "itemId": "019a0000-0000-7000-8000-0000000000c4",
+          "qty": 1500,
+          "lineTotal": 49950
+        },
+        "returned": {
+          "qty": 0,
+          "refund": 0
+        },
+        "qty": 500
+      },
+      "expected": {
+        "returnable": {
+          "qty": 1500,
+          "value": 49950
+        },
+        "refund": 16650
+      }
+    },
+    {
+      "name": "more than is left is refused",
+      "input": {
+        "line": {
+          "lineNo": 2,
+          "itemId": "019a0000-0000-7000-8000-0000000000c3",
+          "qty": 3000,
+          "lineTotal": 1000000
+        },
+        "returned": {
+          "qty": 1000,
+          "refund": 333333
+        },
+        "qty": 2500
+      },
+      "error": "return_over_quantity"
+    },
+    {
+      "name": "a line already fully returned is refused",
+      "input": {
+        "line": {
+          "lineNo": 1,
+          "itemId": "019a0000-0000-7000-8000-0000000000c1",
+          "qty": 1000,
+          "lineTotal": 435000
+        },
+        "returned": {
+          "qty": 1000,
+          "refund": 435000
+        },
+        "qty": 1000
+      },
+      "error": "return_over_quantity"
+    },
+    {
+      "name": "nothing is not a return",
+      "input": {
+        "line": {
+          "lineNo": 1,
+          "itemId": "019a0000-0000-7000-8000-0000000000c1",
+          "qty": 1000,
+          "lineTotal": 435000
+        },
+        "returned": {
+          "qty": 0,
+          "refund": 0
+        },
+        "qty": 0
+      },
+      "error": "invalid_quantity"
+    }
+  ]
+}

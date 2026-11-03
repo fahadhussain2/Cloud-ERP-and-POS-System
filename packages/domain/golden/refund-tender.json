@@ -1,0 +1,354 @@
+{
+  "description": "Settling a bill with returned lines (POS spec §12, §19, POS-17, PRD W7, D-007, owner answer 1 to W1-13): the same rules as a sale when the total is above 0; one refund row when it is below 0 (cash at the desk, on account for a customer with a customer account, or a transfer to a bank or wallet method with its reference); no row at all for an even exchange. Delux's methods, Rs 1 rounding. A cash refund records no cash received or change; its cash due is negative (a payout at the desk). The first problem, for a refund: no_payment, refund_one_method, unknown_method, refund_needs_account, amount_not_rounded, reference_required, reference_too_long, sum_mismatch, cash_received_on_refund; for an even exchange: even_takes_no_payment. `settlement` is settleTender's result when there is no problem.",
+  "cases": [
+    {
+      "name": "a refund in cash at the desk",
+      "input": {
+        "total": -435000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": -435000,
+            "reference": null
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": null,
+        "settlement": {
+          "payments": [
+            {
+              "method": "cash",
+              "amount": -435000,
+              "cashReceived": null,
+              "changeDue": null,
+              "reference": null
+            }
+          ],
+          "cashDue": -435000,
+          "change": 0
+        }
+      }
+    },
+    {
+      "name": "a refund to the customer's account",
+      "input": {
+        "total": -435000,
+        "payments": [
+          {
+            "method": "on_account",
+            "amount": -435000,
+            "reference": null
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": true
+      },
+      "expected": {
+        "problem": null,
+        "settlement": {
+          "payments": [
+            {
+              "method": "on_account",
+              "amount": -435000,
+              "cashReceived": null,
+              "changeDue": null,
+              "reference": null
+            }
+          ],
+          "cashDue": 0,
+          "change": 0
+        }
+      }
+    },
+    {
+      "name": "to account without a customer account",
+      "input": {
+        "total": -435000,
+        "payments": [
+          {
+            "method": "on_account",
+            "amount": -435000,
+            "reference": null
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": "refund_needs_account",
+        "settlement": null
+      }
+    },
+    {
+      "name": "a refund by Raast with its reference",
+      "input": {
+        "total": -435000,
+        "payments": [
+          {
+            "method": "raast",
+            "amount": -435000,
+            "reference": " RAAST-7781 "
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": null,
+        "settlement": {
+          "payments": [
+            {
+              "method": "raast",
+              "amount": -435000,
+              "cashReceived": null,
+              "changeDue": null,
+              "reference": "RAAST-7781"
+            }
+          ],
+          "cashDue": 0,
+          "change": 0
+        }
+      }
+    },
+    {
+      "name": "by Raast without a reference",
+      "input": {
+        "total": -435000,
+        "payments": [
+          {
+            "method": "raast",
+            "amount": -435000,
+            "reference": null
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": "reference_required",
+        "settlement": null
+      }
+    },
+    {
+      "name": "no refund row",
+      "input": {
+        "total": -435000,
+        "payments": [],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": "no_payment",
+        "settlement": null
+      }
+    },
+    {
+      "name": "a refund split two ways is refused",
+      "input": {
+        "total": -435000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": -235000,
+            "reference": null
+          },
+          {
+            "method": "raast",
+            "amount": -200000,
+            "reference": "R1"
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": "refund_one_method",
+        "settlement": null
+      }
+    },
+    {
+      "name": "an unknown method",
+      "input": {
+        "total": -435000,
+        "payments": [
+          {
+            "method": "cheque",
+            "amount": -435000,
+            "reference": null
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": "unknown_method",
+        "settlement": null
+      }
+    },
+    {
+      "name": "a refund that isn't the total",
+      "input": {
+        "total": -435000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": -400000,
+            "reference": null
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": "sum_mismatch",
+        "settlement": null
+      }
+    },
+    {
+      "name": "a refund with a positive amount",
+      "input": {
+        "total": -435000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 435000,
+            "reference": null
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": "sum_mismatch",
+        "settlement": null
+      }
+    },
+    {
+      "name": "a refund in paisa",
+      "input": {
+        "total": -435050,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": -435050,
+            "reference": null
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": "amount_not_rounded",
+        "settlement": null
+      }
+    },
+    {
+      "name": "cash received on a refund",
+      "input": {
+        "total": -435000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": -435000,
+            "reference": null
+          }
+        ],
+        "cashReceived": 500000,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": "cash_received_on_refund",
+        "settlement": null
+      }
+    },
+    {
+      "name": "an even exchange takes no payment",
+      "input": {
+        "total": 0,
+        "payments": [],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": null,
+        "settlement": {
+          "payments": [],
+          "cashDue": 0,
+          "change": 0
+        }
+      }
+    },
+    {
+      "name": "an even exchange with a payment row",
+      "input": {
+        "total": 0,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 0,
+            "reference": null
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": "even_takes_no_payment",
+        "settlement": null
+      }
+    },
+    {
+      "name": "the difference to pay, as a sale: cash with change",
+      "input": {
+        "total": 45000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 45000,
+            "reference": null
+          }
+        ],
+        "cashReceived": 50000,
+        "hasCustomerAccount": false
+      },
+      "expected": {
+        "problem": null,
+        "settlement": {
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 45000,
+              "cashReceived": 50000,
+              "changeDue": 5000,
+              "reference": null
+            }
+          ],
+          "cashDue": 45000,
+          "change": 5000
+        }
+      }
+    },
+    {
+      "name": "the difference to pay on account needs a credit customer, as a sale",
+      "input": {
+        "total": 45000,
+        "payments": [
+          {
+            "method": "on_account",
+            "amount": 45000,
+            "reference": null
+          }
+        ],
+        "cashReceived": null,
+        "hasCustomerAccount": true
+      },
+      "expected": {
+        "problem": "on_account_needs_customer",
+        "settlement": null
+      }
+    }
+  ]
+}
