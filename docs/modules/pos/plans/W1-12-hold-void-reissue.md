@@ -71,6 +71,7 @@
 - **One exception for cash on a voided bill:** a void after the handover and cash taken for a voided bill are both `cash_received_for_void`, told apart by `order`, so `void_not_permitted` has no `after_handover` cause. Either way the cash is in the drawer for a voided bill (D-059).
 - **`same_day` behaves as `same_day_before_handover`** in `canVoid` (owner answer 1): no window allows a void after the handover.
 - **The reversal** reads the sale's stored posting: each line comes back at its own unit cost through `averageAfterReceipt`; a line that left with no cost comes back at 0 and leaves the average as it is; a customer entry is reversed on its own due date; the sale's `no_cost` and `negative_stock` aren't raised again.
+- **Hold is built** (`packages/domain/src/hold.ts`, `apps/pos/src/db/held.ts`, `screens/HoldDialogs.tsx`): the worker re-runs `checkHold` inside the hold's transaction, so the cap and the permission hold whatever the screen thought. Expired bills are swept whenever someone's list is read (at unlock, on `Shift+F8`) and before a hold counts the cap, rather than on a minute timer: a held bill is only seen through the list. The key bar's recall shows the count (*Recall (2)*). Local schema 10 also adds the index the void needs (`$.saleId` of `V`), so the schema changes once in this task.
 - **The reissue** takes the new lines' ids from the counter (`reissueBill`); an item no longer in the local catalog allows fractions only if its quantity has one.
 
 ## Verify

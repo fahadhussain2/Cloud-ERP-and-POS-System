@@ -171,7 +171,10 @@
     "reprint": "Reprint",
     "customer": "Customer",
     "desk": "Cash desk",
-    "sell": "Sell"
+    "sell": "Sell",
+    "hold": "Hold",
+    "recall": "Recall",
+    "recallCount": "Recall ({{count}})"
   },
   "dialog": {
     "cancel": "Cancel"
@@ -645,5 +648,38 @@
     "note_too_long": "The note is at most 200 characters.",
     "own_variance": "The session’s own cashier can’t acknowledge its variance.",
     "not_acknowledger": "That person can’t acknowledge a variance."
+  },
+  "hold": {
+    "title": "Hold this bill",
+    "help_one": "The bill with its {{count}} line is set aside on this counter, as it is now. Recall it with Shift+F8 before the end of the day.",
+    "help_other": "The bill with its {{count}} lines is set aside on this counter, as it is now. Recall it with Shift+F8 before the end of the day.",
+    "label": "Label (optional)",
+    "labelHint": "e.g. Blue Suzuki, waiting for old part",
+    "action": "Hold bill",
+    "done": "Bill held: {{name}} · Shift+F8 to recall",
+    "walkin": "Walk-in",
+    "empty": "The bill is empty: there is nothing to hold.",
+    "notPermitted": "Your role can't hold bills.",
+    "failed": "The bill couldn't be held or recalled. Try again; if it keeps happening, call the manager.",
+    "error": {
+      "too_many": "20 bills are held on this counter already. Recall or clear one first.",
+      "label_too_long": "The label can be at most 40 characters.",
+      "empty_bill": "The bill is empty: there is nothing to hold.",
+      "not_permitted": "Your role can't hold bills.",
+      "not_found": "That held bill isn't on this counter any more.",
+      "bill_open": "Hold or finish the open bill first."
+    }
+  },
+  "recall": {
+    "title": "Recall a held bill",
+    "help": "Your bills held on this counter today, newest first. ↑ ↓ and Enter recall; Del clears one.",
+    "action": "Recall",
+    "swap": "Your open bill has lines. Enter again holds it and recalls {{name}}.",
+    "swapAction": "Hold mine and recall",
+    "confirmClear": "Clear {{name}}? Its lines are removed for good. Del or Enter again to clear.",
+    "clear": "Clear held bill",
+    "empty": "You have no bills held on this counter.",
+    "items_one": "{{count}} line",
+    "items_other": "{{count}} lines"
   }
 }

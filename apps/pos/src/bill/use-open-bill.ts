@@ -72,8 +72,15 @@ export function useOpenBill(counter: BillCounter, sellerId: string) {
     await persist(() => counter.clearOpenBill(sellerId));
   }, [counter, sellerId, tiers, persist]);
 
+  /** Shows a bill the database has already saved as the person's open bill (a recalled held bill, W1-12). */
+  const load = useCallback((ob: OpenBill) => {
+    current.current = ob;
+    setOpenBill(ob);
+    setSaveFailed(false);
+  }, []);
+
   /** The bill right now, including a change made in this same event. */
   const get = useCallback(() => current.current, []);
 
-  return { openBill, tiers, change, clear, get, saveFailed };
+  return { openBill, tiers, change, clear, load, get, saveFailed };
 }

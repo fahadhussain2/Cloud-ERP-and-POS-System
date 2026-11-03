@@ -49,7 +49,7 @@ import {
   type KeyHint,
   type MoneyFormat,
 } from '@erp/ui';
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { setBillOpen } from '../bill/bill-open';
@@ -58,6 +58,7 @@ import { useOpenBill, type BillCounter } from '../bill/use-open-bill';
 import type { Counter } from '../counter';
 import type { CheckoutSettings, DocumentSummary, PaymentMethodRow } from '../db/checkout';
 import type { CounterCustomer } from '../db/customers';
+import type { HeldBill } from '../db/held';
 import type { PrintJob } from '../print/print-job';
 import type { BillItem, SearchResult, Vehicle } from '../search/search-index';
 import { checkApprover, checkCreditApprover } from '../unlock/approve';
@@ -66,6 +67,7 @@ import { ApprovalDialog, ConfirmDialog, EntryDialog, TierDialog, type ApprovalAt
 import { BillPanel } from './BillPanel';
 import { CustomerDialog, customerStrip, type CustomerChoice } from './CustomerDialog';
 import { CashDialog, MethodDialog, OnAccountDialog, SplitDialog } from './PaymentDialogs';
+import { HoldDialog, RecallDialog } from './HoldDialogs';
 import { PaymentPad } from './PaymentPad';
 import { CLIENT_VERSION } from '../version';
 import { ReprintDialog } from './ReprintDialog';
@@ -92,6 +94,8 @@ type DialogState =
   | { kind: 'method'; method: PaymentMethodRow }
   | { kind: 'split' }
   | { kind: 'reprint' }
+  | { kind: 'hold' }
+  | { kind: 'recall' }
   | { kind: 'customer' }
   | { kind: 'onAccount'; figures: CreditView }
   | { kind: 'creditApproval'; tender: Tender; needs: CreditNeed[]; overLimitBy: Money; overCapBy: Money };
@@ -116,6 +120,10 @@ export type CounterScreenCounter = BillCounter &
     | 'print'
     | 'customers'
     | 'creditFigures'
+    | 'holdBill'
+    | 'heldBills'
+    | 'recallBill'
+    | 'clearHeld'
   >;
 
 const sameTarget = (a: ApprovalTarget, b: ApprovalTarget) =>
@@ -162,7 +170,9 @@ export function CounterScreen({
     shown.current = { results, selected };
   }, [results, selected]);
 
-  const { openBill, tiers, change, clear, get, saveFailed } = useOpenBill(counter, user.id);
+  const { openBill, tiers, change, clear, load, get, saveFailed } = useOpenBill(counter, user.id);
+  /** How many bills this person has held here (POS spec §17), shown on the recall key. */
+  const [heldCount, setHeldCount] = useState(0);
   const [zone, setZone] = useState<Zone>('search');
   const [lineSel, setLineSel] = useState(0);
   const [dialog, setDialog] = useState<DialogState | null>(null);
@@ -215,6 +225,19 @@ export function CounterScreen({
       stop = true;
     };
   }, [counter]);
+
+  // The person's held bills on this counter; reading them sweeps the expired ones (POS spec §17).
+  const heldList = useCallback(() => counter.heldBills(user.id), [counter, user.id]);
+  const countHeld = async () => setHeldCount((await heldList()).length);
+  useEffect(() => {
+    let stop = false;
+    void counter.heldBills(user.id).then((list) => {
+      if (!stop) setHeldCount(list.length);
+    });
+    return () => {
+      stop = true;
+    };
+  }, [counter, user.id]);
 
   // Who the bill is for, and whether it may go on account (POS spec §15).
   const billCustomer = openBill?.customer ?? null;
@@ -602,6 +625,53 @@ export function CounterScreen({
     setDialog({ kind: 'onAccount', figures: await counter.creditFigures(id, offline) });
   };
   const openClear = () => (get()?.bill.lines.length ?? 0) > 0 && setDialog({ kind: 'clear' });
+
+  /** Hold (`F8`, POS spec §17): only a bill with lines, by someone who may hold. */
+  const openHold = () => {
+    if (!can(sellerGrants, 'pos.sale.hold', branchId)) return setMessage(t('hold.notPermitted'));
+    if ((get()?.bill.lines.length ?? 0) === 0) return setMessage(t('hold.empty'));
+    setDialog({ kind: 'hold' });
+  };
+  const holdNow = async (label: string | null): Promise<string | null> => {
+    try {
+      const held = await counter.holdBill({ userId: user.id, label });
+      await clear();
+      setDialog(null);
+      setMessage(null);
+      setNotice(t('hold.done', { name: held.label ?? held.bill.customer?.name ?? t('hold.walkin') }));
+      await countHeld();
+      focusSearch();
+      return null;
+    } catch (err) {
+      if (err instanceof DomainError) return holdErrorKey(err.code);
+      void counter.log('bill.hold_failed', { sellerId: user.id, error: String(err) });
+      return 'hold.failed';
+    }
+  };
+  const holdErrorKey = (code: DomainErrorCode) =>
+    i18n.exists(`hold.error.${code}`) ? `hold.error.${code}` : errorKey(code);
+  /** Recall (`Shift+F8`): one of the person's held bills becomes the open bill; a bill with lines is held first. */
+  const recallHeld = async (held: HeldBill, swap: boolean): Promise<string | null> => {
+    try {
+      load(await counter.recallBill({ id: held.id, userId: user.id, swap: swap ? { label: null } : null }));
+      setDialog(null);
+      setMessage(null);
+      setNotice(null);
+      await countHeld();
+      focusSearch();
+      return null;
+    } catch (err) {
+      if (err instanceof DomainError) return holdErrorKey(err.code);
+      void counter.log('bill.recall_failed', { sellerId: user.id, error: String(err) });
+      return 'hold.failed';
+    }
+  };
+  const clearHeldBill = async (held: HeldBill): Promise<string | null> => {
+    await counter.clearHeld(held.id, user.id);
+    await countHeld();
+    return null;
+  };
+  const openRecall = () => setDialog({ kind: 'recall' });
   const ignore = () => {};
   // F1, F3, F5 never reach the browser on the counter (no help page, find bar or reload mid-bill).
   useShortcuts(
@@ -614,6 +684,8 @@ export function CounterScreen({
       F9: () => void openPay('cash'),
       'Shift+F9': () => void openPay('split'),
       'Alt+P': () => setDialog({ kind: 'reprint' }),
+      F8: openHold,
+      'Shift+F8': openRecall,
       F1: ignore,
       F3: ignore,
       F5: ignore,
@@ -759,6 +831,12 @@ export function CounterScreen({
     { keys: 'F9', label: t('keys.pay'), run: () => void openPay('cash') },
     { keys: 'F4', label: t('keys.customer'), run: () => void openCustomer() },
     { keys: 'F7', label: t('keys.tier'), run: openTier },
+    { keys: 'F8', label: t('keys.hold'), run: openHold },
+    {
+      keys: 'Shift+F8',
+      label: heldCount > 0 ? t('keys.recallCount', { count: heldCount }) : t('keys.recall'),
+      run: openRecall,
+    },
     { keys: 'Alt+C', label: t('keys.clearBill'), run: openClear },
     { keys: 'Alt+P', label: t('keys.reprint'), run: () => setDialog({ kind: 'reprint' }) },
     { keys: 'Alt+L', label: t('keys.lock'), run: onLock },
@@ -1072,6 +1150,20 @@ export function CounterScreen({
           money={money}
           creditCustomer={onAccountBlocked === null}
           onPay={pay}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'hold' && (
+        <HoldDialog lineCount={lines.length} onHold={holdNow} onClose={() => setDialog(null)} />
+      )}
+      {dialog?.kind === 'recall' && (
+        <RecallDialog
+          list={heldList}
+          billHasLines={lines.length > 0}
+          money={money}
+          timeZone={tenantZone()}
+          onRecall={recallHeld}
+          onClear={clearHeldBill}
           onClose={() => setDialog(null)}
         />
       )}

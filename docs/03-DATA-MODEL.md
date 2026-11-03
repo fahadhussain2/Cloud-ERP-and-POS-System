@@ -365,13 +365,14 @@ SQLite WASM in a dedicated worker, on OPFS (`opfs-sahpool`), changed only by num
 
 **Built in W1-11 (local schema 9):** `suppliers`, `supplier_balances` (keyed by `party_id`), `expense_categories` and `bank_accounts` with exactly the pulled columns (`CASH_DESK_COLUMNS`), pulled on a cash desk only; `cash_sessions` gains `counted_cash`, `variance`, `left_in_drawer`; collections (`R`) and cash movements (`M`) in `local_documents` and the outbox like handovers, with an index on the session id of `H`, `R` and `M` for the expected cash.
 
+**Built in W1-12 (local schema 10):** `held_bills`: `id` (UUIDv7), `user_id`, `held_at`, `business_date` (of `held_at`, with the 04:00 cutoff), `label` (optional, 40 characters), `bill` (the person's `open_bills.bill` as it was). Holding moves the open bill here and recalling moves it back, each in one transaction; recalling over a bill with lines holds that one first (the swap). Each person sees only their own; a held bill is deleted once its business day is over, the count written to `diagnostic_log`. Never pushed (POS spec §17). An index on the void's sale id for family `V` in `local_documents`.
+
 The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` in IndexedDB (`erp-pos-keys`), and the device token is kept only in memory.
 
 **Planned (later tasks):**
 
 | Table | Purpose |
 |---|---|
-| `held_bills` | Parked bills (expire at day close) |
 | `pending_overlays` | Derived: local unsynced effects on stock and customer balances, overlaid on the server snapshots |
 | Stock snapshots | Stock balances per item and location (W1-08) |
 

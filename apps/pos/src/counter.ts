@@ -23,6 +23,7 @@ import type {
   DeskState,
   HandoverRequest,
 } from './db/desk';
+import type { HeldBill } from './db/held';
 import type { LocalHealth, QuarantinedRow } from './db/outbox';
 import type { DeviceInfo, PinEvent, TenantSettings } from './db/repo';
 import type { EnrollResult } from './device/session';
@@ -103,6 +104,13 @@ export interface Counter {
   openBill(userId: string): Promise<OpenBill | null>;
   saveOpenBill(userId: string, bill: OpenBill): Promise<void>;
   clearOpenBill(userId: string): Promise<void>;
+  /** Holds the person's open bill and leaves an empty one (POS spec §17); refused with checkHold's problem. */
+  holdBill(req: { userId: string; label: string | null }): Promise<HeldBill>;
+  /** The person's held bills, newest first; the expired ones are swept first. */
+  heldBills(userId: string): Promise<HeldBill[]>;
+  /** Makes a held bill the open bill again; `swap` holds the open bill first when it has lines. */
+  recallBill(req: { id: string; userId: string; swap: { label: string | null } | null }): Promise<OpenBill>;
+  clearHeld(id: string, userId: string): Promise<boolean>;
   /** Rounding, business day, payment methods and the print profile; null before the first pull (POS spec §12). */
   checkout(): Promise<CheckoutSettings | null>;
   /** Finalizes the person's open bill in one local transaction, then signs it (POS spec §12). */

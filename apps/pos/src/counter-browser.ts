@@ -188,6 +188,15 @@ export function browserCounter(): Counter {
     openBill: (userId) => db.loadOpenBill(userId),
     saveOpenBill: (userId, bill) => db.saveOpenBill(userId, bill),
     clearOpenBill: (userId) => db.clearOpenBill(userId),
+    holdBill: (req) => db.holdBill({ ...req, id: uuidv7(), atMs: Date.now() }),
+    heldBills: (userId) => db.heldBills(userId),
+    recallBill: (req) =>
+      db.recallBill({
+        id: req.id,
+        userId: req.userId,
+        holdCurrent: req.swap && { id: uuidv7(), label: req.swap.label, atMs: Date.now() },
+      }),
+    clearHeld: (id, userId) => db.clearHeld(id, userId),
     checkout: () => db.checkoutSettings(),
     finalize: async (req) => {
       const r = await db.finalizeSale(req);

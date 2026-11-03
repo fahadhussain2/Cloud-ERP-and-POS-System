@@ -308,6 +308,31 @@ describe('migrations', () => {
       expect(columns(table)).toEqual([...Object.keys(CASH_DESK_COLUMNS[table]), 'row_version', 'deleted_at']);
   });
 
+  it("schema 10 adds held bills (W1-12), and keeps a W1-11 counter's open bill, outbox and refused rows", () => {
+    const db = fresh();
+    migrate(db, MIGRATIONS.slice(0, 9));
+    db.exec(`INSERT INTO open_bills (user_id, bill, updated_at) VALUES ('sara', '{"version":1}', 'now')`);
+    db.exec(
+      `INSERT INTO local_documents (id, family, seq, number, kind, business_date, payload, created_at)
+       VALUES ('d1', 'S', 1, 'C03-S000001', 'sale', '2026-11-03', '{}', 'now'),
+              ('d2', 'S', 2, 'C03-S000002', 'sale', '2026-11-03', '{}', 'now')`,
+    );
+    db.exec(
+      `INSERT INTO outbox (id, family, seq, payload, signature, status, attempts, created_at)
+       VALUES ('d1', 'S', 1, '{}', 'sig', 'quarantined', 1, 'now'), ('d2', 'S', 2, '{}', null, 'pending', 0, 'now')`,
+    );
+    migrate(db);
+    expect(LATEST_VERSION).toBeGreaterThanOrEqual(10);
+    expect(db.selectValue('SELECT count(*) FROM open_bills')).toBe(1);
+    expect(db.selectObjects('SELECT id, status FROM outbox ORDER BY id')).toEqual([
+      { id: 'd1', status: 'quarantined' },
+      { id: 'd2', status: 'pending' },
+    ]);
+    const columns = db.selectObjects('PRAGMA table_info(held_bills)').map((r) => String(r['name']));
+    expect(columns).toEqual(['id', 'user_id', 'held_at', 'business_date', 'label', 'bill']);
+    expect(db.selectValue('SELECT count(*) FROM held_bills')).toBe(0);
+  });
+
   it('roll back a migration that fails and leave the previous schema', () => {
     const db = fresh();
     const v1 = MIGRATIONS.slice(0, 1);

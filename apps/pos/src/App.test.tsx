@@ -11,12 +11,14 @@ import { App } from './App';
 import type { Counter, CounterHealth } from './counter';
 import type { CheckoutSettings, PaymentMethodRow } from './db/checkout';
 import type { CounterCustomer } from './db/customers';
+import type { HeldBill } from './db/held';
 import type { DeviceInfo } from './db/repo';
 import { i18n } from './i18n';
 import type { PrintJob } from './print/print-job';
 import en from './locales/en.json';
 import {
   buildSaleDocument,
+  DomainError,
   ROLE_TEMPLATES,
   type CreditView,
   type Money,
@@ -137,6 +139,10 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
     openBill: () => Promise.resolve(null),
     saveOpenBill: () => Promise.resolve(),
     clearOpenBill: () => Promise.resolve(),
+    holdBill: () => Promise.reject(new Error('no bill')),
+    heldBills: () => Promise.resolve([]),
+    recallBill: () => Promise.reject(new Error('no held bill')),
+    clearHeld: () => Promise.resolve(false),
     recordPinEvent: (e) => {
       calls.push(`pinEvent ${e.kind} ${e.userId} ${e.byUserId ?? '-'}`);
       return Promise.resolve();
@@ -570,6 +576,7 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
 
   const billCounter = (over: Partial<Counter> = {}) => {
     const bills = new Map<string, OpenBill>();
+    const held: HeldBill[] = [];
     const f = fakeCounter({
       staff: () => Promise.resolve([staff(), manager]),
       grants: (id) => Promise.resolve([role(id === 'm1' ? 'manager' : 'salesman')]),
@@ -608,9 +615,45 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
         bills.delete(u);
         return Promise.resolve();
       },
+      // Held bills as the worker keeps them (db/held.ts): each person's own, newest first.
+      holdBill: ({ userId, label }) => {
+        const bill = bills.get(userId);
+        if (!bill || bill.bill.lines.length === 0)
+          return Promise.reject(new DomainError('empty_bill', 'nothing to hold'));
+        if (held.length >= 20) return Promise.reject(new DomainError('too_many', 'too many'));
+        const h: HeldBill = {
+          id: `held-${held.length + 1}-${Date.now()}`,
+          userId,
+          heldAt: new Date().toISOString(),
+          businessDate: '2026-11-03',
+          label: label?.trim() || null,
+          bill,
+        };
+        held.unshift(h);
+        bills.delete(userId);
+        return Promise.resolve(h);
+      },
+      heldBills: (userId) => Promise.resolve(held.filter((h) => h.userId === userId)),
+      recallBill: ({ id, userId, swap }) => {
+        const i = held.findIndex((h) => h.id === id && h.userId === userId);
+        if (i < 0) return Promise.reject(new DomainError('not_found', 'gone'));
+        const [h] = held.splice(i, 1);
+        const open = bills.get(userId);
+        if (open && open.bill.lines.length > 0) {
+          if (!swap) return Promise.reject(new DomainError('bill_open', 'open bill'));
+          held.unshift({ ...h!, id: `held-swap-${Date.now()}`, label: swap.label, bill: open });
+        }
+        bills.set(userId, h!.bill);
+        return Promise.resolve(h!.bill);
+      },
+      clearHeld: (id, userId) => {
+        const i = held.findIndex((h) => h.id === id && h.userId === userId);
+        if (i >= 0) held.splice(i, 1);
+        return Promise.resolve(i >= 0);
+      },
       ...over,
     });
-    return { ...f, bills };
+    return { ...f, bills, held };
   };
 
   const unlockAs = async (name: RegExp, pin: string) => {
@@ -816,6 +859,80 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
     expect(await screen.findByText(en.bill.empty)).toBeDefined();
     expect(f.bills.has('u1')).toBe(false);
     expect(isBillOpen()).toBe(false);
+  });
+
+  describe('hold and recall (POS-08, POS spec §17, W1-12)', () => {
+    const plainText = (el: Element | null) => plain(el?.textContent);
+    const recallList = () => screen.getByRole('listbox', { name: en.recall.title });
+
+    it('F8 holds the bill with a label and leaves an empty one; Shift+F8 and Enter bring it back as it was', async () => {
+      const f = billCounter();
+      show(f.counter);
+      const box = await unlockAs(/Asif Khan/, '4831');
+      await add(box, '2*brpd');
+      key('F8');
+      fireEvent.change(await screen.findByLabelText(en.hold.label), { target: { value: '  Blue Suzuki ' } });
+      fireEvent.click(action(en.hold.action));
+      expect(await screen.findByText(en.bill.empty)).toBeDefined();
+      expect(screen.getByText(/Bill held: Blue Suzuki/)).toBeDefined();
+      expect(f.held.map((h) => h.label)).toEqual(['Blue Suzuki']);
+      expect(screen.getByRole('button', { name: /Recall \(1\)/ })).toBeDefined();
+      key('F8', { shiftKey: true });
+      await waitFor(() => expect(plainText(recallList())).toContain('Blue Suzuki'));
+      expect(plainText(recallList())).toContain('Rs 9,000');
+      key('Enter');
+      await waitFor(() => expect(total()).toBe('Rs 9,000'));
+      expect(f.held).toEqual([]);
+      expect(f.bills.get('u1')?.bill.lines).toHaveLength(1);
+    });
+
+    it('an empty bill is not held, and says why', async () => {
+      const f = billCounter();
+      show(f.counter);
+      await unlockAs(/Asif Khan/, '4831');
+      await screen.findByText(en.bill.empty);
+      key('F8');
+      expect(await screen.findByText(en.hold.empty)).toBeDefined();
+      expect(screen.queryByLabelText(en.hold.label)).toBeNull();
+    });
+
+    it('recalling over a bill with lines asks, then swaps the two', async () => {
+      const f = billCounter();
+      show(f.counter);
+      const box = await unlockAs(/Asif Khan/, '4831');
+      await add(box, 'brpd');
+      key('F8');
+      await screen.findByLabelText(en.hold.label);
+      fireEvent.click(action(en.hold.action));
+      await screen.findByText(en.bill.empty);
+      await add(box, 'hose');
+      key('F8', { shiftKey: true });
+      await waitFor(() => expect(plainText(recallList())).toContain('Rs 4,500'));
+      key('Enter');
+      expect(await screen.findByText(/Enter again holds it/)).toBeDefined();
+      expect(total()).toBe('Rs 200');
+      key('Enter');
+      await waitFor(() => expect(total()).toBe('Rs 4,500'));
+      expect(f.held.map((h) => h.bill.bill.lines[0]?.unitPrice)).toEqual([20000]);
+    });
+
+    it('Del clears a held bill after a second Del', async () => {
+      const f = billCounter();
+      show(f.counter);
+      const box = await unlockAs(/Asif Khan/, '4831');
+      await add(box, 'brpd');
+      key('F8');
+      await screen.findByLabelText(en.hold.label);
+      fireEvent.click(action(en.hold.action));
+      await screen.findByText(en.bill.empty);
+      key('F8', { shiftKey: true });
+      await waitFor(() => expect(plainText(recallList())).toContain('Rs 4,500'));
+      key('Delete');
+      expect(await screen.findByText(/Its lines are removed for good/)).toBeDefined();
+      key('Delete');
+      expect(await screen.findByText(en.recall.empty)).toBeDefined();
+      expect(f.held).toEqual([]);
+    });
   });
 
   it('the key bar follows the zone, and each hint does what its key does', async () => {

@@ -142,6 +142,14 @@ export {
   type QueueEntry,
   type QueueGroup,
 } from './handover';
+export {
+  checkHold,
+  heldExpired,
+  MAX_HELD_BILLS,
+  MAX_HOLD_LABEL_LENGTH,
+  type HoldCheck,
+  type HoldProblem,
+} from './hold';
 export { normalizeIdentifier } from './identifier';
 export { add, money, mulBp, mulQty, negate, parseMoney, sub, sum, type Money } from './money';
 export {
