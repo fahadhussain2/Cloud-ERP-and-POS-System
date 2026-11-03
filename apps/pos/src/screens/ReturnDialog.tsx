@@ -349,18 +349,51 @@ export function ReturnDialog({
     }
   };
 
-  if (state.step === 'find')
+  // One dialog for every step: swapping dialogs would move the focus out of the new one, which closes it.
+  const view =
+    state.step === 'find'
+      ? {
+          title: t('return.title'),
+          description: t('return.help'),
+          actionLabel: t('return.open'),
+          onSubmit: () => {
+            const b = found[selected];
+            if (b) void openBill(b);
+          },
+          body: findBody(),
+        }
+      : state.step === 'lines'
+        ? {
+            title: t('return.linesTitle', { number: state.bill.number }),
+            description: t('return.linesHelp', { date: date(state.bill.createdAt) }),
+            actionLabel: busy ? t('pay.saving') : t('return.add'),
+            onSubmit: () => void submit(),
+            body: linesBody(state),
+          }
+        : {
+            title: t('return.noReceiptTitle'),
+            description: t('return.noReceiptHelp'),
+            actionLabel: busy ? t('pay.saving') : t('return.add'),
+            onSubmit: () => void submit(),
+            body: noneBody(state),
+          };
+  return (
+    <FormDialog
+      title={view.title}
+      description={view.description}
+      actionLabel={view.actionLabel}
+      busy={busy}
+      onClose={onClose}
+      onSubmit={view.onSubmit}
+    >
+      {view.body}
+    </FormDialog>
+  );
+
+  function findBody() {
     return (
-      <FormDialog
-        title={t('return.title')}
-        description={t('return.help')}
-        actionLabel={t('return.open')}
-        onClose={onClose}
-        onSubmit={() => {
-          const b = found[selected];
-          if (b) void openBill(b);
-        }}
-      >
+      <>
+        {' '}
         <Label htmlFor="return-search" className={LABEL_CLASS}>
           {t('return.search')}
         </Label>
@@ -417,20 +450,14 @@ export function ReturnDialog({
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-      </FormDialog>
+      </>
     );
+  }
 
-  if (state.step === 'lines') {
-    const s = state;
+  function linesBody(s: Extract<Step, { step: 'lines' }>) {
     return (
-      <FormDialog
-        title={t('return.linesTitle', { number: s.bill.number })}
-        description={t('return.linesHelp', { date: date(s.bill.createdAt) })}
-        actionLabel={busy ? t('pay.saving') : t('return.add')}
-        busy={busy}
-        onClose={onClose}
-        onSubmit={() => void submit()}
-      >
+      <>
+        {' '}
         <div className="flex max-h-[55vh] flex-col gap-2 overflow-y-auto">
           {s.bill.lines.map((l) => {
             const item = s.items[l.itemId];
@@ -476,105 +503,100 @@ export function ReturnDialog({
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-      </FormDialog>
+      </>
     );
   }
 
-  const s = state;
-  return (
-    <FormDialog
-      title={t('return.noReceiptTitle')}
-      description={t('return.noReceiptHelp')}
-      actionLabel={busy ? t('pay.saving') : t('return.add')}
-      busy={busy}
-      onClose={onClose}
-      onSubmit={() => void submit()}
-    >
-      <label className="flex flex-col gap-1">
-        <span className={LABEL_CLASS}>{t('return.ref')}</span>
-        <Input
-          className="font-mono"
-          maxLength={40}
-          autoComplete="off"
-          value={s.ref}
-          onChange={(e) => setState({ ...s, ref: e.target.value })}
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className={LABEL_CLASS}>{t('return.itemSearch')}</span>
-        <Input
-          autoFocus
-          autoComplete="off"
-          spellCheck={false}
-          value={itemQuery}
-          onChange={(e) => findItems(e.target.value)}
-          onKeyDown={onItemKey}
-        />
-      </label>
-      {items.length > 0 && (
-        <OptionList
-          id="return-items"
-          label={t('search.results')}
-          items={items}
-          selected={itemSel}
-          itemKey={(r) => r.id}
-          onSelect={setItemSel}
-          onChoose={(i) => void addNoReceiptItem(items[i]!)}
-          className="max-h-40"
-        >
-          {(r) => (
-            <div className="px-2 py-1">
-              <span className="font-mono text-xs">{r.code}</span> {r.name}
-            </div>
-          )}
-        </OptionList>
-      )}
-      <div className="flex max-h-[40vh] flex-col gap-2 overflow-y-auto">
-        {s.rows.map((r, i) => (
-          <div
-            key={`${r.item.itemId}-${i}`}
-            className="flex flex-col gap-1 border-b border-line pb-2"
-            data-testid="return-line"
+  function noneBody(s: Extract<Step, { step: 'none' }>) {
+    return (
+      <>
+        {' '}
+        <label className="flex flex-col gap-1">
+          <span className={LABEL_CLASS}>{t('return.ref')}</span>
+          <Input
+            className="font-mono"
+            maxLength={40}
+            autoComplete="off"
+            value={s.ref}
+            onChange={(e) => setState({ ...s, ref: e.target.value })}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className={LABEL_CLASS}>{t('return.itemSearch')}</span>
+          <Input
+            autoFocus
+            autoComplete="off"
+            spellCheck={false}
+            value={itemQuery}
+            onChange={(e) => findItems(e.target.value)}
+            onKeyDown={onItemKey}
+          />
+        </label>
+        {items.length > 0 && (
+          <OptionList
+            id="return-items"
+            label={t('search.results')}
+            items={items}
+            selected={itemSel}
+            itemKey={(r) => r.id}
+            onSelect={setItemSel}
+            onChoose={(i) => void addNoReceiptItem(items[i]!)}
+            className="max-h-40"
           >
-            <span className="font-medium">
-              {r.item.name} <span className="font-mono text-xs text-muted-foreground">{r.item.code}</span>
-            </span>
-            <div className="flex flex-wrap items-end gap-2">
-              {markFields(
-                r,
-                (mark) => setState({ ...s, rows: s.rows.map((x, j) => (j === i ? { ...x, ...mark } : x)) }),
-                r.item.name,
-              )}
-              <label className="flex flex-col gap-1">
-                <span className={LABEL_CLASS}>{t('return.price')}</span>
-                <Input
-                  aria-label={`${t('return.price')} · ${r.item.name}`}
-                  className="h-9 w-28 font-mono"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  value={r.price}
-                  onChange={(e) =>
-                    setState({
-                      ...s,
-                      rows: s.rows.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)),
-                    })
-                  }
-                />
-              </label>
+            {(r) => (
+              <div className="px-2 py-1">
+                <span className="font-mono text-xs">{r.code}</span> {r.name}
+              </div>
+            )}
+          </OptionList>
+        )}
+        <div className="flex max-h-[40vh] flex-col gap-2 overflow-y-auto">
+          {s.rows.map((r, i) => (
+            <div
+              key={`${r.item.itemId}-${i}`}
+              className="flex flex-col gap-1 border-b border-line pb-2"
+              data-testid="return-line"
+            >
+              <span className="font-medium">
+                {r.item.name} <span className="font-mono text-xs text-muted-foreground">{r.item.code}</span>
+              </span>
+              <div className="flex flex-wrap items-end gap-2">
+                {markFields(
+                  r,
+                  (mark) => setState({ ...s, rows: s.rows.map((x, j) => (j === i ? { ...x, ...mark } : x)) }),
+                  r.item.name,
+                )}
+                <label className="flex flex-col gap-1">
+                  <span className={LABEL_CLASS}>{t('return.price')}</span>
+                  <Input
+                    aria-label={`${t('return.price')} · ${r.item.name}`}
+                    className="h-9 w-28 font-mono"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={r.price}
+                    onChange={(e) =>
+                      setState({
+                        ...s,
+                        rows: s.rows.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)),
+                      })
+                    }
+                  />
+                </label>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {r.suggested === null
+                  ? t('return.noSuggestion')
+                  : t('return.suggested', { price: m(r.suggested) })}
+              </span>
             </div>
-            <span className="text-xs text-muted-foreground">
-              {r.suggested === null
-                ? t('return.noSuggestion')
-                : t('return.suggested', { price: m(r.suggested) })}
-            </span>
-          </div>
-        ))}
-      </div>
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-    </FormDialog>
-  );
+          ))}
+        </div>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+      </>
+    );
+  }
 }

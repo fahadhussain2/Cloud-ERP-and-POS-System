@@ -521,3 +521,156 @@ test('the drawer is counted blind, short, acknowledged later; the owner acknowle
   await expect(row).toContainText(`By ${OWNER.fullName}`);
   await expect.poll(async () => (await closed())?.acknowledged_by_user_id ?? null).not.toBeNull();
 });
+
+// W1-13 plan scope 7: returns and exchanges. The drawer above is closed, so the cashier opens a new session for the
+// refunds first.
+
+/** On the counter: F3, find `bill`, mark `qty` of `item` to come back, and put it on the bill. */
+async function returnFrom(page: Page, bill: string, item: string, qty: string) {
+  await page.keyboard.press('F3');
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(pos.return.search).fill(bill);
+  await expect(dialog.getByRole('option', { name: new RegExp(bill) })).toBeVisible();
+  await dialog.getByLabel(pos.return.search).press('Enter');
+  const marks = page.getByRole('dialog', { name: `Return from ${bill}` });
+  await marks.getByLabel(`${pos.return.qtyBack} · ${item}`).fill(qty);
+  await marks.getByLabel(`${pos.return.qtyBack} · ${item}`).press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByTestId('returned-line')).toBeVisible();
+}
+
+/** F9 on a refund, then Finalize & print; returns the return's number from the notice. */
+async function refundAtDesk(page: Page): Promise<string> {
+  await page.keyboard.press('F9');
+  const dialog = page.getByRole('dialog', { name: pos.refund.title.cash });
+  await dialog.getByRole('button', { name: new RegExp(`^${pos.pay.finalize}`) }).click();
+  const notice = page.getByRole('region', { name: pos.bill.title }).getByRole('status');
+  await expect(notice).toHaveText(/^Return C\d+-S\d{6} printed · refund Rs\s?[\d,]+ at the cash desk/);
+  return /C\d+-S\d{6}/.exec((await notice.textContent()) ?? '')![0];
+}
+
+const returnOf = async (number: string) =>
+  (
+    await sql<{
+      kind: string;
+      handover_status: string;
+      cash_due: string;
+      return_of_number: string | null;
+      no_receipt: boolean;
+    }>(
+      `SELECT kind, handover_status, cash_due, return_of_number, no_receipt FROM erp.sales_documents
+       WHERE number = $1`,
+      [number],
+    )
+  )[0] ?? null;
+
+test('the cashier opens a new session for the refunds', async () => {
+  await till.keyboard.press('Alt+O');
+  await till.getByRole('dialog').getByLabel(pos.desk.open.label).fill('5000');
+  await till.getByRole('dialog').getByRole('button', { name: pos.desk.open.action }).click();
+  await expect(deskNotice()).toHaveText(/Session D01-Z\d{6} opened with Rs\s?5,000/);
+});
+
+test("a handed-over bill is returned on the counter; the refund is in the desk's queue and paid out with Enter", async ({
+  page,
+}) => {
+  await openCounter(page);
+  const bill = await sell(page, 'FNBL002');
+  await queue()
+    .getByRole('row', { name: new RegExp(bill) })
+    .click({ timeout: 10_000 });
+  await scanField().press('Enter');
+  await expect.poll(() => handoverOf(bill)).toMatchObject({ status: 'received' });
+
+  await returnFrom(page, bill, 'FAN BELT MEHRAN', '1');
+  const ret = await refundAtDesk(page);
+  const row = queue().getByRole('row', { name: new RegExp(ret) });
+  await expect(row).toContainText('Pay out', { timeout: 5_000 });
+  await row.click();
+  await scanField().press('Enter');
+  await expect(deskNotice()).toHaveText(new RegExp(`Paid out Rs\\s?900 for ${ret}`));
+  await expect
+    .poll(() => returnOf(ret))
+    .toMatchObject({
+      kind: 'return',
+      handover_status: 'paid_out',
+      cash_due: '-90000',
+      return_of_number: bill,
+    });
+  const books = await sql<{ code: string; debit: string; credit: string }>(
+    `SELECT a.code, l.debit, l.credit FROM erp.journal_entries e JOIN erp.journal_lines l ON l.entry_id = e.id
+     JOIN erp.accounts a ON a.id = l.account_id JOIN erp.sales_documents d ON d.id = e.source_id
+     WHERE e.source_type = 'sale' AND d.number = $1 ORDER BY l.line_no`,
+    [ret],
+  );
+  expect(books).toContainEqual({ code: '4110', debit: '90000', credit: '0' });
+  expect(books).toContainEqual({ code: '1120', debit: '0', credit: '90000' });
+});
+
+test('an exchange: the fan belt back, the brake pads out, only the difference paid', async ({ page }) => {
+  await openCounter(page);
+  const bill = await sell(page, 'FNBL002');
+  await returnFrom(page, bill, 'FAN BELT MEHRAN', '1');
+  const box = page.getByRole('combobox');
+  await box.fill('BRPD001');
+  await expect(
+    page.getByRole('listbox', { name: pos.search.results }).getByRole('option').first(),
+  ).toBeVisible();
+  await box.press('Enter');
+  await expect(box).toHaveValue('');
+  await expect(page.getByTestId('bill-total')).toHaveText(/Rs\s?3,600/);
+  await page.keyboard.press('F9');
+  await page.getByRole('dialog').getByLabel(pos.pay.cashReceived).press('Enter');
+  const notice = page.getByRole('region', { name: pos.bill.title }).getByRole('status');
+  await expect(notice).toHaveText(/^Bill C\d+-S\d{6} printed · bring Rs\s?3,600 to the cash desk/);
+  const ex = /C\d+-S\d{6}/.exec((await notice.textContent()) ?? '')![0];
+  await expect.poll(() => returnOf(ex)).toMatchObject({ kind: 'exchange', cash_due: '360000' });
+});
+
+test('without a receipt, the manager approves the refund price with their own PIN', async ({ page }) => {
+  await openCounter(page);
+  await page.keyboard.press('F3');
+  await page.getByRole('dialog').getByRole('button', { name: pos.return.noReceipt }).click();
+  const none = page.getByRole('dialog', { name: pos.return.noReceiptTitle });
+  await none.getByLabel(pos.return.itemSearch).fill('FNBL002');
+  await expect(none.getByRole('option').first()).toBeVisible();
+  await none.getByLabel(pos.return.itemSearch).press('Enter');
+  const price = none.getByLabel(`${pos.return.price} · FAN BELT MEHRAN`);
+  await price.fill('800');
+  await price.press('Enter');
+
+  const approval = page.getByRole('dialog');
+  await expect(approval).toContainText(pos.return.need.no_receipt_return);
+  await approval.getByRole('button', { name: new RegExp(MANAGER.fullName) }).click();
+  await approval.getByLabel(pos.approval.pin).fill(MANAGER.pin);
+  await approval.getByLabel(pos.override.reason.before_go_live).check();
+  await approval.getByRole('button', { name: new RegExp(`^${pos.approval.action}`) }).click();
+  await expect(page.getByTestId('return-source')).toHaveText(pos.bill.returnedNoReceipt);
+  const ret = await refundAtDesk(page);
+  await expect
+    .poll(() => returnOf(ret))
+    .toMatchObject({ kind: 'return', no_receipt: true, cash_due: '-80000' });
+  const approved = await sql<{ kind: string; approver: string }>(
+    `SELECT o.kind, u.full_name AS approver FROM erp.overrides o JOIN erp.sales_documents d ON d.id = o.document_id
+     JOIN erp.users u ON u.id = o.approved_by_user_id WHERE d.number = $1`,
+    [ret],
+  );
+  expect(approved).toEqual([{ kind: 'no_receipt_return', approver: MANAGER.fullName }]);
+});
+
+test("offline, a return of this counter's own bill is written and printed, and syncs on reconnect", async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(90_000);
+  await openCounter(page);
+  const bill = await sell(page, 'FNBL002');
+  await context.setOffline(true);
+  await returnFrom(page, bill, 'FAN BELT MEHRAN', '1');
+  const ret = await refundAtDesk(page);
+  await context.setOffline(false);
+  await expect(page.getByText('0 bills waiting to sync')).toBeVisible({ timeout: 30_000 });
+  await expect
+    .poll(() => returnOf(ret), { timeout: 30_000 })
+    .toMatchObject({ kind: 'return', return_of_number: bill });
+});

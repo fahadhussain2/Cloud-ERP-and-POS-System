@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W1-02 (POS shell), W1-03 (catalog and search), W1-05 (bill building) and W1-06 (finalize and print) and W1-09 (customers and credit) merged; W1-12 (hold, void and reissue) built, in review (D-099) |
+| **Status** | In progress: W1-02 (POS shell), W1-03 (catalog and search), W1-05 (bill building) and W1-06 (finalize and print) and W1-09 (customers and credit) merged; W1-12 (hold, void and reissue) merged (D-099); W1-13 (return and exchange) built, in review (D-100) |
 | **Requirements** | 17 (POS-01…POS-17) |
 | **Feature spec needed** | Yes: checkout screen and keyboard map; local DB and storage guardrails |
 
@@ -27,7 +27,7 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 | POS-09 | Finalize → print the bill silently to the device's default printer (local or shared network printer) using its print profile (POS-16). | 1 |
 | POS-10 | Reprint (marked REPRINT, logged). | 1 |
 | POS-11 | Void with permission, PIN and reason within the void window; optional linked reissue. | 1 |
-| POS-12 | Return / exchange screen per W6, including legacy bill lookup (90 days), reason and condition, no-receipt flow with PIN, return window and non-returnable… | 1 |
+| POS-12 | Return / exchange screen per W6, including bill lookup (90 days; no legacy bills, D-100), reason and condition, no-receipt flow with PIN, return window and non-returnable… | 1 |
 | POS-13 | Per-device document numbering, gapless and never reused (e.g. | 1 |
 | POS-14 | Status bar: online/offline, last sync, unsynced count, warnings when offline longer than a threshold. | 1 |
 | POS-15 | Cash rounding per tenant rule (e.g. | 1 |

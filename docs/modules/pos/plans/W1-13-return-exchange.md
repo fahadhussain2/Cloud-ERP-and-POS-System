@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#58](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/58) |
 | **Module** | pos (return rules in `packages/domain`, returned lines in `packages/posting`, push of returns and the 90-day bill datasets in `apps/api`, the return screen, pad, print and local schema in `apps/pos`) |
-| **Status** | Accepted (2026-11-03) with the owner's answers 1–5 |
+| **Status** | Accepted (2026-11-03) with the owner's answers 1–5. Built (2026-11-03) on `w1-13-return-exchange`, in review; Verify 1 done, Verify 2 and 3 to do |
 | **Refs** | POS-12, SYN-01 (90 days of the branch's bills), CSH-04 (the first real refund), POS-13, POS-17 (the pad switches for refunds), PLT-07 (approval on the same screen), INV-01; MIG-03 dropped (owner answer 4); PRD W6, W7, Q3 (30 days, no category excluded); architecture §4.3 (the 90-day dataset), §4.4, §4.5 (an unsynced counter's bill); data model §2 (`categories.return_policy`), §5 (the return fields), §12; posting rules §4.2, §4.3, §8; sync spec §3, §6.1, §6.2; POS spec §10–§13, §15, §18; cash desk spec §6, §7; CLAUDE.md rules 1–9; D-005, D-006, D-007, D-008, D-030 (in part superseded), D-044, D-047, D-048, D-051, D-094, D-095, D-097, D-099 |
 | **Depends on** | W1-08 (a line's cost is on its movement), W1-12 (voided bills; merged), W1-10 (refund payouts, built and waiting for a real refund), W1-09 (customers, for the lookup by phone) |
 | **Size** | about 4½ days (the task list says 3): domain and contracts 1, posting ½, server (migration, push, datasets) 1, the counter (local schema, return screen, pad, print) 1½, e2e and docs ½ (owner answer 5) |
@@ -71,6 +71,19 @@
 - [ ] **Local schema 11 (worker):** a schema-10 counter with open and held bills, outbox and quarantined rows upgrades in place; rows older than 90 days are pruned; finalize re-checks the returnable quantity.
 - [ ] **Dialogs (jsdom, fake counter):** the search by code, number, phone and date; marking lines; the no-receipt path and the approver's price; the approval; the refund buttons; the print call.
 - [ ] **E2E:** the flows in scope item 7.
+
+## Build notes
+
+- **The tests came first** (the first commit): the domain goldens (`return-lines.json`, `return-policy.json`, `no-receipt-price.json`, `return-bill.json` for `addReturn`, `exchange-totals.json`, `refund-tender.json`, `return-document.json`, `return-review.json`) and the posting golden (`post-return.json`, with a check that every case balances). Push, the datasets, local schema 11, the worker and the screens are tested with their code.
+- **A separate builder:** `buildReturnDocument` makes the V2 document and `buildSaleDocument` stays as it was for V1; the worker picks one by whether the open bill has returned lines. Every caller of the sale builder is unchanged. `AnySaleDocument` (V1 or V2) is what the counter stores, prints and voids.
+- **The return's approval is given when its lines go on the bill** (the `F3` dialog, then the approval on the same screen), and kept on the bill's `returns` block; the returned lines can't be edited after (`Alt+C` clears the bill, `removeReturn` in the domain). A refund by transfer is approved at payment. So an approval never has to be judged again for a changed line.
+- **A refund to account isn't credit:** `reviewCredit` and the push's credit check skip an on-account amount below 0, and the counter's `unsynced` counts only positive on-account parts.
+- **`bill_lines` sends `line_total`** (already net of the bill discount) and not `bill_share`: what was paid is all a return needs.
+- **A return waits for its original:** `waitingReturns` (`packages/posting`) finds returns whose original line is linked and unposted; push posts them right after their original, and `postPending` excludes them until then and posts them after the original in the same pass. The rebuild takes the original's replayed movement for the cost.
+- **A line is linked to its original only when it can come back at its cost** (the same item, a sold line); otherwise it is stored unlinked (flagged `return_original_invalid`) and comes back at the current average.
+- **The return dialog is one dialog for all its steps** (find, lines, no receipt): e2e showed that swapping dialogs moved the focus out of the new one, which then closed itself.
+- **Known limit:** a bill with only returned lines can't be held (`F8` needs sold lines, `checkHold`); finish the return or clear it.
+- **E2E covers** a handed-over bill returned and its refund paid out at the desk, an exchange, a no-receipt return approved by the manager, and an offline return of this counter's own bill. A part returned in two goes, a refund to account, out of the window, and a seller without `pos.return.create` are covered by the goldens, the worker tests, the integration tests and the screen tests rather than e2e.
 
 ## Verify
 

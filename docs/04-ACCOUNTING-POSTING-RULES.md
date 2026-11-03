@@ -93,7 +93,7 @@ Line price concessions (negotiated below list) are **not** separate GL entries. 
 | Settlement, cash | `Cr CASH_IN_TRANSIT`: refund due, paid out at the desk (§4.5) |
 | Settlement, account customer | `Cr AR_CONTROL (party)` |
 | Settlement, non-cash refund by transfer | `Cr <bank/wallet account>` |
-| Cost reversal | `Dr INVENTORY / Cr COGS`: qty × **the original line's unit_cost** (for legacy-bill or no-receipt returns: the current avg cost). Stock goes into SHOP (resellable) or DAMAGED (defective). Both are Inventory until written off. |
+| Cost reversal | `Dr INVENTORY / Cr COGS`: qty × **the original line's unit_cost**, from its stock movement (for a no-receipt return, or an original that left with no cost: the current avg cost; D-044, W1-13). A return posts only once its original bill has posted (it waits, like a void). Stock goes into SHOP (resellable) or DAMAGED (defective). Both are Inventory until written off. |
 
 ### 4.3 Exchange (mixed lines)
 §4.1 for the positive lines plus §4.2 for the negative lines, in **one** journal entry. Only the **net** settlement moves: `cash_due` > 0 is collected, < 0 is refunded.

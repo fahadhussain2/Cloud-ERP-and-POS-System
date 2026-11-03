@@ -147,7 +147,7 @@ As in [posting rules §7](04-ACCOUNTING-POSTING-RULES.md#7-opening-balances-at-c
 ## 5. Transaction history
 | Data | Migrated? | Rule |
 |---|---|---|
-| Sale bills, **last 90 days** (Dec 2025 rate ≈ 13,000 bills) | **Yes, read-only** | → `legacy_sales` / `legacy_sale_lines` (`legacy_period`, `legacy_doc_no`, date, customer, lines: item, qty, rate). Enables linked returns of pre-go-live bills (POS-12). Bills are looked up by number plus a date window, because legacy numbers restart per period database. Legacy sale-return documents in the window reduce the lines' `returned_qty`. |
+| Sale bills, last 90 days | **No** (D-100, owner answer 4 to W1-13; MIG-03 dropped) | A part bought before go-live is a no-receipt return: the manager looks the bill up in the read-only legacy system and sets the refund price; the old number is kept as the return's reference. |
 | Older sales, purchases, GL vouchers | No | They stay in the legacy DB, which is kept **read-only** for reference |
 | Purchase history | Derived only | Last supplier and last cost per item → `item_costs.last_supplier_id/last_cost` (for reorder suggestions) |
 | Sales history | Derived only | 30/90-day sales quantity per item for the **first** reorder suggestions, and "last sold date" for the dormant flag |
@@ -181,7 +181,6 @@ The importer **never auto-deletes or auto-merges**. It reports, and the owner de
 | Σ customer balances and Σ supplier balances vs legacy Customer/Supplier Outstanding reports | Exact |
 | Top 20 customer and supplier balances confirmed by the owner | Signed off |
 | Opening journal balances (Dr = Cr) | Exact |
-| Legacy 90-day bills: count and Σ totals vs legacy Daily Sales Register | Exact |
 
 ## 9. Timeline
 | When | Run |

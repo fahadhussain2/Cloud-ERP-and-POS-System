@@ -55,7 +55,7 @@ The scanner types the bill code (`C03-S000412 4320`, POS spec §13) and Enter in
 
 ## 6. Refund payouts (CSH-04)
 
-A bill with cash due < 0 is a refund: in the queue in orange, recorded as a **payout** (`kind: payout`, `cash.refund.pay`), by the queue or by scanning its code, the same way as a handover. The first real refunds come with returns (W1-13).
+A bill with cash due < 0 is a refund: in the queue in orange, recorded as a **payout** (`kind: payout`, `cash.refund.pay`), by the queue or by scanning its code, the same way as a handover. Refunds come from returns and exchanges (POS spec §19, W1-13): a counter's *Refund cash at desk* puts the return in the queue within seconds, and the bill says *Refund due Rs 450, collect at the cash desk*.
 
 ## 7. The desk's own sales
 

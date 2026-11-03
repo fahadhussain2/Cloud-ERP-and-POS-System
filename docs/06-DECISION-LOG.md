@@ -862,3 +862,21 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - The live check catches most leaks at the counter; the server catches the rest.
 - **Status:** Accepted (with the W1-12 plan, owner answers 1–5)
 
+
+### D-100 Return and exchange: one document of signed lines (V2 only for returns), refunds that add up, no legacy bills (2026-11-03)
+- **Decision:**
+  - **A return or exchange is an `S` document with negative lines** (D-006), written as **`SaleDocumentV2`** only when the bill has returned lines; a plain sale stays `SaleDocumentV1`, and push takes both. `kind` is derived: `return`, or `exchange` with sold lines too.
+  - **One original bill per return** (owner answer 2); the return keeps that bill's customer. Replacement items follow every sale rule; a bill discount is on the sold lines only.
+  - **A line returned in parts adds up to what was paid:** the refund for `k` of the `r` units left is the value left × `k` / `r`, half away from zero, and all that is left refunds exactly what is left (`refundFor`).
+  - **The policy** (`returnNeeds`): the tenant's `return_window_days` (30), or the category's own window; non-returnable categories; approvals `return_permission`, `return_outside_policy`, `no_receipt_return`, one approver's own PIN covering them all, with the reasons *Regular customer, Manufacturer defect, Lost bill, Bought before go-live, Owner's instruction, Other* (owner answer 3).
+  - **No receipt:** the counter suggests the lowest net price of the branch's last 90 days, else today's default-tier price; **the approver may set the price**, and the override keeps both. Cost back at the current average.
+  - **Refunds:** cash at the desk (a payout in its queue, W1-10), credit to a customer's account (not counted as unsynced credit until the balance has it), or **by transfer** with a reference and the PIN of someone with `pos.override.approve` (override `refund_transfer`, owner answer 1); an even exchange takes no payment.
+  - **No legacy bills** (owner answer 4): MIG-03 is dropped, and **D-030 is superseded in that part** (the masters and opening balances stay). A part bought before go-live is a no-receipt return; the manager checks the old bill in the read-only legacy system and sets the price; its number goes in the return's reference.
+  - **Every counter pulls the branch's last 90 days of bills** (`bills`, `bill_lines`, `bill_payments`, SYN-01), pruned past 90 days; the pulled return lines say what came back already, so nothing is derived for it.
+  - **The server never refuses a return** (rule 7): it judges it under the original bill's per-bill lock and flags `return_over_quantity`, `return_original_invalid`, `return_price_mismatch`, `return_not_permitted`. Stock comes back at the original line's cost (D-044), into Damaged for a defective line; a return posts only once its original has.
+- **Why:**
+  - One document keeps one number, one print and one cash movement for an exchange, and V2 only for returns keeps the pilot's sales untouched.
+  - Refunding the share of what is left never drifts by a paisa, however a line comes back.
+  - The legacy bills would have put a second kind of original through the lookup, the quantities, the review, the posting and the print, plus an importer step, for about a month's benefit.
+- **Trade-off:** for about the first month after go-live, returns of pre-go-live parts need a manager's PIN, and nothing stops the same old part coming back twice beyond the manager's check of the legacy system.
+- **Status:** Accepted (with the W1-13 plan, owner answers 1–5)

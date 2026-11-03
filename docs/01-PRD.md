@@ -123,7 +123,7 @@ If either is exceeded, a manager PIN is needed. No cash moves, and the receipt s
 A finalized bill is never edited. A Manager or Cashier with the permission voids it, with a **PIN and a reason**, and optionally issues a corrected bill linked to it. Default rule: voids are allowed until the business day closes **and** before the cash handover. After that, use a return. The voided bill keeps its number and prints as VOID.
 
 ### W6. Return and exchange (one screen)
-1. Scan the bill's code, or search the bill by number, phone or date. This includes pre-cutover legacy bills from the last 90 days.
+1. Scan the bill's code, or search the bill by number, phone or date, among the branch's bills of the last 90 days. Pre-cutover legacy bills are not imported (D-100): a part bought before go-live is a no-receipt return, priced by the manager from the old bill in the read-only legacy system.
 2. Mark the lines coming back (up to the quantity originally sold, minus earlier returns). For each, record a **reason** (wrong part, unused option, defective, changed mind, other) and a **condition** (resellable goes back to Shop; defective goes to the Damaged location).
 3. Optionally add replacement items. The screen shows the net amount: the customer pays the difference or receives a refund.
 4. Refunds are at the **price originally paid**.
@@ -231,7 +231,7 @@ Printing to the shared network printer keeps working, because it only needs the 
 | POS-09 | Finalize → print the bill silently to the device's default printer (local or shared network printer) using its print profile (POS-16). The bill shows the shop header, bill number, date and time, salesman, lines, totals, tender, cash received and change, return policy line, and a scannable **bill code** (barcode or signed QR). | 1 |
 | POS-10 | Reprint (marked REPRINT, logged). | 1 |
 | POS-11 | **Void** with permission, PIN and reason within the void window; optional linked **reissue**. | 1 |
-| POS-12 | **Return / exchange** screen per W6, including legacy bill lookup (90 days), reason and condition, no-receipt flow with PIN, return window and non-returnable category rules (approver PIN when out of policy), and the role permission "can process returns" (approver PIN when missing). | 1 |
+| POS-12 | **Return / exchange** screen per W6, including bill lookup (90 days; no legacy bills, D-100), reason and condition, no-receipt flow with PIN, return window and non-returnable category rules (approver PIN when out of policy), and the role permission "can process returns" (approver PIN when missing). | 1 |
 | POS-13 | Per-device document numbering, gapless and never reused (e.g. `C03-S000412`). | 1 |
 | POS-14 | Status bar: online/offline, last sync, unsynced count, warnings when offline longer than a threshold. | 1 |
 | POS-15 | Cash rounding per tenant rule (e.g. to the nearest whole rupee), posted to a rounding account. | 1 |
@@ -319,7 +319,7 @@ All reports filter by date range and export to CSV. PDF/print is offered where i
 |---|---|---|
 | MIG-01 | Repeatable importer for masters (items, categories, brands, origins, parties, chart of accounts) with cleanup reports. | 1 |
 | MIG-02 | Opening balances at cutover: stock quantity (into Shop) and average cost, customer and supplier balances, GL opening entry. | 1 |
-| MIG-03 | The last 90 days of legacy sale bills imported read-only for return lookup. | 1 |
+| MIG-03 | ~~The last 90 days of legacy sale bills imported read-only for return lookup.~~ **Dropped (D-100):** pre-go-live returns are no-receipt returns with a manager's PIN. | – |
 | MIG-04 | Reconciliation report: counts, stock value, AR/AP totals and trial balance vs legacy. | 1 |
 
 ## 7. Non-functional requirements

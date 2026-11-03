@@ -101,7 +101,7 @@ infra/            # docker-compose, Caddyfile, backup config, deploy scripts
 | Users (+ PIN verifier), roles, permissions, limits | ~20 | Incremental pull |
 | Tenant/branch settings, payment methods, expense categories, reason codes | small | Incremental pull |
 | Stock balances per item/location (snapshot) | ~20k × 3 | Incremental pull |
-| Branch sale bills, last 90 days (headers + lines), incl. legacy | ~13k bills | Incremental pull |
+| Branch sale bills, last 90 days (headers, lines, payments; no legacy bills, D-100) | ~13k bills | Incremental pull (W1-13) |
 | This device's documents, last 30 days + outbox | — | Local |
 
 The bootstrap download is ~20 MB uncompressed (a few MB gzipped).

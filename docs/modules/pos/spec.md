@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). The bill (§10) and the keyboard map (§11): with the W1-05 plan and owner answers (2026-10-27). Payment and finalize (§12), printing and reprint (§13): with the W1-06 plan and owner answers (2026-10-27). Push, offline warnings, the revoked counter and device health (§4, §7, §12, §14): with the W1-07 plan and owner answers (2026-10-28), D-094. Customers and credit (§15): with the W1-09 plan and owner answers (2026-10-31), D-096. The cash desk device (§16): with the W1-10 plan and owner answers (2026-11-01), D-097. Hold and recall (§17), void and reissue (§18): with the W1-12 plan and owner answers (2026-11-03). |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): local database, storage safeguards, device setup, unlock (2026-10-25). Search (§9) and the status bar at the top (§7): accepted with the W1-03 plan (2026-10-26). The bill (§10) and the keyboard map (§11): with the W1-05 plan and owner answers (2026-10-27). Payment and finalize (§12), printing and reprint (§13): with the W1-06 plan and owner answers (2026-10-27). Push, offline warnings, the revoked counter and device health (§4, §7, §12, §14): with the W1-07 plan and owner answers (2026-10-28), D-094. Customers and credit (§15): with the W1-09 plan and owner answers (2026-10-31), D-096. The cash desk device (§16): with the W1-10 plan and owner answers (2026-11-01), D-097. Hold and recall (§17), void and reissue (§18): with the W1-12 plan and owner answers (2026-11-03). Return and exchange (§19) and the refund pad (§12): with the W1-13 plan and owner answers (2026-11-03), D-100. |
 | **Refs** | POS-01, POS-14, PLT-01, PLT-03, PLT-04; architecture §4.1–§4.4, §8; data model §12; sync spec; CLAUDE.md rules 6, 9, 10; D-009, D-010, D-039, D-082 |
 
 The PRD and architecture describe what the counter does. This spec fixes how its foundations behave, precisely enough to build and test. **v1** covers what W1-02 builds; checkout, the payment pad and the keyboard map come in later versions.
@@ -152,10 +152,9 @@ POS-03, D-053, from the prototype. The key bar always shows the keys of the curr
 |---|---|
 | **Search** (`F2`) | `↑ ↓` result · `Enter` add · `2*` or `1.5*` before the text sets the quantity · `Esc` clear · `Tab` to the bill lines |
 | **Bill lines** (`Tab`) | `↑ ↓` line · `+ −` quantity · `Q` set quantity · `P` price · `D` bill discount · `Del` remove · `Esc` back to search; any other letter types into the search |
-| **Anywhere** | `F2` search · `F4` customer (W1-09) · `F7` price tier · `F8` hold · `Shift+F8` recall · `Alt+V` void (W1-12) · `F9` cash · `Shift+F9` split payment · `Alt+P` reprint · `Alt+C` clear the bill · `Alt+L` lock · `Alt+S` counter health (W1-07, also on the staff list) |
+| **Anywhere** | `F2` search · `F3` return / exchange (W1-13) · `F4` customer (W1-09) · `F7` price tier · `F8` hold · `Shift+F8` recall · `Alt+V` void (W1-12) · `F9` cash (on a return: refund cash at the desk, or finalize an even exchange) · `Shift+F9` split payment · `Alt+P` reprint · `Alt+C` clear the bill · `Alt+L` lock · `Alt+S` counter health (W1-07, also on the staff list) |
 | **Dialogs** | `Enter` the main button · `Esc` cancel · `Tab` next field |
 | **Cash desk** (W1-10, W1-11, cash desk spec) | `Enter` confirm · `E` correct the cash received · `↑ ↓` select · `Alt+O` open the session · `Alt+R` receive a customer's payment · `Alt+M` cash out · `Alt+X` count and close · `Alt+Q` to selling and back · `Alt+L` lock |
-| **Later tasks** (shown once built) | `F3` return (W1-13) |
 
 `F1`, `F3`, `F5`, `F7` and `F9` never reach the browser on the counter (no help page, find bar, reload or caret browsing mid-bill). `F6` and `Alt+D` are not used: Chrome keeps them for the address bar.
 
@@ -168,6 +167,7 @@ POS-06, POS-13, POS-15, POS-17, PRD W1 and W3, D-047, D-053. The rules are in `p
 **The payment pad** sits under the total and never moves (POS-17): *Cash `F9`* (large, accent colour), then one button per other active payment method in its `sort` order (*Bank transfer*, *Raast*, *JazzCash*, *Easypaisa*, *Card*), *On account*, and *Split payment `Shift+F9`*. Only methods the tenant has active are shown.
 
 - All buttons are disabled while the bill is empty.
+- **A bill with returned lines** (§19): below 0 the pad offers *Refund cash at desk* (`F9`), *Credit to account* and *Refund by transfer*; at 0, *Finalize even exchange* (`F9`).
 - **Pay is refused while any approval is pending** (§10): *Approve the prices first*.
 - *On account* is enabled for a credit customer when the seller holds `pos.credit.sell` (§15); otherwise it is disabled with its reason as a hint.
 
@@ -232,6 +232,8 @@ POS-09, POS-10, POS-16, architecture §4.5 and §8, D-048, D-055.
 | `copies` | 1, or 2 = a second page in the same print job |
 | `template_options` | `headerLines` (array of text), `policyText` |
 
+**A return or exchange** prints as *RETURN* or *EXCHANGE*, with what it returns and what happens to the refund (§19).
+
 **What the bill shows** (POS-09, Q12, the prototype's layout): the shop name and header lines (the branch's address and phone and `branch.receipt_header.lines`, then the profile's `headerLines`), *SALE BILL*, the bill number, date and time (tenant locale), counter, salesman, customer (*Walk-in*, or the customer's name and code, §15); the lines (#, code, description, quantity, rate, amount); subtotal, discount and rounding when not zero, **TOTAL**; each payment with its reference; *Cash received* and **CHANGE** when there is cash; the policy line (`policyText`, default *Exchange or return within 30 days with this bill.*); the bill code, with its text under the bars. Black on white, no shading. Text through i18n keys, logical CSS properties (rule 10).
 
 **Bill code** (`billCode`, `parseBillCode`): Code 39, no check character, `<bill number> <cash due in whole rupees>`, e.g. `C03-S000412 4320`, or `C03-S000413 0` for a bill paid without cash. A cash due with paisa is refused (it is always rounded at Delux; a tenant whose increment leaves paisa can't use the barcode profile). Parsing ignores spaces around the text and a trailing Enter, and refuses anything else. The bars come from `code39Svg` in `packages/print`.
@@ -289,7 +291,7 @@ Each result: code, name, city, the phone's **last four digits** (`•••• 4
 | **Limit** | `balance + unsynced + amount > credit_limit` | Exactly at the limit is fine. No limit (empty) is never over (D-085). |
 | **Offline cap** | offline **and** `offlineToday + amount > offline_daily_cap` | A cap of 0: every offline on-account sale needs an approval. |
 
-- **`balance`** is the pulled balance; **`unsynced`** the on-account parts of this counter's bills (never a bill voided here, W1-12) for the customer that the pulled balance can't include yet: still in the outbox (pending or refused), or accepted by the server (`local_documents.accepted_at`) after the start of the last pull that ran to `hasMore = false`.
+- **`balance`** is the pulled balance; **`unsynced`** the on-account parts of this counter's bills (never a bill voided here, W1-12, nor a refund to account, W1-13: until the balance has it, the customer owes more) for the customer that the pulled balance can't include yet: still in the outbox (pending or refused), or accepted by the server (`local_documents.accepted_at`) after the start of the last pull that ran to `hasMore = false`.
 - **Offline** is what the status bar shows at finalize (§7). **`offlineToday`** is the on-account parts of this counter's bills for the customer **made while offline on the same business date** (their `credit.offline`, owner answer 1).
 
 **Over either:** the popup says which and by how much, and *Finalize & print* opens the approval on the same screen, as for a price (§10): an approver with **`pos.credit.over_limit`** for this branch, their own PIN (checked offline; wrong PINs count towards their own lock), and a reason: *Customer will pay soon, Regular customer, Owner's instruction*, or *Other* with a note (owner answer 2). The seller may approve themselves if they hold the permission. Both checks over at once need one approval that names both. The approval is for this bill and amount; it isn't kept on the open bill, and Esc leaves the bill unpaid.
@@ -333,3 +335,28 @@ POS-11, PRD W5, D-002, owner answers 1–3 and 5 to W1-12. The rules are `checkV
 **The void** is a document of **family `V`** (`C03-V000001`, `SaleVoidV1`, sync spec §6.2), written with its outbox row in one local transaction (rule 6), signed after the commit and pushed at once. **The bill is never changed** (rule 3): it keeps its number, and the counter prints it again with a **VOID** band (the void's number, when, who asked, who approved, the reason). A reprint (§13) of a voided bill carries the band too, and the reprint list marks it *VOID*. A voided bill leaves the credit figures (§15) and, on a desk, its queue at once.
 
 **Reissue:** after the void, *Reissue now (Enter)* or Esc. The new open bill has the voided bill's customer, tier, lines and prices, with its **price approvals** (owner answer 3: they hold while the prices stay); a credit approval is asked again at payment. The bill panel shows *Reissue of C03-S000412*; it is corrected and paid like any bill, gets the next `S` number, carries `reissueOf` and prints *Reissue of C03-S000412*. With lines already on the open bill, hold it first (`F8`).
+
+## 19. Return and exchange (W1-13)
+
+POS-12, PRD W6 and W7, D-005, D-006, D-007, D-044, D-051, D-100, owner answers 1–5 to W1-13. The rules are `returnable`, `refundFor`, `returnNeeds`, `lowestPrice90`, `addReturn` and `buildReturnDocument` in `packages/domain`; the worker finds bills and writes the return (`db/returns.ts`, `db/checkout.ts`), the server reviews it with `reviewReturn`.
+
+**`F3` *Return / exchange*** on an empty bill (a bill with lines is held first, `F8`): one search box: **scan the bill's code**, type its number (`C03-S000412`, `S412`), **4 or more digits of a phone** (the bills of customers with that phone, and walk-in bills with it), or **a date** (`2026-11-02` or `2/11/2026`). It searches the branch's bills of the last 90 days pulled to this counter (sync spec §3) and this counter's own documents, its unsynced ones too; voided bills aren't listed, and an old one says *older than 30 days*. Enter opens the bill. A bill of another counter that hasn't synced isn't there: use *No receipt*, with its number as the reference.
+
+**Marking lines:** each line shows what was sold, what came back already (the server's returns and this counter's own), what can still come back and the refund each. Type the **quantity back**, the **reason** (*Wrong part, Unused option, Defective, Changed mind, Other* with a note) and the **condition** (*Resellable* → Shop, *Defective* → Damaged; *Defective* presets it). Enter puts the returned lines on the bill. **One original bill per return** (owner answer 2): the bill takes that bill's customer, and the return can't change it.
+
+**The refund** for `k` of the `r` units left is the line's value left × `k` / `r`, half away from zero; all that is left refunds exactly what is left, so a line returned in parts adds up to what the customer paid, after the bill discount.
+
+**No receipt** (a lost bill, a bill from before go-live, owner answer 4): find each item, type how many come back and the **refund each**, which starts at the lowest net price of the branch's last 90 days (else today's default-tier price, else blank). Optionally the old bill's number as the reference. The manager sets the final price before approving.
+
+**Approvals on the same screen** (PLT-07, as for a price, §10), one approver's own PIN covering every need: *the seller can't process returns* (`pos.return.create`, D-051), *outside the policy* (past the tenant's 30 days or the category's own window, or a non-returnable category: `pos.return.outside_policy`), *no receipt* (`pos.return.no_receipt`). The reasons are *Regular customer, Manufacturer defect, Lost bill, Bought before go-live, Owner's instruction*, or *Other* with a note (owner answer 3). Each is an override on the document; a no-receipt one keeps the suggested and the approved price.
+
+**On the bill panel** the returned lines come first, in orange, under *Returned from C03-S000412* (or *Returned without a receipt*), then the sold lines (an exchange: add them from search as on any bill, with every price rule; a bill discount is on them only). The totals show *Returned −Rs X*; a negative total is orange. The returned lines can't be edited; `Alt+C` clears the whole bill.
+
+**Settling** (§12, POS-17, D-053): the total is sold − bill discount − refunds, cash-rounded. Above 0 the pad pays as usual. **Below 0** the pad offers **Refund cash at desk** (`F9`: the desk pays it out from its queue or by a scan, cash desk spec §6), **Credit to account** (only with a customer with an account; the counter doesn't count it against the customer's unsynced credit, §15), and **Refund by transfer** (a bank or wallet method with its reference, then the PIN of someone with `pos.override.approve`, override `refund_transfer`, owner answer 1). **At 0**: *Finalize even exchange* (`F9`), with no payment. One refund method per document; refund popups show the amount in orange.
+
+**Finalize** is §12's one local transaction; the worker checks the returned lines again in it, so two returns of one line on this counter can't both pass (*That's more than can still come back of that line*). On a desk with an open session, a cash refund is paid out to it at once (cash desk spec §7). The document is **`SaleDocumentV2`** (sync spec §6.1); a plain sale stays V1.
+
+**The print** (§13): *RETURN* or *EXCHANGE*, *Returned from C03-S000412 (2 Nov 2026)* or *No receipt · old bill 023956*, the returned lines first with their reason and condition, a *Returned* row in the totals, and *Refund due Rs 450, collect at the cash desk*, *Credited to account* or *Refunded by Raast*; the bill code carries the negative amount (`C03-S000415 -450`).
+
+**A return can be voided** like any bill (§18), before its payout; a voided return isn't reissued: start the return again with `F3`.
+

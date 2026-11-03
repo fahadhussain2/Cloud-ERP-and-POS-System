@@ -8,7 +8,7 @@
 
 ## Scope
 
-Importer for the legacy SQL Server dumps: masters, opening balances, 90 days of bills, cleanup and reconciliation reports.
+Importer for the legacy SQL Server dumps: masters, opening balances, cleanup and reconciliation reports. No sale bills (D-100).
 
 ## Requirements
 
@@ -18,7 +18,7 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 |---|---|---|
 | MIG-01 | Repeatable importer for masters (items, categories, brands, origins, parties, chart of accounts) with cleanup reports. | 1 |
 | MIG-02 | Opening balances at cutover: stock quantity (into Shop) and average cost, customer and supplier balances, GL opening entry. | 1 |
-| MIG-03 | The last 90 days of legacy sale bills imported read-only for return lookup. | 1 |
+| MIG-03 | ~~The last 90 days of legacy sale bills imported read-only for return lookup.~~ Dropped (D-100): pre-go-live returns are no-receipt returns. | – |
 | MIG-04 | Reconciliation report: counts, stock value, AR/AP totals and trial balance vs legacy. | 1 |
 
 ## Running the importer
