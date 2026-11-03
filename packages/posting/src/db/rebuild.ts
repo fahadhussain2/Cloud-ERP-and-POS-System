@@ -4,8 +4,9 @@ import { emptyState, withChanges } from '../replay';
 import { postCashMovement, postCollection, postSession } from '../cash';
 import { postHandover } from '../handover';
 import { postSale } from '../sale';
+import { postVoid } from '../void';
 import type { LedgerState, Posting, PostingContext, PostingResult } from '../types';
-import { loadCashMovement, loadCollection, loadHandover, loadSale, loadSessionEvent } from './load';
+import { loadCashMovement, loadCollection, loadHandover, loadSale, loadSessionEvent, loadVoid } from './load';
 import type { SourceType } from './post';
 import { writePosting } from './write';
 
@@ -47,6 +48,8 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
   let state = emptyState();
   let journals = 0;
   const steps: Replayed[] = [];
+  // Each sale's replayed posting, for its void to swap (W1-12).
+  const sales = new Map<string, Posting>();
   for (const r of rows.rows) {
     let result: PostingResult | null;
     if (r.source_type === 'cash_handover') {
@@ -61,11 +64,16 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
     } else if (r.source_type === 'cash_session') {
       const doc = await loadSessionEvent(c, r.source_id);
       result = doc ? postSession(doc, r.context) : null;
+    } else if (r.source_type === 'sales_void') {
+      const v = await loadVoid(c, r.source_id);
+      const original = v ? sales.get(v.saleId) : undefined;
+      result = v && original ? postVoid(v.void, original, r.context, state) : null;
     } else {
       const loaded = await loadSale(c, r.source_id);
       result = loaded ? postSale(loaded.sale, r.context, state) : null;
     }
     const posting = result?.ok ? result.posting : null;
+    if (posting && r.source_type === 'sale') sales.set(r.source_id, posting);
     if (posting) state = withChanges(state, posting.state);
     const journalNumber =
       posting && posting.journal.lines.length > 0 ? `J${String((journals += 1)).padStart(6, '0')}` : null;

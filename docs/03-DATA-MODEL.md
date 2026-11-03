@@ -64,7 +64,7 @@ Data in this document is grouped by area. Fields marked † are derived and main
 
 **roles:** `name, template_key (owner|manager|cashier|salesman|purchaser|accountant, or null for a custom role), permissions text[], limits jsonb`
 - Permissions are catalog keys from `packages/domain` (`pos.void`, `pos.return.create`, `cost.view`, …); `*` = all (Owner).
-- `limits`: `{ maxDiscountBp, voidWindow: none|same_day_before_handover|same_day }`. Yes/no abilities are permissions, not limits (D-081).
+- `limits`: `{ maxDiscountBp, voidWindow: none|same_day_before_handover|same_day }`. Yes/no abilities are permissions, not limits (D-081). No window allows a void after the cash handover (D-099): `same_day` is judged as `same_day_before_handover`, and migration 0013 moved every `same_day` role to it.
 
 **user_roles:** `user_id, role_id, branch_id (nullable = all branches)`
 
@@ -141,7 +141,9 @@ A **single document type** covers sales, returns and exchanges:
 
 This keeps the one-screen exchange (D-006) to one document, one number, one receipt and one cash movement.
 
-**Built in W1-07 (migration 0008):** `sales_documents`, `sales_lines`, `sales_payments` and `overrides` as below, filled by push (sync spec §6.2). Also on the document: the signed `payload` (jsonb) exactly as the device sent it, its `payload_hash`, the `signature`, and `exception_count`; on each line its `bill_share` of the bill discount; on each payment its `line_no` (the order on the bill). `id` is the device-made UUIDv7 (rule 7); `(device_id, seq)` is unique, the number is only indexed (one that doesn't follow from them is accepted and flagged). The app role never updates or deletes lines, payments or overrides (rule 3). The void and return fields come with W1-12 and W1-13. Lines get their `tax_code_id` on push; **a line's cost is on its stock movement**, not on the line (W1-08, D-095): finalized lines are never updated.
+**Built in W1-07 (migration 0008):** `sales_documents`, `sales_lines`, `sales_payments` and `overrides` as below, filled by push (sync spec §6.2). Also on the document: the signed `payload` (jsonb) exactly as the device sent it, its `payload_hash`, the `signature`, and `exception_count`; on each line its `bill_share` of the bill discount; on each payment its `line_no` (the order on the bill). `id` is the device-made UUIDv7 (rule 7); `(device_id, seq)` is unique, the number is only indexed (one that doesn't follow from them is accepted and flagged). The app role never updates or deletes lines, payments or overrides (rule 3). The void fields came with W1-12 (below); the return fields come with W1-13. Lines get their `tax_code_id` on push; **a line's cost is on its stock movement**, not on the line (W1-08, D-095): finalized lines are never updated.
+
+**Built in W1-12 (migration 0013):** on `sales_documents` the void fields (`void_document_id`, `void_reason_code`, `voided_at`, `voided_by_user_id`, `void_approved_by_user_id`, set once by the void, audited; `status = 'voided'` exactly when `void_document_id` is set) and the reissue's `reissue_of_id`, `reissue_of_number` (from its document, set at push; no foreign key, the voided bill may arrive later). **`sales_voids`** keeps each device's voids (family `V`): `id` (the device's UUIDv7), `branch_id, device_id, number, seq, sale_document_id` (null until the bill arrives, linked by `sale_number`), `voided_by_user_id, approved_by_user_id, reason_code, note, handover_seen, at_device, business_date, received_at, duplicate_of_id` (a second void of the bill: kept, never posted), the signed `payload, payload_hash, signature, client_version, exception_count`. One void per bill. Each void's approval is also an `overrides` row of kind `void` on the bill.
 
 **sales_documents**
 | Field | Notes |
@@ -284,7 +286,7 @@ Journal vouchers written by the accountant are stored as `journal_entries` with 
 
 **sync_inbox:** `tenant_id, document_id (PK together), device_id, family, seq, status (accepted|rejected), result jsonb, payload_hash, received_at, attempts`. A `duplicate` is an answer, not a stored state; a rejected row is checked again when the document comes back (sync spec §6.2).
 
-**exceptions:** `kind (below_floor_no_override|discount_over_limit|document_inconsistent|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature|no_cost|posting_failed|posted_after_lock|duplicate_handover|handover_not_permitted|cash_not_permitted|float_mismatch), severity (low|medium|high), document_type, document_id, device_id, user_id, business_date, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`. Clock skew is unique per device and business date; `posting_failed` is one per document (W1-08).
+**exceptions:** `kind (below_floor_no_override|discount_over_limit|document_inconsistent|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature|no_cost|posting_failed|posted_after_lock|duplicate_handover|handover_not_permitted|cash_not_permitted|float_mismatch|void_not_permitted|duplicate_void), severity (low|medium|high), document_type, document_id, device_id, user_id, business_date, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`. Clock skew is unique per device and business date; `posting_failed` is one per document (W1-08).
 
 **Built in W1-07** with the two above (migration 0008, sync spec §6.2–§8):
 

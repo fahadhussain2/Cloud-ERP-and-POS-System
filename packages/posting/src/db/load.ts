@@ -8,8 +8,10 @@ import type {
   PostingContext,
   PostingHandover,
   PostingRole,
+  Posting,
   PostingSale,
   PostingSessionEvent,
+  PostingVoid,
 } from '../types';
 
 // Reading what a posting needs from the database (W1-08). Money comes back as bigint text and quantities as
@@ -267,8 +269,20 @@ export async function loadContext(
 }
 
 /** The costs and balances a sale's lines touch. */
-export async function loadState(c: pg.ClientBase, sale: PostingSale): Promise<LedgerState> {
-  const items = [...new Set(sale.lines.map((l) => l.itemId))];
+export const loadState = (c: pg.ClientBase, sale: PostingSale): Promise<LedgerState> =>
+  loadStateOf(
+    c,
+    sale.lines.map((l) => l.itemId),
+    sale.lines.map((l) => l.locationId),
+  );
+
+/** The costs of these items and their balances in these locations. */
+export async function loadStateOf(
+  c: pg.ClientBase,
+  itemIds: readonly string[],
+  locationIds: readonly string[],
+): Promise<LedgerState> {
+  const items = [...new Set(itemIds)];
   const state: LedgerState = { costs: {}, balances: {} };
   const costs = await c.query<{ item_id: string; avg_cost: string | null; on_hand: string }>(
     'SELECT item_id, avg_cost, (on_hand * 1000)::bigint AS on_hand FROM erp.item_costs WHERE item_id = ANY ($1)',
@@ -282,8 +296,119 @@ export async function loadState(c: pg.ClientBase, sale: PostingSale): Promise<Le
   const balances = await c.query<{ item_id: string; location_id: string; qty: string }>(
     `SELECT item_id, location_id, (qty * 1000)::bigint AS qty FROM erp.stock_balances
      WHERE item_id = ANY ($1) AND location_id = ANY ($2)`,
-    [items, [...new Set(sale.lines.map((l) => l.locationId))]],
+    [items, [...new Set(locationIds)]],
   );
   for (const r of balances.rows) (state.balances[r.location_id] ??= {})[r.item_id] = toQty(r.qty);
   return state;
+}
+
+/**
+ * A stored void (W1-12) and the sale it voids, or null when there is none, it is a duplicate, or its bill hasn't
+ * arrived yet: none of those posts.
+ */
+export async function loadVoid(
+  c: pg.ClientBase,
+  id: string,
+): Promise<{ void: PostingVoid; saleId: string } | null> {
+  const { rows } = await c.query<{
+    number: string;
+    sale_number: string;
+    sale_document_id: string;
+    branch_id: string;
+    business_date: string;
+  }>(
+    `SELECT number, sale_number, sale_document_id, branch_id, business_date::text FROM erp.sales_voids
+     WHERE id = $1 AND duplicate_of_id IS NULL AND sale_document_id IS NOT NULL`,
+    [id],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    saleId: r.sale_document_id,
+    void: {
+      id,
+      number: r.number,
+      saleNumber: r.sale_number,
+      branchId: r.branch_id,
+      businessDate: r.business_date,
+    },
+  };
+}
+
+/**
+ * A sale's posting as it was stored (posting rules §4.4: a void swaps it): its journal lines in order, its stock
+ * movements in line order, its customer entries. Null when the sale has no posting yet.
+ */
+export async function loadSalePosting(c: pg.ClientBase, saleId: string): Promise<Posting | null> {
+  const posting = await c.query<{ seq: string; entry_date: string }>(
+    "SELECT seq, entry_date::text FROM erp.postings WHERE source_type = 'sale' AND source_id = $1",
+    [saleId],
+  );
+  const p = posting.rows[0];
+  if (!p) return null;
+  const entry = await c.query<{ branch_id: string; memo: string | null }>(
+    `SELECT l.branch_id, e.memo FROM erp.journal_entries e JOIN erp.journal_lines l ON l.entry_id = e.id
+     WHERE e.posting_seq = $1 LIMIT 1`,
+    [p.seq],
+  );
+  const lines = await c.query<{ account_id: string; party_id: string | null; debit: string; credit: string }>(
+    `SELECT l.account_id, l.party_id, l.debit, l.credit FROM erp.journal_entries e
+     JOIN erp.journal_lines l ON l.entry_id = e.id WHERE e.posting_seq = $1 ORDER BY l.line_no`,
+    [p.seq],
+  );
+  const movements = await c.query<{
+    source_line_id: string;
+    item_id: string;
+    location_id: string;
+    qty: string;
+    unit_cost: string;
+    value_delta: string;
+    avg_cost_after: string | null;
+  }>(
+    `SELECT m.source_line_id, m.item_id, m.location_id, (m.qty_delta * 1000)::bigint AS qty, m.unit_cost,
+       m.value_delta, m.avg_cost_after
+     FROM erp.stock_movements m LEFT JOIN erp.sales_lines l ON l.id = m.source_line_id
+     WHERE m.posting_seq = $1 ORDER BY l.line_no, m.id`,
+    [p.seq],
+  );
+  const parties = await c.query<{
+    party_id: string;
+    role: 'customer' | 'supplier';
+    amount: string;
+    due_date: string;
+  }>(
+    `SELECT party_id, role, amount, due_date::text FROM erp.party_ledger_entries WHERE posting_seq = $1
+     ORDER BY id`,
+    [p.seq],
+  );
+  return {
+    entryDate: p.entry_date,
+    journal: {
+      branchId: entry.rows[0]?.branch_id ?? '',
+      memo: entry.rows[0]?.memo ?? '',
+      lines: lines.rows.map((l) => ({
+        accountId: l.account_id,
+        partyId: l.party_id,
+        debit: toMoney(l.debit),
+        credit: toMoney(l.credit),
+      })),
+    },
+    movements: movements.rows.map((m) => ({
+      sourceLineId: m.source_line_id,
+      itemId: m.item_id,
+      locationId: m.location_id,
+      qtyDelta: toQty(m.qty),
+      unitCost: toMoney(m.unit_cost),
+      valueDelta: toMoney(m.value_delta),
+      avgCostAfter: m.avg_cost_after === null ? null : toMoney(m.avg_cost_after),
+    })),
+    partyEntries: parties.rows.map((e) => ({
+      partyId: e.party_id,
+      role: e.role,
+      amount: toMoney(e.amount),
+      dueDate: e.due_date,
+    })),
+    exceptions: [],
+    state: { costs: {}, balances: {} },
+  };
 }

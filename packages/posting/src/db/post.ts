@@ -4,6 +4,7 @@ import type pg from 'pg';
 import { postCashMovement, postCollection, postSession } from '../cash';
 import { postHandover } from '../handover';
 import { postSale } from '../sale';
+import { postVoid } from '../void';
 import type { PostingContext, PostingException, PostingResult } from '../types';
 import {
   loadCashMovement,
@@ -11,8 +12,11 @@ import {
   loadContext,
   loadHandover,
   loadSale,
+  loadSalePosting,
   loadSessionEvent,
   loadState,
+  loadStateOf,
+  loadVoid,
 } from './load';
 import { writePosting } from './write';
 
@@ -22,7 +26,8 @@ import { writePosting } from './write';
 // a posting that fails is rolled back alone, the document stays accepted (SYN-03) and gets a `posting_failed`
 // exception.
 
-export type SourceType = 'sale' | 'cash_handover' | 'payment' | 'cash_movement' | 'cash_session';
+export type SourceType =
+  'sale' | 'cash_handover' | 'payment' | 'cash_movement' | 'cash_session' | 'sales_void';
 
 /**
  * Where each kind of document lives, which row holds it, and whom an exception on it belongs to. Constants, never
@@ -42,6 +47,7 @@ const SOURCES: Record<
     userColumn: 'cashier_user_id',
     byClose: true,
   },
+  sales_void: { table: 'sales_voids', documentType: 'sales_void', userColumn: 'voided_by_user_id' },
 };
 
 /** The SQL that finds a source's row by the document id in `$n`. */
@@ -194,6 +200,20 @@ async function compute(
     const context = await loadContext(c, null);
     return { context, result: postSession(doc, context) };
   }
+  if (type === 'sales_void') {
+    // A duplicate, or a void whose bill hasn't arrived, loads as null: it never posts (W1-12).
+    const v = await loadVoid(c, id);
+    if (!v) throw missing();
+    const context = await loadContext(c, null);
+    const original = await loadSalePosting(c, v.saleId);
+    if (original === null) return { context, result: { ok: false, error: { code: 'sale_not_posted' } } };
+    const state = await loadStateOf(
+      c,
+      original.movements.map((m) => m.itemId),
+      original.movements.map((m) => m.locationId),
+    );
+    return { context, result: postVoid(v.void, original, context, state) };
+  }
   const loaded = await loadSale(c, id);
   if (!loaded) throw new Error(`no ${type} ${id} to post`);
   const context = await loadContext(c, loaded.sale.customerId);
@@ -250,6 +270,12 @@ export async function postPending(
                FROM erp.cash_sessions z
                WHERE NOT EXISTS (SELECT 1 FROM erp.postings p
                                  WHERE p.source_type = 'cash_session' AND p.source_id = z.id)
+               UNION ALL
+               -- A void posts once its bill has posted (it swaps the bill's posting, W1-12).
+               SELECT v.id, 'sales_void', v.received_at, v.device_id, v.seq FROM erp.sales_voids v
+               WHERE v.duplicate_of_id IS NULL AND v.sale_document_id IS NOT NULL
+                 AND EXISTS (SELECT 1 FROM erp.postings p WHERE p.source_type = 'sale' AND p.source_id = v.sale_document_id)
+                 AND NOT EXISTS (SELECT 1 FROM erp.postings p WHERE p.source_type = 'sales_void' AND p.source_id = v.id)
                UNION ALL
                SELECT z.close_document_id, 'cash_session', z.closed_at, z.device_id, (z.close_payload->>'seq')::int
                FROM erp.cash_sessions z

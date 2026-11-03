@@ -99,7 +99,7 @@ Line price concessions (negotiated below list) are **not** separate GL entries. 
 §4.1 for the positive lines plus §4.2 for the negative lines, in **one** journal entry. Only the **net** settlement moves: `cash_due` > 0 is collected, < 0 is refunded.
 
 ### 4.4 Void
-A reversing journal entry with every line of the original entry swapped, dated the void date. Stock movements are reversed at the same unit costs, and party ledger entries are reversed. A void is only allowed before the cash handover (D-002 / PRD W5), so `CASH_IN_TRANSIT` is cleared by the reversal itself.
+A reversing journal entry with every line of the original entry swapped, dated the void's business date (the day after the lock date when locked). Stock movements are reversed at the same unit costs (the average recomputed as a receipt at that cost; a line that left with no cost comes back at 0 and leaves the average as it is), and party ledger entries are reversed on their own due dates. A void is only allowed before the cash handover, for every role (D-002 / PRD W5, owner answer 1 to W1-12), so `CASH_IN_TRANSIT` is cleared by the reversal itself. A void reaches the books only after its bill has posted; one whose bill hasn't arrived or hasn't posted waits (W1-12). Cash taken at the desk for a voided bill anyway still posts its handover, so `CASH_IN_TRANSIT` shows it until it is explained (`cash_received_for_void`, D-059).
 
 ### 4.5 Cash desk events
 | Event | Entry |

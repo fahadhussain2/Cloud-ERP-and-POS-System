@@ -10,6 +10,7 @@ import {
   fromBase64Url,
   PushRequestSchema,
   SaleDocumentV1,
+  SaleVoidV1,
   toBase64Url,
   verifyCanonical,
   type ExceptionKind,
@@ -31,6 +32,7 @@ import {
   reviewHandover,
   reviewSale,
   reviewSession,
+  reviewVoid,
   type CashFinding,
   type CashHandoverDocument,
   type CashMovementDocument,
@@ -46,6 +48,8 @@ import {
   type RoleLimits,
   type SaleDocument,
   type SaleFinding,
+  type SaleVoidDocument,
+  type VoidFinding,
 } from '@erp/domain';
 import { holdPostingOrder, postDocument, type PostOutcome, type SourceType } from '@erp/posting';
 import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
@@ -59,7 +63,9 @@ import type pg from 'pg';
 // and flagged `posting_failed`. A cash desk also pushes its handovers (H) and its sessions' open and close (Z, W1-10):
 // a handover is linked to its bill by number, now or when the bill arrives, reviewed with reviewHandover and posted.
 // From W1-11 it also pushes collections (R) and cash movements (M), and closes with a count (CashSessionV2): each is
-// reviewed (reviewDeskDocument, reviewSession), stored and posted like a handover.
+// reviewed (reviewDeskDocument, reviewSession), stored and posted like a handover. From W1-12 any device pushes its
+// voids (V): linked to the bill by number, now or when the bill arrives, reviewed with reviewVoid, the bill marked
+// voided, and the bill's posting reversed once the bill has posted.
 
 interface Deps {
   pool: pg.Pool;
@@ -81,7 +87,8 @@ type Trusted =
   | { family: 'H'; doc: CashHandoverDocument }
   | { family: 'R'; doc: CustomerCollectionDocument }
   | { family: 'M'; doc: CashMovementDocument }
-  | { family: 'Z'; doc: CashSessionDocument };
+  | { family: 'Z'; doc: CashSessionDocument }
+  | { family: 'V'; doc: SaleVoidDocument };
 
 /** What every document of one push is checked against, read once per push. */
 interface Setting {
@@ -115,6 +122,10 @@ const SEVERITY: Partial<Record<ExceptionKind, 'low' | 'medium' | 'high'>> = {
   handover_not_permitted: 'low',
   cash_not_permitted: 'low',
   clock_skew: 'low',
+  // Cash in the drawer for a voided bill is a possible leak (D-059).
+  cash_received_for_void: 'high',
+  void_not_permitted: 'medium',
+  duplicate_void: 'medium',
 };
 
 const sha256 = (value: unknown) => createHash('sha256').update(canonicalJson(value)).digest();
@@ -276,9 +287,17 @@ async function pushOne(
   try {
     const t = await trusted(c, device, s, doc);
     let post: SourceType | null = null;
+    /** Voids that were waiting for this bill: posted after it (W1-12). */
+    let voids: string[] = [];
     if (t.family === 'S') {
-      result = await accept(c, device, s, t.doc, doc, received);
+      const stored = await accept(c, device, s, t.doc, doc, received);
+      result = stored.result;
+      voids = stored.voids;
       post = 'sale';
+    } else if (t.family === 'V') {
+      const stored = await acceptVoid(c, device, t.doc, doc, received);
+      result = stored.result;
+      if (stored.post) post = 'sales_void';
     } else if (t.family === 'H') {
       const stored = await acceptHandover(c, device, t.doc, doc, received);
       result = stored.result;
@@ -298,6 +317,10 @@ async function pushOne(
     if (post !== null) {
       const started = performance.now();
       posting = await postDocument(c, { tenantId: device.tenantId, type: post, id: doc.id, now: received });
+      // A void can only swap a posted bill: one whose bill failed to post waits for the catch-up.
+      if (posting.status === 'posted')
+        for (const id of voids)
+          await postDocument(c, { tenantId: device.tenantId, type: 'sales_void', id, now: received });
       postingMs = Math.round(performance.now() - started);
     }
   } catch (err) {
@@ -343,6 +366,7 @@ async function trusted(c: pg.ClientBase, device: Device, s: Setting, doc: PushDo
   if (doc.family === 'Z') return { family: 'Z', doc: await trustedSession(c, device, doc) };
   if (doc.family === 'R') return { family: 'R', doc: await trustedCollection(c, device, s, doc) };
   if (doc.family === 'M') return { family: 'M', doc: await trustedMovement(c, device, doc) };
+  if (doc.family === 'V') return { family: 'V', doc: await trustedVoid(c, device, doc) };
   const parsed = SaleDocumentV1.safeParse(doc.payload);
   if (!parsed.success) throw new Rejected('bad_schema');
   const d = parsed.data as unknown as SaleDocument;
@@ -470,6 +494,31 @@ async function trustedMovement(c: pg.ClientBase, device: Device, doc: PushDocume
   return m;
 }
 
+/**
+ * A void (W1-12): from any kind of device, but only of its own bill (owner answer 2): the bill's number carries the
+ * device's code. The bill itself isn't checked: it is linked by number, now or when it arrives. The voider and the
+ * approver must be this tenant's.
+ */
+async function trustedVoid(c: pg.ClientBase, device: Device, doc: PushDocument) {
+  const parsed = SaleVoidV1.safeParse(doc.payload);
+  if (!parsed.success) throw new Rejected('bad_schema');
+  const v = parsed.data as unknown as SaleVoidDocument;
+  if (v.id !== doc.id || v.seq !== doc.seq) throw new Rejected('bad_schema');
+  if (
+    v.deviceId !== device.deviceId ||
+    v.branchId !== device.branchId ||
+    !v.saleNumber.startsWith(`${device.code}-S`)
+  )
+    throw new Rejected('wrong_device');
+  const users = [...new Set([v.userId, v.approvedBy])];
+  const known = await c.query<{ n: number }>('SELECT count(*)::int AS n FROM erp.users WHERE id = ANY($1)', [
+    users,
+  ]);
+  if (known.rows[0]!.n !== users.length) throw new Rejected('unknown_reference');
+  await seqTaken(c, device, doc);
+  return v;
+}
+
 async function grantsOf(c: pg.ClientBase, userIds: string[]): Promise<Record<string, RoleGrant[]>> {
   const { rows } = await c.query<{
     user_id: string;
@@ -496,9 +545,9 @@ async function accept(
   d: SaleDocument,
   doc: PushDocument,
   received: Date,
-): Promise<PushResult> {
-  // First, before the posting order lock a sale on account takes: the same order as a handover's push.
-  if (d.cashDue !== 0) await holdBill(c, d.number);
+): Promise<{ result: PushResult; voids: string[] }> {
+  // First, before the posting order lock a sale on account takes: the same order as a handover's and a void's push.
+  await holdBill(c, d.number);
   const grants = await grantsOf(c, [d.sellerId, ...d.overrides.map((o) => o.approvedBy)]);
   const findings = reviewSale(d, {
     deviceCode: device.code,
@@ -528,9 +577,9 @@ async function accept(
     `INSERT INTO erp.sales_documents (id, tenant_id, branch_id, device_id, number, seq, kind, business_date,
        created_at_device, received_at, salesperson_user_id, customer_party_id, walkin_phone, price_tier_id, subtotal,
        line_discount_total, bill_discount, rounding, tax_total, total, cash_due, handover_status, payload, payload_hash,
-       signature, client_version, exception_count, cash_received, change_due)
+       signature, client_version, exception_count, cash_received, change_due, reissue_of_id, reissue_of_number)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
-       $24, $25, $26, $27, $28, $29)`,
+       $24, $25, $26, $27, $28, $29, $30, $31)`,
     [
       d.id,
       device.tenantId,
@@ -562,6 +611,9 @@ async function accept(
       // What the cash desk's queue shows (W1-10): the salesman's cash received and the change.
       cash?.cashReceived ?? null,
       cash?.changeDue ?? null,
+      // The voided bill this one reissues (W1-12), as the counter named it.
+      d.reissueOf?.id ?? null,
+      d.reissueOf?.number ?? null,
     ],
   );
   // Each line says which tax code applied, at 0% for now (ACC-09): the item's own, or the tenant's default.
@@ -640,12 +692,184 @@ async function accept(
       details: e.details,
     });
   await linkWaitingHandovers(c, device.tenantId, d);
+  const voids = await linkWaitingVoids(c, device, d);
   return {
-    id: d.id,
-    status: 'accepted',
-    exceptions: [...new Set(exceptions.map((e) => e.kind))],
-    error: null,
+    result: {
+      id: d.id,
+      status: 'accepted',
+      exceptions: [...new Set(exceptions.map((e) => e.kind))],
+      error: null,
+    },
+    voids,
   };
+}
+
+/**
+ * Voids that arrived before their bill (W1-12): linked now, and the bill marked voided. They were reviewed at their
+ * own arrival against the bill number and the document's dates, so nothing new is found. Returns the ones to post.
+ */
+async function linkWaitingVoids(c: pg.ClientBase, device: Device, bill: SaleDocument): Promise<string[]> {
+  const { rows } = await c.query<{ id: string; payload: SaleVoidDocument; duplicate_of_id: string | null }>(
+    `SELECT id, payload, duplicate_of_id FROM erp.sales_voids
+     WHERE sale_number = $1 AND sale_document_id IS NULL ORDER BY received_at, id`,
+    [bill.number],
+  );
+  const toPost: string[] = [];
+  for (const v of rows) {
+    await c.query('UPDATE erp.sales_voids SET sale_document_id = $2 WHERE id = $1', [v.id, bill.id]);
+    if (v.duplicate_of_id !== null) continue;
+    await markVoided(c, device, bill.id, v.payload);
+    toPost.push(v.id);
+  }
+  return toPost;
+}
+
+/**
+ * The bill becomes voided (workflow fields, audited by the table's trigger and as `sale.voided`), and the approval is
+ * kept as an override of kind `void` on it, so the overrides report sees it (data model §5).
+ */
+async function markVoided(c: pg.ClientBase, device: Device, billId: string, v: SaleVoidDocument) {
+  await c.query(
+    `UPDATE erp.sales_documents SET status = 'voided', void_document_id = $2, void_reason_code = $3, voided_at = $4,
+       voided_by_user_id = $5, void_approved_by_user_id = $6
+     WHERE id = $1 AND status = 'finalized'`,
+    [billId, v.id, v.reason, v.createdAt, v.userId, v.approvedBy],
+  );
+  await c.query(
+    `INSERT INTO erp.overrides (tenant_id, document_id, line_id, kind, requested_by_user_id, approved_by_user_id,
+       reason_code, note, values, at_device)
+     VALUES ($1, $2, NULL, 'void', $3, $4, $5, $6, $7, $8)`,
+    [
+      device.tenantId,
+      billId,
+      v.userId,
+      v.approvedBy,
+      v.reason,
+      v.note,
+      JSON.stringify({
+        voidNumber: v.number,
+        total: v.saleTotal,
+        cashDue: v.saleCashDue,
+        seen: v.handoverSeen,
+      }),
+      v.createdAt,
+    ],
+  );
+  await c.query(
+    `INSERT INTO erp.audit_log (tenant_id, at, user_id, device_id, action, entity, entity_id, after)
+     VALUES ($1, $2, $3, $4, 'sale.voided', 'sales_documents', $5, $6)`,
+    [
+      device.tenantId,
+      v.createdAt,
+      v.approvedBy,
+      v.deviceId,
+      billId,
+      JSON.stringify({ number: v.saleNumber, void: v.number, voidedBy: v.userId, reason: v.reason }),
+    ],
+  );
+}
+
+/**
+ * Stores a pushed void (W1-12) with its findings: linked to its bill when the bill is here (and the bill marked
+ * voided), else waiting for it by number. A second void of the bill is kept as a duplicate and never posted. Says
+ * whether to post it now: only a linked first void of a bill that has posted.
+ */
+async function acceptVoid(
+  c: pg.ClientBase,
+  device: Device,
+  v: SaleVoidDocument,
+  doc: PushDocument,
+  received: Date,
+): Promise<{ result: PushResult; post: boolean }> {
+  await holdBill(c, v.saleNumber);
+  const bill = (
+    await c.query<{ id: string; business_date: string; cash_due: string; posted: boolean }>(
+      `SELECT d.id, d.business_date::text, d.cash_due,
+         EXISTS (SELECT 1 FROM erp.postings p WHERE p.source_type = 'sale' AND p.source_id = d.id) AS posted
+       FROM erp.sales_documents d WHERE d.number = $1 ORDER BY d.received_at, d.id LIMIT 1`,
+      [v.saleNumber],
+    )
+  ).rows[0];
+  const existing = (
+    await c.query<{ id: string; number: string }>(
+      `SELECT id, number FROM erp.sales_voids
+       WHERE sale_number = $1 AND duplicate_of_id IS NULL AND id <> $2 FOR UPDATE`,
+      [v.saleNumber, v.id],
+    )
+  ).rows[0];
+  // Any handover in of the number, an offline scan whose bill hasn't arrived included.
+  const handover = (
+    await c.query<{ id: string; number: string; at_device: Date }>(
+      `SELECT id, number, at_device FROM erp.cash_handovers
+       WHERE bill_number = $1 AND kind = 'in' AND duplicate_of_id IS NULL ORDER BY at_device LIMIT 1`,
+      [v.saleNumber],
+    )
+  ).rows[0];
+  const grants = await grantsOf(c, [v.approvedBy]);
+  const findings = reviewVoid(v, {
+    bill: bill ? { id: bill.id, businessDate: bill.business_date, cashDue: money(bill.cash_due) } : null,
+    handover: handover
+      ? { id: handover.id, number: handover.number, at: handover.at_device.toISOString() }
+      : null,
+    existing: existing ?? null,
+    grants: grants[v.approvedBy] ?? [],
+    branchId: v.branchId,
+  });
+  await c.query(
+    `INSERT INTO erp.sales_voids (id, tenant_id, branch_id, device_id, number, seq, sale_document_id, sale_number,
+       voided_by_user_id, approved_by_user_id, reason_code, note, handover_seen, at_device, business_date, received_at,
+       duplicate_of_id, payload, payload_hash, signature, client_version, exception_count)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
+    [
+      v.id,
+      device.tenantId,
+      v.branchId,
+      v.deviceId,
+      v.number,
+      v.seq,
+      bill?.id ?? null,
+      v.saleNumber,
+      v.userId,
+      v.approvedBy,
+      v.reason,
+      v.note,
+      v.handoverSeen,
+      v.createdAt,
+      v.businessDate,
+      received,
+      existing?.id ?? null,
+      JSON.stringify(doc.payload),
+      sha256(doc.payload),
+      Buffer.from(fromBase64Url(doc.signature!)),
+      v.clientVersion,
+      findings.length,
+    ],
+  );
+  const duplicate = existing !== undefined;
+  if (bill && !duplicate) await markVoided(c, device, bill.id, v);
+  for (const f of findings) await addVoidException(c, device, v, f);
+  return {
+    result: {
+      id: v.id,
+      status: 'accepted',
+      exceptions: [...new Set(findings.map((f) => f.kind))],
+      error: null,
+    },
+    post: bill !== undefined && bill.posted && !duplicate,
+  };
+}
+
+/** One exception on a void, with its figures (sync spec §6.2). */
+async function addVoidException(c: pg.ClientBase, device: Device, v: SaleVoidDocument, f: VoidFinding) {
+  const { kind, ...details } = f;
+  await addException(c, device, {
+    kind,
+    documentType: 'sales_void',
+    documentId: v.id,
+    userId: v.userId,
+    businessDate: v.businessDate,
+    details: { ...details, billNumber: v.saleNumber, voidNumber: v.number, approvedBy: v.approvedBy },
+  });
 }
 
 /**
@@ -716,8 +940,16 @@ async function acceptHandover(
 ): Promise<{ result: PushResult; duplicate: boolean }> {
   await holdBill(c, h.billNumber);
   const bill = (
-    await c.query<{ id: string; cash_due: string }>(
-      'SELECT id, cash_due FROM erp.sales_documents WHERE number = $1 ORDER BY received_at, id LIMIT 1',
+    await c.query<{
+      id: string;
+      cash_due: string;
+      void_id: string | null;
+      void_number: string | null;
+      voided_at: Date | null;
+    }>(
+      `SELECT d.id, d.cash_due, v.id AS void_id, v.number AS void_number, d.voided_at
+       FROM erp.sales_documents d LEFT JOIN erp.sales_voids v ON v.id = d.void_document_id
+       WHERE d.number = $1 ORDER BY d.received_at, d.id LIMIT 1`,
       [h.billNumber],
     )
   ).rows[0];
@@ -731,7 +963,17 @@ async function acceptHandover(
   ).rows[0];
   const grants = await grantsOf(c, [h.cashierId]);
   const findings = reviewHandover(h, {
-    bill: bill ? { id: bill.id, cashDue: money(bill.cash_due) } : null,
+    bill: bill
+      ? {
+          id: bill.id,
+          cashDue: money(bill.cash_due),
+          // A voided bill (W1-12): cash for it is a finding (D-059).
+          voided:
+            bill.void_id === null
+              ? null
+              : { id: bill.void_id, number: bill.void_number!, at: bill.voided_at!.toISOString() },
+        }
+      : null,
     existing: existing ?? null,
     grants: grants[h.cashierId] ?? [],
     branchId: h.branchId,
@@ -1112,7 +1354,8 @@ async function addException(
   e: {
     kind: ExceptionKind;
     /** Defaults to a sale. */
-    documentType?: 'sales_document' | 'cash_handover' | 'payment' | 'cash_movement' | 'cash_session';
+    documentType?:
+      'sales_document' | 'cash_handover' | 'payment' | 'cash_movement' | 'cash_session' | 'sales_void';
     documentId: string | null;
     userId: string | null;
     businessDate: string;

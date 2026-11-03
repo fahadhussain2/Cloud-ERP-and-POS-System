@@ -10,6 +10,7 @@ import {
   PULL_LIMIT_MAX,
   TemporaryPinRequest,
   verifyPin,
+  type BillStatusResponse,
   type CashDeskDataset,
   type CatalogDataset,
   type CheckoutDataset,
@@ -298,6 +299,56 @@ export function registerSync(scope: FastifyInstance, { pool, now, requireAuth, r
       if (outcome === 'refused') return reply.code(403).send({ error: 'cannot_grant' });
       if (outcome !== 'set') return reply.code(400).send({ error: 'weak_pin', problem: outcome.problem });
       return reply.code(204).send();
+    },
+  );
+
+  // Before a void (W1-12, POS spec §18): has the cash desk taken this bill's cash? Only the device's own bills (owner
+  // answer 2). The bill's status, or, while the bill isn't here, any handover of its number (an offline scan).
+  scope.get<{ Querystring: { number?: string } }>(
+    '/sync/bills/status',
+    { preHandler: requireDevice },
+    async (req, reply) => {
+      const d = req.device!;
+      const number = req.query.number ?? '';
+      if (!/^[A-Z]\d{2,}-S\d{6,}$/.test(number)) return reply.code(400).send({ error: 'invalid_request' });
+      if (!number.startsWith(`${d.code}-`)) return reply.code(403).send({ error: 'not_own_bill' });
+      const answer: BillStatusResponse = await withTenant(
+        pool,
+        { tenantId: d.tenantId, deviceId: d.deviceId, requestId: req.id },
+        async (_db, c) => {
+          const bill = (
+            await c.query<{
+              status: 'finalized' | 'voided';
+              handover_status: BillStatusResponse['handoverStatus'];
+            }>(
+              'SELECT status, handover_status FROM erp.sales_documents WHERE number = $1 ORDER BY received_at LIMIT 1',
+              [number],
+            )
+          ).rows[0];
+          const handover = (
+            await c.query<{ kind: 'in' | 'payout'; at_device: Date; cashier: string | null }>(
+              `SELECT h.kind, h.at_device, u.full_name AS cashier FROM erp.cash_handovers h
+               LEFT JOIN erp.users u ON u.id = h.cashier_user_id
+               WHERE h.bill_number = $1 AND h.duplicate_of_id IS NULL ORDER BY h.at_device LIMIT 1`,
+              [number],
+            )
+          ).rows[0];
+          const fromHandover = handover ? (handover.kind === 'in' ? 'received' : 'paid_out') : null;
+          // A pending bill with a handover not yet linked to it still counts as handed over.
+          const handoverStatus =
+            bill === undefined || bill.handover_status === 'pending'
+              ? (fromHandover ?? bill?.handover_status ?? null)
+              : bill.handover_status;
+          return {
+            known: bill !== undefined,
+            status: bill?.status ?? null,
+            handoverStatus,
+            handedOverAt: handover?.at_device.toISOString() ?? null,
+            cashierName: handover?.cashier ?? null,
+          };
+        },
+      );
+      return answer;
     },
   );
 

@@ -181,6 +181,8 @@ export type PostingError =
   | { code: 'role_unmapped'; role: PostingRole }
   | { code: 'on_account_without_customer' }
   | { code: 'target_unmapped'; targetId: string | null }
-  | { code: 'party_missing' };
+  | { code: 'party_missing' }
+  /** A void whose sale has no posting yet: it waits for it (W1-12). */
+  | { code: 'sale_not_posted' };
 
 export type PostingResult = { ok: true; posting: Posting } | { ok: false; error: PostingError };

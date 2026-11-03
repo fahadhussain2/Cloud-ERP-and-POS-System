@@ -43,6 +43,9 @@ export const EXCEPTION_KINDS = [
   'handover_not_permitted',
   'cash_not_permitted',
   'float_mismatch',
+  // Voids (W1-12): an approver or a day the rules don't allow, and a second void of one bill.
+  'void_not_permitted',
+  'duplicate_void',
 ] as const;
 export type ExceptionKind = (typeof EXCEPTION_KINDS)[number];
 

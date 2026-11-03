@@ -11,6 +11,7 @@ import { expect, test } from './counter-test';
 import {
   BACKOFFICE_PORT,
   CASHIER,
+  MANAGER,
   OWN_PIN,
   OWNER,
   OWNER_PASSWORD,
@@ -24,6 +25,8 @@ import {
 // within 5 s under its salesman, confirmed with Enter; a corrected cash received; a scan of a queued bill; offline, a
 // scan of a bill whose counter hasn't synced, matched by the server once both are back; a second scan refused; a
 // sale on the desk handed over by itself. W1-11 adds a collection, a cash-out offline and the counted close (below).
+// W1-12 plan scope 7: a void before the handover and its reissue, a handed-over bill refused, and an offline void of a
+// bill the desk took cash for, flagged on the server.
 
 const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
 const POS = `http://localhost:${POS_PORT}`;
@@ -360,6 +363,105 @@ test('offline, a cash-out is written and printed at the desk; it reaches the ser
       ['6310', 20000, 0],
       ['1110', 0, 20000],
     ]);
+});
+
+/** The counter: Alt+V, the bill by its number, then the manager's own PIN and a reason (POS spec §18). */
+async function voidBill(page: Page, bill: string) {
+  await page.keyboard.press('Alt+V');
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(pos.void.search).fill(bill);
+  await expect(dialog.getByRole('option', { name: new RegExp(bill) })).toBeVisible();
+  await dialog.getByLabel(pos.void.search).press('Enter');
+}
+async function approveVoid(page: Page) {
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: new RegExp(MANAGER.fullName) }).click();
+  await dialog.getByLabel(pos.approval.pin).fill(MANAGER.pin);
+  await dialog.getByLabel(pos.override.reason.wrong_price).check();
+  await dialog.getByRole('button', { name: new RegExp(`^${pos.approval.action}`) }).click();
+}
+const saleOf = async (bill: string) =>
+  (
+    await sql<{ status: string; reissue_of_number: string | null }>(
+      'SELECT status, reissue_of_number FROM erp.sales_documents WHERE number = $1',
+      [bill],
+    )
+  )[0] ?? null;
+
+test('a manager voids a cash bill before its handover: it leaves the queue, and its reissue joins it', async ({
+  page,
+}) => {
+  await openCounter(page);
+  const bill = await sell(page, 'FNBL002');
+  await expect(queue().getByText(bill)).toBeVisible({ timeout: 10_000 });
+
+  await voidBill(page, bill);
+  await expect(page.getByRole('dialog')).toContainText(pos.void.deskStatus.pending);
+  await approveVoid(page);
+  await expect(page.getByRole('dialog')).toContainText(`Reissue ${bill}?`);
+  // The desk drops it as soon as the server has the void (queue-changed).
+  await expect(queue().getByText(bill)).toBeHidden({ timeout: 10_000 });
+  await expect.poll(() => saleOf(bill)).toMatchObject({ status: 'voided' });
+
+  await page.getByRole('button', { name: new RegExp(`^${pos.void.reissueAction}`) }).click();
+  await expect(page.getByText(`Reissue of ${bill}`, { exact: true })).toBeVisible();
+  await page.keyboard.press('F9');
+  await page.getByRole('dialog').getByLabel(pos.pay.cashReceived).press('Enter');
+  const notice = page.getByRole('region', { name: pos.bill.title }).getByRole('status');
+  await expect(notice).toHaveText(/^Bill C\d+-S\d{6} printed/);
+  const again = /C\d+-S\d{6}/.exec((await notice.textContent()) ?? '')![0];
+  await expect(queue().getByText(again)).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => saleOf(again)).toMatchObject({ status: 'finalized', reissue_of_number: bill });
+});
+
+test('a bill the desk has taken cash for is refused, with when and by whom', async ({ page }) => {
+  await openCounter(page);
+  const bill = await sell(page, 'FNBL002');
+  await expect(queue().getByText(bill)).toBeVisible({ timeout: 10_000 });
+  await queue()
+    .getByRole('row', { name: new RegExp(bill) })
+    .click();
+  await scanField().press('Enter');
+  await expect.poll(() => handoverOf(bill)).toMatchObject({ status: 'received' });
+
+  await voidBill(page, bill);
+  const panel = page.getByRole('region', { name: pos.bill.title });
+  await expect(panel).toContainText(new RegExp(`${bill} was handed over at .* by ${CASHIER.fullName}`));
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect((await saleOf(bill))?.status).toBe('finalized');
+});
+
+test('offline, a void of a bill the desk took cash for meanwhile is flagged on the server', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(90_000);
+  await openCounter(page);
+  const bill = await sell(page, 'FNBL002');
+  await expect(queue().getByText(bill)).toBeVisible({ timeout: 10_000 });
+  await context.setOffline(true);
+  // The desk, still online, takes the cash.
+  await queue()
+    .getByRole('row', { name: new RegExp(bill) })
+    .click();
+  await scanField().press('Enter');
+  await expect.poll(() => handoverOf(bill)).toMatchObject({ status: 'received' });
+
+  await voidBill(page, bill);
+  await expect(page.getByRole('dialog')).toContainText(pos.void.approveUnknown);
+  await approveVoid(page);
+  // No reissue: Esc.
+  await expect(page.getByRole('dialog')).toContainText(`Reissue ${bill}?`);
+  await page.keyboard.press('Escape');
+  await context.setOffline(false);
+  await expect(page.getByText('0 bills waiting to sync')).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => saleOf(bill), { timeout: 30_000 }).toMatchObject({ status: 'voided' });
+  const flagged = await sql<{ kind: string; order: string }>(
+    `SELECT e.kind, e.details->>'order' AS order FROM erp.exceptions e JOIN erp.sales_voids v ON v.id = e.document_id
+     WHERE v.sale_number = $1`,
+    [bill],
+  );
+  expect(flagged).toEqual([{ kind: 'cash_received_for_void', order: 'before_void' }]);
 });
 
 test('the drawer is counted blind, short, acknowledged later; the owner acknowledges it on the day reconciliation', async ({
