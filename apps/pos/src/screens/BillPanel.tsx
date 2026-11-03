@@ -37,6 +37,7 @@ export function BillPanel({
   tierName,
   customerText,
   walkinPhone,
+  reissueOf = null,
   selected,
   active,
   message,
@@ -58,6 +59,8 @@ export function BillPanel({
   customerText: string | null;
   /** A walk-in's phone, shown by its last four digits. */
   walkinPhone: string | null;
+  /** The voided bill this one reissues (POS spec §18), or null. */
+  reissueOf?: string | null;
   /** The selected line, when the lines have the keyboard. */
   selected: number;
   active: boolean;
@@ -99,6 +102,11 @@ export function BillPanel({
           {t('bill.title')}
         </h2>
         <span className="text-sm">
+          {reissueOf && (
+            <Badge variant="outline" className="me-2">
+              {t('bill.reissueOf', { number: reissueOf })}
+            </Badge>
+          )}
           {customerText ??
             (walkinPhone ? t('bill.walkInPhone', { phone: maskPhone(walkinPhone) }) : t('bill.walkIn'))}{' '}
           · <span className="font-semibold">{t('bill.tierPrices', { tier: tierName })}</span>

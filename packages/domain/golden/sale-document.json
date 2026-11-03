@@ -1,5 +1,5 @@
 {
-  "description": "The finalized sale (sync spec §6.1, POS spec §12): lines with their list, floor, discount and share of the bill discount; amounts with rounding; settled payments; cash due; the approvals as overrides. Every case runs on counter C03 (device 019a…d1, branch 019a…e1) in Asia/Karachi with the 04:00 cutoff, Rs 1 rounding, Delux's payment methods and app version 0.6.0. From W1-09 a case may give the customer (party id, or a walk-in phone), the counter’s credit view (the account, the pulled balance and when, this counter’s unsynced on-account total, offline or not, today’s offline on-account total) and a credit approval; cases without them are walk-in bills with no phone.",
+  "description": "The finalized sale (sync spec §6.1, POS spec §12): lines with their list, floor, discount and share of the bill discount; amounts with rounding; settled payments; cash due; the approvals as overrides. Every case runs on counter C03 (device 019a…d1, branch 019a…e1) in Asia/Karachi with the 04:00 cutoff, Rs 1 rounding, Delux's payment methods and app version 0.6.0. From W1-09 a case may give the customer (party id, or a walk-in phone), the counter’s credit view (the account, the pulled balance and when, this counter’s unsynced on-account total, offline or not, today’s offline on-account total) and a credit approval; cases without them are walk-in bills with no phone. From W1-12 a case may name the voided bill it reissues (reissueOf: id and number); the document then carries it, and a bill that reissues nothing has no reissueOf at all.",
   "cases": [
     {
       "name": "three lines, a bill discount, a below-floor approval and a split cash + JazzCash payment",
@@ -323,6 +323,107 @@
           }
         ],
         "clientVersion": "0.6.0"
+      }
+    },
+    {
+      "name": "a reissue (W1-12): the voided bill it replaces is named on the document",
+      "input": {
+        "sellerMaxDiscountBp": 10000,
+        "context": { "id": "019a3f70-0000-7000-8000-00000000f004", "seq": 414, "createdAtMs": 1793614530000 },
+        "bill": {
+          "version": 1,
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "lines": [
+            {
+              "id": "l1",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "allowsFraction": false,
+              "list": 145000,
+              "floor": 140000,
+              "unitPrice": 145000,
+              "approval": null
+            }
+          ],
+          "billDiscount": 10000,
+          "billApproval": {
+            "kind": "below_floor",
+            "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+            "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+            "reason": "regular_customer",
+            "note": null,
+            "at": "2026-11-02T10:15:00.000Z",
+            "values": { "billDiscount": 10000, "lines": [{ "id": "l1", "qty": 1000, "unitPrice": 145000 }] }
+          }
+        },
+        "tender": {
+          "payments": [{ "method": "raast", "amount": 135000, "reference": "RST-5512" }],
+          "cashReceived": null
+        },
+        "reissueOf": { "id": "019a5000-0000-7000-8000-000000000412", "number": "C03-S000412" }
+      },
+      "expected": {
+        "version": 1,
+        "id": "019a3f70-0000-7000-8000-00000000f004",
+        "family": "S",
+        "seq": 414,
+        "number": "C03-S000414",
+        "kind": "sale",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "createdAt": "2026-11-02T10:15:30.000Z",
+        "businessDate": "2026-11-02",
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "tierId": "019a0000-0000-7000-8000-0000000000b1",
+        "customerId": null,
+        "walkinPhone": null,
+        "lines": [
+          {
+            "lineNo": 1,
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "listPrice": 145000,
+            "floorPrice": 140000,
+            "unitPrice": 145000,
+            "lineDiscount": 0,
+            "billShare": 10000,
+            "lineTotal": 135000
+          }
+        ],
+        "amounts": {
+          "subtotal": 145000,
+          "lineDiscountTotal": 0,
+          "billDiscount": 10000,
+          "rounding": 0,
+          "taxTotal": 0,
+          "total": 135000
+        },
+        "payments": [
+          {
+            "method": "raast",
+            "amount": 135000,
+            "cashReceived": null,
+            "changeDue": null,
+            "reference": "RST-5512"
+          }
+        ],
+        "cashDue": 0,
+        "handoverStatus": "not_applicable",
+        "overrides": [
+          {
+            "kind": "below_floor",
+            "lineNo": null,
+            "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+            "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+            "reason": "regular_customer",
+            "note": null,
+            "at": "2026-11-02T10:15:00.000Z",
+            "values": { "billDiscount": 10000, "lines": [{ "lineNo": 1, "qty": 1000, "unitPrice": 145000 }] }
+          }
+        ],
+        "clientVersion": "0.6.0",
+        "reissueOf": { "id": "019a5000-0000-7000-8000-000000000412", "number": "C03-S000412" }
       }
     },
     {

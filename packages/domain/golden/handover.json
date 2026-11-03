@@ -1,5 +1,5 @@
 {
-  "description": "The cash desk's handover check (cash desk spec, CSH-02, CSH-03, CSH-04, PRD W4, W7): may this cashier confirm this bill now, and what is recorded. A positive cash due is a handover in, a negative one a payout. The cash received is the cashier's correction, else the salesman's figure, else the exact amount; a bill known only from its code has no salesman's figure. Unless a case says otherwise: session …51 is open on this desk for cashier …a5 (a cashier: cash.handover.receive, cash.refund.pay, cash.session.close); …a6 may receive handovers but not pay refunds; …a1 is a salesman. Unit Rs 1 = 100, amounts in paisa.",
+  "description": "The cash desk's handover check (cash desk spec, CSH-02, CSH-03, CSH-04, PRD W4, W7): may this cashier confirm this bill now, and what is recorded. A positive cash due is a handover in, a negative one a payout. The cash received is the cashier's correction, else the salesman's figure, else the exact amount; a bill known only from its code has no salesman's figure. Unless a case says otherwise: session …51 is open on this desk for cashier …a5 (a cashier: cash.handover.receive, cash.refund.pay, cash.session.close); …a6 may receive handovers but not pay refunds; …a1 is a salesman. Unit Rs 1 = 100, amounts in paisa. A queue row may say the bill was voided (W1-12): bill_voided, checked right after nothing_to_collect, so the cashier never takes cash for it.",
   "cases": [
     {
       "name": "a queued bill, the salesman took Rs 5,000 for Rs 4,320",
@@ -396,6 +396,56 @@
         "amount": 432000,
         "cashReceived": 432000,
         "changeGiven": 0,
+        "correctedFrom": null
+      }
+    },
+    {
+      "name": "a voided bill from the queue (W1-12): don't take cash for it",
+      "input": {
+        "target": {
+          "number": "C03-S000412",
+          "cashDue": 432000,
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000412",
+          "cashReceived": 500000,
+          "handoverStatus": "pending",
+          "status": "voided"
+        }
+      },
+      "expected": { "ok": false, "problem": "bill_voided" }
+    },
+    {
+      "name": "a voided bill is said before there is no session",
+      "input": {
+        "target": {
+          "number": "C03-S000412",
+          "cashDue": 432000,
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000412",
+          "cashReceived": 500000,
+          "handoverStatus": "pending",
+          "status": "voided"
+        },
+        "session": null
+      },
+      "expected": { "ok": false, "problem": "bill_voided" }
+    },
+    {
+      "name": "a bill the queue says is finalized is taken as before",
+      "input": {
+        "target": {
+          "number": "C03-S000412",
+          "cashDue": 432000,
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000412",
+          "cashReceived": 500000,
+          "handoverStatus": "pending",
+          "status": "finalized"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "kind": "in",
+        "amount": 432000,
+        "cashReceived": 500000,
+        "changeGiven": 68000,
         "correctedFrom": null
       }
     }

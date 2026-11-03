@@ -58,7 +58,18 @@ export type DomainErrorCode =
   | 'left_invalid'
   | 'reason_required'
   | 'own_variance'
-  | 'not_acknowledger';
+  | 'not_acknowledger'
+  // Hold, void and reissue (POS spec §17–§18, W1-12)
+  | 'too_many'
+  | 'label_too_long'
+  | 'not_found'
+  | 'bill_open'
+  | 'other_device'
+  | 'already_voided'
+  | 'other_day'
+  | 'handed_over'
+  | 'window_none'
+  | 'bill_voided';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

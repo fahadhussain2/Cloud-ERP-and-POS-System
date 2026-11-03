@@ -846,3 +846,19 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Without the safe, the drawer's account would drift from the drawer every time the cash left it at night.
   - A report computed from the documents can't go stale when a counter syncs late.
 - **Status:** Accepted (with the W1-11 plan, owner answers 1–5)
+
+### D-099 Hold and void: held bills stay on the counter per person, a void is its own document of family V, never after the handover (2026-11-03)
+- **Decision:**
+  - **A held bill is the open bill set aside on its counter** (`held_bills`), with an optional label, recalled only by the person who held it, at most 20 per counter, gone once its business day is over (04:00, owner answer 4). Never pushed.
+  - **A void is a signed document of its own, family `V`** (`C03-V000001`, `SaleVoidV1`), in the outbox like every document; the bill is never changed (rule 3), keeps its number and prints again with a VOID band. A family of its own keeps the bill series gapless and gives the void the same push, idempotency and gap handling as every family. **`V` joins the families** of architecture §4.4.
+  - **A bill is voided only on the device that made it** (owner answer 2), on its business day, with the PIN of someone holding `pos.void` and a reason (owner answer 5).
+  - **Never after the cash handover, for any role** (owner answer 1, as D-002 and posting rules §4.4 say): after it, a return (W1-13). The Manager and Owner templates move from `same_day` to `same_day_before_handover`, and migration 0013 moves every role with `same_day`; the value stays valid and is judged the same. A desk's own cash bill is handed over at once, so it is corrected with a return.
+  - **Before a void, the counter asks the server** whether the desk has the cash (`GET /api/sync/bills/status`, 3 s); offline it goes on with a warning. The server stores every void (rule 7) and flags `void_not_permitted`, `duplicate_void` and, for cash in the drawer for a voided bill, `cash_received_for_void` with which came first (D-059).
+  - **The void's reversal swaps the sale's own posting** (source `sales_void`), and posts only once the bill has.
+  - **A reissue is a new sale** with `reissueOf`, starting from the voided bill's customer, lines, prices and price approvals (owner answer 3).
+- **Why:**
+  - A printed, signed bill can't be edited, and a void decided offline must be a fact the server can't refuse.
+  - Voiding after the cash reached the drawer would need the cash paid back at the desk; a return already does that properly.
+  - The live check catches most leaks at the counter; the server catches the rest.
+- **Status:** Accepted (with the W1-12 plan, owner answers 1–5)
+

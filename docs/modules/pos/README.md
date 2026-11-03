@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W1-02 (POS shell), W1-03 (catalog and search), W1-05 (bill building) and W1-06 (finalize and print) and W1-09 (customers and credit) merged |
+| **Status** | In progress: W1-02 (POS shell), W1-03 (catalog and search), W1-05 (bill building) and W1-06 (finalize and print) and W1-09 (customers and credit) merged; W1-12 (hold, void and reissue) built, in review (D-099) |
 | **Requirements** | 17 (POS-01…POS-17) |
 | **Feature spec needed** | Yes: checkout screen and keyboard map; local DB and storage guardrails |
 
@@ -112,6 +112,28 @@ The screens talk only to the `Counter` interface (`counter.ts`), so they are tes
 | The payment pad and the Cash, method and Split popups | `apps/pos/src/screens/PaymentPad.tsx`, `PaymentDialogs.tsx` |
 | The printed bill and printing | `apps/pos/src/print/` (`BillPrint.tsx`, `print-bill.tsx`); print styles in `styles.css` |
 | Reprint (`Alt+P`) | `apps/pos/src/screens/ReprintDialog.tsx` |
+
+## Hold and recall (W1-12)
+
+[Plan](plans/W1-12-hold-void-reissue.md), [spec §17](spec.md).
+
+| Part | Where |
+|---|---|
+| The hold check, the cap and the label, when a held bill expires (golden cases in `golden/hold.json`, `held-expiry.json`) | `packages/domain/src/hold.ts` |
+| Local schema 10, holding, the list and its sweep, the recall and its swap, clearing | `apps/pos/src/db/held.ts` |
+| The Hold and Recall dialogs (`F8`, `Shift+F8`) | `apps/pos/src/screens/HoldDialogs.tsx`, `CounterScreen.tsx` |
+
+## Void and reissue (W1-12)
+
+[Plan](plans/W1-12-hold-void-reissue.md), [spec §18](spec.md).
+
+| Part | Where |
+|---|---|
+| Who may void, the void check, the void document, the server's review (golden cases in `golden/void*.json`); the reissue's open bill (`reissue.json`) | `packages/domain/src/void.ts`, `reissue.ts` |
+| The wire schema (family V) and the bill status answer | `SaleVoidV1`, `BillStatusResponseSchema` in `packages/contracts` |
+| Today's bills, what a desk knows itself, the void transaction | `apps/pos/src/db/void.ts` |
+| The live cash desk check | `apps/pos/src/sync/bills.ts` |
+| The Void dialog, the approval, the VOID print, the reissue | `apps/pos/src/screens/VoidDialog.tsx`, `CounterScreen.tsx`, `print/BillPrint.tsx` |
 
 ## Work in this module
 

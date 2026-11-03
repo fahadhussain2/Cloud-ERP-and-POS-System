@@ -124,7 +124,8 @@ const BASE: CashHandoverDocument = {
 interface ReviewCase {
   handover: Partial<CashHandoverDocument>;
   context: {
-    bill: { id: string; cashDue: Money } | null;
+    /** From W1-12 the stored bill also says whether it was voided, and when. */
+    bill: { id: string; cashDue: Money; voided?: { id: string; number: string; at: string } | null } | null;
     existing: { id: string; number: string } | null;
   };
 }

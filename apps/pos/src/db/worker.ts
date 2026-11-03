@@ -8,6 +8,8 @@ import { SearchIndex, type SearchOptions } from '../search/search-index';
 import * as checkout from './checkout';
 import * as customers from './customers';
 import * as desk from './desk';
+import * as held from './held';
+import * as voids from './void';
 import { currentVersion, migrate } from './migrate';
 import * as outbox from './outbox';
 import * as repo from './repo';
@@ -72,6 +74,16 @@ const ops = {
   loadOpenBill: (userId: string) => repo.loadOpenBill(open(), userId),
   saveOpenBill: (userId: string, bill: OpenBill) => repo.saveOpenBill(open(), userId, bill),
   clearOpenBill: (userId: string) => repo.clearOpenBill(open(), userId),
+  /** Held bills (POS spec §17, W1-12): set aside and recalled by the person who held them, swept at 04:00. */
+  holdBill: (req: held.HoldRequest) => held.holdBill(open(), req),
+  heldBills: (userId: string) => held.heldBills(open(), userId, Date.now()),
+  recallBill: (req: held.RecallRequest) => held.recallBill(open(), req),
+  clearHeld: (id: string, userId: string) => held.clearHeld(open(), id, userId),
+  /** Voiding a bill of this counter (POS spec §18, W1-12): one transaction with its outbox row. */
+  voidableBills: (filter: string) => voids.voidableBills(open(), Date.now(), filter),
+  localDeskStatus: (billNumber: string) => voids.localDeskStatus(open(), billNumber),
+  voidBill: (req: voids.VoidRequest) => voids.voidBill(open(), req),
+  voidOf: (saleId: string) => voids.voidOf(open(), saleId),
   /** Paying, finalizing and reprinting (POS spec §12–§13). */
   checkoutSettings: () => checkout.checkoutSettings(open()),
   finalizeSale: (req: checkout.FinalizeRequest) => checkout.finalizeSale(open(), req),

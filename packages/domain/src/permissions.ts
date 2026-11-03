@@ -54,7 +54,10 @@ export type Permission = (typeof PERMISSIONS)[number];
 const CATALOG = new Set<string>(PERMISSIONS);
 export const isPermission = (value: string): value is Permission => CATALOG.has(value);
 
-/** How long after a sale it may still be voided (PRD W5, D-007). */
+/**
+ * How long after a sale it may still be voided (PRD W5, D-002). No window allows a void after the cash handover (owner
+ * answer 1 to W1-12): `same_day` stays a valid value and is judged as `same_day_before_handover` (`canVoid`).
+ */
 export type VoidWindow = 'none' | 'same_day_before_handover' | 'same_day';
 const VOID_WINDOWS: readonly VoidWindow[] = ['none', 'same_day_before_handover', 'same_day'];
 
@@ -76,7 +79,7 @@ const SELL: Permission[] = ['pos.sale.create', 'pos.sale.hold', 'pos.credit.sell
 
 /** The role templates from PRD §4. Tenants copy them into custom roles (PLT-06). */
 export const ROLE_TEMPLATES: Readonly<Record<RoleTemplateKey, RoleTemplate>> = {
-  owner: { permissions: ['*'], limits: { maxDiscountBp: 10_000, voidWindow: 'same_day' } },
+  owner: { permissions: ['*'], limits: { maxDiscountBp: 10_000, voidWindow: 'same_day_before_handover' } },
   manager: {
     permissions: [
       ...SELL,
@@ -100,7 +103,7 @@ export const ROLE_TEMPLATES: Readonly<Record<RoleTemplateKey, RoleTemplate>> = {
       'reports.view',
       'admin.devices',
     ],
-    limits: { maxDiscountBp: 10_000, voidWindow: 'same_day' },
+    limits: { maxDiscountBp: 10_000, voidWindow: 'same_day_before_handover' },
   },
   cashier: {
     permissions: [

@@ -28,7 +28,7 @@ import { settleTender, type PaymentMethodInfo, type SettledPayment, type Tender 
 // here; the server re-checks it with the same functions (W1-07). Clock, ids and sequence are passed in.
 
 /** Document families and their number letter (architecture §4.4). */
-export type DocumentFamily = 'S' | 'H' | 'R' | 'M' | 'Z';
+export type DocumentFamily = 'S' | 'H' | 'R' | 'M' | 'Z' | 'V';
 
 export interface SaleTotal {
   /** Lines − bill discount. */
@@ -114,6 +114,8 @@ export interface SaleDocument {
   overrides: SaleDocumentOverride[];
   /** W1-09: absent on a bill without an on-account payment, and on every bill written before. */
   credit?: SaleDocumentCredit;
+  /** W1-12: the voided bill this one reissues; absent on every other bill. */
+  reissueOf?: { id: string; number: string };
   clientVersion: string;
 }
 
@@ -193,6 +195,8 @@ export function buildSaleDocument(input: {
   /** The counter's credit figures; needed for an on-account payment. */
   credit: CreditView | null;
   creditApproval: CreditApproval | null;
+  /** The voided bill this one reissues (POS spec §18), or null. */
+  reissueOf?: { id: string; number: string } | null;
   context: SaleContext;
 }): SaleDocument {
   const { bill, customer, credit, context: c } = input;
@@ -278,6 +282,7 @@ export function buildSaleDocument(input: {
     handoverStatus: settlement.cashDue > 0 ? 'pending' : 'not_applicable',
     overrides: [...overrides, ...creditOverrides],
     ...(onAccount > 0 ? { credit: creditBlock(credit!) } : {}),
+    ...(input.reissueOf ? { reissueOf: { id: input.reissueOf.id, number: input.reissueOf.number } } : {}),
     clientVersion: c.clientVersion,
   };
 }

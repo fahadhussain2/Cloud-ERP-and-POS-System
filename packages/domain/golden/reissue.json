@@ -1,0 +1,722 @@
+{
+  "description": "The open bill a reissue starts from (POS spec §18, PRD W5, owner answer 3 to W1-12): the voided sale's tier, its lines (item, quantity, list and floor as they were, the unit price), its bill discount, and its price approvals (below_list, below_floor, on a line or on the bill discount) as they were, so they hold while the prices stay (POS spec §10). Credit approvals are never kept on an open bill (POS spec §15). The seller is who reissues; the customer and walk-in phone are the counter's to set (not in the domain bill). Whether a unit allows fractions comes from the local catalog; an item no longer there allows them only if its quantity has one. Each new line gets the next of the given ids; a list of ids that doesn't fit the lines is unknown_line. …a1 a salesman, …a2 a manager, …a7 another salesman.",
+  "cases": [
+    {
+      "name": "a cash bill with a below-floor price: the lines, prices and the approval as they were, for whoever reissues",
+      "input": {
+        "document": {
+          "version": 1,
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "family": "S",
+          "seq": 412,
+          "number": "C03-S000412",
+          "kind": "sale",
+          "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "createdAt": "2026-11-03T09:05:00.000Z",
+          "businessDate": "2026-11-03",
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "customerId": null,
+          "walkinPhone": null,
+          "clientVersion": "0.9.0",
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 2000,
+              "listPrice": 150000,
+              "floorPrice": 120000,
+              "unitPrice": 150000,
+              "lineDiscount": 0,
+              "billShare": 0,
+              "lineTotal": 300000
+            },
+            {
+              "lineNo": 2,
+              "itemId": "019a0000-0000-7000-8000-0000000000c2",
+              "qty": 1000,
+              "listPrice": 150000,
+              "floorPrice": 140000,
+              "unitPrice": 132000,
+              "lineDiscount": 18000,
+              "billShare": 0,
+              "lineTotal": 132000
+            }
+          ],
+          "amounts": {
+            "subtotal": 450000,
+            "lineDiscountTotal": 18000,
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0,
+            "total": 432000
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 432000,
+              "cashReceived": 500000,
+              "changeDue": 68000,
+              "reference": null
+            }
+          ],
+          "cashDue": 432000,
+          "handoverStatus": "pending",
+          "overrides": [
+            {
+              "kind": "below_floor",
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "regular_customer",
+              "note": null,
+              "at": "2026-11-03T09:04:30.000Z",
+              "values": {
+                "list": 150000,
+                "floor": 140000,
+                "price": 132000
+              },
+              "lineNo": 2
+            }
+          ]
+        },
+        "sellerId": "019a0000-0000-7000-8000-0000000000a7",
+        "allowsFraction": {
+          "019a0000-0000-7000-8000-0000000000c1": false,
+          "019a0000-0000-7000-8000-0000000000c2": false
+        },
+        "lineIds": ["n1", "n2"]
+      },
+      "expected": {
+        "version": 1,
+        "sellerId": "019a0000-0000-7000-8000-0000000000a7",
+        "tierId": "019a0000-0000-7000-8000-0000000000b1",
+        "lines": [
+          {
+            "id": "n1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 2000,
+            "allowsFraction": false,
+            "list": 150000,
+            "floor": 120000,
+            "unitPrice": 150000,
+            "approval": null
+          },
+          {
+            "id": "n2",
+            "itemId": "019a0000-0000-7000-8000-0000000000c2",
+            "qty": 1000,
+            "allowsFraction": false,
+            "list": 150000,
+            "floor": 140000,
+            "unitPrice": 132000,
+            "approval": {
+              "kind": "below_floor",
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "regular_customer",
+              "note": null,
+              "at": "2026-11-03T09:04:30.000Z",
+              "values": {
+                "list": 150000,
+                "floor": 140000,
+                "price": 132000
+              }
+            }
+          }
+        ],
+        "billDiscount": 0,
+        "billApproval": null
+      }
+    },
+    {
+      "name": "a bill discount approved below the floor, on another tier: the bill approval follows the new line ids",
+      "input": {
+        "document": {
+          "version": 1,
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "family": "S",
+          "seq": 412,
+          "number": "C03-S000412",
+          "kind": "sale",
+          "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "createdAt": "2026-11-03T09:05:00.000Z",
+          "businessDate": "2026-11-03",
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b2",
+          "customerId": null,
+          "walkinPhone": null,
+          "clientVersion": "0.9.0",
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "listPrice": 145000,
+              "floorPrice": 140000,
+              "unitPrice": 145000,
+              "lineDiscount": 0,
+              "billShare": 10000,
+              "lineTotal": 135000
+            }
+          ],
+          "amounts": {
+            "subtotal": 145000,
+            "lineDiscountTotal": 0,
+            "billDiscount": 10000,
+            "rounding": 0,
+            "taxTotal": 0,
+            "total": 135000
+          },
+          "payments": [
+            {
+              "method": "raast",
+              "amount": 135000,
+              "cashReceived": null,
+              "changeDue": null,
+              "reference": "RST-5512"
+            }
+          ],
+          "cashDue": 0,
+          "handoverStatus": "not_applicable",
+          "overrides": [
+            {
+              "kind": "below_floor",
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "regular_customer",
+              "note": null,
+              "at": "2026-11-03T09:04:00.000Z",
+              "lineNo": null,
+              "values": {
+                "billDiscount": 10000,
+                "lines": [
+                  {
+                    "lineNo": 1,
+                    "qty": 1000,
+                    "unitPrice": 145000
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "allowsFraction": {
+          "019a0000-0000-7000-8000-0000000000c1": false
+        },
+        "lineIds": ["r1"]
+      },
+      "expected": {
+        "version": 1,
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "tierId": "019a0000-0000-7000-8000-0000000000b2",
+        "lines": [
+          {
+            "id": "r1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "list": 145000,
+            "floor": 140000,
+            "unitPrice": 145000,
+            "approval": null
+          }
+        ],
+        "billDiscount": 10000,
+        "billApproval": {
+          "kind": "below_floor",
+          "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+          "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+          "reason": "regular_customer",
+          "note": null,
+          "at": "2026-11-03T09:04:00.000Z",
+          "values": {
+            "billDiscount": 10000,
+            "lines": [
+              {
+                "id": "r1",
+                "qty": 1000,
+                "unitPrice": 145000
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "on account: the price approval is kept, the credit approval isn't (the credit check runs again at payment); a metre item allows fractions",
+      "input": {
+        "document": {
+          "version": 1,
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "family": "S",
+          "seq": 412,
+          "number": "C03-S000412",
+          "kind": "sale",
+          "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "createdAt": "2026-11-03T09:05:00.000Z",
+          "businessDate": "2026-11-03",
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "customerId": "019a3000-0000-7000-8000-0000000000c1",
+          "walkinPhone": null,
+          "clientVersion": "0.9.0",
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c3",
+              "qty": 1500,
+              "listPrice": 33300,
+              "floorPrice": null,
+              "unitPrice": 33300,
+              "lineDiscount": 0,
+              "billShare": 0,
+              "lineTotal": 49950
+            },
+            {
+              "lineNo": 2,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "listPrice": null,
+              "floorPrice": null,
+              "unitPrice": 80000,
+              "lineDiscount": 0,
+              "billShare": 0,
+              "lineTotal": 80000
+            }
+          ],
+          "amounts": {
+            "subtotal": 129950,
+            "lineDiscountTotal": 0,
+            "billDiscount": 0,
+            "rounding": 50,
+            "taxTotal": 0,
+            "total": 130000
+          },
+          "payments": [
+            {
+              "method": "on_account",
+              "amount": 130000,
+              "cashReceived": null,
+              "changeDue": null,
+              "reference": null
+            }
+          ],
+          "cashDue": 0,
+          "handoverStatus": "not_applicable",
+          "overrides": [
+            {
+              "kind": "below_floor",
+              "lineNo": 2,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "other",
+              "note": "no price yet",
+              "at": "2026-11-03T09:03:00.000Z",
+              "values": {
+                "list": null,
+                "floor": null,
+                "price": 80000
+              }
+            },
+            {
+              "kind": "credit_limit",
+              "lineNo": null,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "regular_customer",
+              "note": null,
+              "at": "2026-11-03T09:04:50.000Z",
+              "values": {
+                "limit": 5000000,
+                "balance": 4950000,
+                "unsynced": 0,
+                "amount": 130000
+              }
+            }
+          ],
+          "credit": {
+            "offline": false,
+            "balance": 4950000,
+            "balanceAsOf": "2026-11-03T09:00:00.000Z",
+            "unsynced": 0,
+            "offlineToday": 0
+          }
+        },
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "allowsFraction": {
+          "019a0000-0000-7000-8000-0000000000c3": true,
+          "019a0000-0000-7000-8000-0000000000c1": false
+        },
+        "lineIds": ["x1", "x2"]
+      },
+      "expected": {
+        "version": 1,
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "tierId": "019a0000-0000-7000-8000-0000000000b1",
+        "lines": [
+          {
+            "id": "x1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c3",
+            "qty": 1500,
+            "allowsFraction": true,
+            "list": 33300,
+            "floor": null,
+            "unitPrice": 33300,
+            "approval": null
+          },
+          {
+            "id": "x2",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "list": null,
+            "floor": null,
+            "unitPrice": 80000,
+            "approval": {
+              "kind": "below_floor",
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "other",
+              "note": "no price yet",
+              "at": "2026-11-03T09:03:00.000Z",
+              "values": {
+                "list": null,
+                "floor": null,
+                "price": 80000
+              }
+            }
+          }
+        ],
+        "billDiscount": 0,
+        "billApproval": null
+      }
+    },
+    {
+      "name": "an item gone from the catalog: whole units, unless the line has a fraction",
+      "input": {
+        "document": {
+          "version": 1,
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "family": "S",
+          "seq": 412,
+          "number": "C03-S000412",
+          "kind": "sale",
+          "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "createdAt": "2026-11-03T09:05:00.000Z",
+          "businessDate": "2026-11-03",
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "customerId": "019a3000-0000-7000-8000-0000000000c1",
+          "walkinPhone": null,
+          "clientVersion": "0.9.0",
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c3",
+              "qty": 1500,
+              "listPrice": 33300,
+              "floorPrice": null,
+              "unitPrice": 33300,
+              "lineDiscount": 0,
+              "billShare": 0,
+              "lineTotal": 49950
+            },
+            {
+              "lineNo": 2,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 1000,
+              "listPrice": null,
+              "floorPrice": null,
+              "unitPrice": 80000,
+              "lineDiscount": 0,
+              "billShare": 0,
+              "lineTotal": 80000
+            }
+          ],
+          "amounts": {
+            "subtotal": 129950,
+            "lineDiscountTotal": 0,
+            "billDiscount": 0,
+            "rounding": 50,
+            "taxTotal": 0,
+            "total": 130000
+          },
+          "payments": [
+            {
+              "method": "on_account",
+              "amount": 130000,
+              "cashReceived": null,
+              "changeDue": null,
+              "reference": null
+            }
+          ],
+          "cashDue": 0,
+          "handoverStatus": "not_applicable",
+          "overrides": [
+            {
+              "kind": "below_floor",
+              "lineNo": 2,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "other",
+              "note": "no price yet",
+              "at": "2026-11-03T09:03:00.000Z",
+              "values": {
+                "list": null,
+                "floor": null,
+                "price": 80000
+              }
+            },
+            {
+              "kind": "credit_limit",
+              "lineNo": null,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "regular_customer",
+              "note": null,
+              "at": "2026-11-03T09:04:50.000Z",
+              "values": {
+                "limit": 5000000,
+                "balance": 4950000,
+                "unsynced": 0,
+                "amount": 130000
+              }
+            }
+          ],
+          "credit": {
+            "offline": false,
+            "balance": 4950000,
+            "balanceAsOf": "2026-11-03T09:00:00.000Z",
+            "unsynced": 0,
+            "offlineToday": 0
+          }
+        },
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "allowsFraction": {},
+        "lineIds": ["x1", "x2"]
+      },
+      "expected": {
+        "version": 1,
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "tierId": "019a0000-0000-7000-8000-0000000000b1",
+        "lines": [
+          {
+            "id": "x1",
+            "itemId": "019a0000-0000-7000-8000-0000000000c3",
+            "qty": 1500,
+            "allowsFraction": true,
+            "list": 33300,
+            "floor": null,
+            "unitPrice": 33300,
+            "approval": null
+          },
+          {
+            "id": "x2",
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "list": null,
+            "floor": null,
+            "unitPrice": 80000,
+            "approval": {
+              "kind": "below_floor",
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "other",
+              "note": "no price yet",
+              "at": "2026-11-03T09:03:00.000Z",
+              "values": {
+                "list": null,
+                "floor": null,
+                "price": 80000
+              }
+            }
+          }
+        ],
+        "billDiscount": 0,
+        "billApproval": null
+      }
+    },
+    {
+      "name": "fewer line ids than lines is refused",
+      "input": {
+        "document": {
+          "version": 1,
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "family": "S",
+          "seq": 412,
+          "number": "C03-S000412",
+          "kind": "sale",
+          "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "createdAt": "2026-11-03T09:05:00.000Z",
+          "businessDate": "2026-11-03",
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "customerId": null,
+          "walkinPhone": null,
+          "clientVersion": "0.9.0",
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 2000,
+              "listPrice": 150000,
+              "floorPrice": 120000,
+              "unitPrice": 150000,
+              "lineDiscount": 0,
+              "billShare": 0,
+              "lineTotal": 300000
+            },
+            {
+              "lineNo": 2,
+              "itemId": "019a0000-0000-7000-8000-0000000000c2",
+              "qty": 1000,
+              "listPrice": 150000,
+              "floorPrice": 140000,
+              "unitPrice": 132000,
+              "lineDiscount": 18000,
+              "billShare": 0,
+              "lineTotal": 132000
+            }
+          ],
+          "amounts": {
+            "subtotal": 450000,
+            "lineDiscountTotal": 18000,
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0,
+            "total": 432000
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 432000,
+              "cashReceived": 500000,
+              "changeDue": 68000,
+              "reference": null
+            }
+          ],
+          "cashDue": 432000,
+          "handoverStatus": "pending",
+          "overrides": [
+            {
+              "kind": "below_floor",
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "regular_customer",
+              "note": null,
+              "at": "2026-11-03T09:04:30.000Z",
+              "values": {
+                "list": 150000,
+                "floor": 140000,
+                "price": 132000
+              },
+              "lineNo": 2
+            }
+          ]
+        },
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "allowsFraction": {
+          "019a0000-0000-7000-8000-0000000000c1": false,
+          "019a0000-0000-7000-8000-0000000000c2": false
+        },
+        "lineIds": ["n1"]
+      },
+      "error": "unknown_line"
+    },
+    {
+      "name": "two lines with the same id is refused",
+      "input": {
+        "document": {
+          "version": 1,
+          "id": "019a5000-0000-7000-8000-000000000412",
+          "family": "S",
+          "seq": 412,
+          "number": "C03-S000412",
+          "kind": "sale",
+          "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "createdAt": "2026-11-03T09:05:00.000Z",
+          "businessDate": "2026-11-03",
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "tierId": "019a0000-0000-7000-8000-0000000000b1",
+          "customerId": null,
+          "walkinPhone": null,
+          "clientVersion": "0.9.0",
+          "lines": [
+            {
+              "lineNo": 1,
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "qty": 2000,
+              "listPrice": 150000,
+              "floorPrice": 120000,
+              "unitPrice": 150000,
+              "lineDiscount": 0,
+              "billShare": 0,
+              "lineTotal": 300000
+            },
+            {
+              "lineNo": 2,
+              "itemId": "019a0000-0000-7000-8000-0000000000c2",
+              "qty": 1000,
+              "listPrice": 150000,
+              "floorPrice": 140000,
+              "unitPrice": 132000,
+              "lineDiscount": 18000,
+              "billShare": 0,
+              "lineTotal": 132000
+            }
+          ],
+          "amounts": {
+            "subtotal": 450000,
+            "lineDiscountTotal": 18000,
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0,
+            "total": 432000
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 432000,
+              "cashReceived": 500000,
+              "changeDue": 68000,
+              "reference": null
+            }
+          ],
+          "cashDue": 432000,
+          "handoverStatus": "pending",
+          "overrides": [
+            {
+              "kind": "below_floor",
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "regular_customer",
+              "note": null,
+              "at": "2026-11-03T09:04:30.000Z",
+              "values": {
+                "list": 150000,
+                "floor": 140000,
+                "price": 132000
+              },
+              "lineNo": 2
+            }
+          ]
+        },
+        "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+        "allowsFraction": {
+          "019a0000-0000-7000-8000-0000000000c1": false,
+          "019a0000-0000-7000-8000-0000000000c2": false
+        },
+        "lineIds": ["n1", "n1"]
+      },
+      "error": "unknown_line"
+    }
+  ]
+}

@@ -510,6 +510,52 @@ export const salesDocuments = erp.table('sales_documents', {
   // The cash payment's figures, for the cash desk's queue (W1-10).
   cashReceived: bigint('cash_received', { mode: 'number' }),
   changeDue: bigint('change_due', { mode: 'number' }),
+  // The bill's void and the voided bill a reissue replaces (W1-12).
+  voidDocumentId: uuid('void_document_id'),
+  voidReasonCode: text('void_reason_code'),
+  voidedAt: timestamp('voided_at', { withTimezone: true }),
+  voidedByUserId: uuid('voided_by_user_id'),
+  voidApprovedByUserId: uuid('void_approved_by_user_id'),
+  reissueOfId: uuid('reissue_of_id'),
+  reissueOfNumber: text('reissue_of_number'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+/** A device's void of one of its bills (W1-12, family V), linked to the bill by number. */
+export const salesVoids = erp.table('sales_voids', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  number: text('number').notNull(),
+  seq: integer('seq').notNull(),
+  saleDocumentId: uuid('sale_document_id'),
+  saleNumber: text('sale_number').notNull(),
+  voidedByUserId: uuid('voided_by_user_id').notNull(),
+  approvedByUserId: uuid('approved_by_user_id').notNull(),
+  reasonCode: text('reason_code', {
+    enum: [
+      'wrong_item',
+      'wrong_quantity',
+      'wrong_price',
+      'wrong_customer_or_payment',
+      'duplicate_bill',
+      'customer_cancelled',
+      'other',
+    ],
+  }).notNull(),
+  note: text('note'),
+  handoverSeen: text('handover_seen', { enum: ['pending', 'not_applicable', 'unknown'] }).notNull(),
+  atDevice: timestamp('at_device', { withTimezone: true }).notNull(),
+  businessDate: date('business_date').notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  duplicateOfId: uuid('duplicate_of_id'),
+  payload: jsonb('payload').notNull(),
+  payloadHash: bytea('payload_hash').notNull(),
+  signature: bytea('signature').notNull(),
+  clientVersion: text('client_version').notNull(),
+  exceptionCount: integer('exception_count').notNull(),
   ...syncColumns,
   ...auditColumns,
 });

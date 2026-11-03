@@ -5,7 +5,7 @@
 | **Status** | v1 accepted with the [W1-08 plan](plans/W1-08-posting-engine.md) (D-095); built in W1-08 for sales |
 | **Refs** | INV-01, INV-02, INV-03, ACC-01, ACC-02, ACC-03, ACC-08, ACC-09; [posting rules](../../04-ACCOUNTING-POSTING-RULES.md); architecture §5.2, §7; data model §3, §4, §7, §9; CLAUDE.md rules 1, 3, 4, 5, 7; D-017, D-022, D-057, D-094, D-095 |
 
-What every operational document becomes in the books, how that is written, and how it is proven. The posting rules say **which** lines a document posts; this spec says **how** the engine posts them. Each new document type (returns W1-13, voids W1-12, handovers W1-10, opening W1-14, receipts W1-16, stock operations W1-18, journal vouchers W1-19) adds a pure function and golden cases here, and nothing else changes.
+What every operational document becomes in the books, how that is written, and how it is proven. The posting rules say **which** lines a document posts; this spec says **how** the engine posts them. Each new document type (returns W1-13, voids W1-12 (§5c), handovers W1-10, opening W1-14, receipts W1-16, stock operations W1-18, journal vouchers W1-19) adds a pure function and golden cases here, and nothing else changes.
 
 ## 1. Shape
 
@@ -85,6 +85,12 @@ Because it posts its own amount, its order against its bill doesn't change the b
 - **`postSession`** (source `cash_session`; the open posts under the session's id, the close under its close document's id): an open whose float differs from `floatExpected` moves the difference between `CASH_SHORT_OVER` and `CASH_DRAWER`; a close moves its variance the same way, then counted − left in the drawer to `CASH_SAFE`. A desk's first open, an open with the float that stayed and a close without a count (W1-10) post no lines.
 
 Push posts each in the accepting transaction, the catch-up posts what push couldn't (`postPending` reads all five sources), and the rebuild check replays them. After a day of desk documents and a counted close, `CASH_DRAWER` moved by exactly what the drawer did (tested in `cash.test.ts`).
+
+## 5c. Voids (posting rules §4.4, W1-12)
+
+`postVoid(void, original, context, state)` (`packages/posting/src/void.ts`, source `sales_void`): the voided sale's **own posting** comes in as it is stored (`loadSalePosting`: its journal lines in order, its stock movements in line order, its customer entries); every journal line is swapped under the memo `<void number> <bill number>`, dated the void's business date (or the day after the lock date, `posted_after_lock`); each movement comes back with the opposite quantity at its own unit cost, the average recomputed by `averageAfterReceipt` (a line that left with no cost: back at 0, the average unchanged); each customer entry is reversed on its own due date. It names no role or method, so it can't fail for a mapping. The sale's `no_cost` and `negative_stock` aren't raised again.
+
+A void posts only once its bill has (`sale_not_posted` otherwise): push posts it in the accepting transaction when the bill is posted, posts a void that was waiting right after its bill, and `postPending` reads voids whose bill has posted. A duplicate never posts. **The rebuild** replays a void against the sale's **replayed** posting, so the check stays exact. Every case nets its sale to nothing (tested in `void.test.ts` and `void.int.test.ts`).
 
 ## 6. Known limits
 

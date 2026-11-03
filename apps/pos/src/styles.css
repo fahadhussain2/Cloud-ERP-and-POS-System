@@ -46,6 +46,19 @@
 .bill-head p {
   margin: 0;
 }
+.bill-void {
+  margin-block: 1mm;
+  padding-block: 1.2mm;
+  border-block: 0.8mm solid #000;
+  font-size: 1.4em;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.bill-reissue {
+  font-weight: 700;
+}
+
 .bill-reprint {
   margin-block: 1mm;
   padding-block: 0.8mm;

@@ -23,6 +23,7 @@ import {
 // locked salesman offline, a deactivated person leaves the counter, a manager's back office has the PIN action only.
 // W1-06 plan scope 6: pay by cash, Raast and split, refusals, numbering across a reload, offline printing, reprint.
 // W1-09 plan scope 6: customers by phone and their tier, on account, the limit and the offline cap, a walk-in phone.
+// W1-12 plan scope 7: hold and recall.
 
 const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
 const POS = `http://localhost:${POS_PORT}`;
@@ -472,6 +473,45 @@ test('F5 does not reload; the bill waits for the same person after a lock, and a
   await unlockAs(page, SALESMAN.fullName, OWN_PIN);
   await expect(total(page)).toHaveText(/Rs\s3,975/);
   await expect(billPanel(page)).toContainText('Mechanic prices');
+});
+
+// W1-12 plan scope 7: hold a bill, sell another, recall the first as it was; recall over a bill with lines swaps them;
+// the held bill waits for the same person after a lock. The salesman's bill is left as the next flow expects it.
+test('F8 holds the bill and Shift+F8 recalls it; recalling over a bill with lines swaps the two', async ({
+  page,
+}) => {
+  await page.goto(POS);
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await expect(total(page)).toHaveText(/Rs\s3,975/);
+  await page.keyboard.press('F8');
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(pos.hold.label).fill('Blue Suzuki');
+  await dialog.getByLabel(pos.hold.label).press('Enter');
+  await expect(page.getByText(pos.bill.empty)).toBeVisible();
+  await expect(billPanel(page)).toContainText('Bill held: Blue Suzuki');
+
+  // Another customer meanwhile, then the first comes back: Enter asks, a second Enter swaps.
+  await addToBill(page, 'brpd001');
+  await page.keyboard.press('Shift+F8');
+  await expect(dialog.getByRole('listbox')).toContainText('Blue Suzuki');
+  await page.keyboard.press('Enter');
+  await expect(dialog).toContainText('Enter again holds it');
+  await page.keyboard.press('Enter');
+  await expect(dialog).toHaveCount(0);
+  await expect(total(page)).toHaveText(/Rs\s3,975/);
+  await expect(billPanel(page)).toContainText('Mechanic prices');
+
+  // The bill set aside by the swap waits for the same person after a lock; Del twice clears it.
+  await page.keyboard.press('Alt+L');
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await expect(page.getByRole('button', { name: /Recall \(1\)/ })).toBeVisible();
+  await page.keyboard.press('Shift+F8');
+  await expect(dialog.getByRole('listbox')).toContainText(/Rs\s4,500/);
+  await page.keyboard.press('Delete');
+  await page.keyboard.press('Delete');
+  await expect(dialog).toContainText(pos.recall.empty);
+  await page.keyboard.press('Escape');
+  await expect(total(page)).toHaveText(/Rs\s3,975/);
 });
 
 // W1-06 plan scope 6: paying and printing. window.print() is replaced by a recorder of what the print container shows

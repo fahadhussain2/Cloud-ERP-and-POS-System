@@ -1,4 +1,12 @@
-import { can, canApprove, nextPinState, type ApprovalKind, type PinState, type RoleGrant } from '@erp/domain';
+import {
+  can,
+  canApprove,
+  canVoid,
+  nextPinState,
+  type ApprovalKind,
+  type PinState,
+  type RoleGrant,
+} from '@erp/domain';
 
 import { unlockableStaff, type StaffUser } from './unlock';
 
@@ -34,6 +42,18 @@ export function checkCreditApprover(opts: {
   verify: (verifier: string, pin: string) => Promise<boolean>;
 }): Promise<{ result: ApproverResult; approverState: PinState }> {
   return checkStaffPin({ ...opts, allowed: (grants) => can(grants, 'pos.credit.over_limit', opts.branchId) });
+}
+
+/** A void (POS spec §18, W1-12): `pos.void` here with a window other than `none` (`canVoid`). */
+export function checkVoidApprover(opts: {
+  approver: StaffUser;
+  approverState: PinState;
+  approverGrants: readonly RoleGrant[];
+  branchId: string;
+  pin: string;
+  verify: (verifier: string, pin: string) => Promise<boolean>;
+}): Promise<{ result: ApproverResult; approverState: PinState }> {
+  return checkStaffPin({ ...opts, allowed: (grants) => canVoid(grants, opts.branchId) === null });
 }
 
 /** A manager's *Try again* on a refused bill (POS spec §14, owner answer 4 to W1-07): `admin.devices` here. */

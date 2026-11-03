@@ -100,7 +100,12 @@ export function ReprintDialog({
         >
           {(b) => (
             <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-2 py-1.5">
-              <span className="font-mono font-semibold">{b.number}</span>
+              <span className="font-mono font-semibold">
+                {b.number}
+                {b.voidNumber && (
+                  <span className="ms-2 font-sans text-xs font-bold text-bad">{t('reprint.voided')}</span>
+                )}
+              </span>
               <span className="text-sm text-muted-foreground">{when(b.createdAt)}</span>
               <span className="text-end font-semibold tabular-nums">{formatMoney(b.total, money)}</span>
             </div>

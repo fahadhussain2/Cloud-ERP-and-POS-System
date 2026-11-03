@@ -48,6 +48,7 @@ The scanner types the bill code (`C03-S000412 4320`, POS spec §13) and Enter in
 - **In the queue:** the bill is selected; Enter then records it (method `scan`).
 - **Not in the queue** (its counter hasn't synced, or the desk is offline): *C04-S000077 isn't in the queue yet. Record Rs 1,250 from the bill?* Enter records it from the code's number and amount, with no sale id (owner answer 2). Esc cancels.
 - **Already handed over here:** refused with *Already handed over: D01-H000031 by Ali at 10:16*; nothing is written.
+- **A voided bill** (the queue says so, or this desk voided it): refused with *C03-S000412 was voided: don't take cash for it* (`handover.bill_voided`, W1-12). Offline the desk can't know; the server flags it (`cash_received_for_void`, §13).
 - **Not a bill code** (an item label, a typo): *That isn't a bill code*.
 
 **Offline** the queue stays on screen but stops updating; a banner says *Offline since 14:05 · the queue is not updating · scan each bill*. Handovers keep being written and wait in the outbox (PRD W15).
@@ -118,6 +119,7 @@ Push (sync spec §6.2) takes `H` and `Z` only from a cash desk. A handover is **
 | `handover_amount_mismatch` | medium | the amount (or its direction) differs from the bill's cash due, once both are there (D-059) |
 | `duplicate_handover` | medium | the bill already has a handover of that kind: kept with `duplicate_of_id`, **never posted** |
 | `handover_not_permitted` | low | the server says the cashier lacks the permission |
+| `cash_received_for_void` | high | the bill was voided (W1-12, D-059): before the handover was made, or after it while the counter was offline. The handover still posts, so cash in transit shows it until explained |
 
 Each handover posts `Dr CASH_DRAWER / Cr CASH_IN_TRANSIT` (a payout the reverse) for its own amount (posting rules §4.5), so its order against the bill doesn't matter. Cash received, corrections and change never post.
 
@@ -132,4 +134,4 @@ A collection for a customer, or a cash-out naming a category, supplier or bank t
 
 ## 14. Not built yet
 
-`cash_handover_mode = off` and its provisional drawer variance (CSH-09, Wave 2: the desk shows the queue regardless); voids before the handover and `cash_received_for_void` (W1-12); customer ageing at the desk (W1-20); undoing a handover, collection or cash-out recorded by mistake (it shows in the drawer variance, or the accountant reverses it, W1-19); a printed handover slip; amounts in words on the slips.
+`cash_handover_mode = off` and its provisional drawer variance (CSH-09, Wave 2: the desk shows the queue regardless); customer ageing at the desk (W1-20); undoing a handover, collection or cash-out recorded by mistake (it shows in the drawer variance, or the accountant reverses it, W1-19); a printed handover slip; amounts in words on the slips.

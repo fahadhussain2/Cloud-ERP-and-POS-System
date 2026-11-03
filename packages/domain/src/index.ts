@@ -142,6 +142,14 @@ export {
   type QueueEntry,
   type QueueGroup,
 } from './handover';
+export {
+  checkHold,
+  heldExpired,
+  MAX_HELD_BILLS,
+  MAX_HOLD_LABEL_LENGTH,
+  type HoldCheck,
+  type HoldProblem,
+} from './hold';
 export { normalizeIdentifier } from './identifier';
 export { add, money, mulBp, mulQty, negate, parseMoney, sub, sum, type Money } from './money';
 export {
@@ -210,3 +218,22 @@ export {
   type TenderLine,
   type TenderProblem,
 } from './tender';
+export { reissueBill } from './reissue';
+export {
+  buildVoidDocument,
+  canVoid,
+  checkVoid,
+  reviewVoid,
+  VOID_REASONS,
+  type CashDeskStatus,
+  type HandoverSeen,
+  type SaleVoidDocument,
+  type VoidableBill,
+  type VoidCheck,
+  type VoidContext,
+  type VoidFinding,
+  type VoidInput,
+  type VoidProblem,
+  type VoidReason,
+  type VoidReview,
+} from './void';

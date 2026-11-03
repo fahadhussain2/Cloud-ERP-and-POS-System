@@ -117,6 +117,8 @@ export interface HandoverTarget {
   cashReceived: Money | null;
   /** As the server last said; a bill known only from its code is `pending`. */
   handoverStatus: HandoverStatus;
+  /** As the queue says (W1-12); absent for a bill known only from its code. */
+  status?: 'finalized' | 'voided';
 }
 
 export interface HandoverInput {
@@ -136,6 +138,7 @@ export interface HandoverInput {
 
 export type HandoverProblem =
   | 'nothing_to_collect'
+  | 'bill_voided'
   | 'no_session'
   | 'not_session_cashier'
   | 'not_permitted'
@@ -171,6 +174,8 @@ const permissionFor = (kind: HandoverKind): Permission =>
 export function checkHandover(input: HandoverInput): HandoverCheck {
   const { session, target } = input;
   if (target.cashDue === 0) return { ok: false, problem: 'nothing_to_collect' };
+  // Never take cash for a voided bill (D-059, W1-12).
+  if (target.status === 'voided') return { ok: false, problem: 'bill_voided' };
   if (session === null || session.status !== 'open') return { ok: false, problem: 'no_session' };
   if (session.cashierId !== input.cashierId) return { ok: false, problem: 'not_session_cashier' };
   const kind = kindOf(target.cashDue);
@@ -280,6 +285,14 @@ export function buildHandoverDocument(
 export type HandoverFinding =
   | { kind: 'duplicate_handover'; duplicateOf: string; duplicateOfNumber: string }
   | { kind: 'handover_amount_mismatch'; handoverKind: HandoverKind; amount: Money; billCashDue: Money }
+  | {
+      kind: 'cash_received_for_void';
+      voidId: string;
+      voidNumber: string;
+      voidedAt: string;
+      /** The handover was made before the void (pushed after it), or after it (cash for a voided bill). */
+      order: 'before_void' | 'after_void';
+    }
   | { kind: 'handover_not_permitted'; permission: Permission };
 
 /**
@@ -289,8 +302,8 @@ export type HandoverFinding =
 export function reviewHandover(
   handover: CashHandoverDocument,
   context: {
-    /** The stored bill, or null until it arrives. */
-    bill: { id: string; cashDue: Money } | null;
+    /** The stored bill, or null until it arrives; with its void (W1-12), or null when it isn't voided. */
+    bill: { id: string; cashDue: Money; voided?: { id: string; number: string; at: string } | null } | null;
     /** An earlier handover of the same bill and kind that isn't itself a duplicate. */
     existing: { id: string; number: string } | null;
     /** The roles the server holds for the cashier. */
@@ -299,11 +312,13 @@ export function reviewHandover(
   },
 ): HandoverFinding[] {
   const findings: HandoverFinding[] = [];
-  if (context.existing !== null && context.existing.id !== handover.id)
+  const earlier = context.existing !== null && context.existing.id !== handover.id ? context.existing : null;
+  const duplicate = earlier !== null;
+  if (earlier !== null)
     findings.push({
       kind: 'duplicate_handover',
-      duplicateOf: context.existing.id,
-      duplicateOfNumber: context.existing.number,
+      duplicateOf: earlier.id,
+      duplicateOfNumber: earlier.number,
     });
   if (context.bill !== null) {
     const signed = handover.kind === 'in' ? handover.amount : negate(handover.amount);
@@ -313,6 +328,17 @@ export function reviewHandover(
         handoverKind: handover.kind,
         amount: handover.amount,
         billCashDue: context.bill.cashDue,
+      });
+    // Cash in the drawer for a voided bill (D-059); a duplicate brings no cash.
+    const voided = context.bill.voided;
+    if (voided && handover.kind === 'in' && !duplicate)
+      findings.push({
+        kind: 'cash_received_for_void',
+        voidId: voided.id,
+        voidNumber: voided.number,
+        voidedAt: voided.at,
+        // The same second counts as before, as in reviewVoid.
+        order: handover.createdAt <= voided.at ? 'before_void' : 'after_void',
       });
   }
   const permission = permissionFor(handover.kind);

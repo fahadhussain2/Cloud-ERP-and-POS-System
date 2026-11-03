@@ -229,6 +229,20 @@ export const MIGRATIONS: readonly Migration[] = [
       "CREATE INDEX local_documents_session ON local_documents (json_extract(payload, '$.sessionId')) WHERE family IN ('H', 'R', 'M')",
     ],
   },
+  {
+    // Hold, void and reissue (W1-12, POS spec §17–§18): bills set aside by the person who held them, as their open
+    // bill was, until their business day is over; never pushed. Voids (family V) live in local_documents and the
+    // outbox like every document, found by the bill they void.
+    version: 10,
+    statements: [
+      `CREATE TABLE held_bills (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL, held_at TEXT NOT NULL, business_date TEXT NOT NULL, label TEXT,
+        bill TEXT NOT NULL
+      )`,
+      'CREATE INDEX held_bills_user ON held_bills (user_id, held_at)',
+      "CREATE INDEX local_documents_sale ON local_documents (json_extract(payload, '$.saleId')) WHERE family = 'V'",
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

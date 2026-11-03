@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: accepted with the W1-03 plan (2026-10-26). Checkout datasets and the sale document (§6.1): with the W1-06 plan (2026-10-27). Push (§6.2), gaps and re-push (§7) and the SSE nudge (§8): with the W1-07 plan and owner answers (2026-10-28), D-094. Customer datasets, the customer on the sale document and the credit exceptions: with the W1-09 plan and owner answers (2026-10-31), D-096. The cash queue, handovers and sessions in push and `queue-changed`: with the W1-10 plan and owner answers (2026-11-01), D-097. The desk's four cash-out datasets, collections, cash movements and the counted close in push: with the W1-11 plan and owner answers (2026-11-02), D-098. |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: accepted with the W1-03 plan (2026-10-26). Checkout datasets and the sale document (§6.1): with the W1-06 plan (2026-10-27). Push (§6.2), gaps and re-push (§7) and the SSE nudge (§8): with the W1-07 plan and owner answers (2026-10-28), D-094. Customer datasets, the customer on the sale document and the credit exceptions: with the W1-09 plan and owner answers (2026-10-31), D-096. The cash queue, handovers and sessions in push and `queue-changed`: with the W1-10 plan and owner answers (2026-11-01), D-097. The desk's four cash-out datasets, collections, cash movements and the counted close in push: with the W1-11 plan and owner answers (2026-11-02), D-098. Voids (family `V`), the reissue on the sale document and the bill status call: with the W1-12 plan and owner answers (2026-11-03), D-099. |
 | **Refs** | SYN-01…SYN-06; architecture §4.1, §5; data model §10, §12; CLAUDE.md rules 6–9; D-009, D-011, D-042, D-047 |
 
 The architecture (§5) sets the principles. This spec fixes the contracts precisely enough to build and test them. **v1 covers pull**, which W1-02 (users and settings for unlock) and W1-03 (the catalog) need. The **sale document** a counter writes to its outbox is fixed with W1-06 (§6.1); **push**, server acceptance and exceptions (§6.2), gaps and re-push after a restore (§7) and the SSE nudge (§8) with W1-07.
@@ -143,6 +143,7 @@ What a counter writes to `local_documents` and the `outbox` when a bill is final
 | `cashDue`, `handoverStatus` | the cash amount (0 without cash); `'pending'` when above 0, else `'not_applicable'` |
 | `overrides[]` | each approval on the bill (POS spec §10, §15): `kind` (`below_list` \| `below_floor` \| `credit_limit` \| `offline_cap`), `lineNo` (null for the bill discount and for credit), `requestedBy`, `approvedBy`, `reason`, `note`, `at`, `values` (a line: `list`, `floor`, `price`; the bill: `billDiscount` and `lines` as `lineNo`, `qty`, `unitPrice`; `credit_limit`: `limit`, `balance`, `unsynced`, `amount`; `offline_cap`: `cap`, `offlineToday`, `amount`) |
 | `credit` | optional, only on a bill with an on-account payment (W1-09): `offline`, `balance`, `balanceAsOf`, `unsynced`, `offlineToday`, what the counter saw when it decided (POS spec §15) |
+| `reissueOf` | optional, only on a reissue (W1-12): the voided bill's `id` and `number` (POS spec §18) |
 | `clientVersion` | the app version |
 
 The outbox row's `signature` is the device's ECDSA signature over `canonicalJson(document)` (D-082), added right after the commit. A later version of the document adds a new schema next to v1; the server keeps accepting v1 (architecture §4.2). W1-09's fields are additive and optional, so every v1 bill written before still parses (D-096).
@@ -160,7 +161,7 @@ POST /api/sync/push   (device token, body up to 5 MB)
 
 **The request.**
 
-- `documents`: at most **100**, unique ids, in ascending `seq` within each family (`S`, `H`, `R`, `M`, `Z`). A cash desk also sends its handovers (`H`, `CashHandoverV1`) and its sessions' open and close (`Z`, `CashSessionV2`; a W1-10 `CashSessionV1` close is still taken), its collections (`R`, `CustomerCollectionV1`) and its cash movements (`M`, `CashMovementV1`, W1-11). Each is an outbox row: the document's UUIDv7 (the idempotency key, rule 7), its family and seq, the payload exactly as the device stored it, and its `signature` (base64url P1363 over `canonicalJson(payload)`, D-082), or `null` when the counter couldn't sign it.
+- `documents`: at most **100**, unique ids, in ascending `seq` within each family (`S`, `H`, `R`, `M`, `Z`, `V`). Any device sends its voids (`V`, `SaleVoidV1`, W1-12). A cash desk also sends its handovers (`H`, `CashHandoverV1`) and its sessions' open and close (`Z`, `CashSessionV2`; a W1-10 `CashSessionV1` close is still taken), its collections (`R`, `CustomerCollectionV1`) and its cash movements (`M`, `CashMovementV1`, W1-11). Each is an outbox row: the document's UUIDv7 (the idempotency key, rule 7), its family and seq, the payload exactly as the device stored it, and its `signature` (base64url P1363 over `canonicalJson(payload)`, D-082), or `null` when the counter couldn't sign it.
 - `events`: at most 500 audit events (§5, POS spec §13): `pin.locked` `{ id, at, userId }`, `pin.unlocked_by_manager` `{ id, at, userId, byUserId }`, `bill.reprinted` `{ id, at, userId, documentId, number }`.
 - `health` (PLT-09): `outboxCount` (refused bills included), `oldestUnsyncedAt`, `quarantinedCount`, `storagePersisted`, `storageUsage`, `storageQuota`, `lastPullAt`.
 - **An empty push is the handshake:** no documents, no events. The counter sends one at start-up, so a restored server is noticed even when nothing is waiting (§7).
@@ -177,8 +178,8 @@ POST /api/sync/push   (device token, body up to 5 MB)
 | `unsigned` | `signature` is null |
 | `bad_signature` | it doesn't verify with the key of the device the payload names. Also written as a `bad_signature` exception (severity high). Well signed by **another** device → `wrong_device` |
 | `bad_schema` | the payload fails `SaleDocumentV1` (an unknown `version` included), or its `id`, `seq` or family differ from the row's |
-| `wrong_device` | another device's document (a counter pushes only its own, owner answer 3 to W1-07), or another branch's; an `H`, `R`, `M` or `Z` from a device that isn't a cash desk |
-| `unknown_reference` | a seller, approver, requester, tier, item, payment method or customer that isn't this tenant's; a handover's, collection's or cash movement's cashier; a collection's payment method; a session close naming a session the server doesn't have (the desk pushes the open first). A collection's customer and a cash movement's category, supplier or bank are not checked: such a document is stored and fails to post until they exist (D-095). **A handover's bill is never checked:** it is linked by number, now or when the bill arrives |
+| `wrong_device` | another device's document (a counter pushes only its own, owner answer 3 to W1-07), or another branch's; an `H`, `R`, `M` or `Z` from a device that isn't a cash desk; a `V` of a bill whose number isn't the pushing device's (owner answer 2 to W1-12) |
+| `unknown_reference` | a seller, approver, requester, tier, item, payment method or customer that isn't this tenant's; a handover's, collection's or cash movement's cashier; a collection's payment method; a session close naming a session the server doesn't have (the desk pushes the open first); a void's voider or approver. A collection's customer and a cash movement's category, supplier or bank are not checked: such a document is stored and fails to post until they exist (D-095). **A handover's bill is never checked:** it is linked by number, now or when the bill arrives |
 | `seq_conflict` | another id already holds this device's seq |
 
 4. **Re-check the rules** with `reviewSale` (`packages/domain`, the counter's own functions, rule 2), and for a bill with an on-account payment `reviewCredit` against the customer's account, its balance, read under the tenant's posting order lock (`holdPostingOrder`, D-017), so no other posting moves it before this sale is posted, and the device's offline on-account total for that customer and business date. Neither refuses: their findings become exceptions (below).
@@ -207,8 +208,23 @@ An unexpected error rolls back that document and answers `500`; the documents be
 | `handover_not_permitted` | low | the server says the cashier lacks `cash.handover.receive` (or `cash.refund.pay` for a payout) |
 | `cash_not_permitted` | low | a collection, cash movement, open or close by someone the server says lacks the permission, or a close acknowledged by someone without `cash.variance.approve` or by the session's own cashier (`details.ownVariance`); that acknowledgement isn't stored (W1-11) |
 | `float_mismatch` | medium | an open's float differs from what stayed at the desk's last close (`details`: `openingFloat`, `floatExpected`) |
+| `void_not_permitted` | medium | a void whose approver the server says lacks `pos.void` or has the window `none`, or of a bill of another business day (`details.cause`: `not_permitted`, `window_none`, `other_day`, W1-12). The void stands |
+| `duplicate_void` | medium | a second void of a bill: stored with `duplicate_of_id`, never posted |
+| `cash_received_for_void` | high | a handover in of a voided bill (D-059), on the void or on the handover, whichever arrives second (`details.order`: `before_void`, the desk took the cash before the void; `after_void`, after it). The handover still posts |
 
 **Handovers (W1-10, cash desk spec §13):** stored in `cash_handovers`, linked to their bill by number and the bill marked `received` or `paid_out`; one whose bill hasn't arrived waits and is linked when the bill is accepted, its amount compared then. A bill with cash and a handover of it take a **per-bill lock** first (`pg_advisory_xact_lock`), before the posting order lock, because a scan and its bill often arrive in overlapping transactions. Each handover that isn't a duplicate is posted in the same transaction. A session's open creates its `cash_sessions` row and its close sets the close fields and the count (W1-11); each posts (source `cash_session`): the open a float other than what stayed, the close its variance and what went to the safe. **Collections and cash movements (W1-11)** are stored in `payments` and `cash_movements` and posted in the accepting transaction (sources `payment`, `cash_movement`).
+
+**Voids (W1-12, POS spec §18):** stored in `sales_voids`, linked to their bill by number under the same per-bill lock as a handover (every sale takes it now); one whose bill hasn't arrived waits and is applied when the bill is accepted. Reviewed with `reviewVoid` against the server's roles, the bill (or the document's own dates before it arrives) and any handover in of the number, an offline scan included. The bill becomes `voided` (its void fields, an `overrides` row of kind `void`, the audit row `sale.voided`), its row comes again in `cash_queue` with its status, so every desk drops it, and its posting is reversed (source `sales_void`) once the bill has posted. A sale's `reissueOf` is stored on it as `reissue_of_id`, `reissue_of_number`.
+
+**The bill status call (W1-12):**
+
+```
+GET /api/sync/bills/status?number=C03-S000412   (device token)
+→ 200 { known, status, handoverStatus, handedOverAt, cashierName }   (BillStatusResponseSchema)
+→ 400 { error: 'invalid_request' } | 403 { error: 'not_own_bill' } | 401
+```
+
+Only the device's own bills (the number carries its code). `handoverStatus` is the bill's, or `received` / `paid_out` from a handover of its number that the bill doesn't have yet (an offline scan); null when the server has neither. The counter asks it before a void, for at most 3 s (POS spec §18).
 
 Prices and floors are judged on the **document's own snapshot**: a price changed in the back office during an outage is expected and not flagged (architecture §4.7). Approvals are judged against the roles the server holds now.
 

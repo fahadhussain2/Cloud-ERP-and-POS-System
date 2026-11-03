@@ -125,7 +125,7 @@ The bootstrap download is ~20 MB uncompressed (a few MB gzipped).
 - **Revocation:** revoking a device in the back office blocks its next sync. Documents it already created are still accepted, flagged for review.
 
 ### 4.4 Document numbering and time
-- Number series per device and family: `S` sales/returns/exchanges, `H` cash handovers and refund payouts, `R` collections, `M` cash movements, `Z` cash session close. Format: `{deviceCode}-{family}{seq:6}`, e.g. `C03-S000412`. Gapless and never reused (voids keep their number).
+- Number series per device and family: `S` sales/returns/exchanges, `H` cash handovers and refund payouts, `R` collections, `M` cash movements, `Z` cash session open and close, `V` voids (W1-12, D-099). Format: `{deviceCode}-{family}{seq:6}`, e.g. `C03-S000412`. Gapless and never reused (a voided bill keeps its number; its void has its own).
 - `uuid` (UUIDv7) generated on the device is the identity. The number is for humans.
 - **Business date** = local date (tenant timezone) of `created_at − day_cutoff_hours` (default cutoff 04:00). Every device can compute it with no coordination.
 - The device sends its clock with every push. If skew is greater than 5 minutes, the device health page and the exceptions report flag it. The server also stores `received_at`.

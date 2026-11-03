@@ -50,6 +50,20 @@ function BillPage({ job }: { job: PrintJob }) {
           <p key={line}>{line}</p>
         ))}
         <h2>{t('print.saleBill')}</h2>
+        {job.voided && (
+          <p className="bill-void" data-testid="void-band">
+            {t('print.void', {
+              number: job.voided.number,
+              at: time(job.voided.at),
+              by: job.voided.by,
+              approvedBy: job.voided.approvedBy,
+              reason: job.voided.reason,
+            })}
+          </p>
+        )}
+        {d.reissueOf && (
+          <p className="bill-reissue">{t('print.reissueOf', { number: d.reissueOf.number })}</p>
+        )}
         {job.reprint && (
           <p className="bill-reprint" data-testid="reprint-band">
             {t('print.reprint', { at: time(job.reprint.at), by: job.reprint.by })}

@@ -9,6 +9,7 @@ import type {
   PinState,
   RoleGrant,
   SaleDocument,
+  SaleVoidDocument,
 } from '@erp/domain';
 
 import type { OpenBill } from './bill/open-bill';
@@ -23,13 +24,16 @@ import type {
   DeskState,
   HandoverRequest,
 } from './db/desk';
+import type { HeldBill } from './db/held';
 import type { LocalHealth, QuarantinedRow } from './db/outbox';
+import type { VoidListBill, VoidRequest } from './db/void';
 import type { DeviceInfo, PinEvent, TenantSettings } from './db/repo';
 import type { EnrollResult } from './device/session';
 import type { DeskPrintJob } from './print/DeskSlipPrint';
 import type { PrintJob } from './print/print-job';
 import type { BillItem, SearchOptions, SearchResult, Tier } from './search/search-index';
 import type { CheckResult } from './storage/checks';
+import type { DeskCheck } from './sync/bills';
 import type { PinChangeResult } from './sync/pin';
 import type { PullResult } from './sync/pull';
 import type { PushOutcome } from './sync/push';
@@ -103,6 +107,23 @@ export interface Counter {
   openBill(userId: string): Promise<OpenBill | null>;
   saveOpenBill(userId: string, bill: OpenBill): Promise<void>;
   clearOpenBill(userId: string): Promise<void>;
+  /** Holds the person's open bill and leaves an empty one (POS spec §17); refused with checkHold's problem. */
+  holdBill(req: { userId: string; label: string | null }): Promise<HeldBill>;
+  /** The person's held bills, newest first; the expired ones are swept first. */
+  heldBills(userId: string): Promise<HeldBill[]>;
+  /** Makes a held bill the open bill again; `swap` holds the open bill first when it has lines. */
+  recallBill(req: { id: string; userId: string; swap: { label: string | null } | null }): Promise<OpenBill>;
+  clearHeld(id: string, userId: string): Promise<boolean>;
+  /** This counter's bills of today that aren't voided, newest first, for the Void dialog (POS spec §18). */
+  voidableBills(filter: string): Promise<VoidListBill[]>;
+  /** Has the cash desk taken this bill's cash? What this device knows itself, else the live check (unknown offline). */
+  deskCheck(billNumber: string): Promise<DeskCheck>;
+  /** Voids a bill in one local transaction, then signs the void; refused with checkVoid's problem as a DomainError. */
+  voidBill(
+    req: Omit<VoidRequest, 'id' | 'createdAtMs' | 'clientVersion'>,
+  ): Promise<{ void: SaleVoidDocument; sale: SaleDocument }>;
+  /** The void of a bill on this counter, for its prints, or null. */
+  voidOf(saleId: string): Promise<SaleVoidDocument | null>;
   /** Rounding, business day, payment methods and the print profile; null before the first pull (POS spec §12). */
   checkout(): Promise<CheckoutSettings | null>;
   /** Finalizes the person's open bill in one local transaction, then signs it (POS spec §12). */

@@ -27,6 +27,8 @@ export interface OpenBill {
   customer?: BillCustomer | null;
   /** A walk-in's phone as typed, only without a customer. */
   walkinPhone?: string | null;
+  /** The voided bill this one reissues (POS spec §18, W1-12); absent or null on every other bill. */
+  reissueOf?: { id: string; number: string } | null;
 }
 
 /** A stored open bill, or null for one this version doesn't know (another version, or not JSON at all). */
