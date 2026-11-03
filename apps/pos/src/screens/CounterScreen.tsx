@@ -1,8 +1,12 @@
 import { uuidv7 } from '@erp/contracts';
 import {
   add,
+  addReturn,
+  money as toMoney,
+  negate,
   approve,
   billAmounts,
+  businessDate,
   can,
   changeTier,
   checkCredit,
@@ -14,6 +18,8 @@ import {
   parseWholeAmount,
   pendingApprovals,
   reissueBill,
+  RETURN_APPROVAL_REASONS,
+  returnNeeds,
   removeLine,
   saleTotal,
   setBillDiscount,
@@ -30,6 +36,9 @@ import {
   type Money,
   type PendingApproval,
   type Qty,
+  type ReturnApprovalBy,
+  type ReturnApprovalKind,
+  type ReturnApprovalReason,
   type RoleGrant,
   type AnySaleDocument,
   type SaleDocument,
@@ -59,6 +68,7 @@ import { useTranslation } from 'react-i18next';
 
 import { setBillOpen } from '../bill/bill-open';
 import { addItem, formatQty, parseQuantity, quantityPrefix, setCustomer, tryEdit } from '../bill/bill-state';
+import type { BillCustomer } from '../bill/open-bill';
 import { useOpenBill, type BillCounter } from '../bill/use-open-bill';
 import type { Counter } from '../counter';
 import type { CheckoutSettings, DocumentSummary, PaymentMethodRow } from '../db/checkout';
@@ -68,14 +78,20 @@ import type { VoidListBill } from '../db/void';
 import type { DeskCheck } from '../sync/bills';
 import type { PrintJob } from '../print/print-job';
 import type { BillItem, SearchResult, Vehicle } from '../search/search-index';
-import { checkApprover, checkCreditApprover, checkVoidApprover } from '../unlock/approve';
+import {
+  checkApprover,
+  checkCreditApprover,
+  checkReturnApprover,
+  checkVoidApprover,
+} from '../unlock/approve';
 import type { StaffUser } from '../unlock/unlock';
 import { ApprovalDialog, ConfirmDialog, EntryDialog, TierDialog, type ApprovalAttempt } from './BillDialogs';
 import { BillPanel } from './BillPanel';
 import { CustomerDialog, customerStrip, type CustomerChoice } from './CustomerDialog';
-import { CashDialog, MethodDialog, OnAccountDialog, SplitDialog } from './PaymentDialogs';
+import { CashDialog, MethodDialog, OnAccountDialog, RefundDialog, SplitDialog } from './PaymentDialogs';
 import { HoldDialog, RecallDialog } from './HoldDialogs';
-import { PaymentPad } from './PaymentPad';
+import { PaymentPad, type PadMode } from './PaymentPad';
+import { ReturnDialog, type ReturnChoice } from './ReturnDialog';
 import { CLIENT_VERSION } from '../version';
 import { ReprintDialog } from './ReprintDialog';
 import { VoidDialog } from './VoidDialog';
@@ -109,7 +125,12 @@ type DialogState =
   | { kind: 'reissue'; sale: SaleDocument }
   | { kind: 'customer' }
   | { kind: 'onAccount'; figures: CreditView }
-  | { kind: 'creditApproval'; tender: Tender; needs: CreditNeed[]; overLimitBy: Money; overCapBy: Money };
+  | { kind: 'creditApproval'; tender: Tender; needs: CreditNeed[]; overLimitBy: Money; overCapBy: Money }
+  | { kind: 'return'; windowDays: number }
+  | { kind: 'returnApproval'; choice: ReturnChoice; needs: ReturnApprovalKind[] }
+  | { kind: 'refund'; to: 'cash' | 'account' | 'transfer' }
+  | { kind: 'refundApproval'; tender: Tender }
+  | { kind: 'even' };
 
 export type CounterScreenCounter = BillCounter &
   Pick<
@@ -139,6 +160,10 @@ export type CounterScreenCounter = BillCounter &
     | 'deskCheck'
     | 'voidBill'
     | 'voidOf'
+    | 'findBills'
+    | 'returnableBill'
+    | 'noReceiptPrice'
+    | 'returnPolicy'
   >;
 
 const sameTarget = (a: ApprovalTarget, b: ApprovalTarget) =>
@@ -207,6 +232,17 @@ export function CounterScreen({
   const amounts = openBill ? billAmounts(openBill.bill) : null;
   const pending = openBill && maxDiscountBp !== null ? pendingApprovals(openBill.bill, maxDiscountBp) : [];
   const total = openBill && settings ? saleTotal(openBill.bill, settings.increment) : null;
+  /** What comes back on this bill (W1-13, POS spec §19). */
+  const returns = openBill?.bill.returns ?? null;
+  /** The pad pays, refunds or settles an even exchange (POS-17, D-053). */
+  const padMode: PadMode =
+    returns === null || total === null
+      ? 'pay'
+      : total.total < 0
+        ? 'refund'
+        : total.total === 0
+          ? 'even'
+          : 'pay';
 
   useEffect(() => {
     let stop = false;
@@ -264,8 +300,8 @@ export function CounterScreen({
       ? t('credit.notPermitted')
       : null;
 
-  // An app update waits while this bill has lines (POS spec §8).
-  const hasLines = lines.length > 0;
+  // An app update waits while this bill has lines (POS spec §8), returned ones too.
+  const hasLines = lines.length > 0 || returns !== null;
   useEffect(() => setBillOpen(hasLines), [hasLines]);
   useEffect(() => () => setBillOpen(false), []);
 
@@ -461,7 +497,8 @@ export function CounterScreen({
   /** Opens a payment popup (POS spec §12): never for an empty bill, nor while a price waits for an approval. */
   const openPay = async (kind: 'cash' | 'split' | PaymentMethodRow) => {
     const ob = get();
-    if (!ob || ob.bill.lines.length === 0 || maxDiscountBp === null) return;
+    const empty = ob?.bill.lines.length === 0 && (ob.bill.returns ?? null) === null;
+    if (!ob || empty || maxDiscountBp === null) return;
     if (pendingApprovals(ob.bill, maxDiscountBp).length > 0) return setMessage(t('pay.approveFirst'));
     // Fresh each time: the first pull may have brought the methods since the screen opened.
     const s = await counter.checkout();
@@ -476,6 +513,23 @@ export function CounterScreen({
           : { kind: 'method', method: kind },
     );
   };
+
+  /** F9 on a return: refund cash at the desk, or finalize an even exchange (POS-17). */
+  const payOrRefund = () => {
+    if (padMode === 'refund') return openRefund('cash');
+    if (padMode === 'even') return setDialog({ kind: 'even' });
+    void openPay('cash');
+  };
+  const openRefund = (to: 'cash' | 'account' | 'transfer') => {
+    const ob = get();
+    if (!ob || (ob.bill.returns ?? null) === null || !settings) return;
+    if (maxDiscountBp !== null && pendingApprovals(ob.bill, maxDiscountBp).length > 0)
+      return setMessage(t('pay.approveFirst'));
+    setMessage(null);
+    setDialog({ kind: 'refund', to });
+  };
+  /** A refund to account needs a customer with an account (PRD W7); the customer list only has such customers. */
+  const refundAccountBlocked = customerRow ? null : t('refund.needsCustomer');
 
   const methodName = (code: string) => settings?.methods.find((x) => x.code === code)?.name ?? code;
   const tenantZone = () => settings?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -518,6 +572,15 @@ export function CounterScreen({
   };
 
   const describe = (d: AnySaleDocument) => {
+    if (d.version === 2) {
+      const refund = d.payments.find((p) => p.amount < 0);
+      if (d.payments.length === 0) return t('return.doneEven', { number: d.number });
+      if (refund?.method === 'cash')
+        return t('return.doneRefund', { number: d.number, cash: m(negate(refund.amount)) });
+      if (refund?.method === 'on_account')
+        return t('return.doneAccount', { number: d.number, amount: m(negate(refund.amount)) });
+      if (refund) return t('return.doneTransfer', { number: d.number, method: methodName(refund.method) });
+    }
     const cash = d.payments.find((p) => p.changeDue !== null);
     if (!cash)
       return t('pay.doneNoCash', {
@@ -536,6 +599,7 @@ export function CounterScreen({
   const pay = async (
     tender: Tender,
     creditApproval: CreditApproval | null = null,
+    refundApproval: ReturnApprovalBy | null = null,
   ): Promise<string | null> => {
     const ob = get();
     const customerId = ob?.customer?.id ?? null;
@@ -565,6 +629,7 @@ export function CounterScreen({
         tender,
         offline,
         creditApproval,
+        refundApproval,
       });
     } catch (err) {
       if (err instanceof DomainError) return errorKey(err.code);
@@ -839,6 +904,103 @@ export function CounterScreen({
     setNotice(t('void.reissuing', { number: sale.number }));
     focusSearch();
   };
+  /** `F3` Return / exchange (POS spec §19): on an empty bill; a bill with lines is held first (F8). */
+  const openReturn = async () => {
+    const ob = get();
+    if (!ob) return;
+    if (ob.bill.lines.length > 0 || (ob.bill.returns ?? null) !== null) {
+      setMessage(t('return.holdFirst'));
+      return focusSearch();
+    }
+    const s = settings ?? (await counter.checkout());
+    if (!s) return setMessage(t('pay.notReady'));
+    const { windowDays } = await counter.returnPolicy([]);
+    setMessage(null);
+    setDialog({ kind: 'return', windowDays });
+  };
+  const todayIs = () => businessDate(nowMs(), settings?.timeZone ?? tenantZone(), settings?.cutoffHour ?? 4);
+
+  /** Puts the returned lines on the bill, with the original bill's customer (POS spec §19). */
+  const applyReturn = (
+    choice: ReturnChoice,
+    needs: ReturnApprovalKind[],
+    approval: ReturnApprovalBy | null,
+  ): string | null => {
+    const source = choice.source;
+    const customerId = source.kind === 'bill' ? source.customerId : null;
+    const c = customerId === null ? undefined : customers.find((x) => x.id === customerId);
+    const customer: BillCustomer | null =
+      customerId === null ? null : { id: customerId, code: c?.code ?? '', name: c?.name ?? customerId };
+    const err = change((ob) => {
+      const r = tryEdit(ob, (b) => addReturn(b, { source, lines: choice.lines, needs, approval }));
+      if (!r.ok) return r;
+      return {
+        ok: true as const,
+        bill: {
+          ...r.bill,
+          items: { ...r.bill.items, ...choice.items },
+          ...(source.kind === 'bill' ? { customer, walkinPhone: null } : {}),
+        },
+      };
+    });
+    if (err) return errorKey(err);
+    setDialog(null);
+    setNotice(null);
+    setMessage(null);
+    focusSearch();
+    return null;
+  };
+
+  /** What the dialog chose: on the bill at once, or after an approval on the same screen (D-051, PLT-07). */
+  const chooseReturn = async (choice: ReturnChoice): Promise<string | null> => {
+    const ids = [...new Set(choice.lines.map((l) => l.itemId))];
+    const policy = await counter.returnPolicy(ids);
+    const check = returnNeeds({
+      sellerGrants,
+      branchId: branchId ?? '',
+      original: choice.source.kind === 'bill' ? { businessDate: choice.source.businessDate } : null,
+      today: todayIs(),
+      windowDays: policy.windowDays,
+      items: choice.lines.map((l) => policy.items[ids.indexOf(l.itemId)] ?? {}),
+    });
+    if (check.needs.length === 0) return applyReturn(choice, [], null);
+    setDialog({ kind: 'returnApproval', choice, needs: check.needs });
+    return null;
+  };
+
+  /** An approver's PIN for a return's needs, or for a refund by transfer (owner answer 1 to W1-13). */
+  const attemptReturn = async (
+    kinds: ReturnApprovalKind[],
+    done: (by: ReturnApprovalBy) => Promise<void> | void,
+    ...[approver, pin, reason, note]: Parameters<ApprovalAttempt<ReturnApprovalReason>>
+  ): ReturnType<ApprovalAttempt<ReturnApprovalReason>> => {
+    const [before, grants] = await Promise.all([
+      counter.getPinState(approver.id),
+      counter.grants(approver.id),
+    ]);
+    const r = await checkReturnApprover({
+      approver,
+      approverState: before,
+      approverGrants: grants,
+      branchId: branchId ?? '',
+      kinds,
+      pin,
+      verify: (v, x) => counter.verifyPin(v, x),
+    });
+    await counter.setPinState(approver.id, r.approverState);
+    if (!before.locked && r.approverState.locked)
+      await counter.recordPinEvent({
+        kind: 'locked',
+        userId: approver.id,
+        byUserId: null,
+        at: new Date().toISOString(),
+      });
+    await counter.log(`approval.return.${r.result}`, { sellerId: user.id, approverId: approver.id, kinds });
+    if (r.result === 'approved')
+      await done({ approvedBy: approver.id, reason, note, at: new Date().toISOString() });
+    return { result: r.result, failures: r.approverState.failures };
+  };
+
   const ignore = () => {};
   // F1, F3, F5 never reach the browser on the counter (no help page, find bar or reload mid-bill).
   useShortcuts(
@@ -848,14 +1010,14 @@ export function CounterScreen({
       F7: openTier,
       'Alt+C': openClear,
       'Alt+L': onLock,
-      F9: () => void openPay('cash'),
+      F9: payOrRefund,
       'Shift+F9': () => void openPay('split'),
       'Alt+P': () => setDialog({ kind: 'reprint' }),
       F8: openHold,
       'Shift+F8': openRecall,
       'Alt+V': openVoid,
       F1: ignore,
-      F3: ignore,
+      F3: () => void openReturn(),
       F5: ignore,
     },
     dialog === null,
@@ -996,7 +1158,12 @@ export function CounterScreen({
         : t('search.found', { count: results.length });
 
   const common: KeyHint[] = [
-    { keys: 'F9', label: t('keys.pay'), run: () => void openPay('cash') },
+    {
+      keys: 'F9',
+      label: padMode === 'refund' ? t('keys.refund') : padMode === 'even' ? t('keys.even') : t('keys.pay'),
+      run: payOrRefund,
+    },
+    { keys: 'F3', label: t('keys.return'), run: () => void openReturn() },
     { keys: 'F4', label: t('keys.customer'), run: () => void openCustomer() },
     { keys: 'F7', label: t('keys.tier'), run: openTier },
     { keys: 'F8', label: t('keys.hold'), run: openHold },
@@ -1164,7 +1331,11 @@ export function CounterScreen({
           pad={
             <PaymentPad
               methods={settings?.methods ?? []}
-              disabled={lines.length === 0}
+              disabled={lines.length === 0 && returns === null}
+              mode={padMode}
+              onRefund={openRefund}
+              refundAccountBlocked={refundAccountBlocked}
+              onEven={() => setDialog({ kind: 'even' })}
               onCash={() => void openPay('cash')}
               onMethod={(method) => void openPay(method)}
               onAccount={() => void openOnAccount()}
@@ -1415,6 +1586,121 @@ export function CounterScreen({
           figures={dialog.figures}
           timeZone={tenantZone()}
           onPay={pay}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'return' && (
+        <ReturnDialog
+          counter={counter}
+          money={money}
+          timeZone={tenantZone()}
+          windowDays={dialog.windowDays}
+          today={todayIs()}
+          onChoose={chooseReturn}
+          onClose={() => {
+            setDialog(null);
+            focusSearch();
+          }}
+        />
+      )}
+      {dialog?.kind === 'returnApproval' && (
+        <ApprovalDialog<ReturnApprovalReason>
+          description={dialog.needs.map((n) => t(`return.need.${n}`)).join(' ')}
+          facts={[
+            [
+              t('return.from'),
+              dialog.choice.source.kind === 'bill' ? dialog.choice.source.number : t('return.noReceiptShort'),
+            ],
+            ...dialog.choice.lines.map(
+              (l) =>
+                [
+                  dialog.choice.items[l.itemId]?.name ?? l.itemId,
+                  l.price === null
+                    ? `×${formatQty(l.qty, money.locale)}`
+                    : t('return.priceFact', {
+                        qty: formatQty(l.qty, money.locale),
+                        price: m(l.price),
+                        suggested: l.suggested === null ? '–' : m(l.suggested),
+                      }),
+                ] as [string, ReactNode],
+            ),
+            [t('approval.seller'), user.fullName],
+          ]}
+          staff={staff}
+          reasons={RETURN_APPROVAL_REASONS}
+          onApprove={(...args) =>
+            attemptReturn(
+              dialog.needs,
+              (by) => {
+                const problem = applyReturn(dialog.choice, dialog.needs, by);
+                if (problem) {
+                  setDialog(null);
+                  setMessage(t(problem));
+                }
+              },
+              ...args,
+            )
+          }
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'refund' && settings && total && (
+        <RefundDialog
+          to={dialog.to}
+          settings={settings}
+          total={total.total}
+          money={money}
+          customerName={customerRow?.name ?? null}
+          onPay={(tender) => {
+            // A refund by transfer is approved by a manager first (owner answer 1 to W1-13).
+            if (dialog.to === 'transfer') {
+              setDialog({ kind: 'refundApproval', tender });
+              return Promise.resolve(null);
+            }
+            return pay(tender);
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'refundApproval' && (
+        <ApprovalDialog<ReturnApprovalReason>
+          description={t('return.need.refund_transfer')}
+          facts={[
+            [t('refund.amount'), m(negate(dialog.tender.payments[0]?.amount ?? toMoney(0)))],
+            [t('refund.method'), methodName(dialog.tender.payments[0]?.method ?? '')],
+            [t('approval.seller'), user.fullName],
+          ]}
+          staff={staff}
+          reasons={RETURN_APPROVAL_REASONS}
+          onApprove={(...args) =>
+            attemptReturn(
+              ['refund_transfer'],
+              async (by) => {
+                const problem = await pay(dialog.tender, null, by);
+                if (problem) {
+                  setDialog(null);
+                  setMessage(t(problem));
+                }
+              },
+              ...args,
+            )
+          }
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'even' && (
+        <ConfirmDialog
+          title={t('refund.evenTitle')}
+          body={t('refund.evenBody')}
+          actionLabel={t('pay.finalize')}
+          onConfirm={() => {
+            void pay({ payments: [], cashReceived: null }).then((problem) => {
+              if (problem) {
+                setDialog(null);
+                setMessage(t(problem));
+              }
+            });
+          }}
           onClose={() => setDialog(null)}
         />
       )}

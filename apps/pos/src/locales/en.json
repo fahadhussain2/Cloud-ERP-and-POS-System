@@ -148,7 +148,11 @@
     "aboveListTotal": "Above list",
     "rounding": "Rounding",
     "walkInPhone": "Walk-in · {{phone}}",
-    "reissueOf": "Reissue of {{number}}"
+    "reissueOf": "Reissue of {{number}}",
+    "returnedTitle": "Coming back",
+    "returnedFrom": "Returned from {{number}}",
+    "returnedNoReceipt": "Returned without a receipt",
+    "returned": "Returned"
   },
   "keys": {
     "counter": "Counter",
@@ -176,7 +180,10 @@
     "hold": "Hold",
     "recall": "Recall",
     "recallCount": "Recall ({{count}})",
-    "void": "Void"
+    "void": "Void",
+    "refund": "Refund",
+    "even": "Finalize",
+    "return": "Return"
   },
   "dialog": {
     "cancel": "Cancel"
@@ -251,7 +258,10 @@
       "wrong_price": "Wrong price or discount",
       "wrong_customer_or_payment": "Wrong customer or payment",
       "duplicate_bill": "Duplicate bill",
-      "customer_cancelled": "Customer cancelled"
+      "customer_cancelled": "Customer cancelled",
+      "manufacturer_defect": "Manufacturer defect",
+      "lost_bill": "Lost bill",
+      "before_go_live": "Bought before go-live"
     }
   },
   "error": {
@@ -274,7 +284,20 @@
     "other": "That can’t be done.",
     "invalid_customer": "A customer’s bill doesn’t take a walk-in phone.",
     "invalid_phone": "That isn’t a phone number: 7 to 15 digits.",
-    "credit_approval_pending": "This bill goes over the customer’s credit: it needs an approval."
+    "credit_approval_pending": "This bill goes over the customer’s credit: it needs an approval.",
+    "note_too_long": "A note is at most 200 characters.",
+    "return_over_quantity": "That's more than can still come back of that line (some came back already). Start the return again.",
+    "bill_not_empty": "A return starts on an empty bill. Hold this bill (F8) or finish it first.",
+    "empty_return": "Type how many come back of at least one line.",
+    "invalid_reason": "Choose a reason.",
+    "invalid_condition": "Choose the condition.",
+    "original_required": "That line isn't on the bill.",
+    "other_item": "That line is another item.",
+    "duplicate_line": "That line is marked twice.",
+    "return_approval_pending": "This return needs an approval first.",
+    "no_return": "There is nothing coming back on this bill.",
+    "return_customer_mismatch": "A return keeps the original bill's customer.",
+    "refund_approval_pending": "A refund by transfer needs a manager's approval first."
   },
   "pay": {
     "pad": "Payment",
@@ -324,7 +347,11 @@
     "reference_too_long": "A reference has at most 40 characters.",
     "sum_mismatch": "The payments must add up exactly to the total.",
     "cash_received_without_cash": "Cash received needs a cash amount.",
-    "cash_received_short": "Cash received is less than the cash amount."
+    "cash_received_short": "Cash received is less than the cash amount.",
+    "refund_one_method": "A refund goes back one way only.",
+    "refund_needs_account": "Only a customer with an account can be credited.",
+    "cash_received_on_refund": "A refund takes no cash received.",
+    "even_takes_no_payment": "An even exchange takes no payment."
   },
   "reprint": {
     "title": "Reprint a bill",
@@ -742,5 +769,77 @@
       "note_required": "Write a note for “Other”.",
       "note_too_long": "The note can be at most 200 characters."
     }
+  },
+  "return": {
+    "title": "Return / exchange",
+    "help": "Scan the customer's bill, or type its number, a phone number or a date. Enter opens the bill.",
+    "search": "Bill code, number, phone or date",
+    "open": "Open the bill",
+    "none": "No bill of the last 90 days found. Check the number, or use No receipt.",
+    "bills": "Bills found",
+    "outsideWindow": "older than {{days}} days",
+    "noReceipt": "No receipt",
+    "notHere": "That bill isn't on this counter yet. Wait for the sync, or use No receipt.",
+    "linesTitle": "Return from {{number}}",
+    "linesHelp": "Sold {{date}}. Type how many of each line come back, with the reason and the condition. Enter puts them on the bill.",
+    "lineFacts": "sold {{sold}} · back {{back}} · can return {{left}} · {{price}} each",
+    "allBack": "All of it has come back already.",
+    "qtyBack": "Qty back",
+    "reasonLabel": "Reason",
+    "conditionLabel": "Condition",
+    "note": "Note",
+    "add": "Add to the bill",
+    "markSomething": "Type how many come back of at least one line.",
+    "noReceiptTitle": "Return without a receipt",
+    "noReceiptHelp": "Find each item and type how many come back. The refund price starts at the lowest price of the last 90 days; a manager approves it with their PIN.",
+    "ref": "Old bill number, if the customer knows it (optional)",
+    "itemSearch": "Find the item",
+    "price": "Refund each",
+    "suggested": "Lowest price of the last 90 days: {{price}}",
+    "noSuggestion": "No sale in 90 days and no price: type the refund.",
+    "holdFirst": "A return starts on an empty bill. Hold this bill (F8) or finish it first.",
+    "from": "Return from",
+    "noReceiptShort": "No receipt",
+    "priceFact": "×{{qty}} at {{price}} each (suggested {{suggested}})",
+    "need": {
+      "return_permission": "Your role can't process returns: someone who may approves it.",
+      "return_outside_policy": "This return is outside the return policy (too old, or a category that isn't returnable).",
+      "no_receipt_return": "A return without a receipt needs a manager's PIN, and the refund price is theirs.",
+      "refund_transfer": "A refund by transfer needs a manager's PIN."
+    },
+    "reason": {
+      "wrong_part": "Wrong part",
+      "unused_option": "Unused option",
+      "defective": "Defective",
+      "changed_mind": "Changed mind",
+      "other": "Other"
+    },
+    "condition": {
+      "resellable": "Resellable (to Shop)",
+      "defective": "Defective (to Damaged)"
+    },
+    "doneEven": "Exchange {{number}} printed · nothing to pay",
+    "doneRefund": "Return {{number}} printed · refund {{cash}} at the cash desk",
+    "doneAccount": "Return {{number}} printed · {{amount}} credited to the account",
+    "doneTransfer": "Return {{number}} printed · refunded by {{method}}"
+  },
+  "refund": {
+    "even": "Finalize even exchange",
+    "cash": "Refund cash at desk",
+    "account": "Credit to account",
+    "transfer": "Refund by transfer",
+    "title": {
+      "cash": "Refund cash at the desk",
+      "account": "Credit to account",
+      "transfer": "Refund by transfer"
+    },
+    "toAccount": "The refund goes on {{name}}'s account.",
+    "amount": "Refund",
+    "atDesk": "The bill goes to the cash desk's queue; the cashier pays the customer.",
+    "method": "Refund to",
+    "transferApproval": "A manager approves the transfer with their PIN next.",
+    "needsCustomer": "Only a customer with an account",
+    "evenTitle": "Even exchange",
+    "evenBody": "What comes back pays for what goes out exactly: nothing to pay or refund."
   }
 }

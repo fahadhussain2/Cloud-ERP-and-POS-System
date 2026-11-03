@@ -2,6 +2,7 @@ import {
   hasListPrice,
   negate,
   sub,
+  sum,
   type Approval,
   type BillAmounts,
   type PendingApproval,
@@ -82,6 +83,10 @@ export function BillPanel({
   const approvedBy = (a: Approval<unknown>) =>
     t('bill.approved', { name: nameOf(a.approvedBy), reason: t(`override.reason.${a.reason}`) });
   const lines = openBill?.bill.lines ?? [];
+  /** What comes back on this bill (W1-13, POS spec §19): shown first, in orange; changed only by clearing the bill. */
+  const returns = openBill?.bill.returns ?? null;
+  const refunds = sum((returns?.lines ?? []).map((l) => l.refund));
+  const hasAny = lines.length > 0 || returns !== null;
   const lineNeeds = new Set(pending.flatMap((p) => (p.target === 'bill' ? [] : [p.target.lineId])));
   const billNeeds = pending.some((p) => p.target === 'bill');
   const billApproval = openBill?.bill.billApproval ?? null;
@@ -127,10 +132,40 @@ export function BillPanel({
       )}
       {openBill === null ? (
         <p className="m-0 px-3.5 py-4 text-muted-foreground">{t('bill.loading')}</p>
-      ) : lines.length === 0 ? (
+      ) : !hasAny ? (
         <p className="m-0 flex-1 px-3.5 py-4 text-muted-foreground">{t('bill.empty')}</p>
       ) : (
         <>
+          {returns !== null && (
+            <section
+              aria-label={t('bill.returnedTitle')}
+              className="mx-3.5 mb-1.5 rounded-lg border border-warn bg-warn-soft px-2 py-1.5"
+            >
+              <p className="m-0 text-xs font-semibold text-warn" data-testid="return-source">
+                {returns.source.kind === 'bill'
+                  ? t('bill.returnedFrom', { number: returns.source.number })
+                  : t('bill.returnedNoReceipt')}
+              </p>
+              {returns.lines.map((l) => (
+                <div
+                  key={l.id}
+                  className="grid grid-cols-[minmax(0,1fr)_52px_96px] items-center gap-2 py-1 text-sm"
+                  data-testid="returned-line"
+                >
+                  <span className="flex min-w-0 flex-col">
+                    <span className="font-medium wrap-anywhere">
+                      {openBill.items[l.itemId]?.name ?? l.itemId}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {t(`return.reason.${l.reason}`)} · {t(`return.condition.${l.condition}`)}
+                    </span>
+                  </span>
+                  <span className="text-end tabular-nums">×{formatQty(l.qty, money.locale)}</span>
+                  <span className="text-end font-semibold text-warn tabular-nums">{m(negate(l.refund))}</span>
+                </div>
+              ))}
+            </section>
+          )}
           <div className="grid grid-cols-[22px_minmax(0,1fr)_52px_86px_96px] gap-2 px-5 pb-1 text-[11px] font-semibold tracking-[.06em] text-muted-foreground uppercase">
             <span>{t('bill.head.no')}</span>
             <span>{t('bill.head.item')}</span>
@@ -197,7 +232,7 @@ export function BillPanel({
           </OptionList>
         </>
       )}
-      {amounts && lines.length > 0 && (
+      {amounts && hasAny && (
         <div className="flex flex-col gap-1 border-t border-line bg-surface-2 px-3.5 pt-2.5 pb-3">
           <div className="flex justify-between gap-3 text-muted-foreground tabular-nums">
             <span>{t('bill.lines', { count: lines.length })}</span>
@@ -234,6 +269,12 @@ export function BillPanel({
               <span>{m(negate(amounts.billDiscount))}</span>
             </div>
           )}
+          {returns !== null && (
+            <div className="flex justify-between gap-3 text-warn tabular-nums">
+              <span>{t('bill.returned')}</span>
+              <span data-testid="bill-returned">{m(negate(refunds))}</span>
+            </div>
+          )}
           {total !== null && total.rounding !== 0 && (
             <div className="flex justify-between gap-3 text-muted-foreground tabular-nums">
               <span>{t('bill.rounding')}</span>
@@ -245,7 +286,10 @@ export function BillPanel({
               {t('bill.total')}
             </span>
             <span
-              className="font-display text-[40px] leading-none font-bold tabular-nums"
+              className={cn(
+                'font-display text-[40px] leading-none font-bold tabular-nums',
+                (total?.total ?? 0) < 0 && 'text-warn',
+              )}
               data-testid="bill-total"
             >
               {m(total?.total ?? amounts.total)}

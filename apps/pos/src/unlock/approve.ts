@@ -1,10 +1,12 @@
 import {
   can,
   canApprove,
+  canApproveReturn,
   canVoid,
   nextPinState,
   type ApprovalKind,
   type PinState,
+  type ReturnApprovalKind,
   type RoleGrant,
 } from '@erp/domain';
 
@@ -54,6 +56,22 @@ export function checkVoidApprover(opts: {
   verify: (verifier: string, pin: string) => Promise<boolean>;
 }): Promise<{ result: ApproverResult; approverState: PinState }> {
   return checkStaffPin({ ...opts, allowed: (grants) => canVoid(grants, opts.branchId) === null });
+}
+
+/**
+ * A return's approval (POS spec §19, D-051, W1-13): every permission its needs take here (`canApproveReturn`), e.g.
+ * `pos.return.no_receipt` without a receipt, or `pos.override.approve` for a refund by transfer.
+ */
+export function checkReturnApprover(opts: {
+  approver: StaffUser;
+  approverState: PinState;
+  approverGrants: readonly RoleGrant[];
+  branchId: string;
+  kinds: readonly ReturnApprovalKind[];
+  pin: string;
+  verify: (verifier: string, pin: string) => Promise<boolean>;
+}): Promise<{ result: ApproverResult; approverState: PinState }> {
+  return checkStaffPin({ ...opts, allowed: (grants) => canApproveReturn(grants, opts.branchId, opts.kinds) });
 }
 
 /** A manager's *Try again* on a refused bill (POS spec §14, owner answer 4 to W1-07): `admin.devices` here. */

@@ -18,13 +18,15 @@ import { i18n } from './i18n';
 import type { PrintJob } from './print/print-job';
 import en from './locales/en.json';
 import {
+  qty as toQty,
+  buildReturnDocument,
   buildSaleDocument,
   DomainError,
   ROLE_TEMPLATES,
   type CreditView,
   type Money,
   type RoleGrant,
-  type SaleDocument,
+  type AnySaleDocument,
   type SaleVoidDocument,
   type Tender,
 } from '@erp/domain';
@@ -1069,7 +1071,7 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
         creditFigures: (_id, offline) => Promise.resolve({ ...credit, offline }),
         ...over,
       });
-      const docs: SaleDocument[] = [];
+      const docs: AnySaleDocument[] = [];
       const printed: PrintJob[] = [];
       const reprints: string[] = [];
       const finalized: Tender[] = [];
@@ -1078,7 +1080,7 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
         const ob = f.bills.get(req.userId);
         if (!ob) return Promise.resolve({ document: docs.at(-1)!, repeated: true, handover: null });
         try {
-          const document = buildSaleDocument({
+          const common = {
             bill: ob.bill,
             tender: req.tender,
             methods: METHODS,
@@ -1086,20 +1088,24 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
             customer: { id: ob.customer?.id ?? null, walkinPhone: ob.walkinPhone ?? null },
             credit: ob.customer ? { ...credit, offline: req.offline } : null,
             creditApproval: req.creditApproval,
-            reissueOf: ob.reissueOf ?? null,
-            context: {
-              id: req.id,
-              seq: docs.length + 1,
-              deviceId: 'd',
-              deviceCode: 'C01',
-              branchId: 'b',
-              createdAtMs: req.createdAtMs,
-              timeZone: 'Asia/Karachi',
-              cutoffHour: 4,
-              increment: 100 as Money,
-              clientVersion: req.clientVersion,
-            },
-          });
+          };
+          const context = {
+            id: req.id,
+            seq: docs.length + 1,
+            deviceId: 'd',
+            deviceCode: 'C01',
+            branchId: 'b',
+            createdAtMs: req.createdAtMs,
+            timeZone: 'Asia/Karachi',
+            cutoffHour: 4,
+            increment: 100 as Money,
+            clientVersion: req.clientVersion,
+          };
+          // A return or exchange (W1-13) as the worker builds it.
+          const document: AnySaleDocument =
+            (ob.bill.returns ?? null) !== null
+              ? buildReturnDocument({ ...common, refundApproval: req.refundApproval ?? null, context })
+              : buildSaleDocument({ ...common, reissueOf: ob.reissueOf ?? null, context });
           f.bills.delete(req.userId);
           docs.push(document);
           return Promise.resolve({ document, repeated: false, handover: null });
@@ -1120,6 +1126,43 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
           })),
         );
       f.counter.bill = (id) => Promise.resolve(docs.find((d) => d.id === id) ?? null);
+      // The return search over this counter's bills, as db/returns.ts finds them (W1-13).
+      f.counter.findBills = (q) =>
+        Promise.resolve(
+          docs
+            .filter((d) => d.number.includes(q.trim().toUpperCase()))
+            .map((d) => ({
+              id: d.id,
+              number: d.number,
+              businessDate: d.businessDate,
+              createdAt: d.createdAt,
+              total: d.amounts.total,
+              customerId: d.customerId,
+              kind: d.kind,
+            })),
+        );
+      f.counter.returnableBill = (id) => {
+        const d = docs.find((x) => x.id === id);
+        if (!d) return Promise.resolve(null);
+        return Promise.resolve({
+          id: d.id,
+          number: d.number,
+          businessDate: d.businessDate,
+          createdAt: d.createdAt,
+          customerId: d.customerId,
+          total: d.amounts.total,
+          paidOnAccount: false,
+          lines: d.lines.map((l) => ({
+            lineNo: l.lineNo,
+            itemId: l.itemId,
+            qty: l.qty,
+            lineTotal: l.lineTotal,
+            unitPrice: l.unitPrice,
+            returned: { qty: toQty(0), refund: 0 as Money },
+            isReturn: l.qty < 0,
+          })),
+        });
+      };
       f.counter.recordReprint = (r) => {
         reprints.push(`${r.number} ${r.userId}`);
         return Promise.resolve({ ...r, id: 'r1', pushedAt: null });
@@ -1530,7 +1573,11 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
         await waitFor(() => expect(total()).toBe('Rs 4,500'));
         expect(screen.getByText('Reissue of C01-S000001')).toBeDefined();
         await payCash(f, 2);
-        expect(f.docs[1]!.reissueOf).toEqual({ id: f.docs[0]!.id, number: 'C01-S000001' });
+        const reissued = f.docs[1]!;
+        expect(reissued.version === 1 && reissued.reissueOf).toEqual({
+          id: f.docs[0]!.id,
+          number: 'C01-S000001',
+        });
         expect(f.docs[1]!.number).toBe('C01-S000002');
       });
 
@@ -1567,6 +1614,99 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
         fireEvent.submit(screen.getByLabelText(en.approval.pin).closest('form')!);
         expect(await screen.findByText(en.approval.notAllowed)).toBeDefined();
         expect(f.voids).toEqual([]);
+      });
+    });
+
+    describe('return and exchange (POS-12, POS spec §19, W1-13)', () => {
+      const payCash = async (f: ReturnType<typeof payCounter>, n: number) => {
+        fireEvent.keyDown(window, { key: 'F9' });
+        enter(await within(await screen.findByRole('dialog')).findByLabelText(en.pay.cashReceived));
+        await waitFor(() => expect(f.docs).toHaveLength(n));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      };
+
+      it('F3 finds a paid bill, takes one pad back, and F9 refunds it in cash at the desk, printed as RETURN', async () => {
+        const f = payCounter();
+        const box = await sold(f.counter);
+        await payCash(f, 1);
+        await waitFor(() => expect(document.activeElement).toBe(box));
+        fireEvent.keyDown(window, { key: 'F3' });
+        const find = within(await screen.findByRole('dialog'));
+        fireEvent.change(find.getByLabelText(en.return.search), { target: { value: 'C01-S000001' } });
+        await find.findByRole('option', { name: /C01-S000001/ });
+        enter(find.getByLabelText(en.return.search));
+        const marks = within(await screen.findByRole('dialog', { name: /Return from C01-S000001/ }));
+        fireEvent.change(marks.getByLabelText(`${en.return.qtyBack} · BRAKE PADS FRONT COROLLA`), {
+          target: { value: '1' },
+        });
+        enter(marks.getByLabelText(`${en.return.qtyBack} · BRAKE PADS FRONT COROLLA`));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        expect(screen.getByTestId('returned-line').textContent).toContain(en.return.reason.wrong_part);
+        expect(total()).toContain('4,500');
+
+        fireEvent.keyDown(window, { key: 'F9' });
+        const refund = within(await screen.findByRole('dialog', { name: en.refund.title.cash }));
+        expect(plain(refund.getByTestId('refund-total').textContent)).toBe('Rs 4,500');
+        fireEvent.submit(refund.getByTestId('refund-total').closest('form')!);
+        await waitFor(() => expect(f.docs).toHaveLength(2));
+        const r = f.docs[1]!;
+        expect([r.version, r.kind, r.cashDue, r.handoverStatus]).toEqual([2, 'return', -450000, 'pending']);
+        expect(r.version === 2 && r.returnOf).toEqual({
+          id: f.docs[0]!.id,
+          number: 'C01-S000001',
+          businessDate: f.docs[0]!.businessDate,
+        });
+        expect(f.printed.at(-1)!.document).toEqual(r);
+        await waitFor(() => expect(notice()).toContain('refund Rs 4,500 at the cash desk'));
+      });
+
+      it("a return without a receipt waits for the manager's PIN, at the price on screen", async () => {
+        const f = payCounter();
+        show(f.counter);
+        const box = await unlockAs(/Asif Khan/, '4831');
+        await waitFor(() => expect(document.activeElement).toBe(box));
+        fireEvent.keyDown(window, { key: 'F3' });
+        const find = within(await screen.findByRole('dialog'));
+        fireEvent.click(find.getByRole('button', { name: en.return.noReceipt }));
+        const none = within(await screen.findByRole('dialog', { name: en.return.noReceiptTitle }));
+        const itemBox = none.getByLabelText(en.return.itemSearch);
+        fireEvent.change(itemBox, { target: { value: 'brpd' } });
+        await none.findByRole('option', { name: /BRAKE PADS/ });
+        fireEvent.keyDown(itemBox, { key: 'Enter' });
+        const price = await none.findByLabelText(`${en.return.price} · BRAKE PADS FRONT COROLLA`);
+        fireEvent.change(price, { target: { value: '4000' } });
+        enter(price);
+
+        expect(await screen.findByText(en.return.need.no_receipt_return)).toBeDefined();
+        fireEvent.change(screen.getByLabelText(en.unlock.shortCode), { target: { value: '41' } });
+        fireEvent.click(screen.getByLabelText(en.override.reason.before_go_live));
+        fireEvent.change(screen.getByLabelText(en.approval.pin), { target: { value: '4321' } });
+        fireEvent.submit(screen.getByLabelText(en.approval.pin).closest('form')!);
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        expect(screen.getByTestId('return-source').textContent).toBe(en.bill.returnedNoReceipt);
+
+        fireEvent.keyDown(window, { key: 'F9' });
+        const refund = within(await screen.findByRole('dialog', { name: en.refund.title.cash }));
+        fireEvent.submit(refund.getByTestId('refund-total').closest('form')!);
+        await waitFor(() => expect(f.docs).toHaveLength(1));
+        const r = f.docs[0]!;
+        expect(r.version === 2 && r.noReceipt).toEqual({ ref: null });
+        expect(r.overrides).toEqual([
+          expect.objectContaining({
+            kind: 'no_receipt_return',
+            approvedBy: 'm1',
+            reason: 'before_go_live',
+            values: { lines: [{ lineNo: 1, suggested: null, price: 400000 }] },
+          }),
+        ]);
+      });
+
+      it('F3 on a bill with lines asks to hold it first', async () => {
+        const f = payCounter();
+        await sold(f.counter);
+        fireEvent.keyDown(window, { key: 'F3' });
+        expect(await screen.findByText(en.return.holdFirst)).toBeDefined();
+        expect(screen.queryByRole('dialog')).toBeNull();
       });
     });
   });
