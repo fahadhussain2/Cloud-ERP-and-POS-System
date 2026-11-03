@@ -698,6 +698,13 @@ describe("the branch's 90-day bills (SYN-01, sync spec §3)", () => {
     expect(changes.bill_payments!.some((p) => p.document_id === old.id)).toBe(false);
   });
 
+  it("sends a business date as the date itself, whatever the server's time zone", async () => {
+    const s = sale(counter, [['OIL001', 1, 120000]]);
+    await push(counter, [s]);
+    const bill = (await pull(other, 'bills')).bills!.find((b) => b.id === s.id)!;
+    expect(bill['business_date']).toBe(s.businessDate);
+  });
+
   it("sends the tenant's return window", async () => {
     expect((await pull(counter, 'tenant')).tenant![0]).toMatchObject({ return_window_days: 30 });
   });
