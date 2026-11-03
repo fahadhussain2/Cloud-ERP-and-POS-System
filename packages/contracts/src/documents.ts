@@ -139,12 +139,55 @@ export const SaleDocumentV1 = z
     handoverStatus: z.enum(['pending', 'not_applicable']),
     overrides: z.array(Override),
     credit: Credit.optional(),
+    /** W1-12: the voided bill this one reissues; absent on every other bill. */
+    reissueOf: z.strictObject({ id: z.uuid(), number: z.string().regex(/^[A-Z]\d{2,}-S\d{6,}$/) }).optional(),
     clientVersion: z.string().min(1),
   })
   .refine((d) => d.customerId === null || d.walkinPhone === null, {
     message: 'a walk-in phone only goes on a walk-in bill',
   });
 export type SaleDocumentV1 = z.infer<typeof SaleDocumentV1>;
+
+/**
+ * A void of a finalized bill, version 1 (family V, sync spec §6.2, POS spec §18, W1-12): what `buildVoidDocument` in
+ * `@erp/domain` makes. The bill is never changed (rule 3); the void names it by id and number.
+ */
+export const SaleVoidV1 = z
+  .strictObject({
+    version: z.literal(1),
+    id: z.uuid(),
+    family: z.literal('V'),
+    seq: z.int().positive(),
+    number: z.string().regex(/^[A-Z]\d{2,}-V\d{6,}$/),
+    deviceId: z.uuid(),
+    branchId: z.uuid(),
+    saleId: z.uuid(),
+    saleNumber: z.string().regex(/^[A-Z]\d{2,}-S\d{6,}$/),
+    saleBusinessDate: z.iso.date(),
+    saleTotal: NonNegativeMoney,
+    saleCashDue: NonNegativeMoney,
+    userId: z.uuid(),
+    approvedBy: z.uuid(),
+    reason: z.enum([
+      'wrong_item',
+      'wrong_quantity',
+      'wrong_price',
+      'wrong_customer_or_payment',
+      'duplicate_bill',
+      'customer_cancelled',
+      'other',
+    ]),
+    note: z.string().min(1).max(200).nullable(),
+    handoverSeen: z.enum(['pending', 'not_applicable', 'unknown']),
+    createdAt: Instant,
+    businessDate: z.iso.date(),
+    clientVersion: z.string().min(1),
+  })
+  .refine((d) => d.reason !== 'other' || d.note !== null, { message: '"other" needs a note' })
+  .refine((d) => (d.saleCashDue === 0) === (d.handoverSeen === 'not_applicable'), {
+    message: 'a bill without cash has nothing at the desk, and one with cash has',
+  });
+export type SaleVoidV1 = z.infer<typeof SaleVoidV1>;
 
 // The cash desk's documents (W1-10, cash desk spec): a handover or refund payout (family H) and a session's open or
 // close (family Z). What `buildHandoverDocument` and `buildSessionDocument` in `@erp/domain` make.

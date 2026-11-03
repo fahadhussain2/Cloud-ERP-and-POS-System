@@ -48,6 +48,7 @@ The scanner types the bill code (`C03-S000412 4320`, POS spec §13) and Enter in
 - **In the queue:** the bill is selected; Enter then records it (method `scan`).
 - **Not in the queue** (its counter hasn't synced, or the desk is offline): *C04-S000077 isn't in the queue yet. Record Rs 1,250 from the bill?* Enter records it from the code's number and amount, with no sale id (owner answer 2). Esc cancels.
 - **Already handed over here:** refused with *Already handed over: D01-H000031 by Ali at 10:16*; nothing is written.
+- **A voided bill** (the queue says so, or this desk voided it): refused with *C03-S000412 was voided: don't take cash for it* (`handover.bill_voided`, W1-12). Offline the desk can't know; the server flags it (`cash_received_for_void`, §13).
 - **Not a bill code** (an item label, a typo): *That isn't a bill code*.
 
 **Offline** the queue stays on screen but stops updating; a banner says *Offline since 14:05 · the queue is not updating · scan each bill*. Handovers keep being written and wait in the outbox (PRD W15).

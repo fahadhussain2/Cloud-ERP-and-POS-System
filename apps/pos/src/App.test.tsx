@@ -12,6 +12,7 @@ import type { Counter, CounterHealth } from './counter';
 import type { CheckoutSettings, PaymentMethodRow } from './db/checkout';
 import type { CounterCustomer } from './db/customers';
 import type { HeldBill } from './db/held';
+import type { DeskCheck } from './sync/bills';
 import type { DeviceInfo } from './db/repo';
 import { i18n } from './i18n';
 import type { PrintJob } from './print/print-job';
@@ -24,6 +25,7 @@ import {
   type Money,
   type RoleGrant,
   type SaleDocument,
+  type SaleVoidDocument,
   type Tender,
 } from '@erp/domain';
 import type { PushOutcome } from './sync/push';
@@ -143,6 +145,10 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
     heldBills: () => Promise.resolve([]),
     recallBill: () => Promise.reject(new Error('no held bill')),
     clearHeld: () => Promise.resolve(false),
+    voidableBills: () => Promise.resolve([]),
+    deskCheck: () => Promise.resolve({ status: 'unknown', at: null, cashierName: null }),
+    voidBill: () => Promise.reject(new Error('no bill')),
+    voidOf: () => Promise.resolve(null),
     recordPinEvent: (e) => {
       calls.push(`pinEvent ${e.kind} ${e.userId} ${e.byUserId ?? '-'}`);
       return Promise.resolve();
@@ -1076,6 +1082,7 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
             customer: { id: ob.customer?.id ?? null, walkinPhone: ob.walkinPhone ?? null },
             credit: ob.customer ? { ...credit, offline: req.offline } : null,
             creditApproval: req.creditApproval,
+            reissueOf: ob.reissueOf ?? null,
             context: {
               id: req.id,
               seq: docs.length + 1,
@@ -1105,6 +1112,7 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
             createdAt: d.createdAt,
             total: d.amounts.total,
             cashDue: d.cashDue,
+            voidNumber: null,
           })),
         );
       f.counter.bill = (id) => Promise.resolve(docs.find((d) => d.id === id) ?? null);
@@ -1115,7 +1123,46 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
       const setCredit = (c: Partial<CreditView>) => {
         credit = { ...credit, ...c };
       };
-      return { ...f, docs, printed, reprints, finalized, setCredit };
+      // Voids as the worker writes them (db/void.ts), with what the cash desk says set by the test.
+      const voids: { req: Parameters<Counter['voidBill']>[0]; void: SaleVoidDocument }[] = [];
+      let desk: DeskCheck = { status: 'pending', at: null, cashierName: null };
+      const voidOfSale = (id: string) => voids.find((v) => v.void.saleId === id)?.void ?? null;
+      f.counter.voidableBills = () =>
+        Promise.resolve(
+          [...docs]
+            .reverse()
+            .filter((d) => voidOfSale(d.id) === null)
+            .map((d) => ({
+              id: d.id,
+              number: d.number,
+              createdAt: d.createdAt,
+              sellerId: d.sellerId,
+              customerId: d.customerId,
+              total: d.amounts.total,
+              cashDue: d.cashDue,
+            })),
+        );
+      f.counter.deskCheck = () => Promise.resolve(desk);
+      f.counter.voidBill = (req) => {
+        const sale = docs.find((d) => d.id === req.saleId)!;
+        const v = {
+          number: `C01-V${String(voids.length + 1).padStart(6, '0')}`,
+          saleId: sale.id,
+          saleNumber: sale.number,
+          userId: req.userId,
+          approvedBy: req.approverId,
+          reason: req.reason,
+          note: req.note,
+          createdAt: '2026-11-03T09:20:00.000Z',
+        } as SaleVoidDocument;
+        voids.push({ req, void: v });
+        return Promise.resolve({ void: v, sale });
+      };
+      f.counter.voidOf = (id) => Promise.resolve(voidOfSale(id));
+      const setDesk = (d: DeskCheck) => {
+        desk = d;
+      };
+      return { ...f, docs, printed, reprints, finalized, setCredit, voids, setDesk };
     };
 
     const dialog = () => screen.getByRole('dialog');
@@ -1438,6 +1485,85 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
       expect(f.printed[1]!.items['BRPD001']?.code).toBe('BRPD001');
       expect(f.reprints).toEqual(['C01-S000001 u1']);
       await waitFor(() => expect(notice()).toBe('Bill C01-S000001 reprinted'));
+    });
+
+    describe('void and reissue (POS-11, POS spec §18, W1-12)', () => {
+      const payCash = async (f: ReturnType<typeof payCounter>, n: number) => {
+        fireEvent.keyDown(window, { key: 'F9' });
+        enter(await within(await screen.findByRole('dialog')).findByLabelText(en.pay.cashReceived));
+        await waitFor(() => expect(f.docs).toHaveLength(n));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      };
+
+      it("Alt+V voids a bill with the manager's PIN and a reason, prints it as VOID, and reissues it linked", async () => {
+        const f = payCounter();
+        const box = await sold(f.counter);
+        await payCash(f, 1);
+        await waitFor(() => expect(document.activeElement).toBe(box));
+        fireEvent.keyDown(window, { key: 'v', altKey: true });
+        const list = within(await screen.findByRole('dialog'));
+        await list.findByRole('option', { name: /C01-S000001/ });
+        enter(list.getByLabelText(en.void.search));
+        expect(await screen.findByText(en.void.deskStatus.pending)).toBeDefined();
+        fireEvent.change(screen.getByLabelText(en.unlock.shortCode), { target: { value: '41' } });
+        fireEvent.click(screen.getByLabelText(en.override.reason.wrong_price));
+        fireEvent.change(screen.getByLabelText(en.approval.pin), { target: { value: '4321' } });
+        fireEvent.submit(screen.getByLabelText(en.approval.pin).closest('form')!);
+
+        expect(await screen.findByText('Reissue C01-S000001?')).toBeDefined();
+        expect(f.voids.map((v) => [v.req.userId, v.req.approverId, v.req.reason, v.req.deskStatus])).toEqual([
+          ['u1', 'm1', 'wrong_price', 'pending'],
+        ]);
+        expect(f.printed[1]!.document).toEqual(f.docs[0]);
+        expect(f.printed[1]!.voided).toMatchObject({
+          number: 'C01-V000001',
+          by: 'Asif Khan',
+          approvedBy: 'Tariq Manager',
+          reason: en.override.reason.wrong_price,
+        });
+
+        fireEvent.click(action(en.void.reissueAction));
+        await waitFor(() => expect(total()).toBe('Rs 4,500'));
+        expect(screen.getByText('Reissue of C01-S000001')).toBeDefined();
+        await payCash(f, 2);
+        expect(f.docs[1]!.reissueOf).toEqual({ id: f.docs[0]!.id, number: 'C01-S000001' });
+        expect(f.docs[1]!.number).toBe('C01-S000002');
+      });
+
+      it('refuses a bill the cash desk has taken, saying when and by whom', async () => {
+        const f = payCounter();
+        const box = await sold(f.counter);
+        await payCash(f, 1);
+        f.setDesk({ status: 'received', at: '2026-11-03T09:05:00.000Z', cashierName: 'Ali' });
+        await waitFor(() => expect(document.activeElement).toBe(box));
+        fireEvent.keyDown(window, { key: 'v', altKey: true });
+        const list = within(await screen.findByRole('dialog'));
+        await list.findByRole('option', { name: /C01-S000001/ });
+        enter(list.getByLabelText(en.void.search));
+        expect(
+          await screen.findByText(/C01-S000001 was handed over at 2:05.(PM|pm) by Ali: it can't be voided/),
+        ).toBeDefined();
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(f.voids).toEqual([]);
+      });
+
+      it('offline warns that the desk could not be asked; a salesman cannot approve', async () => {
+        const f = payCounter();
+        const box = await sold(f.counter);
+        await payCash(f, 1);
+        f.setDesk({ status: 'unknown', at: null, cashierName: null });
+        await waitFor(() => expect(document.activeElement).toBe(box));
+        fireEvent.keyDown(window, { key: 'v', altKey: true });
+        const list = within(await screen.findByRole('dialog'));
+        await list.findByRole('option', { name: /C01-S000001/ });
+        enter(list.getByLabelText(en.void.search));
+        expect(await screen.findByText(en.void.approveUnknown)).toBeDefined();
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Asif Khan/ }));
+        fireEvent.change(screen.getByLabelText(en.approval.pin), { target: { value: '4831' } });
+        fireEvent.submit(screen.getByLabelText(en.approval.pin).closest('form')!);
+        expect(await screen.findByText(en.approval.notAllowed)).toBeDefined();
+        expect(f.voids).toEqual([]);
+      });
     });
   });
 });

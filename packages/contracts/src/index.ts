@@ -29,8 +29,10 @@ export {
   CashSessionV2,
   CustomerCollectionV1,
   SaleDocumentV1,
+  SaleVoidV1,
 } from './documents';
 export {
+  BillStatusResponseSchema,
   EXCEPTION_KINDS,
   PUSH_BATCH_MAX,
   PUSH_EVENTS_MAX,
@@ -38,6 +40,7 @@ export {
   PushResponseSchema,
   REJECT_CODES,
   SYNC_EVENTS,
+  type BillStatusResponse,
   type DeviceHealth,
   type DocumentFamily,
   type ExceptionKind,

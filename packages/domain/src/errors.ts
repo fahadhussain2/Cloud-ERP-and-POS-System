@@ -63,7 +63,13 @@ export type DomainErrorCode =
   | 'too_many'
   | 'label_too_long'
   | 'not_found'
-  | 'bill_open';
+  | 'bill_open'
+  | 'other_device'
+  | 'already_voided'
+  | 'other_day'
+  | 'handed_over'
+  | 'window_none'
+  | 'bill_voided';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

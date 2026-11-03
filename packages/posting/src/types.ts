@@ -32,6 +32,16 @@ export interface PostingHandover {
   amount: Money;
 }
 
+/** A stored void as posting needs it (posting rules §4.4, W1-12): it reverses its sale's own posting. */
+export interface PostingVoid {
+  id: string;
+  /** The void's own number, e.g. `C03-V000001`. */
+  number: string;
+  saleNumber: string;
+  branchId: string;
+  businessDate: string;
+}
+
 /** A stored customer collection as posting needs it (posting rules §4.5, W1-11). */
 export interface PostingCollection {
   id: string;

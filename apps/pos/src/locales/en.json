@@ -147,7 +147,8 @@
     "saveFailed": "This bill can’t be saved on this counter. Don’t lock or reload: finish it, and call the manager.",
     "aboveListTotal": "Above list",
     "rounding": "Rounding",
-    "walkInPhone": "Walk-in · {{phone}}"
+    "walkInPhone": "Walk-in · {{phone}}",
+    "reissueOf": "Reissue of {{number}}"
   },
   "keys": {
     "counter": "Counter",
@@ -174,7 +175,8 @@
     "sell": "Sell",
     "hold": "Hold",
     "recall": "Recall",
-    "recallCount": "Recall ({{count}})"
+    "recallCount": "Recall ({{count}})",
+    "void": "Void"
   },
   "dialog": {
     "cancel": "Cancel"
@@ -243,7 +245,13 @@
       "regular_customer": "Regular customer",
       "other": "Other",
       "pay_soon": "Customer will pay soon",
-      "owner_instruction": "Owner’s instruction"
+      "owner_instruction": "Owner’s instruction",
+      "wrong_item": "Wrong item",
+      "wrong_quantity": "Wrong quantity",
+      "wrong_price": "Wrong price or discount",
+      "wrong_customer_or_payment": "Wrong customer or payment",
+      "duplicate_bill": "Duplicate bill",
+      "customer_cancelled": "Customer cancelled"
     }
   },
   "error": {
@@ -325,7 +333,8 @@
     "action": "Reprint",
     "none": "No bill of the last 30 days has that number.",
     "empty": "No bills on this counter in the last 30 days.",
-    "done": "Bill {{number}} reprinted"
+    "done": "Bill {{number}} reprinted",
+    "voided": "VOID"
   },
   "print": {
     "saleBill": "SALE BILL",
@@ -375,7 +384,9 @@
       "toAcknowledge": "to acknowledge",
       "receiverSigns": "Received by (signature)",
       "cashierSigns": "Cashier and manager (signatures)"
-    }
+    },
+    "void": "VOID {{number}} · {{at}} · by {{by}}, approved by {{approvedBy}} · {{reason}}",
+    "reissueOf": "Reissue of {{number}}"
   },
   "health": {
     "title": "Counter health",
@@ -681,5 +692,45 @@
     "empty": "You have no bills held on this counter.",
     "items_one": "{{count}} line",
     "items_other": "{{count}} lines"
+  },
+  "void": {
+    "title": "Void a bill",
+    "help": "This counter's bills of today. Type part of the number or scan the bill; ↑ ↓ and Enter choose it.",
+    "search": "Bill number or scan",
+    "choose": "Void this bill",
+    "none": "No bill of today on this counter has that number.",
+    "empty": "No bills of today on this counter to void.",
+    "approve": "Void {{number}}: it keeps its number and prints as VOID. Someone who may void enters their own PIN, with the reason.",
+    "approveUnknown": "Offline: the cash desk can't be asked whether it has taken this bill's cash. Check with the cashier before voiding.",
+    "bill": "Bill",
+    "total": "Total",
+    "desk": "Cash desk",
+    "deskStatus": {
+      "pending": "Not handed over yet",
+      "not_applicable": "Paid without cash",
+      "unknown": "Can't be checked (offline)",
+      "received": "Handed over",
+      "paid_out": "Paid out"
+    },
+    "handedOver": "{{number}} was handed over at {{at}} by {{by}}: it can't be voided. Use a return.",
+    "handedOverHere": "{{number}} was handed over at this desk: it can't be voided. Use a return.",
+    "done": "{{number}} voided ({{void}}) and printed as VOID",
+    "failed": "The bill couldn't be voided. Try again; if it keeps happening, call the manager.",
+    "reissueTitle": "Reissue {{number}}?",
+    "reissueBody": "A new bill starts with its customer, lines and prices, to correct and pay like any bill.",
+    "reissueAction": "Reissue now",
+    "reissuing": "Reissue of {{number}}: correct the bill, then pay",
+    "holdFirst": "Your bill has lines: hold it (F8) or finish it, then reissue {{number}} from its lines by hand.",
+    "error": {
+      "other_device": "That bill was made on another counter: void it there.",
+      "already_voided": "That bill is already voided.",
+      "other_day": "That bill is of another day: use a return.",
+      "handed_over": "The cash desk has taken that bill's cash: use a return.",
+      "not_permitted": "That person can't void bills.",
+      "window_none": "That person's role doesn't allow voids.",
+      "reason_required": "Choose a reason.",
+      "note_required": "Write a note for “Other”.",
+      "note_too_long": "The note can be at most 200 characters."
+    }
   }
 }

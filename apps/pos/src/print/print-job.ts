@@ -24,4 +24,9 @@ export interface PrintJob {
   timeZone: string;
   /** A reprint carries a band with when and who (owner answer 3 to W1-06). */
   reprint: { at: string; by: string } | null;
+  /**
+   * A voided bill prints with a VOID band (PRD W5, POS spec §18, W1-12): its void's number, when, who asked, who
+   * approved, the reason (already in words). Absent or null on a bill that isn't voided.
+   */
+  voided?: { number: string; at: string; by: string; approvedBy: string; reason: string } | null;
 }

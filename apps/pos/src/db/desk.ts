@@ -182,7 +182,11 @@ export function deskState(db: SqlDb, nowMs = Date.now()): DeskState {
     session,
     queue: db
       .selectObjects(`SELECT ${QUEUE_COLUMNS} FROM cash_queue ORDER BY created_at_device`)
-      .map(queueEntry),
+      .map(queueEntry)
+      // A bill voided on this desk leaves its queue at once, before the server knows (W1-12).
+      .map((e) =>
+        e.status === 'finalized' && voidedHere(db, e.id) ? { ...e, status: 'voided' as const } : e,
+      ),
     local: localHandovers(db, nowMs),
   };
 }
@@ -334,6 +338,12 @@ export function closeSession(db: SqlDb, req: CloseRequest): CashSessionDocument 
 }
 
 /** The bill a handover is for: the queue's row when the desk has it, else what the scanned code says. */
+const voidedHere = (db: SqlDb, saleId: string): boolean =>
+  db.selectValue(
+    "SELECT 1 FROM local_documents WHERE family = 'V' AND json_extract(payload, '$.saleId') = ? LIMIT 1",
+    [saleId],
+  ) !== undefined;
+
 function targetOf(db: SqlDb, number: string, code: { cashDue: Money } | null): HandoverTarget {
   const [row] = db.selectObjects(`SELECT ${QUEUE_COLUMNS} FROM cash_queue WHERE number = ? LIMIT 1`, [
     number,
@@ -346,6 +356,8 @@ function targetOf(db: SqlDb, number: string, code: { cashDue: Money } | null): H
       saleDocumentId: e.id,
       cashReceived: e.cashReceived,
       handoverStatus: e.handoverStatus,
+      // Voided as the queue says, or by this desk itself before the server knows (W1-12).
+      status: e.status === 'voided' || voidedHere(db, e.id) ? 'voided' : 'finalized',
     };
   }
   if (code === null) throw new DomainError('nothing_to_collect', `${number} is not in the queue`);

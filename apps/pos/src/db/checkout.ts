@@ -81,6 +81,8 @@ export interface DocumentSummary {
   createdAt: string;
   total: Money;
   cashDue: Money;
+  /** The number of its void on this counter (W1-12), or null. */
+  voidNumber: string | null;
 }
 
 export interface Reprint {
@@ -210,6 +212,7 @@ export function finalizeSale(db: SqlDb, req: FinalizeRequest): Finalized {
       // Read in this transaction, so two bills for one customer can't both use the same room (POS spec §15).
       credit: customerId === null ? null : creditFigures(db, customerId, req.offline, today),
       creditApproval: req.creditApproval,
+      reissueOf: open.reissueOf ?? null,
       context: {
         id: req.id,
         seq,
@@ -249,10 +252,12 @@ export const setSignature = (db: SqlDb, documentId: string, signature: string): 
 export const recentDocuments = (db: SqlDb, since: string, filter = ''): DocumentSummary[] =>
   db
     .selectObjects(
-      `SELECT id, number, created_at, json_extract(payload, '$.amounts.total') AS total,
-         json_extract(payload, '$.cashDue') AS cash_due
-       FROM local_documents WHERE family = 'S' AND created_at >= ? AND instr(number, ?) > 0
-       ORDER BY created_at DESC, seq DESC LIMIT 500`,
+      `SELECT d.id, d.number, d.created_at, json_extract(d.payload, '$.amounts.total') AS total,
+         json_extract(d.payload, '$.cashDue') AS cash_due,
+         (SELECT v.number FROM local_documents v
+          WHERE v.family = 'V' AND json_extract(v.payload, '$.saleId') = d.id LIMIT 1) AS void_number
+       FROM local_documents d WHERE d.family = 'S' AND d.created_at >= ? AND instr(d.number, ?) > 0
+       ORDER BY d.created_at DESC, d.seq DESC LIMIT 500`,
       [since, filter.trim().toUpperCase()],
     )
     .map((r) => ({
@@ -261,6 +266,7 @@ export const recentDocuments = (db: SqlDb, since: string, filter = ''): Document
       createdAt: String(r['created_at']),
       total: money(Number(r['total'])),
       cashDue: money(Number(r['cash_due'])),
+      voidNumber: text(r['void_number']),
     }));
 
 export const loadDocument = (db: SqlDb, id: string): SaleDocument | null =>

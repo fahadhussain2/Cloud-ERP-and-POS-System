@@ -8,6 +8,7 @@ import { createTokenSource, enroll } from './device/session';
 import { httpApi } from './net/api';
 import { printDeskSlip } from './print/DeskSlipPrint';
 import { printBill } from './print/print-bill';
+import { checkDesk } from './sync/bills';
 import { browserStorage, runStorageChecks } from './storage/checks';
 import { openEventStream } from './sync/events';
 import { changePin } from './sync/pin';
@@ -204,6 +205,19 @@ export function browserCounter(): Counter {
       if (r.handover) await signStored(r.handover);
       return r;
     },
+    voidableBills: (filter) => db.voidableBills(filter),
+    deskCheck: async (billNumber) => {
+      const local = await db.localDeskStatus(billNumber);
+      return local !== null
+        ? { status: local, at: null, cashierName: null }
+        : checkDesk({ api, tokens }, billNumber);
+    },
+    voidBill: async (req) => {
+      const r = await db.voidBill({ ...req, ...made() });
+      await signStored(r.void);
+      return r;
+    },
+    voidOf: (saleId) => db.voidOf(saleId),
     recentBills: (since, filter) => db.recentDocuments(since, filter),
     bill: (id) => db.loadDocument(id),
     recordReprint: (r) => db.recordReprint(r),

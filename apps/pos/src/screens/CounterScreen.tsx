@@ -13,6 +13,7 @@ import {
   parseDiscount,
   parseWholeAmount,
   pendingApprovals,
+  reissueBill,
   removeLine,
   saleTotal,
   setBillDiscount,
@@ -32,6 +33,9 @@ import {
   type RoleGrant,
   type SaleDocument,
   type Tender,
+  type SaleVoidDocument,
+  type VoidReason,
+  VOID_REASONS,
 } from '@erp/domain';
 import {
   Badge,
@@ -59,9 +63,11 @@ import type { Counter } from '../counter';
 import type { CheckoutSettings, DocumentSummary, PaymentMethodRow } from '../db/checkout';
 import type { CounterCustomer } from '../db/customers';
 import type { HeldBill } from '../db/held';
+import type { VoidListBill } from '../db/void';
+import type { DeskCheck } from '../sync/bills';
 import type { PrintJob } from '../print/print-job';
 import type { BillItem, SearchResult, Vehicle } from '../search/search-index';
-import { checkApprover, checkCreditApprover } from '../unlock/approve';
+import { checkApprover, checkCreditApprover, checkVoidApprover } from '../unlock/approve';
 import type { StaffUser } from '../unlock/unlock';
 import { ApprovalDialog, ConfirmDialog, EntryDialog, TierDialog, type ApprovalAttempt } from './BillDialogs';
 import { BillPanel } from './BillPanel';
@@ -71,6 +77,7 @@ import { HoldDialog, RecallDialog } from './HoldDialogs';
 import { PaymentPad } from './PaymentPad';
 import { CLIENT_VERSION } from '../version';
 import { ReprintDialog } from './ReprintDialog';
+import { VoidDialog } from './VoidDialog';
 
 // The counter screen (POS spec §9–§11, §15, POS-02, POS-03, POS-04, POS-05, POS-07, PLT-07): search on the left, the bill on the right,
 // the key bar along the bottom. Every key press searches the local catalog; an older answer never replaces a newer
@@ -96,6 +103,9 @@ type DialogState =
   | { kind: 'reprint' }
   | { kind: 'hold' }
   | { kind: 'recall' }
+  | { kind: 'void' }
+  | { kind: 'voidApproval'; bill: VoidListBill; desk: DeskCheck }
+  | { kind: 'reissue'; sale: SaleDocument }
   | { kind: 'customer' }
   | { kind: 'onAccount'; figures: CreditView }
   | { kind: 'creditApproval'; tender: Tender; needs: CreditNeed[]; overLimitBy: Money; overCapBy: Money };
@@ -124,6 +134,10 @@ export type CounterScreenCounter = BillCounter &
     | 'heldBills'
     | 'recallBill'
     | 'clearHeld'
+    | 'voidableBills'
+    | 'deskCheck'
+    | 'voidBill'
+    | 'voidOf'
   >;
 
 const sameTarget = (a: ApprovalTarget, b: ApprovalTarget) =>
@@ -468,7 +482,12 @@ export function CounterScreen({
     [i.name, i.variant].filter(Boolean).join(' ');
 
   /** Sends a bill to the printer; a print that fails changes nothing, and Alt+P prints it again (POS spec §13). */
-  const printDocument = (document: SaleDocument, items: PrintJob['items'], reprint: PrintJob['reprint']) => {
+  const printDocument = (
+    document: SaleDocument,
+    items: PrintJob['items'],
+    reprint: PrintJob['reprint'],
+    voided: SaleVoidDocument | null = null,
+  ) => {
     const c = document.customerId === null ? undefined : customers.find((x) => x.id === document.customerId);
     try {
       counter.print({
@@ -484,6 +503,13 @@ export function CounterScreen({
         money,
         timeZone: tenantZone(),
         reprint,
+        voided: voided && {
+          number: voided.number,
+          at: voided.createdAt,
+          by: nameOf(voided.userId),
+          approvedBy: nameOf(voided.approvedBy),
+          reason: voided.note ?? t(`override.reason.${voided.reason}`),
+        },
       });
     } catch (err) {
       void counter.log('bill.print_failed', { number: document.number, error: String(err) });
@@ -564,21 +590,29 @@ export function CounterScreen({
     return null;
   };
 
-  /** Reprint (POS spec §13): marked REPRINT with when and who, and kept for the audit log. */
+  /** The code and name of each item on a stored bill, from the local catalog (an item gone from it shows its id). */
+  const itemsOf = async (document: SaleDocument) => {
+    const ids = [...new Set(document.lines.map((l) => l.itemId))];
+    const found = await Promise.all(ids.map((id) => counter.billItem(id, null)));
+    return {
+      found: Object.fromEntries(ids.map((id, i) => [id, found[i] ?? null])),
+      items: Object.fromEntries(
+        ids.flatMap((id, i) => {
+          const item = found[i];
+          return item ? [[id, { code: item.code, name: itemName(item) }] as const] : [];
+        }),
+      ),
+    };
+  };
+
+  /** Reprint (POS spec §13): marked REPRINT with when and who, and kept for the audit log; a voided bill as VOID. */
   const reprintBill = async (summary: DocumentSummary) => {
     const document = await counter.bill(summary.id);
     if (!document) return;
     const at = new Date().toISOString();
     await counter.recordReprint({ documentId: document.id, number: document.number, userId: user.id, at });
-    const ids = [...new Set(document.lines.map((l) => l.itemId))];
-    const found = await Promise.all(ids.map((id) => counter.billItem(id, null)));
-    const items = Object.fromEntries(
-      ids.flatMap((id, i) => {
-        const item = found[i];
-        return item ? [[id, { code: item.code, name: itemName(item) }] as const] : [];
-      }),
-    );
-    printDocument(document, items, { at, by: user.fullName });
+    const [{ items }, voided] = await Promise.all([itemsOf(document), counter.voidOf(document.id)]);
+    printDocument(document, items, { at, by: user.fullName }, voided);
     setDialog(null);
     setNotice(t('reprint.done', { number: document.number }));
     focusSearch();
@@ -672,6 +706,133 @@ export function CounterScreen({
     return null;
   };
   const openRecall = () => setDialog({ kind: 'recall' });
+
+  /** Void (`Alt+V`, POS spec §18): one of this counter's bills of today; the desk is asked first. */
+  const openVoid = () => setDialog({ kind: 'void' });
+  const voidList = useCallback((filter: string) => counter.voidableBills(filter), [counter]);
+  const chooseVoid = async (bill: VoidListBill) => {
+    const desk: DeskCheck =
+      bill.cashDue === 0
+        ? { status: 'not_applicable', at: null, cashierName: null }
+        : await counter.deskCheck(bill.number);
+    if (desk.status === 'received' || desk.status === 'paid_out') {
+      setDialog(null);
+      setMessage(
+        desk.at === null
+          ? t('void.handedOverHere', { number: bill.number })
+          : t('void.handedOver', {
+              number: bill.number,
+              at: new Intl.DateTimeFormat(money.locale, {
+                timeZone: tenantZone(),
+                timeStyle: 'short',
+              }).format(new Date(desk.at)),
+              by: desk.cashierName ?? '',
+            }),
+      );
+      return focusSearch();
+    }
+    setDialog({ kind: 'voidApproval', bill, desk });
+  };
+  /** The approver's own PIN (`pos.void`, PLT-07), then the void in one local transaction, then the VOID print. */
+  const attemptVoid = async (
+    bill: VoidListBill,
+    desk: DeskCheck,
+    ...[approver, pin, reason, note]: Parameters<ApprovalAttempt<VoidReason>>
+  ): ReturnType<ApprovalAttempt<VoidReason>> => {
+    const [before, grants] = await Promise.all([
+      counter.getPinState(approver.id),
+      counter.grants(approver.id),
+    ]);
+    const r = await checkVoidApprover({
+      approver,
+      approverState: before,
+      approverGrants: grants,
+      branchId: branchId ?? '',
+      pin,
+      verify: (v, x) => counter.verifyPin(v, x),
+    });
+    await counter.setPinState(approver.id, r.approverState);
+    if (!before.locked && r.approverState.locked)
+      await counter.recordPinEvent({
+        kind: 'locked',
+        userId: approver.id,
+        byUserId: null,
+        at: new Date().toISOString(),
+      });
+    await counter.log(`void.${r.result}`, {
+      userId: user.id,
+      approverId: approver.id,
+      number: bill.number,
+    });
+    if (r.result === 'approved') {
+      try {
+        const done = await counter.voidBill({
+          userId: user.id,
+          approverId: approver.id,
+          saleId: bill.id,
+          reason,
+          note,
+          deskStatus: desk.status,
+        });
+        printDocument(done.sale, (await itemsOf(done.sale)).items, null, done.void);
+        setMessage(null);
+        setNotice(t('void.done', { number: bill.number, void: done.void.number }));
+        onSaved?.();
+        setDialog({ kind: 'reissue', sale: done.sale });
+      } catch (err) {
+        setDialog(null);
+        if (err instanceof DomainError) setMessage(t(voidErrorKey(err.code)));
+        else {
+          void counter.log('bill.void_failed', { number: bill.number, error: String(err) });
+          setMessage(t('void.failed'));
+        }
+        focusSearch();
+      }
+    }
+    return { result: r.result, failures: r.approverState.failures };
+  };
+  const voidErrorKey = (code: DomainErrorCode) =>
+    i18n.exists(`void.error.${code}`) ? `void.error.${code}` : errorKey(code);
+  /** Reissue (POS spec §18): the voided bill's customer, tier, lines and prices as the open bill, linked to it. */
+  const reissue = async (sale: SaleDocument) => {
+    setDialog(null);
+    if ((get()?.bill.lines.length ?? 0) > 0) {
+      setMessage(t('void.holdFirst', { number: sale.number }));
+      return focusSearch();
+    }
+    const { found } = await itemsOf(sale);
+    const bill = reissueBill({
+      document: sale,
+      sellerId: user.id,
+      allowsFraction: Object.fromEntries(
+        Object.entries(found).flatMap(([id, item]) => (item ? [[id, item.allowsFraction]] : [])),
+      ),
+      lineIds: sale.lines.map(() => uuidv7()),
+    });
+    const c = sale.customerId === null ? undefined : customers.find((x) => x.id === sale.customerId);
+    const ob = {
+      version: 1 as const,
+      bill,
+      items: Object.fromEntries(
+        Object.entries(found).map(([id, item]) => [
+          id,
+          item
+            ? { code: item.code, name: item.name, variant: item.variant, spec: item.spec }
+            : { code: '', name: id, variant: null, spec: null },
+        ]),
+      ),
+      customer:
+        sale.customerId === null
+          ? null
+          : { id: sale.customerId, code: c?.code ?? '', name: c?.name ?? sale.customerId },
+      walkinPhone: sale.walkinPhone,
+      reissueOf: { id: sale.id, number: sale.number },
+    };
+    await counter.saveOpenBill(user.id, ob);
+    load(ob);
+    setNotice(t('void.reissuing', { number: sale.number }));
+    focusSearch();
+  };
   const ignore = () => {};
   // F1, F3, F5 never reach the browser on the counter (no help page, find bar or reload mid-bill).
   useShortcuts(
@@ -686,6 +847,7 @@ export function CounterScreen({
       'Alt+P': () => setDialog({ kind: 'reprint' }),
       F8: openHold,
       'Shift+F8': openRecall,
+      'Alt+V': openVoid,
       F1: ignore,
       F3: ignore,
       F5: ignore,
@@ -839,6 +1001,7 @@ export function CounterScreen({
     },
     { keys: 'Alt+C', label: t('keys.clearBill'), run: openClear },
     { keys: 'Alt+P', label: t('keys.reprint'), run: () => setDialog({ kind: 'reprint' }) },
+    { keys: 'Alt+V', label: t('keys.void'), run: openVoid },
     { keys: 'Alt+L', label: t('keys.lock'), run: onLock },
   ];
   const hints: KeyHint[] =
@@ -985,6 +1148,7 @@ export function CounterScreen({
                 : null
           }
           walkinPhone={openBill?.walkinPhone ?? null}
+          reissueOf={openBill?.reissueOf?.number ?? null}
           selected={lineSel}
           active={zone === 'bill'}
           message={saveFailed ? t('bill.saveFailed') : message}
@@ -1165,6 +1329,47 @@ export function CounterScreen({
           onRecall={recallHeld}
           onClear={clearHeldBill}
           onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'void' && (
+        <VoidDialog
+          list={voidList}
+          money={money}
+          timeZone={tenantZone()}
+          sellerName={nameOf}
+          onChoose={chooseVoid}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'voidApproval' && (
+        <ApprovalDialog<VoidReason>
+          description={
+            dialog.desk.status === 'unknown'
+              ? t('void.approveUnknown')
+              : t('void.approve', { number: dialog.bill.number })
+          }
+          facts={[
+            [t('void.bill'), dialog.bill.number],
+            [t('void.total'), m(dialog.bill.total)],
+            [t('approval.seller'), nameOf(dialog.bill.sellerId)],
+            [t('void.desk'), t(`void.deskStatus.${dialog.desk.status}`)],
+          ]}
+          staff={staff}
+          reasons={VOID_REASONS}
+          onApprove={(...args) => attemptVoid(dialog.bill, dialog.desk, ...args)}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'reissue' && (
+        <ConfirmDialog
+          title={t('void.reissueTitle', { number: dialog.sale.number })}
+          body={t('void.reissueBody')}
+          actionLabel={t('void.reissueAction')}
+          onConfirm={() => void reissue(dialog.sale)}
+          onClose={() => {
+            setDialog(null);
+            focusSearch();
+          }}
         />
       )}
       {dialog?.kind === 'reprint' && (

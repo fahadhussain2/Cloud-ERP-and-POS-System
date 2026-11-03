@@ -218,3 +218,22 @@ export {
   type TenderLine,
   type TenderProblem,
 } from './tender';
+export { reissueBill } from './reissue';
+export {
+  buildVoidDocument,
+  canVoid,
+  checkVoid,
+  reviewVoid,
+  VOID_REASONS,
+  type CashDeskStatus,
+  type HandoverSeen,
+  type SaleVoidDocument,
+  type VoidableBill,
+  type VoidCheck,
+  type VoidContext,
+  type VoidFinding,
+  type VoidInput,
+  type VoidProblem,
+  type VoidReason,
+  type VoidReview,
+} from './void';

@@ -357,6 +357,7 @@ describe('after finalizing', () => {
         createdAt: new Date(T0 + 2 * 60_000).toISOString(),
         total: 145000,
         cashDue: 145000,
+        voidNumber: null,
       },
     ]);
     expect(recentDocuments(db, new Date(T0 + 2 * 60_000).toISOString()).map((d) => d.number)).toEqual([

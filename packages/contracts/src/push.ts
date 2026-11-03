@@ -8,7 +8,7 @@ export const PUSH_BATCH_MAX = 100;
 /** At most this many audit events per push. */
 export const PUSH_EVENTS_MAX = 500;
 
-export type DocumentFamily = 'S' | 'H' | 'R' | 'M' | 'Z';
+export type DocumentFamily = 'S' | 'H' | 'R' | 'M' | 'Z' | 'V';
 
 /** Why the server refuses a document: it can't be trusted or stored (SYN-03). Anything else is accepted. */
 export const REJECT_CODES = [
@@ -117,7 +117,7 @@ export interface PushResponse {
 export const SYNC_EVENTS = { changesAvailable: 'changes-available', queueChanged: 'queue-changed' } as const;
 
 const Instant = z.iso.datetime();
-const Family = z.enum(['S', 'H', 'R', 'M', 'Z']);
+const Family = z.enum(['S', 'H', 'R', 'M', 'Z', 'V']);
 const Count = z.int().nonnegative();
 
 const PushDocumentSchema = z.strictObject({
@@ -203,3 +203,20 @@ export const PushResponseSchema: z.ZodType<PushResponse> = z.strictObject({
   ),
   events: z.array(z.uuid()),
 });
+
+/**
+ * The live cash desk status of one of the device's own bills (W1-12, sync spec §6.2): what the server knows of the bill
+ * and of any handover of its number, an offline scan whose bill hasn't arrived included. Asked before a void.
+ * `GET /api/sync/bills/status?number=C03-S000412` (device token).
+ */
+export const BillStatusResponseSchema = z.strictObject({
+  /** The server has the bill. */
+  known: z.boolean(),
+  status: z.enum(['finalized', 'voided']).nullable(),
+  /** The bill's own status, or `received` / `paid_out` from a handover of its number when the bill isn't there. */
+  handoverStatus: z.enum(['not_applicable', 'pending', 'received', 'paid_out']).nullable(),
+  handedOverAt: z.iso.datetime().nullable(),
+  /** Who took the cash, for the counter to say so. */
+  cashierName: z.string().nullable(),
+});
+export type BillStatusResponse = z.infer<typeof BillStatusResponseSchema>;

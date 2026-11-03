@@ -60,7 +60,10 @@ export const getCustomer = (db: SqlDb, id: string): CounterCustomer | null => {
   return r === undefined ? null : toCustomer(r);
 };
 
-/** The on-account parts of this counter's bills for a customer, with a condition on the document `d`. */
+/**
+ * The on-account parts of this counter's bills for a customer, with a condition on the document `d`. A bill voided here
+ * doesn't count (W1-12): until its void reaches the balance, the counter errs on the customer owing more.
+ */
 const onAccountSum = (db: SqlDb, customerId: string, where: string, params: string[]): Money =>
   money(
     Number(
@@ -68,6 +71,8 @@ const onAccountSum = (db: SqlDb, customerId: string, where: string, params: stri
         `SELECT coalesce(sum(json_extract(p.value, '$.amount')), 0)
          FROM local_documents d, json_each(d.payload, '$.payments') p
          WHERE json_extract(d.payload, '$.customerId') = ? AND json_extract(p.value, '$.method') = 'on_account'
+           AND NOT EXISTS (SELECT 1 FROM local_documents v
+             WHERE v.family = 'V' AND json_extract(v.payload, '$.saleId') = d.id)
            AND (${where})`,
         [customerId, ...params],
       ),

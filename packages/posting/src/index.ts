@@ -6,6 +6,7 @@ export { applyRebuild, checkRebuild, RebuildRefused, type RebuildCheck } from '.
 export { postHandover } from './handover';
 export { emptyState, replay, type ReplayStep } from './replay';
 export { postSale } from './sale';
+export { postVoid } from './void';
 export type {
   CostState,
   JournalLine,
@@ -23,5 +24,6 @@ export type {
   PostingSale,
   PostingSaleLine,
   PostingSessionEvent,
+  PostingVoid,
   StockMovement,
 } from './types';
