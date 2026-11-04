@@ -59,6 +59,8 @@ export const tenants = erp.table('tenants', {
   offlineStrongWarningHours: smallint('offline_strong_warning_hours').notNull(),
   /** Days a sale may be returned without an approval (PRD Q3, W1-13); a category may set its own. */
   returnWindowDays: integer('return_window_days').notNull(),
+  /** Set by the final run: from then on the pilot wipe is refused (D-101, W1-14). */
+  goLiveAt: timestamp('go_live_at', { withTimezone: true }),
   ...syncColumns,
   ...auditColumns,
 });
@@ -726,7 +728,9 @@ export const postingState = erp.table('posting_state', {
 export const postings = erp.table('postings', {
   tenantId: uuid('tenant_id').notNull(),
   seq: bigint('seq', { mode: 'number' }).notNull(),
-  sourceType: text('source_type', { enum: ['sale', 'cash_handover'] }).notNull(),
+  sourceType: text('source_type', {
+    enum: ['sale', 'cash_handover', 'payment', 'cash_movement', 'cash_session', 'sales_void', 'opening'],
+  }).notNull(),
   sourceId: uuid('source_id').notNull(),
   entryDate: date('entry_date').notNull(),
   postedAt: timestamp('posted_at', { withTimezone: true }).notNull(),
@@ -796,6 +800,49 @@ export const itemCosts = erp.table('item_costs', {
   lastSupplierId: uuid('last_supplier_id'),
   lastReceiptAt: timestamp('last_receipt_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+/** The floor from cost per item (CAT-06, D-092, W1-14), kept by the posting layer; pulled by the counters. */
+export const itemFloors = erp.table('item_floors', {
+  tenantId: uuid('tenant_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  floor: bigint('floor', { mode: 'number' }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  ...syncColumns,
+});
+
+/** The opening balances at cutover (MIG-02, posting rules §7, W1-14): a draft until it is posted, then never changed. */
+export const openingBalances = erp.table('opening_balances', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  label: text('label').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  asOf: date('as_of').notNull(),
+  businessDate: date('business_date').notNull(),
+  status: text('status', { enum: ['draft', 'posted'] }).notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  legacy: jsonb('legacy'),
+  ...auditColumns,
+});
+
+export const openingBalanceLines = erp.table('opening_balance_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  openingId: uuid('opening_id').notNull(),
+  lineNo: integer('line_no').notNull(),
+  kind: text('kind', { enum: ['stock', 'customer', 'supplier', 'account'] }).notNull(),
+  itemId: uuid('item_id'),
+  locationId: uuid('location_id'),
+  qty: numeric('qty', { precision: 14, scale: 3 }),
+  unitCost: bigint('unit_cost', { mode: 'number' }),
+  lastCost: bigint('last_cost', { mode: 'number' }),
+  lastSupplierId: uuid('last_supplier_id'),
+  lastReceiptAt: timestamp('last_receipt_at', { withTimezone: true }),
+  partyId: uuid('party_id'),
+  accountId: uuid('account_id'),
+  amount: bigint('amount', { mode: 'number' }),
 });
 
 export const partyLedgerEntries = erp.table('party_ledger_entries', {

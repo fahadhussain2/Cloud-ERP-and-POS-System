@@ -1,0 +1,133 @@
+{
+  "description": "Each item's last purchase on or before the cutoff (migration doc §5): its Rate and supplier, for item_costs.last_cost and last_supplier_id (reorder suggestions). Only lines of a document type that adds stock count (a purchase return doesn't); a rate of 0 or less doesn't count. Latest = the latest DocumentDate, then the highest TransactionID. Items in code order.",
+  "cases": [
+    {
+      "name": "the latest purchase per item, by date then transaction",
+      "input": {
+        "asOf": "2026-12-31",
+        "docTypes": { "3": 1, "4": -1 },
+        "lines": [
+          {
+            "itemId": "ABEA001",
+            "docType": "3",
+            "date": "2026-07-02 10:00:00.000",
+            "transactionId": "5",
+            "rate": "3000.00",
+            "supplierCode": "0210"
+          },
+          {
+            "itemId": "ABEA001",
+            "docType": "3",
+            "date": "2026-12-20 10:15:00.000",
+            "transactionId": "40",
+            "rate": "3050.00",
+            "supplierCode": "0211"
+          },
+          {
+            "itemId": "ABEA001",
+            "docType": "3",
+            "date": "2026-12-20 10:15:00.000",
+            "transactionId": "39",
+            "rate": "2990.00",
+            "supplierCode": "0210"
+          },
+          {
+            "itemId": "BRK010",
+            "docType": "3",
+            "date": "2026-08-02 09:00:00.000",
+            "transactionId": "7",
+            "rate": "450.00",
+            "supplierCode": "0210"
+          }
+        ]
+      },
+      "expected": [
+        { "itemId": "ABEA001", "cost": 305000, "supplierCode": "0211", "date": "2026-12-20 10:15:00.000" },
+        { "itemId": "BRK010", "cost": 45000, "supplierCode": "0210", "date": "2026-08-02 09:00:00.000" }
+      ]
+    },
+    {
+      "name": "a purchase return, a free item (rate 0) and anything after the cutoff don't count",
+      "input": {
+        "asOf": "2026-11-27",
+        "docTypes": { "3": 1, "4": -1 },
+        "lines": [
+          {
+            "itemId": "ABEA001",
+            "docType": "3",
+            "date": "2026-07-02 10:00:00.000",
+            "transactionId": "5",
+            "rate": "3000.00",
+            "supplierCode": "0210"
+          },
+          {
+            "itemId": "ABEA001",
+            "docType": "4",
+            "date": "2026-07-03 10:00:00.000",
+            "transactionId": "6",
+            "rate": "3000.00",
+            "supplierCode": "0210"
+          },
+          {
+            "itemId": "ABEA001",
+            "docType": "3",
+            "date": "2026-07-04 10:00:00.000",
+            "transactionId": "7",
+            "rate": "0.00",
+            "supplierCode": "0211"
+          },
+          {
+            "itemId": "ABEA001",
+            "docType": "3",
+            "date": "2026-11-28 10:00:00.000",
+            "transactionId": "8",
+            "rate": "3200.00",
+            "supplierCode": "0211"
+          }
+        ]
+      },
+      "expected": [
+        { "itemId": "ABEA001", "cost": 300000, "supplierCode": "0210", "date": "2026-07-02 10:00:00.000" }
+      ]
+    },
+    {
+      "name": "a cash purchase keeps no supplier (partner 0001 isn't a party)",
+      "input": {
+        "asOf": "2026-12-31",
+        "docTypes": { "3": 1 },
+        "cashPartners": ["0001", "0002"],
+        "lines": [
+          {
+            "itemId": "ABEA001",
+            "docType": "3",
+            "date": "2026-07-02 10:00:00.000",
+            "transactionId": "5",
+            "rate": "3000.00",
+            "supplierCode": "0001"
+          }
+        ]
+      },
+      "expected": [
+        { "itemId": "ABEA001", "cost": 300000, "supplierCode": null, "date": "2026-07-02 10:00:00.000" }
+      ]
+    },
+    {
+      "name": "an unknown document type stops the run",
+      "input": {
+        "asOf": "2026-12-31",
+        "docTypes": { "3": 1 },
+        "lines": [
+          {
+            "itemId": "ABEA001",
+            "docType": "12",
+            "date": "2026-07-02 10:00:00.000",
+            "transactionId": "5",
+            "rate": "3000.00",
+            "supplierCode": "0210"
+          }
+        ]
+      },
+      "error": "unknown_doc_type"
+    }
+  ]
+}

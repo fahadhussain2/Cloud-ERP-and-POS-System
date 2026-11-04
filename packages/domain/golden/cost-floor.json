@@ -1,0 +1,55 @@
+{
+  "description": "The floor from cost (CAT-06, PRD Q2, D-092, W1-14): the item's average cost × (10,000 + the category's floor_min_margin_bp) / 10,000, half away from zero to the minor unit (D-079). No cost, or a category without a margin, gives no cost floor, and then the list price stays the floor. An explicit floor_price wins over it on the counter.",
+  "cases": [
+    {
+      "name": "Rs 3,100 at 5% (500 bp) = Rs 3,255",
+      "input": { "avgCost": 310000, "marginBp": 500 },
+      "expected": 325500
+    },
+    {
+      "name": "more than half a paisa rounds up: Rs 33.33 at 5% = 3,499.65 paisa → Rs 35.00",
+      "input": { "avgCost": 3333, "marginBp": 500 },
+      "expected": 3500
+    },
+    {
+      "name": "below half a paisa rounds down: Rs 0.09 at 5% = 9.45 paisa → 9",
+      "input": { "avgCost": 9, "marginBp": 500 },
+      "expected": 9
+    },
+    {
+      "name": "exactly half a paisa rounds away from zero: 10 paisa at 5% = 10.5 → 11",
+      "input": { "avgCost": 10, "marginBp": 500 },
+      "expected": 11
+    },
+    {
+      "name": "a margin of 0: the floor is the cost",
+      "input": { "avgCost": 310000, "marginBp": 0 },
+      "expected": 310000
+    },
+    {
+      "name": "a cost of 0 gives a floor of 0",
+      "input": { "avgCost": 0, "marginBp": 500 },
+      "expected": 0
+    },
+    {
+      "name": "no cost known: no cost floor",
+      "input": { "avgCost": null, "marginBp": 500 },
+      "expected": null
+    },
+    {
+      "name": "a category without a margin: no cost floor",
+      "input": { "avgCost": 310000, "marginBp": null },
+      "expected": null
+    },
+    {
+      "name": "a negative margin is refused",
+      "input": { "avgCost": 310000, "marginBp": -100 },
+      "error": "invalid_basis_points"
+    },
+    {
+      "name": "a fractional margin is refused",
+      "input": { "avgCost": 310000, "marginBp": 2.5 },
+      "error": "invalid_basis_points"
+    }
+  ]
+}

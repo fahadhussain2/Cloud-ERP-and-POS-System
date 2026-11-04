@@ -18,6 +18,8 @@ const LEDGERS = [
   'journal_lines',
   'postings',
   'posting_state',
+  // The floor from cost moves with the average (W1-14).
+  'item_floors',
 ];
 const WRITE = new RegExp(
   String.raw`\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM|TRUNCATE(\s+TABLE)?)\s+erp\.(${LEDGERS.join('|')})\b`,

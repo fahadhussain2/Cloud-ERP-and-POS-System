@@ -43,6 +43,22 @@ const MappingFile = z.strictObject({
       }),
     )
     .optional(),
+  /**
+   * The opening balances (W1-14, migration doc §4): each legacy document type that moves stock, with the sign it has
+   * (+1 adds, −1 takes away), confirmed by the owner from the document-type report; the control accounts whose
+   * sub-accounts are the customers and suppliers; whether the period's INV_Item.OpeningQuantity counts.
+   */
+  opening: z
+    .strictObject({
+      docTypes: z.record(
+        z.string(),
+        z.strictObject({ name: z.string(), sign: z.union([z.literal(1), z.literal(-1)]) }),
+      ),
+      customerAccount: z.string(),
+      supplierAccount: z.string(),
+      itemOpeningQuantity: z.boolean(),
+    })
+    .optional(),
   accounts: z.strictObject({
     /** Legacy account → template account code. */
     template: Words,
@@ -68,6 +84,13 @@ export interface Mapping {
   partyTiers: ReadonlyMap<string, 'RETAIL' | 'MECHANIC' | 'WHOLESALE'>;
   /** In minor units. */
   partyCredit: ReadonlyMap<string, PartyCredit>;
+  opening: {
+    docTypes: Readonly<Record<string, number>>;
+    docTypeNames: ReadonlyMap<string, string>;
+    customerAccount: string;
+    supplierAccount: string;
+    itemOpeningQuantity: boolean;
+  };
   accounts: {
     template: ReadonlyMap<string, string>;
     retired: ReadonlySet<string>;
@@ -125,6 +148,15 @@ export function parseMapping(raw: unknown): Mapping {
     cashPartners: new Set(f.cashPartners.map((c) => c.trim())),
     partyTiers: new Map(Object.entries(f.partyTiers).map(([k, v]) => [k.trim(), v])),
     partyCredit: new Map(Object.entries(f.partyCredit ?? {}).map(([k, v]) => [k.trim(), creditTerms(v)])),
+    opening: {
+      docTypes: Object.fromEntries(
+        Object.entries(f.opening?.docTypes ?? {}).map(([k, v]) => [k.trim(), v.sign]),
+      ),
+      docTypeNames: new Map(Object.entries(f.opening?.docTypes ?? {}).map(([k, v]) => [k.trim(), v.name])),
+      customerAccount: f.opening?.customerAccount ?? '10-03-0001',
+      supplierAccount: f.opening?.supplierAccount ?? '20-02-0001',
+      itemOpeningQuantity: f.opening?.itemOpeningQuantity ?? true,
+    },
     accounts: {
       template: new Map(Object.entries(f.accounts.template)),
       retired: new Set(f.accounts.retired),

@@ -708,6 +708,9 @@ importers:
       '@erp/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@erp/posting':
+        specifier: workspace:*
+        version: link:../../packages/posting
       pg:
         specifier: 'catalog:'
         version: 8.23.1

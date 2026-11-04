@@ -131,9 +131,13 @@ const TYPED_DATASETS: TypedDataset[] = [
   ...CASH_DESK_DATASETS,
   ...RETURN_DATASETS,
 ];
-/** Each row's key: `id`, except a customer's or supplier's balance, one per party. */
+/** Each row's key: `id`, except a customer's or supplier's balance (one per party) and an item's floor (W1-14). */
 const keyOf = (d: TypedDataset) =>
-  d === 'customer_balances' || d === 'supplier_balances' ? 'party_id' : 'id';
+  d === 'customer_balances' || d === 'supplier_balances'
+    ? 'party_id'
+    : d === 'item_floors'
+      ? 'item_id'
+      : 'id';
 
 const UPSERT = Object.fromEntries(
   TYPED_DATASETS.map((d) => {
@@ -171,7 +175,7 @@ export function loadCatalog(db: SqlDb): Record<CatalogDataset, Record<string, un
     const columns = catalogColumns(d);
     out[d] = db
       .selectObjects(
-        `SELECT ${columns.map(([n]) => n).join(', ')}, row_version, deleted_at FROM ${d} ORDER BY id`,
+        `SELECT ${columns.map(([n]) => n).join(', ')}, row_version, deleted_at FROM ${d} ORDER BY ${keyOf(d)}`,
       )
       .map((r) => ({
         ...Object.fromEntries(columns.map(([name, type]) => [name, fromSql(type, r[name])])),

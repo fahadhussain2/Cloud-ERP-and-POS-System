@@ -334,6 +334,11 @@ describe('catalog pull (W1-03)', () => {
         'UPDATE erp.items SET default_supplier_id = $1, min_qty = 2, max_qty = 10 WHERE id = $2',
         [supplier.rows[0]!.id, pads],
       );
+      // The floor from cost (W1-14): its row goes to the counter, the cost behind it doesn't.
+      await c.query('INSERT INTO erp.item_floors (tenant_id, item_id, floor) VALUES ($1, $2, 325500)', [
+        tenant,
+        pads,
+      ]);
     });
     await withTenant(pool, { tenantId: other }, (_db, c) =>
       seedCatalog(c, other, [

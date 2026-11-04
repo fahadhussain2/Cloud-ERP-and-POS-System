@@ -20,6 +20,7 @@
     "dev:reset-password": "pnpm --filter @erp/api exec tsx src/dev-reset-password.ts",
     "legacy:stage": "pnpm --filter @erp/legacy-import start stage",
     "legacy:import": "pnpm --filter @erp/legacy-import start load",
+    "legacy:opening": "pnpm --filter @erp/legacy-import start opening",
     "test:watch": "vitest --exclude \"**/*.int.test.ts\"",
     "build": "pnpm -r build",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"

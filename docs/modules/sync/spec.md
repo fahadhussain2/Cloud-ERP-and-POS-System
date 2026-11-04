@@ -53,6 +53,7 @@ Each dataset lists its columns explicitly. **A column not listed never leaves th
 | `item_identifiers` | `item_identifiers` | `id, item_id, kind, value, normalized_value, is_primary, row_version, deleted_at` |
 | `item_compatibility` | `item_compatibility` | `id, item_id, make_id, model, year_from, year_to, note, row_version, deleted_at` |
 | `item_prices` | `item_prices` | `id, item_id, tier_id, price, row_version, deleted_at` |
+| `item_floors` | `item_floors` | `item_id, floor, row_version, deleted_at` (W1-14: the floor from cost, one row per item with a known cost, keyed by `item_id`; never the cost itself) |
 
 `legacy` (on every catalog table) never leaves the server.
 

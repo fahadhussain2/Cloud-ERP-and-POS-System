@@ -132,7 +132,7 @@ POS-04, PLT-07, D-004. The rules are pure functions in `packages/domain` (`bill.
 | below list beyond the seller's limit, at or above the floor | approval `below_list`: someone with `pos.override.approve` whose own `maxDiscountBp` covers the discount |
 | below the floor, or no list price | approval `below_floor`: someone with `pos.price.below_floor` |
 
-**When the floor is unknown, it is the list price** (owner answer 1): the server sends each item's effective floor (explicit, or cost + the category's margin) once costs exist (W1-14).
+**When the floor is unknown, it is the list price** (owner answer 1). The item's floor is its own `floor_price`, else its **floor from cost** (`item_floors`, pulled with the catalog since W1-14: average × (1 + the category's margin, 5% by default)), else unknown. The floor is never shown on the counter.
 
 **Approval on the same screen** (PLT-07): the dialog shows the item, list, floor, requested price and seller. The approver picks their name (or types their short code) and enters **their own PIN**, then a **reason**: *Customer bargain, Old or slow stock, Matching a market price, Regular customer*, or *Other* with a note (owner answer 3). The PIN is checked offline like the manager unlock (§5): wrong PINs count towards the approver's own lock; a locked approver, a temporary PIN not yet replaced, or someone without the permission in this branch is refused. **The seller may approve their own price** if they hold the permission, with their PIN and a reason (owner answer 2). The dialog ends with *Cancel (Esc)* and *Approve (Enter)* (D-053).
 

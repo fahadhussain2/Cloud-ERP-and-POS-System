@@ -130,6 +130,7 @@ Expense accounts used for cash-out at the desk become `expense_categories` (PRD 
 - **Average cost** = the latest `INV_StockRecordTAB.ValuationRate` on or before the cutover (this mirrors legacy `fn_GetValuationRate`). Fallback: `INV_Item.CostPrice`, then `OpeningRate`. Items with no cost → flagged and valued at 0 until fixed.
 - **Negative quantities** (15 items in the Dec 2025 copy) → loaded as negative and listed for the first January cycle counts.
 - It is posted as an opening stock movement plus `Dr INVENTORY` in the opening entry.
+- **As built (W1-14, D-101):** the document types and their signs are in `opening.docTypes` of the mapping file (Dec 2025: 21 Purchase +, 32 Purchase return −, 31 Sale −, 22 Sale return +, 11 Physical stock + with signed quantities, proposed from the names and to be confirmed). Two cross-checks are reported per item: the legacy running balance (the latest `INV_StockRecordTAB.StockQuantity`) and the sum of the stock records' own quantities.
 
 ### 4.2 Customer and supplier balances
 - Balance per party = Σ (`AmountDR − AmountCR`) on GL lines for the control account (`10-03-0001` customers, `20-02-0001` suppliers) **grouped by `SubAccountCode`** (= party ID), including the legacy opening-balance voucher (doctype 10).
@@ -174,6 +175,8 @@ As in [posting rules §7](04-ACCOUNTING-POSTING-RULES.md#7-opening-balances-at-c
 The importer **never auto-deletes or auto-merges**. It reports, and the owner decides. Cleanup decisions are saved as a mapping file that is re-applied on every run.
 
 ## 8. Reconciliation checks (gate for go-live)
+
+Built in W1-14 (`reports/opening/reconciliation.html`): each check below is read from the tenant's own ledgers after posting and shown as *pass*, *differs* or *waiting* (for the legacy report totals the owner types into `legacy-totals.json`).
 | Check | Tolerance |
 |---|---|
 | Item count loaded = legacy item count | Exact |
@@ -189,4 +192,5 @@ The importer **never auto-deletes or auto-merges**. It reports, and the owner de
 | By ~31 Oct | Owner provides a **current 2026 dump** (same SSMS format). Re-run the importer to confirm the per-period database structure and refresh the development data. |
 | ~10 Dec 2026 | **Rehearsal 1** on a fresh dump. Full reconciliation. |
 | ~22 Dec 2026 | **Rehearsal 2.** Timed end to end. Must take < 1 h. |
-| 31 Dec 2026, after close | **Final run** → reconciliation sign-off → set the lock date → open for business 1 Jan. |
+| 31 Dec 2026, after close | **Final run** → wipe the pilot (D-101) → reconciliation sign-off → set the lock date (`erp-tenant go-live`) → open for business 1 Jan. |
+| W1-14 (4 Nov 2026) | **Rehearsal 1** on the Dec 2025 copy, on this PC, into a fresh database: the pipeline end to end (results in the W1-14 plan). The run on the 2026 dump follows when it arrives. |

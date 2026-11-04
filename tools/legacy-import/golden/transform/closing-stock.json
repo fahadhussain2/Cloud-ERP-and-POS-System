@@ -1,0 +1,117 @@
+{
+  "description": "Closing stock per item (migration doc §4.1, as legacy fn_INV_ClosingStock): the period's opening quantity, then each purchase, sale, return and physical-stock line up to and including the cutoff date, with the sign its document type has in the mapping file. An unknown document type stops the run. Items in item-code order; an item at 0 is kept (the reports need it).",
+  "cases": [
+    {
+      "name": "opening + purchases − sales + a sale return − a purchase return",
+      "input": {
+        "asOf": "2026-12-31",
+        "docTypes": { "3": 1, "4": -1, "5": -1, "6": 1, "8": 1, "9": -1 },
+        "openings": [{ "itemId": "ABEA001", "qty": "10.00" }],
+        "movements": [
+          { "itemId": "ABEA001", "docType": "3", "date": "2026-07-02 10:00:00.000", "qty": "5.00" },
+          { "itemId": "ABEA001", "docType": "5", "date": "2026-07-03 11:30:00.000", "qty": "3.00" },
+          { "itemId": "ABEA001", "docType": "6", "date": "2026-07-04 09:00:00.000", "qty": "1.00" },
+          { "itemId": "ABEA001", "docType": "4", "date": "2026-07-05 12:00:00.000", "qty": "2.00" }
+        ]
+      },
+      "expected": [{ "itemId": "ABEA001", "qty": 11000 }]
+    },
+    {
+      "name": "physical-stock adjustments in and out",
+      "input": {
+        "asOf": "2026-12-31",
+        "docTypes": { "8": 1, "9": -1 },
+        "openings": [],
+        "movements": [
+          { "itemId": "BRK010", "docType": "8", "date": "2026-08-01 10:00:00.000", "qty": "4.00" },
+          { "itemId": "BRK010", "docType": "9", "date": "2026-08-02 10:00:00.000", "qty": "1.00" }
+        ]
+      },
+      "expected": [{ "itemId": "BRK010", "qty": 3000 }]
+    },
+    {
+      "name": "the cutoff day counts in full; the next day doesn't, even at midnight",
+      "input": {
+        "asOf": "2026-12-31",
+        "docTypes": { "3": 1, "5": -1 },
+        "openings": [],
+        "movements": [
+          { "itemId": "ABEA001", "docType": "3", "date": "2026-12-31 23:59:59.997", "qty": "2.00" },
+          { "itemId": "ABEA001", "docType": "5", "date": "2027-01-01 00:00:00.000", "qty": "1.00" }
+        ]
+      },
+      "expected": [{ "itemId": "ABEA001", "qty": 2000 }]
+    },
+    {
+      "name": "a document type after the cutoff isn't looked at",
+      "input": {
+        "asOf": "2026-11-27",
+        "docTypes": { "3": 1 },
+        "openings": [],
+        "movements": [
+          { "itemId": "ABEA001", "docType": "3", "date": "2026-11-27 18:00:00.000", "qty": "2.00" },
+          { "itemId": "ABEA001", "docType": "77", "date": "2026-11-28 10:00:00.000", "qty": "9.00" }
+        ]
+      },
+      "expected": [{ "itemId": "ABEA001", "qty": 2000 }]
+    },
+    {
+      "name": "negative closing stock is kept negative; an item with only an opening and one at 0 are both listed, in code order",
+      "input": {
+        "asOf": "2026-12-31",
+        "docTypes": { "3": 1, "5": -1 },
+        "openings": [
+          { "itemId": "ZZZ999", "qty": "0.00" },
+          { "itemId": "CLP002", "qty": "1.00" },
+          { "itemId": "OIL050", "qty": "7.50" }
+        ],
+        "movements": [
+          { "itemId": "CLP002", "docType": "5", "date": "2026-09-09 10:00:00.000", "qty": "4.00" },
+          { "itemId": "ABEA001", "docType": "3", "date": "2026-09-09 10:00:00.000", "qty": "1.00" },
+          { "itemId": "ABEA001", "docType": "5", "date": "2026-09-10 10:00:00.000", "qty": "1.00" }
+        ]
+      },
+      "expected": [
+        { "itemId": "ABEA001", "qty": 0 },
+        { "itemId": "CLP002", "qty": -3000 },
+        { "itemId": "OIL050", "qty": 7500 },
+        { "itemId": "ZZZ999", "qty": 0 }
+      ]
+    },
+    {
+      "name": "fractions add up exactly: 0.1 + 0.2 litres = 0.3",
+      "input": {
+        "asOf": "2026-12-31",
+        "docTypes": { "3": 1 },
+        "openings": [],
+        "movements": [
+          { "itemId": "OIL050", "docType": "3", "date": "2026-09-09 10:00:00.000", "qty": "0.10" },
+          { "itemId": "OIL050", "docType": "3", "date": "2026-09-09 10:00:00.000", "qty": "0.20" }
+        ]
+      },
+      "expected": [{ "itemId": "OIL050", "qty": 300 }]
+    },
+    {
+      "name": "an unknown document type on or before the cutoff stops the run",
+      "input": {
+        "asOf": "2026-12-31",
+        "docTypes": { "3": 1 },
+        "openings": [],
+        "movements": [
+          { "itemId": "ABEA001", "docType": "77", "date": "2026-09-09 10:00:00.000", "qty": "1.00" }
+        ]
+      },
+      "error": "unknown_doc_type"
+    },
+    {
+      "name": "a movement without a date stops the run",
+      "input": {
+        "asOf": "2026-12-31",
+        "docTypes": { "3": 1 },
+        "openings": [],
+        "movements": [{ "itemId": "ABEA001", "docType": "3", "date": null, "qty": "1.00" }]
+      },
+      "error": "bad_date"
+    }
+  ]
+}

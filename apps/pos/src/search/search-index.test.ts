@@ -117,6 +117,24 @@ describe('an item for a bill line (POS spec §10)', () => {
     expect(withUnits().billItem('i9', null)).toMatchObject({ list: null, floor: null, allowsFraction: true });
   });
 
+  it("takes the floor from cost when the item has none of its own; the item's own floor wins (W1-14, D-092)", () => {
+    const index = withUnits();
+    index.apply({
+      item_floors: withSync([
+        { item_id: 'i1', floor: '325500' },
+        { item_id: 'i4', floor: '99000' },
+      ]),
+    });
+    expect(index.billItem('i1', 't-retail')?.floor).toBe(325500);
+    expect(index.billItem('i4', 't-retail')?.floor).toBe(120000);
+    expect(index.billItem('i9', null)?.floor).toBeNull();
+    // A floor that goes (the item has no cost any more) leaves the list price as the floor again.
+    index.apply({
+      item_floors: [{ item_id: 'i1', floor: '325500', row_version: '9', deleted_at: '2026-12-31' }],
+    });
+    expect(index.billItem('i1', 't-retail')?.floor).toBeNull();
+  });
+
   it("falls back to the default tier's price, and is null for an unknown item", () => {
     const index = withUnits();
     expect(index.billItem('i4', 't-mech')?.list).toBe(130000);

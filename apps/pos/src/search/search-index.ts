@@ -91,6 +91,7 @@ const DATASETS = [
   'item_identifiers',
   'item_compatibility',
   'item_prices',
+  'item_floors',
 ] as const satisfies readonly CatalogDataset[];
 /** Lookups whose names are words of many items: a change rebuilds every item's words. */
 const LOOKUPS: ReadonlySet<CatalogDataset> = new Set(['categories', 'brands', 'origins', 'vehicle_makes']);
@@ -137,7 +138,8 @@ export class SearchIndex {
   }
 
   private applyRow(d: CatalogDataset, r: Row): void {
-    const id = String(r['id']);
+    // An item's floor is keyed by the item (W1-14).
+    const id = String(r[d === 'item_floors' ? 'item_id' : 'id']);
     const map = this.rows[d];
     const before = map.get(id);
     const removed = r['deleted_at'] !== null && r['deleted_at'] !== undefined;
@@ -281,7 +283,8 @@ export class SearchIndex {
     const item = this.rows.items.get(itemId);
     if (!item) return null;
     const unit = this.rows.units.get(String(item['unit_id']));
-    const floor = item['floor_price'];
+    // Its own floor, else the floor from cost, else none: the list price is then the floor (D-092, W1-14).
+    const floor = item['floor_price'] ?? this.rows.item_floors.get(itemId)?.['floor'];
     return {
       itemId,
       code: String(item['code']),

@@ -124,7 +124,11 @@ Built in migration `0006` (W0-13). Every catalog table has `legacy jsonb`: the o
 
 **item_prices:** `item_id, tier_id, price`. Unique `(tenant_id, item_id, tier_id)`.
 
-**item_costs**†: `item_id, avg_cost (null = no cost known yet), on_hand (tenant-wide), last_cost, last_supplier_id, last_receipt_at` (built in W1-08)
+**item_costs**†: `item_id, avg_cost (null = no cost known yet), on_hand (tenant-wide), last_cost, last_supplier_id, last_receipt_at` (built in W1-08; the last purchase comes from the opening, W1-14)
+
+**item_floors**† (synced, W1-14, D-092): `item_id, floor` = avg_cost × (1 + the category's `floor_min_margin_bp`), kept by the posting layer; deleted when the item has no cost. The counter's floor: `items.floor_price`, else this, else the list price.
+
+**opening_balances** (W1-14, D-101): `label` (unique), `branch_id`, `as_of`, `business_date`, `status` (draft → posted), `posted_at`, `legacy` (run totals, no personal data). **opening_balance_lines**: `line_no`, `kind` (stock · customer · supplier · account), `item_id, location_id, qty, unit_cost (null = none known), last_cost, last_supplier_id, last_receipt_at` or `party_id, amount` or `account_id, amount`. A posted opening is never changed.
 
 **price_history:** `item_id, target (tier_id | 'floor'), old_value, new_value, source (manual|repricing|import), source_id, user_id, at`
 

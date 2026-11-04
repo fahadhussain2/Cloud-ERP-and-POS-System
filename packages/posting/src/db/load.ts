@@ -7,6 +7,7 @@ import type {
   PostingCollection,
   PostingContext,
   PostingHandover,
+  PostingOpening,
   PostingRole,
   Posting,
   PostingSale,
@@ -481,4 +482,64 @@ export async function loadSalePosting(c: pg.ClientBase, saleId: string): Promise
     exceptions: [],
     state: { costs: {}, balances: {} },
   };
+}
+
+/** A stored opening (W1-14), lines in line order, or null when there is none. */
+export async function loadOpening(c: pg.ClientBase, id: string): Promise<PostingOpening | null> {
+  const head = await c.query<{ label: string; branch_id: string; business_date: string }>(
+    'SELECT label, branch_id, business_date::text FROM erp.opening_balances WHERE id = $1',
+    [id],
+  );
+  const h = head.rows[0];
+  if (!h) return null;
+  const { rows } = await c.query<{
+    id: string;
+    kind: 'stock' | 'customer' | 'supplier' | 'account';
+    item_id: string | null;
+    location_id: string | null;
+    qty: string | null;
+    unit_cost: string | null;
+    last_cost: string | null;
+    last_supplier_id: string | null;
+    last_receipt_at: Date | null;
+    party_id: string | null;
+    account_id: string | null;
+    amount: string | null;
+  }>(
+    `SELECT id, kind, item_id, location_id, (qty * 1000)::bigint AS qty, unit_cost, last_cost, last_supplier_id,
+       last_receipt_at, party_id, account_id, amount
+     FROM erp.opening_balance_lines WHERE opening_id = $1 ORDER BY line_no`,
+    [id],
+  );
+  const opening: PostingOpening = {
+    id,
+    label: h.label,
+    branchId: h.branch_id,
+    businessDate: h.business_date,
+    stock: [],
+    parties: [],
+    accounts: [],
+  };
+  for (const r of rows) {
+    if (r.kind === 'stock')
+      opening.stock.push({
+        id: r.id,
+        itemId: r.item_id!,
+        locationId: r.location_id!,
+        qty: toQty(r.qty!),
+        unitCost: r.unit_cost === null ? null : toMoney(r.unit_cost),
+        lastPurchase:
+          r.last_cost === null
+            ? null
+            : {
+                cost: toMoney(r.last_cost),
+                supplierId: r.last_supplier_id,
+                at: r.last_receipt_at!.toISOString(),
+              },
+      });
+    else if (r.kind === 'account')
+      opening.accounts.push({ id: r.id, accountId: r.account_id!, amount: toMoney(r.amount!) });
+    else opening.parties.push({ id: r.id, partyId: r.party_id!, role: r.kind, amount: toMoney(r.amount!) });
+  }
+  return opening;
 }

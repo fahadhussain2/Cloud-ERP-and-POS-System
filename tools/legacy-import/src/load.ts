@@ -1,6 +1,7 @@
 import { withTenant } from '@erp/db';
 import pg from 'pg';
 
+import { OPENING_TABLES } from './opening-load';
 import { maskPhone } from './transform/rules';
 import { companyDetails } from './transform/company';
 import { buildMasters, type Findings, type Masters, type Row, type Staged } from './transform/masters';
@@ -87,7 +88,7 @@ const USED = {
 /** Read for the AR balances in the credit-customer report. */
 const GL_LINES = 'gl_transactiondetail';
 /** Staging's own bookkeeping, and the GL lines read above for the AR balances. */
-const READ_ELSEWHERE = new Set(['_files', GL_LINES]);
+const READ_ELSEWHERE = new Set(['_files', GL_LINES, ...OPENING_TABLES]);
 
 /** JSON with sorted keys, numbers and strings alike, so database and candidate values compare equal. */
 const canonical = (v: unknown): string => {
