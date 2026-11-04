@@ -1,0 +1,40 @@
+{
+  "description": "Legacy quantities to thousandths, exactly (CLAUDE.md rule 1): decimals beyond the third must be zeros, otherwise the quantity is rounded half away from zero and flagged.",
+  "cases": [
+    { "name": "whole", "input": "5", "expected": { "thousandths": 5000, "rounded": false } },
+    {
+      "name": "SQL Server decimal text",
+      "input": "12.00",
+      "expected": { "thousandths": 12000, "rounded": false }
+    },
+    {
+      "name": "a fraction (litres, metres)",
+      "input": "1.5",
+      "expected": { "thousandths": 1500, "rounded": false }
+    },
+    {
+      "name": "trailing zeros past the third decimal",
+      "input": "2.2500",
+      "expected": { "thousandths": 2250, "rounded": false }
+    },
+    { "name": "negative", "input": "-3.000", "expected": { "thousandths": -3000, "rounded": false } },
+    { "name": "minus zero is zero", "input": "-0.00", "expected": { "thousandths": 0, "rounded": false } },
+    {
+      "name": "a fourth decimal of 5 rounds away from zero",
+      "input": "0.0005",
+      "expected": { "thousandths": 1, "rounded": true }
+    },
+    {
+      "name": "a negative fourth decimal of 5 rounds away from zero",
+      "input": "-0.0005",
+      "expected": { "thousandths": -1, "rounded": true }
+    },
+    {
+      "name": "below half a thousandth rounds down",
+      "input": "1.0004",
+      "expected": { "thousandths": 1000, "rounded": true }
+    },
+    { "name": "not a number", "input": "1,5", "error": "bad_quantity" },
+    { "name": "empty", "input": "", "error": "bad_quantity" }
+  ]
+}

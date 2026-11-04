@@ -1,0 +1,251 @@
+{
+  "description": "Customer and supplier balances (migration doc §4.2): Σ (AmountDR − AmountCR) on the customers' control account per SubAccountCode (> 0 = they owe us), and Σ (AmountCR − AmountDR) on the suppliers' (> 0 = we owe them), up to and including the cutoff date, including the legacy opening voucher. Zero balances are left out; codes in order. The cash partners and lines without a sub-account are not parties: they are listed apart for the report.",
+  "cases": [
+    {
+      "name": "invoices, payments and the opening voucher per customer and supplier",
+      "input": {
+        "asOf": "2026-12-31",
+        "customerAccount": "10-03-0001",
+        "supplierAccount": "20-02-0001",
+        "cashPartners": ["0001", "0002"],
+        "lines": [
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "0105",
+            "date": "2026-07-01 00:00:00.000",
+            "dr": "20000.00",
+            "cr": "0.00"
+          },
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "0105",
+            "date": "2026-08-01 10:00:00.000",
+            "dr": "45000.00",
+            "cr": "0.00"
+          },
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "0105",
+            "date": "2026-08-10 10:00:00.000",
+            "dr": "0.00",
+            "cr": "20000.00"
+          },
+          {
+            "accountCode": "20-02-0001",
+            "subAccountCode": "0210",
+            "date": "2026-07-01 00:00:00.000",
+            "dr": "0.00",
+            "cr": "100000.00"
+          },
+          {
+            "accountCode": "20-02-0001",
+            "subAccountCode": "0210",
+            "date": "2026-09-01 10:00:00.000",
+            "dr": "0.00",
+            "cr": "50000.00"
+          },
+          {
+            "accountCode": "20-02-0001",
+            "subAccountCode": "0210",
+            "date": "2026-09-15 10:00:00.000",
+            "dr": "30000.00",
+            "cr": "0.00"
+          },
+          {
+            "accountCode": "30-01-0001",
+            "subAccountCode": null,
+            "date": "2026-08-01 10:00:00.000",
+            "dr": "0.00",
+            "cr": "45000.00"
+          }
+        ]
+      },
+      "expected": {
+        "customers": [{ "code": "0105", "amount": 4500000 }],
+        "suppliers": [{ "code": "0210", "amount": 12000000 }],
+        "excluded": []
+      }
+    },
+    {
+      "name": "an advance (customer in credit) and a supplier we overpaid are negative; a settled customer is left out",
+      "input": {
+        "asOf": "2026-12-31",
+        "customerAccount": "10-03-0001",
+        "supplierAccount": "20-02-0001",
+        "cashPartners": ["0001", "0002"],
+        "lines": [
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "0105",
+            "date": "2026-08-01 10:00:00.000",
+            "dr": "0.00",
+            "cr": "2000.00"
+          },
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "0106",
+            "date": "2026-08-01 10:00:00.000",
+            "dr": "100.50",
+            "cr": "0.00"
+          },
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "0106",
+            "date": "2026-08-02 10:00:00.000",
+            "dr": "0.00",
+            "cr": "100.50"
+          },
+          {
+            "accountCode": "20-02-0001",
+            "subAccountCode": "0211",
+            "date": "2026-09-15 10:00:00.000",
+            "dr": "5000.00",
+            "cr": "0.00"
+          }
+        ]
+      },
+      "expected": {
+        "customers": [{ "code": "0105", "amount": -200000 }],
+        "suppliers": [{ "code": "0211", "amount": -500000 }],
+        "excluded": []
+      }
+    },
+    {
+      "name": "a party with both roles has a balance in each (one party, two accounts, migration doc §3.4)",
+      "input": {
+        "asOf": "2026-12-31",
+        "customerAccount": "10-03-0001",
+        "supplierAccount": "20-02-0001",
+        "cashPartners": ["0001", "0002"],
+        "lines": [
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "0300",
+            "date": "2026-08-01 10:00:00.000",
+            "dr": "700.00",
+            "cr": "0.00"
+          },
+          {
+            "accountCode": "20-02-0001",
+            "subAccountCode": "0300",
+            "date": "2026-08-01 10:00:00.000",
+            "dr": "0.00",
+            "cr": "900.00"
+          }
+        ]
+      },
+      "expected": {
+        "customers": [{ "code": "0300", "amount": 70000 }],
+        "suppliers": [{ "code": "0300", "amount": 90000 }],
+        "excluded": []
+      }
+    },
+    {
+      "name": "lines after the cutoff are ignored; codes are trimmed and in order",
+      "input": {
+        "asOf": "2026-11-27",
+        "customerAccount": "10-03-0001",
+        "supplierAccount": "20-02-0001",
+        "cashPartners": ["0001", "0002"],
+        "lines": [
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "0120 ",
+            "date": "2026-11-27 18:00:00.000",
+            "dr": "100.00",
+            "cr": "0.00"
+          },
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "0105",
+            "date": "2026-11-20 18:00:00.000",
+            "dr": "50.00",
+            "cr": "0.00"
+          },
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "0120",
+            "date": "2026-11-28 09:00:00.000",
+            "dr": "999.00",
+            "cr": "0.00"
+          }
+        ]
+      },
+      "expected": {
+        "customers": [
+          { "code": "0105", "amount": 5000 },
+          { "code": "0120", "amount": 10000 }
+        ],
+        "suppliers": [],
+        "excluded": []
+      }
+    },
+    {
+      "name": "the cash partners and lines without a sub-account are excluded and listed apart",
+      "input": {
+        "asOf": "2026-12-31",
+        "customerAccount": "10-03-0001",
+        "supplierAccount": "20-02-0001",
+        "cashPartners": ["0001", "0002"],
+        "lines": [
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "0002",
+            "date": "2026-08-01 10:00:00.000",
+            "dr": "300.00",
+            "cr": "0.00"
+          },
+          {
+            "accountCode": "20-02-0001",
+            "subAccountCode": "0001",
+            "date": "2026-08-01 10:00:00.000",
+            "dr": "0.00",
+            "cr": "200.00"
+          },
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "",
+            "date": "2026-08-01 10:00:00.000",
+            "dr": "10.00",
+            "cr": "0.00"
+          },
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": null,
+            "date": "2026-08-02 10:00:00.000",
+            "dr": "5.00",
+            "cr": "0.00"
+          }
+        ]
+      },
+      "expected": {
+        "customers": [],
+        "suppliers": [],
+        "excluded": [
+          { "role": "customer", "code": null, "amount": 1500 },
+          { "role": "customer", "code": "0002", "amount": 30000 },
+          { "role": "supplier", "code": "0001", "amount": 20000 }
+        ]
+      }
+    },
+    {
+      "name": "an amount that isn't a number stops the run",
+      "input": {
+        "asOf": "2026-12-31",
+        "customerAccount": "10-03-0001",
+        "supplierAccount": "20-02-0001",
+        "cashPartners": [],
+        "lines": [
+          {
+            "accountCode": "10-03-0001",
+            "subAccountCode": "0105",
+            "date": "2026-08-01 10:00:00.000",
+            "dr": "x",
+            "cr": "0.00"
+          }
+        ]
+      },
+      "error": "bad_amount"
+    }
+  ]
+}

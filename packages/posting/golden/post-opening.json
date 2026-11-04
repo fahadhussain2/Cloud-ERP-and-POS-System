@@ -1,0 +1,648 @@
+{
+  "description": "Posting the opening balances (posting rules §7, migration doc §4, W1-14)",
+  "notes": "Delux's accounts by code (opening.test.ts): 1110 Cash drawer, 1160 HBL, 1200 AR, 1300 Inventory, 2100 AP, 3300 Opening balance equity. Every case is opening `final` of branch br-main dated 2027-01-01 with no lock date and an empty ledger state unless it says otherwise. Money in paisa, quantities in thousandths. Stock lines come into their location at their cost (or the current average when they have none); customer amounts > 0 are owed to us, supplier amounts > 0 are owed by us; account amounts > 0 are debits; the balance goes to Opening balance equity. Lines: INVENTORY, the customers, the suppliers, the accounts, then OPENING_BALANCE_EQUITY; zero lines are left out. `context` changes the default: `lockDate`, `withoutRoles` (removed).",
+  "cases": [
+    {
+      "name": "stock only: two items into Shop at their cost, the last purchase kept",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [
+            {
+              "id": "ol-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": 5000,
+              "unitCost": 310000,
+              "lastPurchase": { "cost": 305000, "supplierId": "sup-a", "at": "2026-12-20T10:15:00.000Z" }
+            },
+            {
+              "id": "ol-2",
+              "itemId": "item-filter",
+              "locationId": "loc-shop",
+              "qty": 2500,
+              "unitCost": 45000,
+              "lastPurchase": null
+            }
+          ],
+          "parties": [],
+          "accounts": []
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "Opening final",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 1662500, "credit": 0 },
+              { "accountId": "3300", "partyId": null, "debit": 0, "credit": 1662500 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "ol-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 5000,
+              "unitCost": 310000,
+              "valueDelta": 1550000,
+              "avgCostAfter": 310000
+            },
+            {
+              "sourceLineId": "ol-2",
+              "itemId": "item-filter",
+              "locationId": "loc-shop",
+              "qtyDelta": 2500,
+              "unitCost": 45000,
+              "valueDelta": 112500,
+              "avgCostAfter": 45000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-pads": { "avgCost": 310000, "onHand": 5000 },
+              "item-filter": { "avgCost": 45000, "onHand": 2500 }
+            },
+            "balances": { "loc-shop": { "item-pads": 5000, "item-filter": 2500 } }
+          },
+          "lastPurchases": [
+            {
+              "itemId": "item-pads",
+              "lastCost": 305000,
+              "lastSupplierId": "sup-a",
+              "lastReceiptAt": "2026-12-20T10:15:00.000Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a value is rounded half away from zero: 1.5 at Rs 33.33 = Rs 50.00",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [
+            {
+              "id": "ol-1",
+              "itemId": "item-wire",
+              "locationId": "loc-shop",
+              "qty": 1500,
+              "unitCost": 3333,
+              "lastPurchase": null
+            }
+          ],
+          "parties": [],
+          "accounts": []
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "Opening final",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 5000, "credit": 0 },
+              { "accountId": "3300", "partyId": null, "debit": 0, "credit": 5000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "ol-1",
+              "itemId": "item-wire",
+              "locationId": "loc-shop",
+              "qtyDelta": 1500,
+              "unitCost": 3333,
+              "valueDelta": 5000,
+              "avgCostAfter": 3333
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-wire": { "avgCost": 3333, "onHand": 1500 } },
+            "balances": { "loc-shop": { "item-wire": 1500 } }
+          },
+          "lastPurchases": []
+        }
+      }
+    },
+    {
+      "name": "everything (posting rules §7): stock, customers (one an advance), suppliers (one in debit), the drawer and HBL; the balance to equity",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [
+            {
+              "id": "ol-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": 10000,
+              "unitCost": 310000,
+              "lastPurchase": null
+            }
+          ],
+          "parties": [
+            { "id": "ol-2", "partyId": "cust-a", "role": "customer", "amount": 4500000 },
+            { "id": "ol-3", "partyId": "cust-b", "role": "customer", "amount": -200000 },
+            { "id": "ol-4", "partyId": "sup-a", "role": "supplier", "amount": 12000000 },
+            { "id": "ol-5", "partyId": "sup-b", "role": "supplier", "amount": -500000 }
+          ],
+          "accounts": [
+            { "id": "ol-6", "accountId": "1110", "amount": 500000 },
+            { "id": "ol-7", "accountId": "1160", "amount": 25000000 }
+          ]
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "Opening final",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 3100000, "credit": 0 },
+              { "accountId": "1200", "partyId": "cust-a", "debit": 4500000, "credit": 0 },
+              { "accountId": "1200", "partyId": "cust-b", "debit": 0, "credit": 200000 },
+              { "accountId": "2100", "partyId": "sup-a", "debit": 0, "credit": 12000000 },
+              { "accountId": "2100", "partyId": "sup-b", "debit": 500000, "credit": 0 },
+              { "accountId": "1110", "partyId": null, "debit": 500000, "credit": 0 },
+              { "accountId": "1160", "partyId": null, "debit": 25000000, "credit": 0 },
+              { "accountId": "3300", "partyId": null, "debit": 0, "credit": 21400000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "ol-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 10000,
+              "unitCost": 310000,
+              "valueDelta": 3100000,
+              "avgCostAfter": 310000
+            }
+          ],
+          "partyEntries": [
+            { "partyId": "cust-a", "role": "customer", "amount": 4500000, "dueDate": "2027-01-01" },
+            { "partyId": "cust-b", "role": "customer", "amount": -200000, "dueDate": "2027-01-01" },
+            { "partyId": "sup-a", "role": "supplier", "amount": 12000000, "dueDate": "2027-01-01" },
+            { "partyId": "sup-b", "role": "supplier", "amount": -500000, "dueDate": "2027-01-01" }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-pads": { "avgCost": 310000, "onHand": 10000 } },
+            "balances": { "loc-shop": { "item-pads": 10000 } }
+          },
+          "lastPurchases": []
+        }
+      }
+    },
+    {
+      "name": "a negative quantity (migration doc §4.1) moves out at its cost and sets the average; not flagged",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [
+            {
+              "id": "ol-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": 2000,
+              "unitCost": 310000,
+              "lastPurchase": null
+            },
+            {
+              "id": "ol-2",
+              "itemId": "item-clamp",
+              "locationId": "loc-shop",
+              "qty": -3000,
+              "unitCost": 12000,
+              "lastPurchase": null
+            }
+          ],
+          "parties": [],
+          "accounts": []
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "Opening final",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 584000, "credit": 0 },
+              { "accountId": "3300", "partyId": null, "debit": 0, "credit": 584000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "ol-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 2000,
+              "unitCost": 310000,
+              "valueDelta": 620000,
+              "avgCostAfter": 310000
+            },
+            {
+              "sourceLineId": "ol-2",
+              "itemId": "item-clamp",
+              "locationId": "loc-shop",
+              "qtyDelta": -3000,
+              "unitCost": 12000,
+              "valueDelta": -36000,
+              "avgCostAfter": 12000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-pads": { "avgCost": 310000, "onHand": 2000 },
+              "item-clamp": { "avgCost": 12000, "onHand": -3000 }
+            },
+            "balances": { "loc-shop": { "item-pads": 2000, "item-clamp": -3000 } }
+          },
+          "lastPurchases": []
+        }
+      }
+    },
+    {
+      "name": "only negative stock: Cr Inventory, Dr equity",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [
+            {
+              "id": "ol-1",
+              "itemId": "item-clamp",
+              "locationId": "loc-shop",
+              "qty": -3000,
+              "unitCost": 12000,
+              "lastPurchase": null
+            }
+          ],
+          "parties": [],
+          "accounts": []
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "Opening final",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 0, "credit": 36000 },
+              { "accountId": "3300", "partyId": null, "debit": 36000, "credit": 0 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "ol-1",
+              "itemId": "item-clamp",
+              "locationId": "loc-shop",
+              "qtyDelta": -3000,
+              "unitCost": 12000,
+              "valueDelta": -36000,
+              "avgCostAfter": 12000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-clamp": { "avgCost": 12000, "onHand": -3000 } },
+            "balances": { "loc-shop": { "item-clamp": -3000 } }
+          },
+          "lastPurchases": []
+        }
+      }
+    },
+    {
+      "name": "a line without a cost: at the current average when there is one, otherwise at 0 with no_cost and the average unknown",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [
+            {
+              "id": "ol-1",
+              "itemId": "item-bulb",
+              "locationId": "loc-shop",
+              "qty": 4000,
+              "unitCost": null,
+              "lastPurchase": null
+            },
+            {
+              "id": "ol-2",
+              "itemId": "item-fuse",
+              "locationId": "loc-shop",
+              "qty": 2000,
+              "unitCost": null,
+              "lastPurchase": null
+            }
+          ],
+          "parties": [],
+          "accounts": []
+        },
+        "state": {
+          "costs": { "item-fuse": { "avgCost": 15000, "onHand": 0 } },
+          "balances": {}
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "Opening final",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 30000, "credit": 0 },
+              { "accountId": "3300", "partyId": null, "debit": 0, "credit": 30000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "ol-1",
+              "itemId": "item-bulb",
+              "locationId": "loc-shop",
+              "qtyDelta": 4000,
+              "unitCost": 0,
+              "valueDelta": 0,
+              "avgCostAfter": null
+            },
+            {
+              "sourceLineId": "ol-2",
+              "itemId": "item-fuse",
+              "locationId": "loc-shop",
+              "qtyDelta": 2000,
+              "unitCost": 15000,
+              "valueDelta": 30000,
+              "avgCostAfter": 15000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [{ "kind": "no_cost", "details": { "itemId": "item-bulb" } }],
+          "state": {
+            "costs": {
+              "item-bulb": { "avgCost": null, "onHand": 4000 },
+              "item-fuse": { "avgCost": 15000, "onHand": 2000 }
+            },
+            "balances": { "loc-shop": { "item-bulb": 4000, "item-fuse": 2000 } }
+          },
+          "lastPurchases": []
+        }
+      }
+    },
+    {
+      "name": "an item already on hand at another cost: the average is blended (averageAfterReceipt)",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [
+            {
+              "id": "ol-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": 4000,
+              "unitCost": 310000,
+              "lastPurchase": null
+            }
+          ],
+          "parties": [],
+          "accounts": []
+        },
+        "state": {
+          "costs": { "item-pads": { "avgCost": 300000, "onHand": 2000 } },
+          "balances": { "loc-shop": { "item-pads": 2000 } }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "Opening final",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 1240000, "credit": 0 },
+              { "accountId": "3300", "partyId": null, "debit": 0, "credit": 1240000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "ol-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 4000,
+              "unitCost": 310000,
+              "valueDelta": 1240000,
+              "avgCostAfter": 306667
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-pads": { "avgCost": 306667, "onHand": 6000 } },
+            "balances": { "loc-shop": { "item-pads": 6000 } }
+          },
+          "lastPurchases": []
+        }
+      }
+    },
+    {
+      "name": "zero lines are left out; a customer only needs no Inventory account",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [],
+          "parties": [
+            { "id": "ol-1", "partyId": "cust-a", "role": "customer", "amount": 4500000 },
+            { "id": "ol-2", "partyId": "cust-b", "role": "customer", "amount": 0 }
+          ],
+          "accounts": [{ "id": "ol-3", "accountId": "1160", "amount": 0 }]
+        },
+        "context": { "withoutRoles": ["INVENTORY", "AP_CONTROL"] }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "Opening final",
+            "lines": [
+              { "accountId": "1200", "partyId": "cust-a", "debit": 4500000, "credit": 0 },
+              { "accountId": "3300", "partyId": null, "debit": 0, "credit": 4500000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [
+            { "partyId": "cust-a", "role": "customer", "amount": 4500000, "dueDate": "2027-01-01" }
+          ],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} },
+          "lastPurchases": []
+        }
+      }
+    },
+    {
+      "name": "dated on the lock date: posts the day after it, flagged posted_after_lock, due that day",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [],
+          "parties": [{ "id": "ol-1", "partyId": "sup-a", "role": "supplier", "amount": 12000000 }],
+          "accounts": []
+        },
+        "context": { "lockDate": "2027-01-01" }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "Opening final",
+            "lines": [
+              { "accountId": "2100", "partyId": "sup-a", "debit": 0, "credit": 12000000 },
+              { "accountId": "3300", "partyId": null, "debit": 12000000, "credit": 0 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [
+            { "partyId": "sup-a", "role": "supplier", "amount": 12000000, "dueDate": "2027-01-02" }
+          ],
+          "exceptions": [
+            {
+              "kind": "posted_after_lock",
+              "details": { "businessDate": "2027-01-01", "lockDate": "2027-01-01" }
+            }
+          ],
+          "state": { "costs": {}, "balances": {} },
+          "lastPurchases": []
+        }
+      }
+    },
+    {
+      "name": "an empty opening posts no lines",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [],
+          "parties": [],
+          "accounts": []
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-01",
+          "journal": { "branchId": "br-main", "memo": "Opening final", "lines": [] },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} },
+          "lastPurchases": []
+        }
+      }
+    },
+    {
+      "name": "stock without an Inventory account: role_unmapped",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [
+            {
+              "id": "ol-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": 1000,
+              "unitCost": 310000,
+              "lastPurchase": null
+            }
+          ],
+          "parties": [],
+          "accounts": []
+        },
+        "context": { "withoutRoles": ["INVENTORY"] }
+      },
+      "expected": { "ok": false, "error": { "code": "role_unmapped", "role": "INVENTORY" } }
+    },
+    {
+      "name": "a supplier without an AP account: role_unmapped",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [],
+          "parties": [{ "id": "ol-1", "partyId": "sup-a", "role": "supplier", "amount": 100 }],
+          "accounts": []
+        },
+        "context": { "withoutRoles": ["AP_CONTROL"] }
+      },
+      "expected": { "ok": false, "error": { "code": "role_unmapped", "role": "AP_CONTROL" } }
+    },
+    {
+      "name": "without an Opening balance equity account: role_unmapped",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [],
+          "parties": [{ "id": "ol-1", "partyId": "cust-a", "role": "customer", "amount": 100 }],
+          "accounts": []
+        },
+        "context": { "withoutRoles": ["OPENING_BALANCE_EQUITY"] }
+      },
+      "expected": { "ok": false, "error": { "code": "role_unmapped", "role": "OPENING_BALANCE_EQUITY" } }
+    }
+  ]
+}
