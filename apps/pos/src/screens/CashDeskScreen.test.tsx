@@ -413,7 +413,9 @@ describe('the cash desk screen', () => {
 });
 
 // W1-11 (cash desk spec): a customer's payment (Alt+R), a cash-out (Alt+M), and the blind count (Alt+X).
-describe('collections, cash-out and the count (W1-11)', () => {
+// Each test waits up to 5 s for a dialog that opens after two reads from the desk, so the test itself needs more than
+// 5 s on a loaded runner (it timed out in CI on W1-11 and W1-14).
+describe('collections, cash-out and the count (W1-11)', { timeout: 15_000 }, () => {
   it('receives a payment from a customer found by name, and prints the receipt', async () => {
     const f = fakeDesk();
     show(f.counter);

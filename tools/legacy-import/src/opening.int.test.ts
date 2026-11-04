@@ -118,11 +118,19 @@ async function stage(label: string, extraSale = false) {
       c,
       schema,
       'inv_stockrecordtab',
-      ['itemid', 'documenttypeid', 'documentdate', 'transactionid', 'stockquantity', 'valuationrate'],
       [
-        ['ABEA001', '3', '2026-11-02 10:00:00.000', '1', '15.00', '933.3333'],
-        ['ABEA001', '5', '2026-11-25 12:00:00.000', '2', '13.00', '933.3333'],
-        ['BBCD001', '5', '2026-11-25 12:00:00.000', '2', '-3.00', null],
+        'itemid',
+        'documenttypeid',
+        'documentdate',
+        'transactionid',
+        'quantity',
+        'stockquantity',
+        'valuationrate',
+      ],
+      [
+        ['ABEA001', '3', '2026-11-02 10:00:00.000', '1', '5.00', '15.00', '933.3333'],
+        ['ABEA001', '5', '2026-11-25 12:00:00.000', '2', '1.00', '13.00', '933.3333'],
+        ['BBCD001', '5', '2026-11-25 12:00:00.000', '2', '4.00', '-3.00', null],
       ],
     );
     await table(
