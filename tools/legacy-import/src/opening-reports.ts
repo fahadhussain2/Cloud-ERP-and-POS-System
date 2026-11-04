@@ -63,8 +63,20 @@ function reportsOf(r: OpeningResult): Report[] {
       file: 'opening/quantity-mismatch.csv',
       title: 'Closing stock differs from the legacy running balance',
       why: 'A missed document type, a wrong sign, or the period opening counted twice.',
-      header: ['Item', 'Computed', 'Legacy running balance'],
-      rows: d.qtyMismatch.map((x) => [x.code, units(x.computed), units(x.running)]),
+      header: [
+        'Item',
+        'Computed',
+        'Legacy running balance',
+        'Period opening quantity',
+        'From the stock records',
+      ],
+      rows: d.qtyMismatch.map((x) => [
+        x.code,
+        units(x.computed),
+        units(x.running),
+        units(x.periodOpening),
+        units(x.fromRecords),
+      ]),
     },
     {
       file: 'opening/cost-above-retail.csv',

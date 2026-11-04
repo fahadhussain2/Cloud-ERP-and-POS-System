@@ -80,7 +80,7 @@ try {
     };
     const o = args.opening!;
     const started = Date.now();
-    const result = await importOpening({
+    const run = importOpening({
       stagingUrl: url,
       label: args.label,
       appUrl: process.env['LEGACY_TARGET_URL'] ?? DEFAULT_TARGET_URL,
@@ -93,6 +93,12 @@ try {
       inputs: (await optional<OpeningInputs>('opening-inputs.json')) ?? {},
       legacyTotals: await optional<LegacyTotals>('legacy-totals.json'),
       now: new Date(),
+    });
+    // An unmapped document type stops the run, but its report is written first, to decide the signs from.
+    const result = await run.catch(async (err: unknown) => {
+      const partial = (err as { partial?: Awaited<typeof run> }).partial;
+      if (partial) console.info(`document types: ${await writeOpeningReports(partial, labelDir)}`);
+      throw err;
     });
     const page = await writeOpeningReports(result, labelDir);
     const t = result.totals;

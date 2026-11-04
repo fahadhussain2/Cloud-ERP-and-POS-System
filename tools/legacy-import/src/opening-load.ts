@@ -9,6 +9,7 @@ import {
   closingStock,
   lastPurchases,
   latestStockRecords,
+  legacyQty,
   openingCost,
   partyBalances,
   type ClosingStockInput,
@@ -93,7 +94,13 @@ export interface OpeningResult {
     negative: { code: string; qty: number }[];
     zeroWithSales: { code: string; sold: number }[];
     noCost: { code: string; qty: number }[];
-    qtyMismatch: { code: string; computed: number; running: number }[];
+    qtyMismatch: {
+      code: string;
+      computed: number;
+      running: number;
+      periodOpening: number;
+      fromRecords: number;
+    }[];
     costAboveRetail: { code: string; cost: number; retail: number }[];
     unknownItems: string[];
     unknownParties: { role: string; code: string; amount: number }[];
@@ -135,7 +142,9 @@ interface Staged {
     rate: string | null;
     partner: string | null;
   }[];
-  stockRecords: StockRecordsInput['records'];
+  stockRecords: (StockRecordsInput['records'][number] & { docType: string; quantity: string | null })[];
+  /** The stock-record rows as movements (their own Quantity and type), for the third cross-check. */
+  recordMoves: ClosingStockInput['movements'];
   glLines: PartyBalancesInput['lines'];
   docTypeNames: Map<string, string>;
   stockRecordTypes: Map<string, number>;
@@ -186,9 +195,11 @@ async function readStaging(url: string, label: string): Promise<Staged> {
           partner: r['partner'] ?? null,
         });
     const stockRecords = (
-      await q(`SELECT itemid, documentdate, transactionid, stockquantity, valuationrate FROM ${schema}.inv_stockrecordtab
-               ORDER BY _file, _line`)
+      await q(`SELECT itemid, documentdate, transactionid, stockquantity, valuationrate, quantity, documenttypeid
+               FROM ${schema}.inv_stockrecordtab ORDER BY _file, _line`)
     ).map((r) => ({
+      docType: (r['documenttypeid'] ?? '').trim(),
+      quantity: r['quantity'] ?? null,
       itemId: r['itemid'] ?? '',
       date: r['documentdate'],
       transactionId: r['transactionid'],
@@ -218,7 +229,13 @@ async function readStaging(url: string, label: string): Promise<Staged> {
     if (present.has(STAGED.docTypes))
       for (const r of await q(`SELECT documenttypeid, documenttype FROM ${schema}.gen_doctype`))
         docTypeNames.set((r['documenttypeid'] ?? '').trim(), (r['documenttype'] ?? '').trim());
-    return { items, movements, stockRecords, glLines, docTypeNames, stockRecordTypes };
+    const recordMoves = stockRecords.map((r) => ({
+      itemId: r.itemId,
+      docType: r.docType,
+      date: r.date,
+      qty: r.quantity,
+    }));
+    return { items, movements, stockRecords, recordMoves, glLines, docTypeNames, stockRecordTypes };
   } finally {
     await c.end();
   }
@@ -332,6 +349,9 @@ export async function importOpening(opts: OpeningOptions): Promise<OpeningResult
     throw e;
   }
   const closing = closingStock(closingInput);
+  const fromRecords = new Map(
+    closingStock({ ...closingInput, movements: staged.recordMoves }).map((r) => [r.itemId, r.qty]),
+  );
   const records = new Map(
     latestStockRecords({ asOf: opts.asOf, records: staged.stockRecords }).map((r) => [r.itemId, r]),
   );
@@ -445,7 +465,13 @@ export async function importOpening(opts: OpeningOptions): Promise<OpeningResult
         const r = itemRows.get(s.itemId);
         const record = records.get(s.itemId);
         if (record && record.runningQty !== s.qty)
-          result.detail.qtyMismatch.push({ code: s.itemId, computed: s.qty, running: record.runningQty });
+          result.detail.qtyMismatch.push({
+            code: s.itemId,
+            computed: s.qty,
+            running: record.runningQty,
+            periodOpening: legacyQty(r?.['openingquantity'] ?? '0').thousandths,
+            fromRecords: fromRecords.get(s.itemId) ?? 0,
+          });
         if (s.qty === 0) {
           if (recentlySold.has(s.itemId))
             result.detail.zeroWithSales.push({ code: s.itemId, sold: recentlySold.get(s.itemId)! });
