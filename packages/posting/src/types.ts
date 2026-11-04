@@ -84,6 +84,39 @@ export interface PostingSessionEvent {
   toSafe: Money;
 }
 
+/**
+ * The opening balances at cutover as posting needs them (posting rules §7, migration doc §4, W1-14). Lines are the
+ * stored document's, each with its own id.
+ */
+export interface PostingOpening {
+  id: string;
+  /** The dump's label, e.g. `final`; the memo is `Opening <label>`. */
+  label: string;
+  branchId: string;
+  businessDate: string;
+  /** Into the line's location at its cost; `unitCost` null = none known (the current average, else 0). */
+  stock: {
+    id: string;
+    itemId: string;
+    locationId: string;
+    qty: Qty;
+    unitCost: Money | null;
+    lastPurchase: { cost: Money; supplierId: string | null; at: string } | null;
+  }[];
+  /** A customer's amount > 0 is owed to us; a supplier's > 0 is owed by us. */
+  parties: { id: string; partyId: string; role: 'customer' | 'supplier'; amount: Money }[];
+  /** The counted drawer and the bank statements: > 0 debits the account. */
+  accounts: { id: string; accountId: string; amount: Money }[];
+}
+
+/** An item's last purchase, kept on `item_costs` (migration doc §5). */
+export interface LastPurchase {
+  itemId: string;
+  lastCost: Money;
+  lastSupplierId: string | null;
+  lastReceiptAt: string;
+}
+
 export interface PostingSaleLine {
   id: string;
   lineNo: number;
@@ -179,6 +212,8 @@ export interface Posting {
   exceptions: PostingException[];
   /** The costs and balances this posting changed, as they are after it. */
   state: LedgerState;
+  /** An opening's last purchases per item (W1-14); absent on every other posting. */
+  lastPurchases?: LastPurchase[];
 }
 
 export type PostingError =

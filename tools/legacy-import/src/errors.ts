@@ -10,7 +10,10 @@ export type DumpErrorCode =
   | 'columns_changed'
   | 'bad_label'
   | 'no_files'
-  | 'bad_amount';
+  | 'bad_amount'
+  | 'bad_quantity'
+  | 'bad_date'
+  | 'unknown_doc_type';
 
 export class DumpError extends Error {
   constructor(
