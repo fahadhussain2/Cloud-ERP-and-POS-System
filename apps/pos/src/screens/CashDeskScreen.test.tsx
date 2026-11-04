@@ -413,13 +413,15 @@ describe('the cash desk screen', () => {
 });
 
 // W1-11 (cash desk spec): a customer's payment (Alt+R), a cash-out (Alt+M), and the blind count (Alt+X).
-// Each test waits up to 5 s for a dialog that opens after two reads from the desk, so the test itself needs more than
-// 5 s on a loaded runner (it timed out in CI on W1-11 and W1-14).
+// The shortcuts work only once the open session has loaded, so each test waits for it before pressing one (the key
+// was lost in CI on W1-11 and W1-14 when the session loaded after the queue); a loaded runner still needs over 5 s.
 describe('collections, cash-out and the count (W1-11)', { timeout: 15_000 }, () => {
   it('receives a payment from a customer found by name, and prints the receipt', async () => {
     const f = fakeDesk();
     show(f.counter);
     await screen.findByText('C03-S000412');
+    // Alt+R, Alt+M and Alt+X work once the open session has loaded, which may come after the queue.
+    await screen.findAllByText('Receive payment');
     fireEvent.keyDown(window, { key: 'r', altKey: true });
     // The dialog opens after two reads from the desk: give a loaded run time.
     fireEvent.change(
@@ -441,6 +443,8 @@ describe('collections, cash-out and the count (W1-11)', { timeout: 15_000 }, () 
     const f = fakeDesk();
     show(f.counter);
     await screen.findByText('C03-S000412');
+    // Alt+R, Alt+M and Alt+X work once the open session has loaded, which may come after the queue.
+    await screen.findAllByText('Receive payment');
     fireEvent.keyDown(window, { key: 'm', altKey: true });
     fireEvent.change(await screen.findByRole('combobox', { name: 'Expense category' }, { timeout: 5000 }), {
       target: { value: 'e7' },
@@ -463,6 +467,8 @@ describe('collections, cash-out and the count (W1-11)', { timeout: 15_000 }, () 
     const f = fakeDesk();
     show(f.counter);
     await screen.findByText('C03-S000412');
+    // Alt+R, Alt+M and Alt+X work once the open session has loaded, which may come after the queue.
+    await screen.findAllByText('Receive payment');
     fireEvent.keyDown(window, { key: 'x', altKey: true });
     const fiveThousands = await screen.findByRole('textbox', { name: /5,000.*×/ }, { timeout: 5000 });
     expect(screen.queryByText(/Expected in the drawer/)).toBeNull();
@@ -479,6 +485,8 @@ describe('collections, cash-out and the count (W1-11)', { timeout: 15_000 }, () 
     const f = fakeDesk();
     show(f.counter);
     await screen.findByText('C03-S000412');
+    // Alt+R, Alt+M and Alt+X work once the open session has loaded, which may come after the queue.
+    await screen.findAllByText('Receive payment');
     fireEvent.keyDown(window, { key: 'x', altKey: true });
     fireEvent.change(await screen.findByRole('textbox', { name: /1,000.*×/ }, { timeout: 5000 }), {
       target: { value: '4' },
