@@ -274,6 +274,15 @@ export const MIGRATIONS: readonly Migration[] = [
       "CREATE INDEX local_documents_return_of ON local_documents (json_extract(payload, '$.returnOf.id')) WHERE family = 'S'",
     ],
   },
+  {
+    // The floor from cost (W1-14, D-092): pulled with the catalog, one row per item with a known cost.
+    version: 12,
+    statements: [
+      `CREATE TABLE item_floors (
+        item_id TEXT PRIMARY KEY, floor INTEGER NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

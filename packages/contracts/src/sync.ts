@@ -59,6 +59,11 @@ export const CATALOG_COLUMNS = {
     note: 'text',
   },
   item_prices: { id: 'text', item_id: 'text', tier_id: 'text', price: 'money' },
+  /**
+   * The floor from cost (W1-14, D-092): one row per item with a known cost, keyed by `item_id`. The counter's floor is
+   * the item's `floor_price`, else this, else the list price. Never shown on the counter.
+   */
+  item_floors: { item_id: 'text', floor: 'money' },
 } as const satisfies Record<string, Record<string, ColumnType>>;
 
 export type CatalogDataset = keyof typeof CATALOG_COLUMNS;
