@@ -33,6 +33,32 @@ describe('arguments', () => {
     });
   });
 
+  it('reads the opening step: the cutoff, the date it posts on, and whether to post (W1-14)', () => {
+    expect(
+      parseArgs(['opening', '--label', 'final', '--as-of', '2026-12-31', '--date', '2027-01-01', '--post']),
+    ).toEqual({
+      step: 'opening',
+      label: 'final',
+      dump: null,
+      tenant: 'delux',
+      dryRun: false,
+      opening: { asOf: '2026-12-31', date: '2027-01-01', post: true },
+    });
+    expect(parseArgs(['opening', '--label', 'x', '--date', '2027-01-01'])).toEqual({
+      error: '--as-of YYYY-MM-DD is required',
+    });
+    expect(parseArgs(['opening', '--label', 'x', '--as-of', '2026-12-31'])).toEqual({
+      error: '--date YYYY-MM-DD is required',
+    });
+    expect(
+      parseArgs(['opening', '--label', 'x', '--as-of', '2026-12-31', '--date', '2027-01-01', '--post', '--dry-run']),
+    ).toEqual({ error: '--post and --dry-run exclude each other' });
+    expect(parseArgs(['load', '--label', 'x', '--as-of', '2026-12-31'])).toEqual({
+      error: '--as-of and --date are for the opening step',
+    });
+    expect(parseArgs(['load', '--label', 'x', '--post'])).toEqual({ error: 'unknown option --post' });
+  });
+
   it('explains what is wrong', () => {
     expect(parseArgs([])).toEqual({ error: 'which step?' });
     expect(parseArgs(['explode'])).toEqual({ error: 'unknown step explode' });

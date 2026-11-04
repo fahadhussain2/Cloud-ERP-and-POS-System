@@ -3,6 +3,7 @@ import type pg from 'pg';
 
 import { postCashMovement, postCollection, postSession } from '../cash';
 import { postHandover } from '../handover';
+import { postOpening } from '../opening';
 import { postSale } from '../sale';
 import { postVoid } from '../void';
 import type { PostingContext, PostingException, PostingResult } from '../types';
@@ -12,6 +13,7 @@ import {
   loadContext,
   loadHandover,
   loadLineCosts,
+  loadOpening,
   loadSale,
   loadSalePosting,
   loadSessionEvent,
@@ -29,7 +31,13 @@ import { writePosting } from './write';
 // exception.
 
 export type SourceType =
-  'sale' | 'cash_handover' | 'payment' | 'cash_movement' | 'cash_session' | 'sales_void';
+  | 'sale'
+  | 'cash_handover'
+  | 'payment'
+  | 'cash_movement'
+  | 'cash_session'
+  | 'sales_void'
+  | 'opening';
 
 /**
  * Where each kind of document lives, which row holds it, and whom an exception on it belongs to. Constants, never
@@ -50,6 +58,8 @@ const SOURCES: Record<
     byClose: true,
   },
   sales_void: { table: 'sales_voids', documentType: 'sales_void', userColumn: 'voided_by_user_id' },
+  // Posted by the importer, never by the catch-up (W1-14).
+  opening: { table: 'opening_balances', documentType: 'opening_balance', userColumn: 'created_by_user_id' },
 };
 
 /** The SQL that finds a source's row by the document id in `$n`. */
@@ -201,6 +211,17 @@ async function compute(
     if (!doc) throw missing();
     const context = await loadContext(c, null);
     return { context, result: postSession(doc, context) };
+  }
+  if (type === 'opening') {
+    const opening = await loadOpening(c, id);
+    if (!opening) throw missing();
+    const context = await loadContext(c, null);
+    const state = await loadStateOf(
+      c,
+      opening.stock.map((l) => l.itemId),
+      opening.stock.map((l) => l.locationId),
+    );
+    return { context, result: postOpening(opening, context, state) };
   }
   if (type === 'sales_void') {
     // A duplicate, or a void whose bill hasn't arrived, loads as null: it never posts (W1-12).

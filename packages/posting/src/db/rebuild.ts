@@ -3,6 +3,7 @@ import pg from 'pg';
 import { emptyState, withChanges } from '../replay';
 import { postCashMovement, postCollection, postSession } from '../cash';
 import { postHandover } from '../handover';
+import { postOpening } from '../opening';
 import { postSale } from '../sale';
 import { postVoid } from '../void';
 import type { LedgerState, Posting, PostingContext, PostingResult } from '../types';
@@ -10,6 +11,7 @@ import {
   loadCashMovement,
   loadCollection,
   loadHandover,
+  loadOpening,
   loadSale,
   loadSessionEvent,
   loadVoid,
@@ -75,6 +77,9 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
     } else if (r.source_type === 'cash_session') {
       const doc = await loadSessionEvent(c, r.source_id);
       result = doc ? postSession(doc, r.context) : null;
+    } else if (r.source_type === 'opening') {
+      const doc = await loadOpening(c, r.source_id);
+      result = doc ? postOpening(doc, r.context, state) : null;
     } else if (r.source_type === 'sales_void') {
       const v = await loadVoid(c, r.source_id);
       const original = v ? sales.get(v.saleId) : undefined;
@@ -255,6 +260,8 @@ export async function applyRebuild(
     // Synced balance rows can't be deleted (rule 8's change feed): they are zeroed and written again.
     await c.query('UPDATE erp.stock_balances SET qty = 0, updated_at = $1', [opts.now]);
     await c.query('UPDATE erp.party_balances SET balance = 0, updated_at = $1', [opts.now]);
+    // Floors follow the averages written below; an item left with no cost keeps its floor deleted (W1-14).
+    await c.query('UPDATE erp.item_floors SET deleted_at = $1, updated_at = $1 WHERE deleted_at IS NULL', [opts.now]);
     let journals = 0;
     for (const s of steps) {
       if (!s.posting)

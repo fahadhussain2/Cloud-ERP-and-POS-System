@@ -8,6 +8,8 @@ import pg from 'pg';
 import type { ColumnPolicy } from './columns';
 import { DumpError } from './errors';
 import { GROUPS, importMasters } from './load';
+import { importOpening, type LegacyTotals, type OpeningInputs } from './opening-load';
+import { writeOpeningReports } from './opening-reports';
 import { writeStagingReport } from './report';
 import { writeImportReports } from './reports';
 import { stageDump } from './stage';
@@ -62,6 +64,47 @@ try {
     const t = report.totals;
     console.info(`staged ${t.rows.toLocaleString('en-US')} rows from ${t.files} files into ${report.schema}`);
     console.info(`report: ${md}`);
+  } else if (args.step === 'opening') {
+    // W1-14: compute, write the draft (unless --dry-run), post it with --post, and the reconciliation report.
+    const mapping = parseMapping(
+      JSON.parse(await readFile(resolve(toolDir, 'mapping', `${args.tenant}.json`), 'utf8')),
+    );
+    const labelDir = resolve(toolDir, 'out', args.label);
+    const optional = async <T>(file: string): Promise<T | null> => {
+      try {
+        return JSON.parse(await readFile(resolve(labelDir, file), 'utf8')) as T;
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        throw err;
+      }
+    };
+    const o = args.opening!;
+    const started = Date.now();
+    const result = await importOpening({
+      stagingUrl: url,
+      label: args.label,
+      appUrl: process.env['LEGACY_TARGET_URL'] ?? DEFAULT_TARGET_URL,
+      tenantCode: args.tenant,
+      mapping,
+      asOf: o.asOf,
+      businessDate: o.date,
+      write: !args.dryRun,
+      post: o.post,
+      inputs: (await optional<OpeningInputs>('opening-inputs.json')) ?? {},
+      legacyTotals: await optional<LegacyTotals>('legacy-totals.json'),
+      now: new Date(),
+    });
+    const page = await writeOpeningReports(result, labelDir);
+    const t = result.totals;
+    const rs = (minor: number) => (minor / 100).toFixed(2);
+    console.info(
+      `opening ${args.label}: ${result.status}${result.status === 'unchanged' ? `, ${result.differences} lines differ` : ''}`,
+    );
+    console.info(`stock      ${t.stockLines} items, value ${rs(t.stockValue)}, ${t.noCost} without a cost`);
+    console.info(`customers  ${t.customers}, total ${rs(t.customerTotal)}`);
+    console.info(`suppliers  ${t.suppliers}, total ${rs(t.supplierTotal)}`);
+    for (const c of result.checks) console.info(`${c.status.padEnd(8)} ${c.check}`);
+    console.info(`took ${((Date.now() - started) / 1000).toFixed(1)} s. reconciliation: ${page}`);
   } else {
     // transform and report compare and report only; load writes (D-085).
     const mapping = parseMapping(
