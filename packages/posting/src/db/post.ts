@@ -11,12 +11,14 @@ import {
   loadCollection,
   loadContext,
   loadHandover,
+  loadLineCosts,
   loadSale,
   loadSalePosting,
   loadSessionEvent,
   loadState,
   loadStateOf,
   loadVoid,
+  withReturnCosts,
 } from './load';
 import { writePosting } from './write';
 
@@ -217,7 +219,24 @@ async function compute(
   const loaded = await loadSale(c, id);
   if (!loaded) throw new Error(`no ${type} ${id} to post`);
   const context = await loadContext(c, loaded.sale.customerId);
-  return { context, result: postSale(loaded.sale, context, await loadState(c, loaded.sale)) };
+  // A return comes back at its original lines' costs, so it posts only after them (W1-13).
+  const costs = await loadLineCosts(c, [...loaded.originals.values()]);
+  const sale = withReturnCosts(loaded.sale, loaded.originals, (line) => costs.get(line));
+  if (sale === null) return { context, result: { ok: false, error: { code: 'original_not_posted' } } };
+  return { context, result: postSale(sale, context, await loadState(c, sale)) };
+}
+
+/** Returns of this bill that are waiting for it to post (W1-13): accepted, not posted yet, oldest first. */
+export async function waitingReturns(c: pg.ClientBase, billId: string): Promise<string[]> {
+  const { rows } = await c.query<{ id: string }>(
+    `SELECT d.id FROM erp.sales_documents d
+     WHERE EXISTS (SELECT 1 FROM erp.sales_lines r JOIN erp.sales_lines o ON o.id = r.original_line_id
+                   WHERE r.document_id = d.id AND o.document_id = $1)
+       AND NOT EXISTS (SELECT 1 FROM erp.postings p WHERE p.source_type = 'sale' AND p.source_id = d.id)
+     ORDER BY d.received_at, d.id`,
+    [billId],
+  );
+  return rows.map((r) => r.id);
 }
 
 interface Pending {
@@ -253,6 +272,11 @@ export async function postPending(
             `SELECT * FROM (
                SELECT d.id, 'sale' AS type, d.received_at, d.device_id, d.seq FROM erp.sales_documents d
                WHERE NOT EXISTS (SELECT 1 FROM erp.postings p WHERE p.source_type = 'sale' AND p.source_id = d.id)
+                 -- A return posts once the bill it returns has posted (W1-13).
+                 AND NOT EXISTS (SELECT 1 FROM erp.sales_lines rl JOIN erp.sales_lines ol ON ol.id = rl.original_line_id
+                                 WHERE rl.document_id = d.id
+                                   AND NOT EXISTS (SELECT 1 FROM erp.postings p
+                                                   WHERE p.source_type = 'sale' AND p.source_id = ol.document_id))
                UNION ALL
                SELECT h.id, 'cash_handover', h.received_at, h.device_id, h.seq FROM erp.cash_handovers h
                WHERE h.duplicate_of_id IS NULL
@@ -297,9 +321,17 @@ export async function postPending(
         ).rows,
     );
     for (const { id, type } of page) {
-      const outcome = await withTenant(pool, { tenantId }, (_db, c) =>
-        postDocument(c, { tenantId, type, id, now: opts.now() }),
-      );
+      const outcome = await withTenant(pool, { tenantId }, async (_db, c) => {
+        const o = await postDocument(c, { tenantId, type, id, now: opts.now() });
+        // A return held back for this bill posts right after it (W1-13), in the same transaction.
+        if (o.status === 'posted' && type === 'sale')
+          for (const r of await waitingReturns(c, id)) {
+            const after = await postDocument(c, { tenantId, type: 'sale', id: r, now: opts.now() });
+            if (after.status === 'posted') counts.posted += 1;
+            else if (after.status === 'failed') counts.failed += 1;
+          }
+        return o;
+      });
       if (outcome.status === 'posted') counts.posted += 1;
       else if (outcome.status === 'failed') counts.failed += 1;
     }

@@ -1,0 +1,1167 @@
+{
+  "description": "Posting a return or exchange (posting rules §4.2, §4.3, §8, W1-13)",
+  "notes": "As post-sale.json, plus 4110 sales returns and loc-damaged. Every case is document C03-S000415 of branch br-main dated 2026-11-12. A returned line has a negative qty and lineTotal (−refund) and a `returnUnitCost`: the original line's unit cost from its stock movement, or null for the current average (no receipt, or an original that left with no cost). Stock comes back as a receipt at that cost (the average recomputed, posting rules §5.1); with no cost at all it comes back at 0 and leaves the average unknown. COGS and inventory net to one pair of lines per entry.",
+  "cases": [
+    {
+      "name": "a cash return into SHOP at the original line's cost: Dr SALES_RETURNS, Cr cash in transit, Dr INVENTORY / Cr COGS",
+      "input": {
+        "sale": {
+          "id": "ret-1",
+          "number": "C03-S000415",
+          "branchId": "br-main",
+          "businessDate": "2026-11-12",
+          "customerId": null,
+          "lines": [
+            {
+              "id": "line-1",
+              "lineNo": 1,
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": -1000,
+              "lineTotal": -435000,
+              "taxAmount": 0,
+              "returnUnitCost": 310000
+            }
+          ],
+          "amounts": {
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": -435000
+            }
+          ]
+        },
+        "state": {
+          "costs": {
+            "item-pads": {
+              "avgCost": 320000,
+              "onHand": 4000
+            }
+          },
+          "balances": {
+            "loc-shop": {
+              "item-pads": 4000
+            }
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-12",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "C03-S000415",
+            "lines": [
+              {
+                "accountId": "1120",
+                "partyId": null,
+                "debit": 0,
+                "credit": 435000
+              },
+              {
+                "accountId": "4110",
+                "partyId": null,
+                "debit": 435000,
+                "credit": 0
+              },
+              {
+                "accountId": "5100",
+                "partyId": null,
+                "debit": 0,
+                "credit": 310000
+              },
+              {
+                "accountId": "1300",
+                "partyId": null,
+                "debit": 310000,
+                "credit": 0
+              }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "line-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 1000,
+              "unitCost": 310000,
+              "valueDelta": 310000,
+              "avgCostAfter": 318000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-pads": {
+                "avgCost": 318000,
+                "onHand": 5000
+              }
+            },
+            "balances": {
+              "loc-shop": {
+                "item-pads": 5000
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "a defective line goes into DAMAGED, still at the original cost",
+      "input": {
+        "sale": {
+          "id": "ret-1",
+          "number": "C03-S000415",
+          "branchId": "br-main",
+          "businessDate": "2026-11-12",
+          "customerId": null,
+          "lines": [
+            {
+              "id": "line-1",
+              "lineNo": 1,
+              "itemId": "item-pads",
+              "locationId": "loc-damaged",
+              "qty": -1000,
+              "lineTotal": -435000,
+              "taxAmount": 0,
+              "returnUnitCost": 310000
+            }
+          ],
+          "amounts": {
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": -435000
+            }
+          ]
+        },
+        "state": {
+          "costs": {
+            "item-pads": {
+              "avgCost": 320000,
+              "onHand": 4000
+            }
+          },
+          "balances": {
+            "loc-shop": {
+              "item-pads": 4000
+            }
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-12",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "C03-S000415",
+            "lines": [
+              {
+                "accountId": "1120",
+                "partyId": null,
+                "debit": 0,
+                "credit": 435000
+              },
+              {
+                "accountId": "4110",
+                "partyId": null,
+                "debit": 435000,
+                "credit": 0
+              },
+              {
+                "accountId": "5100",
+                "partyId": null,
+                "debit": 0,
+                "credit": 310000
+              },
+              {
+                "accountId": "1300",
+                "partyId": null,
+                "debit": 310000,
+                "credit": 0
+              }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "line-1",
+              "itemId": "item-pads",
+              "locationId": "loc-damaged",
+              "qtyDelta": 1000,
+              "unitCost": 310000,
+              "valueDelta": 310000,
+              "avgCostAfter": 318000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-pads": {
+                "avgCost": 318000,
+                "onHand": 5000
+              }
+            },
+            "balances": {
+              "loc-damaged": {
+                "item-pads": 1000
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "the exchange of posting rules §8 is one entry: Cr SALES 4,800, Dr SALES_RETURNS 4,350, Dr cash in transit 450, COGS net 300",
+      "input": {
+        "sale": {
+          "id": "ret-1",
+          "number": "C03-S000415",
+          "branchId": "br-main",
+          "businessDate": "2026-11-12",
+          "customerId": null,
+          "lines": [
+            {
+              "id": "line-1",
+              "lineNo": 1,
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": -1000,
+              "lineTotal": -435000,
+              "taxAmount": 0,
+              "returnUnitCost": 310000
+            },
+            {
+              "id": "line-2",
+              "lineNo": 2,
+              "itemId": "item-pads-b",
+              "locationId": "loc-shop",
+              "qty": 1000,
+              "lineTotal": 480000,
+              "taxAmount": 0
+            }
+          ],
+          "amounts": {
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 45000
+            }
+          ]
+        },
+        "state": {
+          "costs": {
+            "item-pads": {
+              "avgCost": 310000,
+              "onHand": 4000
+            },
+            "item-pads-b": {
+              "avgCost": 340000,
+              "onHand": 2000
+            }
+          },
+          "balances": {
+            "loc-shop": {
+              "item-pads": 4000,
+              "item-pads-b": 2000
+            }
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-12",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "C03-S000415",
+            "lines": [
+              {
+                "accountId": "1120",
+                "partyId": null,
+                "debit": 45000,
+                "credit": 0
+              },
+              {
+                "accountId": "4100",
+                "partyId": null,
+                "debit": 0,
+                "credit": 480000
+              },
+              {
+                "accountId": "4110",
+                "partyId": null,
+                "debit": 435000,
+                "credit": 0
+              },
+              {
+                "accountId": "5100",
+                "partyId": null,
+                "debit": 30000,
+                "credit": 0
+              },
+              {
+                "accountId": "1300",
+                "partyId": null,
+                "debit": 0,
+                "credit": 30000
+              }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "line-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 1000,
+              "unitCost": 310000,
+              "valueDelta": 310000,
+              "avgCostAfter": 310000
+            },
+            {
+              "sourceLineId": "line-2",
+              "itemId": "item-pads-b",
+              "locationId": "loc-shop",
+              "qtyDelta": -1000,
+              "unitCost": 340000,
+              "valueDelta": -340000,
+              "avgCostAfter": 340000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-pads": {
+                "avgCost": 310000,
+                "onHand": 5000
+              },
+              "item-pads-b": {
+                "avgCost": 340000,
+                "onHand": 1000
+              }
+            },
+            "balances": {
+              "loc-shop": {
+                "item-pads": 5000,
+                "item-pads-b": 1000
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "a refund to account: Cr AR for the customer, a negative ledger entry",
+      "input": {
+        "sale": {
+          "id": "ret-1",
+          "number": "C03-S000415",
+          "branchId": "br-main",
+          "businessDate": "2026-11-12",
+          "customerId": "party-khan",
+          "lines": [
+            {
+              "id": "line-1",
+              "lineNo": 1,
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": -1000,
+              "lineTotal": -435000,
+              "taxAmount": 0,
+              "returnUnitCost": 310000
+            }
+          ],
+          "amounts": {
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0
+          },
+          "payments": [
+            {
+              "method": "on_account",
+              "amount": -435000
+            }
+          ]
+        },
+        "state": {
+          "costs": {
+            "item-pads": {
+              "avgCost": 310000,
+              "onHand": 4000
+            }
+          },
+          "balances": {
+            "loc-shop": {
+              "item-pads": 4000
+            }
+          }
+        },
+        "context": {
+          "customer": {
+            "paymentTermsDays": 30
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-12",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "C03-S000415",
+            "lines": [
+              {
+                "accountId": "1200",
+                "partyId": "party-khan",
+                "debit": 0,
+                "credit": 435000
+              },
+              {
+                "accountId": "4110",
+                "partyId": null,
+                "debit": 435000,
+                "credit": 0
+              },
+              {
+                "accountId": "5100",
+                "partyId": null,
+                "debit": 0,
+                "credit": 310000
+              },
+              {
+                "accountId": "1300",
+                "partyId": null,
+                "debit": 310000,
+                "credit": 0
+              }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "line-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 1000,
+              "unitCost": 310000,
+              "valueDelta": 310000,
+              "avgCostAfter": 310000
+            }
+          ],
+          "partyEntries": [
+            {
+              "partyId": "party-khan",
+              "role": "customer",
+              "amount": -435000,
+              "dueDate": "2026-12-12"
+            }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-pads": {
+                "avgCost": 310000,
+                "onHand": 5000
+              }
+            },
+            "balances": {
+              "loc-shop": {
+                "item-pads": 5000
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "a refund by transfer (Raast): Cr the method's bank account",
+      "input": {
+        "sale": {
+          "id": "ret-1",
+          "number": "C03-S000415",
+          "branchId": "br-main",
+          "businessDate": "2026-11-12",
+          "customerId": null,
+          "lines": [
+            {
+              "id": "line-1",
+              "lineNo": 1,
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": -1000,
+              "lineTotal": -435000,
+              "taxAmount": 0,
+              "returnUnitCost": 310000
+            }
+          ],
+          "amounts": {
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0
+          },
+          "payments": [
+            {
+              "method": "raast",
+              "amount": -435000
+            }
+          ]
+        },
+        "state": {
+          "costs": {
+            "item-pads": {
+              "avgCost": 310000,
+              "onHand": 4000
+            }
+          },
+          "balances": {
+            "loc-shop": {
+              "item-pads": 4000
+            }
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-12",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "C03-S000415",
+            "lines": [
+              {
+                "accountId": "1160",
+                "partyId": null,
+                "debit": 0,
+                "credit": 435000
+              },
+              {
+                "accountId": "4110",
+                "partyId": null,
+                "debit": 435000,
+                "credit": 0
+              },
+              {
+                "accountId": "5100",
+                "partyId": null,
+                "debit": 0,
+                "credit": 310000
+              },
+              {
+                "accountId": "1300",
+                "partyId": null,
+                "debit": 310000,
+                "credit": 0
+              }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "line-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 1000,
+              "unitCost": 310000,
+              "valueDelta": 310000,
+              "avgCostAfter": 310000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-pads": {
+                "avgCost": 310000,
+                "onHand": 5000
+              }
+            },
+            "balances": {
+              "loc-shop": {
+                "item-pads": 5000
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "a no-receipt line comes back at the current average",
+      "input": {
+        "sale": {
+          "id": "ret-1",
+          "number": "C03-S000415",
+          "branchId": "br-main",
+          "businessDate": "2026-11-12",
+          "customerId": null,
+          "lines": [
+            {
+              "id": "line-1",
+              "lineNo": 1,
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": -1000,
+              "lineTotal": -400000,
+              "taxAmount": 0,
+              "returnUnitCost": null
+            }
+          ],
+          "amounts": {
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": -400000
+            }
+          ]
+        },
+        "state": {
+          "costs": {
+            "item-pads": {
+              "avgCost": 320000,
+              "onHand": 4000
+            }
+          },
+          "balances": {
+            "loc-shop": {
+              "item-pads": 4000
+            }
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-12",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "C03-S000415",
+            "lines": [
+              {
+                "accountId": "1120",
+                "partyId": null,
+                "debit": 0,
+                "credit": 400000
+              },
+              {
+                "accountId": "4110",
+                "partyId": null,
+                "debit": 400000,
+                "credit": 0
+              },
+              {
+                "accountId": "5100",
+                "partyId": null,
+                "debit": 0,
+                "credit": 320000
+              },
+              {
+                "accountId": "1300",
+                "partyId": null,
+                "debit": 320000,
+                "credit": 0
+              }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "line-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 1000,
+              "unitCost": 320000,
+              "valueDelta": 320000,
+              "avgCostAfter": 320000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-pads": {
+                "avgCost": 320000,
+                "onHand": 5000
+              }
+            },
+            "balances": {
+              "loc-shop": {
+                "item-pads": 5000
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "an item with no cost comes back at 0, flagged no_cost, with no COGS lines",
+      "input": {
+        "sale": {
+          "id": "ret-1",
+          "number": "C03-S000415",
+          "branchId": "br-main",
+          "businessDate": "2026-11-12",
+          "customerId": null,
+          "lines": [
+            {
+              "id": "line-1",
+              "lineNo": 1,
+              "itemId": "item-new",
+              "locationId": "loc-shop",
+              "qty": -1000,
+              "lineTotal": -400000,
+              "taxAmount": 0,
+              "returnUnitCost": null
+            }
+          ],
+          "amounts": {
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": -400000
+            }
+          ]
+        },
+        "state": {
+          "costs": {},
+          "balances": {}
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-12",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "C03-S000415",
+            "lines": [
+              {
+                "accountId": "1120",
+                "partyId": null,
+                "debit": 0,
+                "credit": 400000
+              },
+              {
+                "accountId": "4110",
+                "partyId": null,
+                "debit": 400000,
+                "credit": 0
+              }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "line-1",
+              "itemId": "item-new",
+              "locationId": "loc-shop",
+              "qtyDelta": 1000,
+              "unitCost": 0,
+              "valueDelta": 0,
+              "avgCostAfter": null
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [
+            {
+              "kind": "no_cost",
+              "details": {
+                "itemId": "item-new"
+              }
+            }
+          ],
+          "state": {
+            "costs": {
+              "item-new": {
+                "avgCost": null,
+                "onHand": 1000
+              }
+            },
+            "balances": {
+              "loc-shop": {
+                "item-new": 1000
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "a fractional return rounded to −Rs 500: Dr ROUNDING the half rupee",
+      "input": {
+        "sale": {
+          "id": "ret-1",
+          "number": "C03-S000415",
+          "branchId": "br-main",
+          "businessDate": "2026-11-12",
+          "customerId": null,
+          "lines": [
+            {
+              "id": "line-1",
+              "lineNo": 1,
+              "itemId": "item-hose",
+              "locationId": "loc-shop",
+              "qty": -1500,
+              "lineTotal": -49950,
+              "taxAmount": 0,
+              "returnUnitCost": 13333
+            }
+          ],
+          "amounts": {
+            "billDiscount": 0,
+            "rounding": -50,
+            "taxTotal": 0
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": -50000
+            }
+          ]
+        },
+        "state": {
+          "costs": {
+            "item-hose": {
+              "avgCost": 13333,
+              "onHand": 10000
+            }
+          },
+          "balances": {
+            "loc-shop": {
+              "item-hose": 10000
+            }
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-12",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "C03-S000415",
+            "lines": [
+              {
+                "accountId": "1120",
+                "partyId": null,
+                "debit": 0,
+                "credit": 50000
+              },
+              {
+                "accountId": "4110",
+                "partyId": null,
+                "debit": 49950,
+                "credit": 0
+              },
+              {
+                "accountId": "4210",
+                "partyId": null,
+                "debit": 50,
+                "credit": 0
+              },
+              {
+                "accountId": "5100",
+                "partyId": null,
+                "debit": 0,
+                "credit": 20000
+              },
+              {
+                "accountId": "1300",
+                "partyId": null,
+                "debit": 20000,
+                "credit": 0
+              }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "line-1",
+              "itemId": "item-hose",
+              "locationId": "loc-shop",
+              "qtyDelta": 1500,
+              "unitCost": 13333,
+              "valueDelta": 20000,
+              "avgCostAfter": 13333
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-hose": {
+                "avgCost": 13333,
+                "onHand": 11500
+              }
+            },
+            "balances": {
+              "loc-shop": {
+                "item-hose": 11500
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "a return into a shelf below zero: no negative_stock, the average restarts at the returned cost",
+      "input": {
+        "sale": {
+          "id": "ret-1",
+          "number": "C03-S000415",
+          "branchId": "br-main",
+          "businessDate": "2026-11-12",
+          "customerId": null,
+          "lines": [
+            {
+              "id": "line-1",
+              "lineNo": 1,
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": -1000,
+              "lineTotal": -435000,
+              "taxAmount": 0,
+              "returnUnitCost": 310000
+            }
+          ],
+          "amounts": {
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0
+          },
+          "payments": [
+            {
+              "method": "cash",
+              "amount": -435000
+            }
+          ]
+        },
+        "state": {
+          "costs": {
+            "item-pads": {
+              "avgCost": 320000,
+              "onHand": -2000
+            }
+          },
+          "balances": {
+            "loc-shop": {
+              "item-pads": -2000
+            }
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-12",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "C03-S000415",
+            "lines": [
+              {
+                "accountId": "1120",
+                "partyId": null,
+                "debit": 0,
+                "credit": 435000
+              },
+              {
+                "accountId": "4110",
+                "partyId": null,
+                "debit": 435000,
+                "credit": 0
+              },
+              {
+                "accountId": "5100",
+                "partyId": null,
+                "debit": 0,
+                "credit": 310000
+              },
+              {
+                "accountId": "1300",
+                "partyId": null,
+                "debit": 310000,
+                "credit": 0
+              }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "line-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 1000,
+              "unitCost": 310000,
+              "valueDelta": 310000,
+              "avgCostAfter": 310000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-pads": {
+                "avgCost": 310000,
+                "onHand": -1000
+              }
+            },
+            "balances": {
+              "loc-shop": {
+                "item-pads": -1000
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "an even exchange: no payment, SALES and SALES_RETURNS both 4,350",
+      "input": {
+        "sale": {
+          "id": "ret-1",
+          "number": "C03-S000415",
+          "branchId": "br-main",
+          "businessDate": "2026-11-12",
+          "customerId": null,
+          "lines": [
+            {
+              "id": "line-1",
+              "lineNo": 1,
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": -1000,
+              "lineTotal": -435000,
+              "taxAmount": 0,
+              "returnUnitCost": 310000
+            },
+            {
+              "id": "line-2",
+              "lineNo": 2,
+              "itemId": "item-pads-b",
+              "locationId": "loc-shop",
+              "qty": 1000,
+              "lineTotal": 435000,
+              "taxAmount": 0
+            }
+          ],
+          "amounts": {
+            "billDiscount": 0,
+            "rounding": 0,
+            "taxTotal": 0
+          },
+          "payments": []
+        },
+        "state": {
+          "costs": {
+            "item-pads": {
+              "avgCost": 310000,
+              "onHand": 4000
+            },
+            "item-pads-b": {
+              "avgCost": 340000,
+              "onHand": 2000
+            }
+          },
+          "balances": {
+            "loc-shop": {
+              "item-pads": 4000,
+              "item-pads-b": 2000
+            }
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-12",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "C03-S000415",
+            "lines": [
+              {
+                "accountId": "4100",
+                "partyId": null,
+                "debit": 0,
+                "credit": 435000
+              },
+              {
+                "accountId": "4110",
+                "partyId": null,
+                "debit": 435000,
+                "credit": 0
+              },
+              {
+                "accountId": "5100",
+                "partyId": null,
+                "debit": 30000,
+                "credit": 0
+              },
+              {
+                "accountId": "1300",
+                "partyId": null,
+                "debit": 0,
+                "credit": 30000
+              }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "line-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 1000,
+              "unitCost": 310000,
+              "valueDelta": 310000,
+              "avgCostAfter": 310000
+            },
+            {
+              "sourceLineId": "line-2",
+              "itemId": "item-pads-b",
+              "locationId": "loc-shop",
+              "qtyDelta": -1000,
+              "unitCost": 340000,
+              "valueDelta": -340000,
+              "avgCostAfter": 340000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-pads": {
+                "avgCost": 310000,
+                "onHand": 5000
+              },
+              "item-pads-b": {
+                "avgCost": 340000,
+                "onHand": 1000
+              }
+            },
+            "balances": {
+              "loc-shop": {
+                "item-pads": 5000,
+                "item-pads-b": 1000
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

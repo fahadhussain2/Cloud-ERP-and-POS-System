@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: accepted with the W1-03 plan (2026-10-26). Checkout datasets and the sale document (§6.1): with the W1-06 plan (2026-10-27). Push (§6.2), gaps and re-push (§7) and the SSE nudge (§8): with the W1-07 plan and owner answers (2026-10-28), D-094. Customer datasets, the customer on the sale document and the credit exceptions: with the W1-09 plan and owner answers (2026-10-31), D-096. The cash queue, handovers and sessions in push and `queue-changed`: with the W1-10 plan and owner answers (2026-11-01), D-097. The desk's four cash-out datasets, collections, cash movements and the counted close in push: with the W1-11 plan and owner answers (2026-11-02), D-098. Voids (family `V`), the reissue on the sale document and the bill status call: with the W1-12 plan and owner answers (2026-11-03), D-099. |
+| **Status** | Accepted v1 (with the W1-02 plan, D-089): pull (2026-10-25). Catalog datasets: accepted with the W1-03 plan (2026-10-26). Checkout datasets and the sale document (§6.1): with the W1-06 plan (2026-10-27). Push (§6.2), gaps and re-push (§7) and the SSE nudge (§8): with the W1-07 plan and owner answers (2026-10-28), D-094. Customer datasets, the customer on the sale document and the credit exceptions: with the W1-09 plan and owner answers (2026-10-31), D-096. The cash queue, handovers and sessions in push and `queue-changed`: with the W1-10 plan and owner answers (2026-11-01), D-097. The desk's four cash-out datasets, collections, cash movements and the counted close in push: with the W1-11 plan and owner answers (2026-11-02), D-098. Voids (family `V`), the reissue on the sale document and the bill status call: with the W1-12 plan and owner answers (2026-11-03), D-099. The 90-day bill datasets, `SaleDocumentV2` for returns and their exceptions: with the W1-13 plan and owner answers (2026-11-03), D-100. |
 | **Refs** | SYN-01…SYN-06; architecture §4.1, §5; data model §10, §12; CLAUDE.md rules 6–9; D-009, D-011, D-042, D-047 |
 
 The architecture (§5) sets the principles. This spec fixes the contracts precisely enough to build and test them. **v1 covers pull**, which W1-02 (users and settings for unlock) and W1-03 (the catalog) need. The **sale document** a counter writes to its outbox is fixed with W1-06 (§6.1); **push**, server acceptance and exceptions (§6.2), gaps and re-push after a restore (§7) and the SSE nudge (§8) with W1-07.
@@ -33,7 +33,7 @@ Each dataset lists its columns explicitly. **A column not listed never leaves th
 
 | Dataset | Table | Scope | Columns |
 |---|---|---|---|
-| `tenant` | `tenants` | the tenant | `id, name, base_currency, currency_minor_units, timezone, locale, tax_mode, cash_rounding_increment, day_cutoff_hour, closing_time, cash_handover_mode, offline_warning_hours, offline_strong_warning_hours, status, row_version, deleted_at` (the two warnings: SYN-06, W1-07) |
+| `tenant` | `tenants` | the tenant | `id, name, base_currency, currency_minor_units, timezone, locale, tax_mode, cash_rounding_increment, day_cutoff_hour, closing_time, cash_handover_mode, offline_warning_hours, offline_strong_warning_hours, return_window_days, status, row_version, deleted_at` (the two warnings: SYN-06, W1-07; the return window: W1-13) |
 | `branch` | `branches` | the device's branch | `id, code, name, address, phone, receipt_header, status, row_version, deleted_at` |
 | `users` | `users` | the tenant | `id, username, full_name, short_code, pin_verifier, pin_must_change, status, row_version, deleted_at`. **Never `password_hash`, `email`, `password_changed_at`, `must_change_password`.** |
 | `roles` | `roles` | the tenant | `id, name, template_key, permissions, limits, row_version, deleted_at` |
@@ -91,7 +91,17 @@ A party that gets its customer account after its own row was pulled (a supplier 
 | `expense_categories` | `expense_categories` | `id, code, name, is_active, row_version, deleted_at`. **Never `gl_account_id`.** |
 | `bank_accounts` | `bank_accounts` | `id, code, name, kind, is_active, row_version, deleted_at`. **Never `gl_account_id`.** |
 
-Stock balances and the 90-day bills (W1-13) are added by their tasks with the same rules.
+**The branch's 90-day bills (W1-13, SYN-01):** pulled by every device of the branch, for returns (POS spec §19). Business date within the last 90 days (a day more on the server, so a counter ahead of the server's date gets all 90; the counter prunes to its own business date at start-up). The lines and payments come with their bill. No legacy bills (owner answer 4 to W1-13, D-100).
+
+| Dataset | Table | Columns |
+|---|---|---|
+| `bills` | `sales_documents`, the device's branch | `id, number, device_id, kind, status, business_date, created_at_device, customer_party_id, walkin_phone, total, return_of_id, row_version, deleted_at`. **Never** the payload, signature, cash figures or void fields. The walk-in phone is personal data: for the lookup by phone, never logged or printed. |
+| `bill_lines` | `sales_lines` of those bills | `id, document_id, line_no, item_id, qty, unit_price, line_total, original_line_id, row_version, deleted_at` (a returned line has `qty` below 0 and its `original_line_id`, so the pulled lines say what came back already). **Never** cost, tax, location or the return's reason. |
+| `bill_payments` | `sales_payments` of those bills | `id, document_id, method_id, amount, row_version, deleted_at`. **Never** a reference or the cash figures. |
+
+A voided bill comes once more with its status (a new `txid`, rule 8). Quantities are sent as numeric text (`-1.000`) and kept as whole thousandths on the counter (ColumnType `qty`).
+
+Stock balances are added by their task with the same rules.
 
 **Bootstrap:** the first pull simply starts from the beginning, in full pages of 1,000 rows (about 125k catalog rows for Delux). An interrupted first load resumes from the last committed page. Measured in W1-03 on the real catalog: **31 seconds** from setup to search, under the 60-second rule, so there is no snapshot download. Revisit if a tenant's catalog is much larger.
 
@@ -132,7 +142,7 @@ What a counter writes to `local_documents` and the `outbox` when a bill is final
 | `version` | `1` |
 | `id` | UUIDv7 made on the counter: the idempotency key (rule 7) |
 | `family`, `seq`, `number` | `'S'`, the sequence from `local_series` (≥ 1), `C03-S000412` |
-| `kind` | `'sale'` (returns and exchanges come with W1-13) |
+| `kind` | `'sale'` (a return or exchange is version 2, below) |
 | `deviceId`, `branchId` | from `meta` |
 | `createdAt`, `businessDate` | the counter's clock at finalize; `YYYY-MM-DD` with the tenant's cutoff (D-056) |
 | `sellerId`, `tierId` | who was unlocked; the bill's tier |
@@ -145,6 +155,18 @@ What a counter writes to `local_documents` and the `outbox` when a bill is final
 | `credit` | optional, only on a bill with an on-account payment (W1-09): `offline`, `balance`, `balanceAsOf`, `unsynced`, `offlineToday`, what the counter saw when it decided (POS spec §15) |
 | `reissueOf` | optional, only on a reissue (W1-12): the voided bill's `id` and `number` (POS spec §18) |
 | `clientVersion` | the app version |
+
+**`SaleDocumentV2`** (W1-13, POS spec §19, D-100): a return or exchange, written only for a bill with returned lines (a plain sale stays V1, and push takes both). As V1, plus:
+
+| Field | Content |
+|---|---|
+| `version`, `kind` | `2`; `'return'` (only returned lines) or `'exchange'` (sold lines too) |
+| `lines[]` | **the returned lines first**: `qty` below 0, `listPrice` and `floorPrice` null, `unitPrice` the refund each, `lineDiscount` and `billShare` 0, `lineTotal` −refund, `returnOf` (`documentId`, `number`, `lineNo` of the original line; null without a receipt), `reason`, `condition` (`resellable` \| `defective`), `note`; then the sold lines as on a sale |
+| `amounts.returnTotal` | the refunds, above 0: `subtotal − lineDiscountTotal − billDiscount − returnTotal + rounding = total` |
+| `amounts.total`, `cashDue` | may be below 0 (a refund; a cash refund is a payout at the desk) or 0 (an even exchange, no payment). `handoverStatus` is `'pending'` whenever the cash due isn't 0 |
+| `payments[]` | as on a sale; or one refund row (negative): `cash` (no cash received or change), `on_account`, or a bank or wallet method with its reference; none for an even exchange |
+| `overrides[]` | as on a sale (lines numbered after the returned ones), then the return's: `return_permission`, `return_outside_policy` (values `{}`), `no_receipt_return` (values: each line's `suggested` and approved `price`), `refund_transfer` (values: `method`, `amount`); `lineNo` null, reasons as POS spec §19 |
+| `returnOf` or `noReceipt` | the original bill's `id`, `number`, `businessDate`; or `{ ref }` (an old bill's number, or null) |
 
 The outbox row's `signature` is the device's ECDSA signature over `canonicalJson(document)` (D-082), added right after the commit. A later version of the document adds a new schema next to v1; the server keeps accepting v1 (architecture §4.2). W1-09's fields are additive and optional, so every v1 bill written before still parses (D-096).
 
@@ -211,10 +233,16 @@ An unexpected error rolls back that document and answers `500`; the documents be
 | `void_not_permitted` | medium | a void whose approver the server says lacks `pos.void` or has the window `none`, or of a bill of another business day (`details.cause`: `not_permitted`, `window_none`, `other_day`, W1-12). The void stands |
 | `duplicate_void` | medium | a second void of a bill: stored with `duplicate_of_id`, never posted |
 | `cash_received_for_void` | high | a handover in of a voided bill (D-059), on the void or on the handover, whichever arrives second (`details.order`: `before_void`, the desk took the cash before the void; `after_void`, after it). The handover still posts |
+| `return_over_quantity` | high | a returned line takes more than was sold minus what other returns took, usually two counters offline (`details`: `lineNo`, `sold`, `returnedBefore`, `qty`; W1-13) |
+| `return_original_invalid` | medium | a returned line's original isn't on the server, is voided, is another item, or is itself a returned line (`details.cause`: `missing`, `voided`, `other_item`, `returned_line`) |
+| `return_price_mismatch` | medium | a linked refund other than `refundFor` gives on the server's figures, or a no-receipt refund other than its approved price (`details.cause`: `linked`, `no_receipt`; `expected`, `refund`) |
+| `return_not_permitted` | medium | a return's need with no approval, or approved by someone the server says lacks the permission (`details.cause`: `permission`, `outside_policy`, `no_receipt`, `transfer`; `approval`: `missing`, `not_permitted`) |
 
 **Handovers (W1-10, cash desk spec §13):** stored in `cash_handovers`, linked to their bill by number and the bill marked `received` or `paid_out`; one whose bill hasn't arrived waits and is linked when the bill is accepted, its amount compared then. A bill with cash and a handover of it take a **per-bill lock** first (`pg_advisory_xact_lock`), before the posting order lock, because a scan and its bill often arrive in overlapping transactions. Each handover that isn't a duplicate is posted in the same transaction. A session's open creates its `cash_sessions` row and its close sets the close fields and the count (W1-11); each posts (source `cash_session`): the open a float other than what stayed, the close its variance and what went to the safe. **Collections and cash movements (W1-11)** are stored in `payments` and `cash_movements` and posted in the accepting transaction (sources `payment`, `cash_movement`).
 
 **Voids (W1-12, POS spec §18):** stored in `sales_voids`, linked to their bill by number under the same per-bill lock as a handover (every sale takes it now); one whose bill hasn't arrived waits and is applied when the bill is accepted. Reviewed with `reviewVoid` against the server's roles, the bill (or the document's own dates before it arrives) and any handover in of the number, an offline scan included. The bill becomes `voided` (its void fields, an `overrides` row of kind `void`, the audit row `sale.voided`), its row comes again in `cash_queue` with its status, so every desk drops it, and its posting is reversed (source `sales_void`) once the bill has posted. A sale's `reissueOf` is stored on it as `reissue_of_id`, `reissue_of_number`.
+
+**Returns (W1-13, POS spec §19):** a `SaleDocumentV2` goes through the same checks (`bad_schema` against V2 when its `version` is 2), then the **original bill's per-bill lock** too, so returns of one line are judged one after the other; `reviewReturn` (`packages/domain`) against the original as the server holds it (what other returns took of each line), the categories' policies, the tenant's `return_window_days` and the roles; `reviewSale` checks its figures, and a refund to account isn't judged as credit. Stored with `return_of_id`, `return_of_number`, `no_receipt`, `no_receipt_ref`; each returned line with its `original_line_id` (only when that is the same item and a sold line), reason, condition, note, and the branch's DAMAGED location for a defective line. Posted (source `sale`) at once, or, when its original hasn't posted, right after it (push and the catch-up).
 
 **The bill status call (W1-12):**
 

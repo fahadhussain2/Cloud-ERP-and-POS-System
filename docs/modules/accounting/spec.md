@@ -92,6 +92,10 @@ Push posts each in the accepting transaction, the catch-up posts what push could
 
 A void posts only once its bill has (`sale_not_posted` otherwise): push posts it in the accepting transaction when the bill is posted, posts a void that was waiting right after its bill, and `postPending` reads voids whose bill has posted. A duplicate never posts. **The rebuild** replays a void against the sale's **replayed** posting, so the check stays exact. Every case nets its sale to nothing (tested in `void.test.ts` and `void.int.test.ts`).
 
+## 5d. Returns and exchanges (posting rules §4.2, §4.3, W1-13)
+
+A return or exchange is a sale document with negative lines, posted by `postSale` (source `sale`) in one entry: sold lines credit `SALES`, returned lines debit **`SALES_RETURNS`** at their refund, the bill discount and rounding as on a sale, and the payments as they are (a negative one credits cash in transit, the customer, or the method's bank). Each returned line comes back into its location (SHOP, or DAMAGED when defective) as a receipt at **`returnUnitCost`**: the original line's unit cost from its stock movement (D-044), or the current average for a no-receipt line or an original that left with no cost; with no cost at all it comes back at 0, leaves the average unknown and is flagged `no_cost`. COGS and inventory net to one pair of lines. A return whose original line is linked but hasn't posted **waits** (`original_not_posted` is never written): push posts it right after its original, and the catch-up excludes it until then and posts it after the original in the same pass. The rebuild takes the original's replayed movement.
+
 ## 6. Known limits
 
 - **Arrival order** sets the cost of a late offline sale (D-017): recorded and reproducible, not re-costed (re-costing is Phase 2).

@@ -30,7 +30,7 @@ Data in this document is grouped by area. Fields marked † are derived and main
 
 ## 2. Platform
 
-**tenants:** `name, legal_name, base_currency (ISO 4217), currency_minor_units, timezone (e.g. Asia/Karachi), locale, fiscal_year_start_month (1–12), fiscal_year_locked bool, tax_mode (none|inclusive|exclusive), cash_rounding_increment (minor units, e.g. 100 = Rs 1), day_cutoff_hour (Delux 4), closing_time (Delux 20:00), cash_handover_mode (required|off; Delux: required), lock_date, settings jsonb, status`
+**tenants:** `name, legal_name, base_currency (ISO 4217), currency_minor_units, timezone (e.g. Asia/Karachi), locale, fiscal_year_start_month (1–12), fiscal_year_locked bool, tax_mode (none|inclusive|exclusive), cash_rounding_increment (minor units, e.g. 100 = Rs 1), day_cutoff_hour (Delux 4), closing_time (Delux 20:00), cash_handover_mode (required|off; Delux: required), return_window_days (Delux 30, PRD Q3; W1-13), lock_date, settings jsonb, status`
 
 **branches:** `code, name, address, phone, receipt_header jsonb`
 
@@ -141,9 +141,11 @@ A **single document type** covers sales, returns and exchanges:
 
 This keeps the one-screen exchange (D-006) to one document, one number, one receipt and one cash movement.
 
-**Built in W1-07 (migration 0008):** `sales_documents`, `sales_lines`, `sales_payments` and `overrides` as below, filled by push (sync spec §6.2). Also on the document: the signed `payload` (jsonb) exactly as the device sent it, its `payload_hash`, the `signature`, and `exception_count`; on each line its `bill_share` of the bill discount; on each payment its `line_no` (the order on the bill). `id` is the device-made UUIDv7 (rule 7); `(device_id, seq)` is unique, the number is only indexed (one that doesn't follow from them is accepted and flagged). The app role never updates or deletes lines, payments or overrides (rule 3). The void fields came with W1-12 (below); the return fields come with W1-13. Lines get their `tax_code_id` on push; **a line's cost is on its stock movement**, not on the line (W1-08, D-095): finalized lines are never updated.
+**Built in W1-07 (migration 0008):** `sales_documents`, `sales_lines`, `sales_payments` and `overrides` as below, filled by push (sync spec §6.2). Also on the document: the signed `payload` (jsonb) exactly as the device sent it, its `payload_hash`, the `signature`, and `exception_count`; on each line its `bill_share` of the bill discount; on each payment its `line_no` (the order on the bill). `id` is the device-made UUIDv7 (rule 7); `(device_id, seq)` is unique, the number is only indexed (one that doesn't follow from them is accepted and flagged). The app role never updates or deletes lines, payments or overrides (rule 3). The void fields came with W1-12 and the return fields with W1-13 (below). Lines get their `tax_code_id` on push; **a line's cost is on its stock movement**, not on the line (W1-08, D-095): finalized lines are never updated.
 
 **Built in W1-12 (migration 0013):** on `sales_documents` the void fields (`void_document_id`, `void_reason_code`, `voided_at`, `voided_by_user_id`, `void_approved_by_user_id`, set once by the void, audited; `status = 'voided'` exactly when `void_document_id` is set) and the reissue's `reissue_of_id`, `reissue_of_number` (from its document, set at push; no foreign key, the voided bill may arrive later). **`sales_voids`** keeps each device's voids (family `V`): `id` (the device's UUIDv7), `branch_id, device_id, number, seq, sale_document_id` (null until the bill arrives, linked by `sale_number`), `voided_by_user_id, approved_by_user_id, reason_code, note, handover_seen, at_device, business_date, received_at, duplicate_of_id` (a second void of the bill: kept, never posted), the signed `payload, payload_hash, signature, client_version, exception_count`. One void per bill. Each void's approval is also an `overrides` row of kind `void` on the bill.
+
+**Built in W1-13 (migration 0014, D-100):** on `sales_documents` `return_of_id`, `return_of_number` (the original bill, from the document, set once at push; no foreign key, it may be missing), `no_receipt`, `no_receipt_ref` (an old bill's number the customer or manager gave); on `sales_lines`, for a returned line (`qty` below 0), `original_line_id` (the line it returns, only when that is the same item and a sold line), `return_reason_code`, `return_condition`, `return_note`, and `location_id` = the branch's DAMAGED location when defective. A return arrives as `SaleDocumentV2` (sync spec §6.1). **No legacy bills** (owner answer 4 to W1-13): `legacy_sales`, `legacy_sale_lines`, `legacy_sale_id` and `legacy_line_id` are not built; a part bought before go-live is a return without a receipt.
 
 **sales_documents**
 | Field | Notes |
@@ -160,7 +162,7 @@ This keeps the one-screen exchange (D-006) to one document, one number, one rece
 | `handover_status` | not_applicable / pending / received / paid_out |
 | `reissue_of_id` | for void & reissue: points to the voided document |
 | `void_reason_code, voided_at, voided_by_user_id, void_approved_by_user_id` | |
-| `no_receipt` bool, `legacy_sale_id` | for returns without a receipt / against legacy bills |
+| `no_receipt` bool, `no_receipt_ref`, `return_of_id`, `return_of_number` | for returns: without a receipt, or of an original bill (W1-13) |
 | `signature, client_version, exception_count` | |
 
 **sales_lines**
@@ -171,8 +173,8 @@ This keeps the one-screen exchange (D-006) to one document, one number, one rece
 | `list_price, unit_price, line_discount, line_total` | list = tier price at the time of sale |
 | `floor_price_at_sale` | snapshot used for validation |
 | `tax_code_id, tax_amount` | 0 for now |
-| `original_line_id` / `legacy_line_id` | for returned lines |
-| `return_reason_code, return_condition (resellable|defective)` | for returned lines |
+| `original_line_id` | for returned lines (W1-13) |
+| `return_reason_code, return_condition (resellable|defective), return_note` | for returned lines |
 | `location_id` | SHOP for sales; SHOP or DAMAGED for returns, by condition |
 | `override_id` | if a below-list/floor price was approved |
 | (cost) | on the line's stock movement (`stock_movements.source_line_id`): the average for a sale; for a return, the original line's cost (W1-13) |
@@ -183,9 +185,7 @@ This keeps the one-screen exchange (D-006) to one document, one number, one rece
 - Cash and on-account have no bank account: the posting engine routes them by role (`CASH_IN_TRANSIT` / `CASH_DRAWER`, `AR_CONTROL`). Every other method posts to its bank account's GL account and needs a reference.
 - A non-cash method without a bank account can't be posted yet; the tenant setup reports it ("needs attention"). Delux: Raast and bank transfer, until the owner picks the bank.
 
-**overrides:** `document_id, line_id (nullable), kind (below_list|below_floor|credit_limit|offline_cap|no_receipt_return|return_permission|return_outside_policy|void|reprint), requested_by_user_id, approved_by_user_id, reason_code, note, values jsonb, at_device`
-
-**legacy_sales / legacy_sale_lines** (read-only, migrated, last 90 days): `legacy_period, legacy_doc_no, date, customer_party_id, total` / `item_id, qty, rate, amount, returned_qty†`
+**overrides:** `document_id, line_id (nullable), kind (below_list|below_floor|credit_limit|offline_cap|no_receipt_return|return_permission|return_outside_policy|void|reprint|refund_transfer), requested_by_user_id, approved_by_user_id, reason_code, note, values jsonb, at_device`
 
 Held bills are **device-local only** and never sent to the server.
 
@@ -286,7 +286,7 @@ Journal vouchers written by the accountant are stored as `journal_entries` with 
 
 **sync_inbox:** `tenant_id, document_id (PK together), device_id, family, seq, status (accepted|rejected), result jsonb, payload_hash, received_at, attempts`. A `duplicate` is an answer, not a stored state; a rejected row is checked again when the document comes back (sync spec §6.2).
 
-**exceptions:** `kind (below_floor_no_override|discount_over_limit|document_inconsistent|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature|no_cost|posting_failed|posted_after_lock|duplicate_handover|handover_not_permitted|cash_not_permitted|float_mismatch|void_not_permitted|duplicate_void), severity (low|medium|high), document_type, document_id, device_id, user_id, business_date, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`. Clock skew is unique per device and business date; `posting_failed` is one per document (W1-08).
+**exceptions:** `kind (below_floor_no_override|discount_over_limit|document_inconsistent|credit_limit_exceeded|offline_cap_exceeded|negative_stock|missing_handover|handover_amount_mismatch|cash_received_for_void|seq_gap|clock_skew|revoked_device_doc|bad_signature|no_cost|posting_failed|posted_after_lock|duplicate_handover|handover_not_permitted|cash_not_permitted|float_mismatch|void_not_permitted|duplicate_void|return_over_quantity|return_original_invalid|return_price_mismatch|return_not_permitted), severity (low|medium|high), document_type, document_id, device_id, user_id, business_date, details jsonb, status (open|reviewed|dismissed), reviewed_by_user_id, reviewed_at`. Clock skew is unique per device and business date; `posting_failed` is one per document (W1-08).
 
 **Built in W1-07** with the two above (migration 0008, sync spec §6.2–§8):
 
@@ -368,6 +368,8 @@ SQLite WASM in a dedicated worker, on OPFS (`opfs-sahpool`), changed only by num
 **Built in W1-11 (local schema 9):** `suppliers`, `supplier_balances` (keyed by `party_id`), `expense_categories` and `bank_accounts` with exactly the pulled columns (`CASH_DESK_COLUMNS`), pulled on a cash desk only; `cash_sessions` gains `counted_cash`, `variance`, `left_in_drawer`; collections (`R`) and cash movements (`M`) in `local_documents` and the outbox like handovers, with an index on the session id of `H`, `R` and `M` for the expected cash.
 
 **Built in W1-12 (local schema 10):** `held_bills`: `id` (UUIDv7), `user_id`, `held_at`, `business_date` (of `held_at`, with the 04:00 cutoff), `label` (optional, 40 characters), `bill` (the person's `open_bills.bill` as it was). Holding moves the open bill here and recalling moves it back, each in one transaction; recalling over a bill with lines holds that one first (the swap). Each person sees only their own; a held bill is deleted once its business day is over, the count written to `diagnostic_log`. Never pushed (POS spec §17). An index on the void's sale id for family `V` in `local_documents`.
+
+**Built in W1-13 (local schema 11):** `bills`, `bill_lines`, `bill_payments`, the branch's last 90 days with exactly the pulled columns (`RETURN_COLUMNS`, sync spec §3; quantities as whole thousandths), pruned past 90 days at start-up; an index on a return's original bill in `local_documents`. An open or held bill may carry `bill.returns` (POS spec §19).
 
 The device's signing key is not in SQLite: it is a non-extractable `CryptoKey` in IndexedDB (`erp-pos-keys`), and the device token is kept only in memory.
 

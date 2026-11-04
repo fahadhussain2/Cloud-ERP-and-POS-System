@@ -1,4 +1,4 @@
-import { billCode, money as toMoney, sub, sum } from '@erp/domain';
+import { billCode, isReturnedLine, money as toMoney, sub, sum } from '@erp/domain';
 import { code39Svg } from '@erp/print';
 import { formatMoney } from '@erp/ui';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +8,8 @@ import type { PrintJob } from './print-job';
 
 // The printed sale bill (POS spec §13, POS-09, the prototype's layout): black on white, no shading, A5 landscape
 // (Delux, owner answer 1) or A4 portrait. Thermal formats print the A4 layout until their templates are built
-// (owner answer 2). Text through i18n keys, logical CSS properties (rule 10).
+// (owner answer 2). A return or exchange (W1-13, POS spec §19) prints as RETURN or EXCHANGE, its returned lines first
+// with their reason and condition, and what happens to the refund. Text through i18n keys, logical CSS (rule 10).
 
 /** The page a profile prints on. */
 export const pageOf = (job: PrintJob): 'a5' | 'a4' =>
@@ -37,8 +38,18 @@ function BillPage({ job }: { job: PrintJob }) {
       timeStyle: 'short',
     }).format(new Date(iso));
   const amounts = d.lines.map((l) => l.lineTotal + l.billShare);
-  const linesTotal = sum(amounts.map((a) => toMoney(a)));
+  const returned = d.version === 2 ? d.lines.filter(isReturnedLine) : [];
+  // The subtotal is the sold lines; the refunds are their own row.
+  const linesTotal = sum(amounts.filter((a) => a > 0).map((a) => toMoney(a)));
+  const returnTotal = d.version === 2 ? d.amounts.returnTotal : 0;
   const cash = d.payments.find((p) => p.changeDue !== null);
+  const refund = d.payments.find((p) => p.amount < 0);
+  const title =
+    d.kind === 'return'
+      ? 'print.returnBill'
+      : d.kind === 'exchange'
+        ? 'print.exchangeBill'
+        : 'print.saleBill';
   const code = codeText(job);
   const policy = job.profile?.policyText ?? t('print.policy');
 
@@ -49,7 +60,22 @@ function BillPage({ job }: { job: PrintJob }) {
         {job.headerLines.map((line) => (
           <p key={line}>{line}</p>
         ))}
-        <h2>{t('print.saleBill')}</h2>
+        <h2>{t(title)}</h2>
+        {d.version === 2 && (
+          <p className="bill-return-of" data-testid="return-of">
+            {d.returnOf
+              ? t('print.returnedFrom', {
+                  number: d.returnOf.number,
+                  date: new Intl.DateTimeFormat(job.money.locale, {
+                    dateStyle: 'medium',
+                    timeZone: 'UTC',
+                  }).format(new Date(`${d.returnOf.businessDate}T00:00:00Z`)),
+                })
+              : d.noReceipt?.ref
+                ? t('print.noReceiptRef', { ref: d.noReceipt.ref })
+                : t('print.noReceipt')}
+          </p>
+        )}
         {job.voided && (
           <p className="bill-void" data-testid="void-band">
             {t('print.void', {
@@ -61,7 +87,7 @@ function BillPage({ job }: { job: PrintJob }) {
             })}
           </p>
         )}
-        {d.reissueOf && (
+        {d.version === 1 && d.reissueOf && (
           <p className="bill-reissue">{t('print.reissueOf', { number: d.reissueOf.number })}</p>
         )}
         {job.reprint && (
@@ -108,7 +134,18 @@ function BillPage({ job }: { job: PrintJob }) {
             <tr key={l.lineNo}>
               <td>{l.lineNo}</td>
               <td>{job.items[l.itemId]?.code ?? ''}</td>
-              <td className="bill-wide">{job.items[l.itemId]?.name ?? l.itemId}</td>
+              <td className="bill-wide">
+                {job.items[l.itemId]?.name ?? l.itemId}
+                {isReturnedLine(l) && (
+                  <span className="bill-returned">
+                    {' · '}
+                    {t('print.returnedLine', {
+                      reason: t(`return.reason.${l.reason}`),
+                      condition: t(`return.condition.${l.condition}`),
+                    })}
+                  </span>
+                )}
+              </td>
               <td className="bill-num">{formatQty(l.qty, job.money.locale)}</td>
               <td className="bill-num">{m(l.unitPrice)}</td>
               <td className="bill-num">{m(amounts[i]!)}</td>
@@ -137,6 +174,12 @@ function BillPage({ job }: { job: PrintJob }) {
             <dt>{t('print.subtotal')}</dt>
             <dd>{m(linesTotal)}</dd>
           </div>
+          {returned.length > 0 && (
+            <div>
+              <dt>{t('print.returned')}</dt>
+              <dd>{m(sub(toMoney(0), toMoney(returnTotal)))}</dd>
+            </div>
+          )}
           {d.amounts.billDiscount !== 0 && (
             <div>
               <dt>{t('print.discount')}</dt>
@@ -162,6 +205,18 @@ function BillPage({ job }: { job: PrintJob }) {
               <dd>{m(p.amount)}</dd>
             </div>
           ))}
+          {refund && (
+            <div className="bill-total" data-testid="refund">
+              <dt>
+                {refund.method === 'cash'
+                  ? t('print.refundAtDesk', { amount: m(sub(toMoney(0), refund.amount)) })
+                  : refund.method === 'on_account'
+                    ? t('print.creditedToAccount')
+                    : t('print.refundedBy', { method: job.methodNames[refund.method] ?? refund.method })}
+              </dt>
+              <dd>{m(sub(toMoney(0), refund.amount))}</dd>
+            </div>
+          )}
           {cash && (
             <>
               <div>

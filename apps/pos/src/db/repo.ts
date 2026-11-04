@@ -7,15 +7,18 @@ import {
   CHECKOUT_DATASETS,
   CUSTOMER_COLUMNS,
   CUSTOMER_DATASETS,
+  RETURN_COLUMNS,
+  RETURN_DATASETS,
   uuidv7,
   type CashDeskDataset,
   type CatalogDataset,
   type CheckoutDataset,
   type CustomerDataset,
   type ColumnType,
+  type ReturnDataset,
   type PullResponse,
 } from '@erp/contracts';
-import { money, type PinState, type RoleGrant, type RoleLimits } from '@erp/domain';
+import { money, parseQty, type PinState, type RoleGrant, type RoleLimits } from '@erp/domain';
 
 import { parseOpenBill, type OpenBill } from '../bill/open-bill';
 import type { StaffUser } from '../unlock/unlock';
@@ -74,7 +77,10 @@ export const setSync = (db: SqlDb, key: string, value: string): void =>
     [key, value],
   );
 
-/** A pulled value as stored in SQLite: flags as 0/1, JSON as text, money as whole minor units (rule 1). */
+/**
+ * A pulled value as stored in SQLite: flags as 0/1, JSON as text, money as whole minor units and a quantity
+ * (numeric text, e.g. "-1.500") as whole thousandths (rule 1).
+ */
 function toSql(type: ColumnType, v: unknown): string | number | null {
   if (v === null || v === undefined) return null;
   switch (type) {
@@ -86,6 +92,8 @@ function toSql(type: ColumnType, v: unknown): string | number | null {
       return JSON.stringify(v);
     case 'money':
       return money(v as number | string);
+    case 'qty':
+      return parseQty(str(v));
     case 'int': {
       const n = Number(v);
       if (!Number.isSafeInteger(n)) throw new Error(`not a whole number: ${str(v)}`);
@@ -103,23 +111,25 @@ function fromSql(type: ColumnType, v: unknown): unknown {
 
 const catalogColumns = (d: CatalogDataset) => Object.entries(CATALOG_COLUMNS[d]) as [string, ColumnType][];
 
-type TypedDataset = CatalogDataset | CheckoutDataset | CustomerDataset | CashDeskDataset;
+type TypedDataset = CatalogDataset | CheckoutDataset | CustomerDataset | CashDeskDataset | ReturnDataset;
 
 /**
- * Pulled datasets stored with exactly their typed columns: the catalog (W1-03), checkout (W1-06), customers (W1-09)
- * and the cash desk's queue (W1-10).
+ * Pulled datasets stored with exactly their typed columns: the catalog (W1-03), checkout (W1-06), customers (W1-09),
+ * the cash desk's queue (W1-10) and the branch's 90-day bills (W1-13).
  */
 const TYPED_COLUMNS: Record<TypedDataset, Record<string, ColumnType>> = {
   ...CATALOG_COLUMNS,
   ...CHECKOUT_COLUMNS,
   ...CUSTOMER_COLUMNS,
   ...CASH_DESK_COLUMNS,
+  ...RETURN_COLUMNS,
 };
 const TYPED_DATASETS: TypedDataset[] = [
   ...CATALOG_DATASETS,
   ...CHECKOUT_DATASETS,
   ...CUSTOMER_DATASETS,
   ...CASH_DESK_DATASETS,
+  ...RETURN_DATASETS,
 ];
 /** Each row's key: `id`, except a customer's or supplier's balance, one per party. */
 const keyOf = (d: TypedDataset) =>

@@ -28,6 +28,7 @@ import {
   type LocalHandover,
   type Money,
   type QueueEntry,
+  type ReturnDocument,
   type SaleDocument,
 } from '@erp/domain';
 import { uuidv7 } from '@erp/contracts';
@@ -408,7 +409,7 @@ export function confirmHandover(db: SqlDb, req: HandoverRequest): CashHandoverDo
  */
 export function autoHandover(
   db: SqlDb,
-  sale: SaleDocument,
+  sale: SaleDocument | ReturnDocument,
   req: { createdAtMs: number; clientVersion: string },
 ): CashHandoverDocument | null {
   const device = getDevice(db);

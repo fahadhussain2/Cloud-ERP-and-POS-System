@@ -1,5 +1,7 @@
 import {
   CASH_DESK_COLUMNS,
+  RETURN_BILL_DAYS,
+  RETURN_COLUMNS,
   CATALOG_COLUMNS,
   CHECKOUT_COLUMNS,
   CounterPinChangeRequest,
@@ -12,6 +14,7 @@ import {
   verifyPin,
   type BillStatusResponse,
   type CashDeskDataset,
+  type ReturnDataset,
   type CatalogDataset,
   type CheckoutDataset,
   type CustomerDataset,
@@ -41,6 +44,31 @@ const isCatalog = (d: PullDataset): d is CatalogDataset => d in CATALOG_COLUMNS;
 const isCheckout = (d: PullDataset): d is CheckoutDataset => d in CHECKOUT_COLUMNS;
 const isCustomer = (d: PullDataset): d is CustomerDataset => d in CUSTOMER_COLUMNS;
 const isCashDesk = (d: PullDataset): d is CashDeskDataset => d in CASH_DESK_COLUMNS;
+const isReturn = (d: PullDataset): d is ReturnDataset => d in RETURN_COLUMNS;
+
+/**
+ * The branch's bills of the last 90 days (W1-13, SYN-01), with their lines and payments. A day more than 90, so a
+ * counter in a time zone ahead of the server's date still gets all of its 90 days; it prunes to its own business date.
+ */
+const BILL_DAYS = RETURN_BILL_DAYS + 1;
+const RETURN_SOURCES: Record<ReturnDataset, Omit<PullSource, 'columns' | 'params'>> = {
+  bills: {
+    table: 'sales_documents',
+    where: `branch_id = $4 AND business_date > current_date - ${BILL_DAYS}`,
+  },
+  bill_lines: {
+    table: 'sales_lines',
+    where: `EXISTS (SELECT 1 FROM erp.sales_documents d
+                    WHERE d.tenant_id = sales_lines.tenant_id AND d.id = sales_lines.document_id
+                      AND d.branch_id = $4 AND d.business_date > current_date - ${BILL_DAYS})`,
+  },
+  bill_payments: {
+    table: 'sales_payments',
+    where: `EXISTS (SELECT 1 FROM erp.sales_documents d
+                    WHERE d.tenant_id = sales_payments.tenant_id AND d.id = sales_payments.document_id
+                      AND d.branch_id = $4 AND d.business_date > current_date - ${BILL_DAYS})`,
+  },
+};
 
 /** How far back the queue sends bills already handed over (sync spec §3). */
 const CASH_QUEUE_DAYS = 7;
@@ -87,6 +115,12 @@ function datasetSource(dataset: PullDataset, branchId: string, deviceId: string)
       ...CUSTOMER_SOURCES[dataset],
       columns: [...Object.keys(CUSTOMER_COLUMNS[dataset]), 'row_version', 'deleted_at'],
     };
+  if (isReturn(dataset))
+    return {
+      ...RETURN_SOURCES[dataset],
+      columns: [...Object.keys(RETURN_COLUMNS[dataset]), 'row_version', 'deleted_at'],
+      params: [branchId],
+    };
   if (isCashDesk(dataset) && dataset !== 'cash_queue')
     return {
       ...DESK_SOURCES[dataset],
@@ -120,6 +154,7 @@ function datasetSource(dataset: PullDataset, branchId: string, deviceId: string)
           'cash_handover_mode',
           'offline_warning_hours',
           'offline_strong_warning_hours',
+          'return_window_days',
           'status',
           'row_version',
           'deleted_at',

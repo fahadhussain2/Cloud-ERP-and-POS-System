@@ -243,6 +243,37 @@ export const MIGRATIONS: readonly Migration[] = [
       "CREATE INDEX local_documents_sale ON local_documents (json_extract(payload, '$.saleId')) WHERE family = 'V'",
     ],
   },
+  {
+    // Return and exchange (W1-13, POS spec §19, SYN-01): the branch's bills of the last 90 days, exactly the pulled
+    // columns, for finding a bill and what came back of it already; pruned past 90 days at start-up. This counter's
+    // own returns are found in local_documents by the bill they return.
+    version: 11,
+    statements: [
+      `CREATE TABLE bills (
+        id TEXT PRIMARY KEY, number TEXT NOT NULL, device_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
+        business_date TEXT NOT NULL, created_at_device TEXT NOT NULL, customer_party_id TEXT, walkin_phone TEXT,
+        total INTEGER NOT NULL, return_of_id TEXT, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX bills_number ON bills (number)',
+      'CREATE INDEX bills_day ON bills (business_date)',
+      'CREATE INDEX bills_customer ON bills (customer_party_id) WHERE customer_party_id IS NOT NULL',
+      'CREATE INDEX bills_phone ON bills (walkin_phone) WHERE walkin_phone IS NOT NULL',
+      `CREATE TABLE bill_lines (
+        id TEXT PRIMARY KEY, document_id TEXT NOT NULL, line_no INTEGER NOT NULL, item_id TEXT NOT NULL,
+        qty INTEGER NOT NULL, unit_price INTEGER NOT NULL, line_total INTEGER NOT NULL, original_line_id TEXT,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX bill_lines_document ON bill_lines (document_id, line_no)',
+      'CREATE INDEX bill_lines_item ON bill_lines (item_id)',
+      'CREATE INDEX bill_lines_original ON bill_lines (original_line_id) WHERE original_line_id IS NOT NULL',
+      `CREATE TABLE bill_payments (
+        id TEXT PRIMARY KEY, document_id TEXT NOT NULL, method_id TEXT NOT NULL, amount INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX bill_payments_document ON bill_payments (document_id)',
+      "CREATE INDEX local_documents_return_of ON local_documents (json_extract(payload, '$.returnOf.id')) WHERE family = 'S'",
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

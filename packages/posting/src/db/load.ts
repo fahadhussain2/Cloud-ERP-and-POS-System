@@ -20,11 +20,19 @@ import type {
 const toMoney = (v: string | number): Money => money(String(v));
 const toQty = (v: string | number): Qty => qty(Number(v));
 
-/** The sale and who it belongs to, or null when there is no such document. */
+/**
+ * The sale and who it belongs to, or null when there is no such document. A returned line (W1-13) comes with
+ * `returnUnitCost: null`; `originals` maps it to the line it returns, when that is known, for `withReturnCosts`.
+ */
 export async function loadSale(
   c: pg.ClientBase,
   id: string,
-): Promise<{ sale: PostingSale; deviceId: string; sellerId: string } | null> {
+): Promise<{
+  sale: PostingSale;
+  deviceId: string;
+  sellerId: string;
+  originals: Map<string, string>;
+} | null> {
   const doc = await c.query<{
     number: string;
     branch_id: string;
@@ -51,8 +59,9 @@ export async function loadSale(
     qty: string;
     line_total: string;
     tax_amount: string;
+    original_line_id: string | null;
   }>(
-    `SELECT id, line_no, item_id, location_id, (qty * 1000)::bigint AS qty, line_total, tax_amount
+    `SELECT id, line_no, item_id, location_id, (qty * 1000)::bigint AS qty, line_total, tax_amount, original_line_id
      FROM erp.sales_lines WHERE document_id = $1 ORDER BY line_no`,
     [id],
   );
@@ -62,9 +71,13 @@ export async function loadSale(
      WHERE p.document_id = $1 ORDER BY p.line_no`,
     [id],
   );
+  const originals = new Map(
+    lines.rows.flatMap((l) => (l.original_line_id === null ? [] : [[l.id, l.original_line_id] as const])),
+  );
   return {
     deviceId: d.device_id,
     sellerId: d.salesperson_user_id,
+    originals,
     sale: {
       id,
       number: d.number,
@@ -79,6 +92,7 @@ export async function loadSale(
         qty: toQty(l.qty),
         lineTotal: toMoney(l.line_total),
         taxAmount: toMoney(l.tax_amount),
+        ...(toQty(l.qty) < 0 ? { returnUnitCost: null } : {}),
       })),
       amounts: {
         billDiscount: toMoney(d.bill_discount),
@@ -88,6 +102,62 @@ export async function loadSale(
       payments: payments.rows.map((p) => ({ method: p.code, amount: toMoney(p.amount) })),
     },
   };
+}
+
+/** How an original line left the stock: its unit cost, and whether a cost was known then. */
+export interface LineCost {
+  unitCost: Money;
+  avgCostAfter: Money | null;
+}
+
+/**
+ * The sale with each returned line's cost from the line it returns (posting rules §4.2, D-044): the original
+ * movement's unit cost, or null (the current average) when the original left with no cost or isn't known. Null when
+ * an original line is known but hasn't been posted yet: the return waits for it, like a void (W1-12).
+ */
+export function withReturnCosts(
+  sale: PostingSale,
+  originals: ReadonlyMap<string, string>,
+  costOf: (originalLineId: string) => LineCost | undefined,
+): PostingSale | null {
+  const lines: PostingSale['lines'] = [];
+  for (const l of sale.lines) {
+    const original = originals.get(l.id);
+    if (l.qty >= 0 || original === undefined) {
+      lines.push(l);
+      continue;
+    }
+    const cost = costOf(original);
+    if (cost === undefined) return null;
+    lines.push({ ...l, returnUnitCost: cost.avgCostAfter === null ? null : cost.unitCost });
+  }
+  return { ...sale, lines };
+}
+
+/** The stored stock movement of each of these sale lines (a sale line moves once). */
+export async function loadLineCosts(
+  c: pg.ClientBase,
+  lineIds: readonly string[],
+): Promise<Map<string, LineCost>> {
+  if (lineIds.length === 0) return new Map();
+  const { rows } = await c.query<{
+    source_line_id: string;
+    unit_cost: string;
+    avg_cost_after: string | null;
+  }>(
+    `SELECT source_line_id, unit_cost, avg_cost_after FROM erp.stock_movements
+     WHERE source_line_id = ANY($1::uuid[]) AND qty_delta < 0`,
+    [lineIds],
+  );
+  return new Map(
+    rows.map((r) => [
+      r.source_line_id,
+      {
+        unitCost: toMoney(r.unit_cost),
+        avgCostAfter: r.avg_cost_after === null ? null : toMoney(r.avg_cost_after),
+      },
+    ]),
+  );
 }
 
 /** A stored handover, or null when there is none or it is a duplicate (a duplicate never posts, W1-10). */

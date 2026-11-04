@@ -92,7 +92,7 @@ function Problem({ text }: { text: string | null }) {
   );
 }
 
-function Big({ label, children, tone }: { label: string; children: ReactNode; tone?: 'good' }) {
+function Big({ label, children, tone }: { label: string; children: ReactNode; tone?: 'good' | 'refund' }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <span className={LABEL_CLASS}>{label}</span>
@@ -100,6 +100,7 @@ function Big({ label, children, tone }: { label: string; children: ReactNode; to
         className={cn(
           'font-display text-[34px] leading-none font-bold tabular-nums',
           tone === 'good' && 'text-ok',
+          tone === 'refund' && 'text-warn',
         )}
       >
         {children}
@@ -456,6 +457,102 @@ export function OnAccountDialog({
           <AlertDescription>{w}</AlertDescription>
         </Alert>
       ))}
+      <Problem text={error} />
+    </FormDialog>
+  );
+}
+
+/**
+ * A refund (POS spec §19, PRD W7, D-007, D-053): the whole net back in orange, to the cash desk (a payout in its
+ * queue), to the customer's account, or by transfer to a bank or wallet method with its reference (owner answer 1 to
+ * W1-13: a manager approves it next). `total` is below 0.
+ */
+export function RefundDialog({
+  to,
+  settings,
+  total,
+  money,
+  customerName,
+  onPay,
+  onClose,
+}: Omit<PayProps, 'creditCustomer'> & { to: 'cash' | 'account' | 'transfer'; customerName: string | null }) {
+  const { t } = useTranslation();
+  const referenceLabel = useReferenceLabel();
+  const { busy, error, setError, pay } = usePaying(onPay);
+  const transfers = settings.methods.filter((x) => !x.isCash && x.code !== 'on_account');
+  const [method, setMethod] = useState(transfers[0]?.code ?? '');
+  const [reference, setReference] = useState('');
+  const chosen = transfers.find((x) => x.code === method);
+  const code = to === 'cash' ? 'cash' : to === 'account' ? 'on_account' : method;
+
+  const submit = () => {
+    const tender: Tender = {
+      payments: [{ method: code, amount: total, reference: reference.trim() === '' ? null : reference }],
+      cashReceived: null,
+    };
+    const problem = checkTender({
+      total,
+      increment: settings.increment,
+      methods: settings.methods,
+      tender,
+      hasCreditCustomer: false,
+      hasReturns: true,
+      hasCustomerAccount: customerName !== null,
+    });
+    if (problem) return setError(`tender.${problem}`);
+    void pay(tender);
+  };
+
+  return (
+    <FormDialog
+      title={t(`refund.title.${to}`)}
+      description={
+        to === 'account' && customerName ? t('refund.toAccount', { name: customerName }) : undefined
+      }
+      actionLabel={busy ? t('pay.saving') : t('pay.finalize')}
+      busy={busy}
+      onClose={onClose}
+      onSubmit={submit}
+    >
+      <Big label={t('refund.amount')} tone="refund">
+        <span data-testid="refund-total">{formatMoney(negate(total), money)}</span>
+      </Big>
+      {to === 'cash' && <p className="m-0 text-muted-foreground">{t('refund.atDesk')}</p>}
+      {to === 'transfer' && (
+        <>
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t('refund.method')}>
+            {transfers.map((x) => (
+              <Button
+                key={x.code}
+                type="button"
+                role="radio"
+                aria-checked={x.code === method}
+                variant={x.code === method ? 'default' : 'outline'}
+                onClick={() => {
+                  setMethod(x.code);
+                  setError(null);
+                }}
+              >
+                {x.name}
+              </Button>
+            ))}
+          </div>
+          {chosen && (
+            <TextField
+              label={referenceLabel(chosen)}
+              autoComplete="off"
+              autoFocus
+              className="font-mono"
+              value={reference}
+              onChange={(e) => {
+                setReference(e.target.value);
+                setError(null);
+              }}
+            />
+          )}
+          <p className="m-0 text-muted-foreground">{t('refund.transferApproval')}</p>
+        </>
+      )}
       <Problem text={error} />
     </FormDialog>
   );

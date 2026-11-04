@@ -1,0 +1,354 @@
+{
+  "description": "What a return needs before it can be finalized (PRD W6 steps 5–7, D-005, D-051, PRD Q3), and whether an approver may give it. Unless a case says otherwise: the seller is the salesman …f1 (pos.return.create); the original bill's business date is 2026-11-02 and today is 2026-11-12; the tenant's window is 30 days; one returned item whose category has no policy of its own ({}). An item's category may set `returnable: false` or its own `windowDays`. Days are counted between business dates; day 30 is inside a 30-day window. `original: null` is a return without a receipt: no window, but a non-returnable category still counts. Needs, in this order: return_permission (the seller lacks pos.return.create), return_outside_policy (outside the window, or a non-returnable category), no_receipt_return. `approverMay`: whether the approver holds every permission the needs take in this branch (pos.return.create, pos.return.outside_policy, pos.return.no_receipt); null when no approver is given. Staff as in testing/returns.ts.",
+  "cases": [
+    {
+      "name": "ten days after the sale, by a salesman who may: nothing",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": "2026-11-02",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}]
+      },
+      "expected": {
+        "needs": [],
+        "daysSince": 10,
+        "outsideWindow": false,
+        "nonReturnable": false,
+        "approverMay": null
+      }
+    },
+    {
+      "name": "the same day: nothing",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": "2026-11-12",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}]
+      },
+      "expected": {
+        "needs": [],
+        "daysSince": 0,
+        "outsideWindow": false,
+        "nonReturnable": false,
+        "approverMay": null
+      }
+    },
+    {
+      "name": "day 30 is still inside the window",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": "2026-10-13",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}]
+      },
+      "expected": {
+        "needs": [],
+        "daysSince": 30,
+        "outsideWindow": false,
+        "nonReturnable": false,
+        "approverMay": null
+      }
+    },
+    {
+      "name": "day 31 is outside it",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": "2026-10-12",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}]
+      },
+      "expected": {
+        "needs": ["return_outside_policy"],
+        "daysSince": 31,
+        "outsideWindow": true,
+        "nonReturnable": false,
+        "approverMay": null
+      }
+    },
+    {
+      "name": "a category with its own 7-day window: day 8 is outside",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": "2026-11-04",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [
+          {},
+          {
+            "windowDays": 7
+          }
+        ]
+      },
+      "expected": {
+        "needs": ["return_outside_policy"],
+        "daysSince": 8,
+        "outsideWindow": true,
+        "nonReturnable": false,
+        "approverMay": null
+      }
+    },
+    {
+      "name": "a category with a 60-day window: day 45 is inside",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": "2026-09-28",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [
+          {
+            "windowDays": 60
+          }
+        ]
+      },
+      "expected": {
+        "needs": [],
+        "daysSince": 45,
+        "outsideWindow": false,
+        "nonReturnable": false,
+        "approverMay": null
+      }
+    },
+    {
+      "name": "a non-returnable category",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": "2026-11-02",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [
+          {
+            "returnable": false
+          }
+        ]
+      },
+      "expected": {
+        "needs": ["return_outside_policy"],
+        "daysSince": 10,
+        "outsideWindow": false,
+        "nonReturnable": true,
+        "approverMay": null
+      }
+    },
+    {
+      "name": "without a receipt",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": null,
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}]
+      },
+      "expected": {
+        "needs": ["no_receipt_return"],
+        "daysSince": null,
+        "outsideWindow": false,
+        "nonReturnable": false,
+        "approverMay": null
+      }
+    },
+    {
+      "name": "without a receipt, from a non-returnable category",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": null,
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [
+          {
+            "returnable": false
+          }
+        ]
+      },
+      "expected": {
+        "needs": ["return_outside_policy", "no_receipt_return"],
+        "daysSince": null,
+        "outsideWindow": false,
+        "nonReturnable": true,
+        "approverMay": null
+      }
+    },
+    {
+      "name": "a seller without pos.return.create needs an approver (D-051)",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f2",
+        "original": "2026-11-02",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}]
+      },
+      "expected": {
+        "needs": ["return_permission"],
+        "daysSince": 10,
+        "outsideWindow": false,
+        "nonReturnable": false,
+        "approverMay": null
+      }
+    },
+    {
+      "name": "everything at once, in order",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f2",
+        "original": null,
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [
+          {
+            "returnable": false
+          }
+        ]
+      },
+      "expected": {
+        "needs": ["return_permission", "return_outside_policy", "no_receipt_return"],
+        "daysSince": null,
+        "outsideWindow": false,
+        "nonReturnable": true,
+        "approverMay": null
+      }
+    },
+    {
+      "name": "the manager may approve all three with one PIN",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f2",
+        "original": null,
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [
+          {
+            "returnable": false
+          }
+        ],
+        "approver": "019a0000-0000-7000-8000-0000000000f3"
+      },
+      "expected": {
+        "needs": ["return_permission", "return_outside_policy", "no_receipt_return"],
+        "daysSince": null,
+        "outsideWindow": false,
+        "nonReturnable": true,
+        "approverMay": true
+      }
+    },
+    {
+      "name": "a senior salesman may approve the missing permission",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f2",
+        "original": "2026-11-02",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}],
+        "approver": "019a0000-0000-7000-8000-0000000000f4"
+      },
+      "expected": {
+        "needs": ["return_permission"],
+        "daysSince": 10,
+        "outsideWindow": false,
+        "nonReturnable": false,
+        "approverMay": true
+      }
+    },
+    {
+      "name": "but not a return outside the window",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f2",
+        "original": "2026-10-01",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}],
+        "approver": "019a0000-0000-7000-8000-0000000000f4"
+      },
+      "expected": {
+        "needs": ["return_permission", "return_outside_policy"],
+        "daysSince": 42,
+        "outsideWindow": true,
+        "nonReturnable": false,
+        "approverMay": false
+      }
+    },
+    {
+      "name": "a cashier may not approve a return without a receipt",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": null,
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}],
+        "approver": "019a0000-0000-7000-8000-0000000000f6"
+      },
+      "expected": {
+        "needs": ["no_receipt_return"],
+        "daysSince": null,
+        "outsideWindow": false,
+        "nonReturnable": false,
+        "approverMay": false
+      }
+    },
+    {
+      "name": "a manager of another branch may not approve here",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": null,
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}],
+        "approver": "019a0000-0000-7000-8000-0000000000f5"
+      },
+      "expected": {
+        "needs": ["no_receipt_return"],
+        "daysSince": null,
+        "outsideWindow": false,
+        "nonReturnable": false,
+        "approverMay": false
+      }
+    },
+    {
+      "name": "someone unknown may not approve",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": null,
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}],
+        "approver": "019a0000-0000-7000-8000-0000000000f9"
+      },
+      "expected": {
+        "needs": ["no_receipt_return"],
+        "daysSince": null,
+        "outsideWindow": false,
+        "nonReturnable": false,
+        "approverMay": false
+      }
+    },
+    {
+      "name": "nothing needed: anyone may",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": "2026-11-02",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}],
+        "approver": "019a0000-0000-7000-8000-0000000000f6"
+      },
+      "expected": {
+        "needs": [],
+        "daysSince": 10,
+        "outsideWindow": false,
+        "nonReturnable": false,
+        "approverMay": true
+      }
+    },
+    {
+      "name": "a date that isn't a business date is refused",
+      "input": {
+        "seller": "019a0000-0000-7000-8000-0000000000f1",
+        "original": "2 Nov 2026",
+        "today": "2026-11-12",
+        "windowDays": 30,
+        "items": [{}]
+      },
+      "error": "invalid_date"
+    }
+  ]
+}

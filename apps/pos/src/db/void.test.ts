@@ -248,9 +248,11 @@ describe('a reissue', () => {
     const sale = sell();
     voidBill(db, request(sale.id));
     const again = sell('cash', undefined, { reissueOf: { id: sale.id, number: sale.number } });
+    // A plain sale is version 1 (W1-13: only a return is version 2).
+    if (again.version !== 1) throw new Error('a sale is version 1');
     expect(again.reissueOf).toEqual({ id: sale.id, number: sale.number });
     expect(SaleDocumentV1.safeParse(again).success).toBe(true);
-    expect(sell().reissueOf).toBeUndefined();
+    expect('reissueOf' in sell()).toBe(false);
   });
 });
 

@@ -1,7 +1,8 @@
 import { DomainError } from './errors';
 import { add, money, sub, sum, type Money } from './money';
 import { can, type RoleGrant } from './permissions';
-import type { SaleDocument, SaleDocumentOverride } from './sale-document';
+import type { ReturnDocument } from './return';
+import type { SaleDocument } from './sale-document';
 
 // Credit control (POS spec §15, POS-07, D-013, D-085, D-096): a sale on account against the customer's limit, and,
 // while the counter is offline, against the per-counter daily cap. The counter decides with `checkCredit`; the server
@@ -148,9 +149,13 @@ export interface CreditReviewContext {
  * The server's credit findings on a synced sale (sync spec §6.2): the limit against the server's own balance, and
  * for a bill made offline the device's cap for the day. Nothing for a sale without an on-account payment.
  */
-export function reviewCredit(document: SaleDocument, context: CreditReviewContext): CreditFinding[] {
+export function reviewCredit(
+  document: SaleDocument | ReturnDocument,
+  context: CreditReviewContext,
+): CreditFinding[] {
   const amount = onAccountAmount(document.payments);
-  if (amount === 0) return [];
+  // A refund to account (W1-13) lowers the balance: it isn't a sale on credit.
+  if (amount <= 0) return [];
   const { account, balanceBefore: balance, offlineTodayBefore: offlineToday } = context;
   const limit = account?.creditLimit ?? null;
   const overBy = limit === null ? money(0) : atLeastZero(sub(add(balance, amount), limit));
@@ -169,7 +174,7 @@ export function reviewCredit(document: SaleDocument, context: CreditReviewContex
 
   // An approval of the kind covers it when the server says its approver may give it.
   const uncovered = (kind: CreditNeed): 'no_approval' | 'not_permitted' | null => {
-    const given = document.overrides.filter((o: SaleDocumentOverride) => o.kind === kind);
+    const given = document.overrides.filter((o) => o.kind === kind);
     if (given.length === 0) return 'no_approval';
     return given.some((o) => can(grantsOf(o.approvedBy), 'pos.credit.over_limit', document.branchId))
       ? null

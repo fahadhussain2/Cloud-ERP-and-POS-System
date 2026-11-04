@@ -69,7 +69,21 @@ export type DomainErrorCode =
   | 'other_day'
   | 'handed_over'
   | 'window_none'
-  | 'bill_voided';
+  | 'bill_voided'
+  // Return and exchange (POS spec §19, W1-13)
+  | 'return_over_quantity'
+  | 'invalid_date'
+  | 'invalid_reason'
+  | 'invalid_condition'
+  | 'bill_not_empty'
+  | 'empty_return'
+  | 'original_required'
+  | 'other_item'
+  | 'duplicate_line'
+  | 'return_approval_pending'
+  | 'no_return'
+  | 'return_customer_mismatch'
+  | 'refund_approval_pending';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;
