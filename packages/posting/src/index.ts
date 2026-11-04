@@ -10,6 +10,7 @@ export {
   type SourceType,
 } from './db/post';
 export { applyRebuild, checkRebuild, RebuildRefused, type RebuildCheck } from './db/rebuild';
+export { KEPT_TABLES, markLive, WIPED_TABLES, WipeRefused, wipePilot, type WipeReport } from './db/wipe';
 export { postHandover } from './handover';
 export { postOpening } from './opening';
 export { emptyState, replay, type ReplayStep } from './replay';
