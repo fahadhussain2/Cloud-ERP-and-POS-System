@@ -120,6 +120,7 @@ About 2½ minutes end to end (rehearsal 2's limit: 1 hour). Reconciliation: item
 - `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`: pass.
 - `pnpm test`: 1,808 of 1,810 pass; the 2 failures are `CashDeskScreen.test.tsx` UI tests hitting the 5 s timeout when the whole suite runs at once (they pass alone, and in some full runs; this task doesn't touch the desk screen).
 - `pnpm test:integration`: 297 passed (28 files), including the new opening, wipe and generated-opening tests.
+- `pnpm e2e` (Edge): 47 passed.
 
 ## Owner answers (2026-11-04)
 
