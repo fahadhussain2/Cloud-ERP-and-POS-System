@@ -641,7 +641,7 @@ async function insertLines(
 async function differencesFrom(c: pg.ClientBase, openingId: string, lines: Record<string, unknown>[]) {
   const text = (l: Record<string, unknown>) =>
     [l['kind'], l['item_id'], l['qty'], l['unit_cost'], l['party_id'], l['account_id'], l['amount']]
-      .map((v) => (v === null || v === undefined ? '-' : String(v)))
+      .map((v) => (typeof v === 'string' || typeof v === 'number' ? String(v) : '-'))
       .join(' ');
   const stored = (
     await c.query<Record<string, unknown>>(

@@ -31,13 +31,7 @@ import { writePosting } from './write';
 // exception.
 
 export type SourceType =
-  | 'sale'
-  | 'cash_handover'
-  | 'payment'
-  | 'cash_movement'
-  | 'cash_session'
-  | 'sales_void'
-  | 'opening';
+  'sale' | 'cash_handover' | 'payment' | 'cash_movement' | 'cash_session' | 'sales_void' | 'opening';
 
 /**
  * Where each kind of document lives, which row holds it, and whom an exception on it belongs to. Constants, never

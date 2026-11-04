@@ -51,7 +51,17 @@ describe('arguments', () => {
       error: '--date YYYY-MM-DD is required',
     });
     expect(
-      parseArgs(['opening', '--label', 'x', '--as-of', '2026-12-31', '--date', '2027-01-01', '--post', '--dry-run']),
+      parseArgs([
+        'opening',
+        '--label',
+        'x',
+        '--as-of',
+        '2026-12-31',
+        '--date',
+        '2027-01-01',
+        '--post',
+        '--dry-run',
+      ]),
     ).toEqual({ error: '--post and --dry-run exclude each other' });
     expect(parseArgs(['load', '--label', 'x', '--as-of', '2026-12-31'])).toEqual({
       error: '--as-of and --date are for the opening step',

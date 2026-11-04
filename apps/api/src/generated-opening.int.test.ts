@@ -24,7 +24,12 @@ beforeAll(async () => {
     ownerPasswordHash: 'x',
     mustChangePassword: true,
   }));
-  await seedGeneratedCatalog(db.ownerUrl, { environment: 'staging', tenantCode: demoSpec.code, items: 60, seed: 7 });
+  await seedGeneratedCatalog(db.ownerUrl, {
+    environment: 'staging',
+    tenantCode: demoSpec.code,
+    items: 60,
+    seed: 7,
+  });
 });
 
 afterAll(async () => {

@@ -50,7 +50,10 @@ const MappingFile = z.strictObject({
    */
   opening: z
     .strictObject({
-      docTypes: z.record(z.string(), z.strictObject({ name: z.string(), sign: z.union([z.literal(1), z.literal(-1)]) })),
+      docTypes: z.record(
+        z.string(),
+        z.strictObject({ name: z.string(), sign: z.union([z.literal(1), z.literal(-1)]) }),
+      ),
       customerAccount: z.string(),
       supplierAccount: z.string(),
       itemOpeningQuantity: z.boolean(),
@@ -146,7 +149,9 @@ export function parseMapping(raw: unknown): Mapping {
     partyTiers: new Map(Object.entries(f.partyTiers).map(([k, v]) => [k.trim(), v])),
     partyCredit: new Map(Object.entries(f.partyCredit ?? {}).map(([k, v]) => [k.trim(), creditTerms(v)])),
     opening: {
-      docTypes: Object.fromEntries(Object.entries(f.opening?.docTypes ?? {}).map(([k, v]) => [k.trim(), v.sign])),
+      docTypes: Object.fromEntries(
+        Object.entries(f.opening?.docTypes ?? {}).map(([k, v]) => [k.trim(), v.sign]),
+      ),
       docTypeNames: new Map(Object.entries(f.opening?.docTypes ?? {}).map(([k, v]) => [k.trim(), v.name])),
       customerAccount: f.opening?.customerAccount ?? '10-03-0001',
       supplierAccount: f.opening?.supplierAccount ?? '20-02-0001',

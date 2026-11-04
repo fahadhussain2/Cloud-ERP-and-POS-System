@@ -133,7 +133,11 @@ const TYPED_DATASETS: TypedDataset[] = [
 ];
 /** Each row's key: `id`, except a customer's or supplier's balance (one per party) and an item's floor (W1-14). */
 const keyOf = (d: TypedDataset) =>
-  d === 'customer_balances' || d === 'supplier_balances' ? 'party_id' : d === 'item_floors' ? 'item_id' : 'id';
+  d === 'customer_balances' || d === 'supplier_balances'
+    ? 'party_id'
+    : d === 'item_floors'
+      ? 'item_id'
+      : 'id';
 
 const UPSERT = Object.fromEntries(
   TYPED_DATASETS.map((d) => {

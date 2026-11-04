@@ -531,7 +531,11 @@ export async function loadOpening(c: pg.ClientBase, id: string): Promise<Posting
         lastPurchase:
           r.last_cost === null
             ? null
-            : { cost: toMoney(r.last_cost), supplierId: r.last_supplier_id, at: r.last_receipt_at!.toISOString() },
+            : {
+                cost: toMoney(r.last_cost),
+                supplierId: r.last_supplier_id,
+                at: r.last_receipt_at!.toISOString(),
+              },
       });
     else if (r.kind === 'account')
       opening.accounts.push({ id: r.id, accountId: r.account_id!, amount: toMoney(r.amount!) });

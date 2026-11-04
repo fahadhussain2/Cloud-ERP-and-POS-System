@@ -261,7 +261,9 @@ export async function applyRebuild(
     await c.query('UPDATE erp.stock_balances SET qty = 0, updated_at = $1', [opts.now]);
     await c.query('UPDATE erp.party_balances SET balance = 0, updated_at = $1', [opts.now]);
     // Floors follow the averages written below; an item left with no cost keeps its floor deleted (W1-14).
-    await c.query('UPDATE erp.item_floors SET deleted_at = $1, updated_at = $1 WHERE deleted_at IS NULL', [opts.now]);
+    await c.query('UPDATE erp.item_floors SET deleted_at = $1, updated_at = $1 WHERE deleted_at IS NULL', [
+      opts.now,
+    ]);
     let journals = 0;
     for (const s of steps) {
       if (!s.posting)

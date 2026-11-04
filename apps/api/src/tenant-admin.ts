@@ -92,11 +92,15 @@ try {
       const tenantId = found.rows[0]?.tenant_id ?? fail(`no shop ${input.tenantCode}`);
       if (input.action === 'go-live') {
         await markLive(url, tenantId, { userId: null, lockDate: input.lockDate, now: new Date() });
-        console.log(`${input.tenantCode}: live; the books up to ${input.lockDate} are locked; the pilot wipe is now refused`);
+        console.log(
+          `${input.tenantCode}: live; the books up to ${input.lockDate} are locked; the pilot wipe is now refused`,
+        );
       } else {
-        if (input.confirm !== input.tenantCode) fail('the shop code typed again does not match: nothing was changed');
+        if (input.confirm !== input.tenantCode)
+          fail('the shop code typed again does not match: nothing was changed');
         const r = await wipePilot(url, tenantId, { userId: null, now: new Date() });
-        for (const [table, n] of Object.entries(r.removed)) if (n > 0) console.log(`  ${table.padEnd(24)} ${n}`);
+        for (const [table, n] of Object.entries(r.removed))
+          if (n > 0) console.log(`  ${table.padEnd(24)} ${n}`);
         console.log(`${input.tenantCode}: the pilot's documents and ledgers are removed`);
         console.log(
           r.devicesRevoked.length > 0
@@ -134,7 +138,9 @@ try {
     console.log(`${input.tenantCode}: ${r.items} generated items seeded in ${(r.ms / 1000).toFixed(1)} s`);
     // And a generated opening, so costs and floors can be tried on staging without real data (W1-14, D-076).
     const o = await seedGeneratedOpening(url, { environment: input.environment, tenantId: r.tenantId });
-    console.log(`${input.tenantCode}: a generated opening posted: ${o.items} items in stock, journal ${o.journal}`);
+    console.log(
+      `${input.tenantCode}: a generated opening posted: ${o.items} items in stock, journal ${o.journal}`,
+    );
   } else {
     const problem = passwordProblem(input.password, input.username);
     if (problem) fail(`the password is not acceptable: ${problem}`);
