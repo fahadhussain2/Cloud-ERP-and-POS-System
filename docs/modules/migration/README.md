@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-12 done; W0-13 (catalog, parties, chart of accounts, cleanup reports) |
+| **Status** | In progress: W0-12, W0-13 done; W1-14 (opening balances, reconciliation, rehearsal 1) built |
 | **Requirements** | 4 (MIG-01…MIG-04) |
 | **Feature spec needed** | Yes: importer design (parser, staging, transform, load) |
 
@@ -47,6 +47,21 @@ pnpm legacy:import --label dec2025
 - `pnpm legacy:import` loads units, categories, brands, origins, vehicle makes, parties, items (identifiers, vehicle tags, tier prices) and the legacy expense accounts into it, as the app role under RLS. A second run prints `unchanged` everywhere. `--dry-run` (or the `transform` step) compares and reports without writing.
 - The owner's decisions live in `tools/legacy-import/mapping/delux.json` (codes and catalog words only). Edit it after the review and run the import again.
 - Reports: `tools/legacy-import/out/<label>/reports/index.html` (with CSVs for Excel). Party reports have names and masked phones; `summary.json` has counts only.
+
+### Opening balances (W1-14)
+
+```bash
+pnpm legacy:opening --label dec2025 --as-of 2025-12-31 --date 2026-01-01 --dry-run
+pnpm legacy:opening --label dec2025 --as-of 2025-12-31 --date 2026-01-01
+pnpm legacy:opening --label dec2025 --as-of 2025-12-31 --date 2026-01-01 --post
+```
+
+- Run after `pnpm legacy:import` for the same label. `--as-of` is the legacy cutoff (inclusive), `--date` the day the opening posts on.
+- Without `--dry-run` it writes or replaces the **draft**; `--post` posts it, once. A re-run after posting changes nothing and counts the lines that differ.
+- **Document types:** each legacy stock document type needs a sign in `opening.docTypes` of the mapping file. An unmapped one stops the run after writing `reports/opening/doc-types.csv`.
+- **Inputs** (git-ignored, next to the label's reports in `out/<label>/`): `opening-inputs.json` = the counted drawer and the bank statement balances by account code in rupees (`{"accounts": {"1110": "5000", "1160": "250000"}}`); `legacy-totals.json` = the four totals read off the legacy reports (`closingStockQty`, `closingStockValue`, `customerOutstanding`, `supplierOutstanding`).
+- **Reports:** `out/<label>/reports/opening/reconciliation.html` (the checks to sign) and CSVs; `opening/parties/` holds names and amounts and stays on this PC; `summary.json` holds totals and counts only.
+- **Another database:** `LEGACY_TARGET_URL` (as the app role), e.g. a rehearsal copy, or production over an SSH tunnel.
 
 ## Related
 

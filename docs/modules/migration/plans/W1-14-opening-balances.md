@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#59](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/59) |
 | **Module** | migration (the opening computed in `tools/legacy-import`, the pilot wipe), with accounting (`postOpening` in `packages/posting`), sync (the `item_floors` dataset) and pos (the counter takes the cost floor) |
-| **Status** | Accepted (2026-11-04) with the owner's answers 1–5 |
+| **Status** | Accepted (2026-11-04) with the owner's answers 1–5. Built (2026-11-04) on `w1-14-opening-balances`; rehearsal 1 run on `dec2025`; the stock quantity cross-check needs the owner (below) |
 | **Refs** | MIG-02, MIG-04, INV-01, INV-02, CAT-06 (floor = cost + margin), PRD Q2 (5%), Q9 (all stock into Shop), Q11 (the 2026 dump); migration doc §4, §7, §8, §9; posting rules §5.1, §7; data model §3, §4, §7; accounting spec §2, §5; importer spec §1, §2; sync spec §3; CLAUDE.md rules 1, 3, 4, 5, 11; D-017, D-030 (masters and openings stay), D-031, D-076, D-079, D-084, D-085, D-090, D-092, D-095, D-100 |
 | **Depends on** | W1-08 (posting engine, `averageAfterReceipt`), W0-13 (masters loaded by legacy key) |
 | **Size** | about 3½ days (the task list says 3): opening document and posting ¾, the legacy computation 1, load, post and reports ¾, the cost floor on the counter ¾, the pilot wipe ¼ (owner answer 1), the rehearsal ¼ |
@@ -85,6 +85,41 @@
 3. ~~**Production for the pilot**~~: answered (below).
 4. ~~**The legacy report totals**~~: answered (below).
 5. ~~**Size**~~: answered (below).
+
+## Changes during the build
+
+| Plan | Built | Why |
+|---|---|---|
+| Posting writes row by row | **One statement per kind of row** (journal lines, movements, party entries and balances, costs, stock balances, floors) for every posting | A 16,753-line opening posts in about 3 s locally; row by row over a tunnel to Helsinki would take hours. |
+| The last purchase on `item_costs` | Carried on the posting (`lastPurchases`), so the rebuild writes it again | The rebuild deletes and rewrites `item_costs`. |
+| Each counter is reset "from its setup screen" | **The wipe revokes the counters**; each is cleared (the browser's site data, with its outbox at 0 on the health page) and enrolled again | The POS has no reset action yet; a revoked counter that wasn't cleared can't push into the clean books. A reset button can be a small later task. |
+| `erp-tenant cutover` | `erp-tenant wipe-pilot` and `erp-tenant go-live <env> <shop> <lock-date>` | The final run needs both: the wipe, then the go-live mark that refuses any later wipe and sets the lock date. |
+| The wipe's table list | `WIPED_TABLES` and `KEPT_TABLES`, and a test that every table in the schema is in exactly one | A table added later must be decided, not silently kept or lost. |
+| — | The opening step writes `doc-types.csv` before it stops on an unmapped document type | So the signs can be decided from the report. |
+| — | `quantity-mismatch.csv` also shows the period opening quantity and the sum of the stock records' own quantities | Rehearsal 1 found the computed and running quantities differing; see below. |
+| — | The staging catalog's categories get the 5% margin if they have none | So the generated opening shows floors on staging. |
+
+## Rehearsal 1 (2026-11-04, this PC, `dec2025`)
+
+Into a fresh database `erp_rehearsal1` (migrations to 0015, the Delux tenant from its spec), `erp_dev` untouched:
+
+| Step | Result | Time |
+|---|---|--:|
+| `legacy:stage` | 217,495 rows from 79 files | 12 s |
+| `legacy:import` | 19,552 items, 373 parties (as in W0-13) | 119 s |
+| `legacy:opening --post` | posted: **16,753 items in stock, Rs 128,033,759.87**, 0 without a cost; **42 customers Rs 679,565.00**, **69 suppliers Rs 5,791,122.00** (the migration doc's reference: ≈ Rs 0.68 M and ≈ Rs 5.79 M) | 5 s |
+| re-run with `--post` | unchanged, 0 lines differ | 3 s |
+| rebuild check | 0 differences; 16,753 floors from cost | 17 s |
+
+About 2½ minutes end to end (rehearsal 2's limit: 1 hour). Reconciliation: item count, stock quantity and value (ledger vs computation), customers and suppliers (ledger vs legacy GL), the entry balanced, every item and party found: **pass**. The four legacy report totals: **waiting** (owner answer 4).
+
+**Open: the stock quantity.** For **6,770 items** the computed closing stock (opening quantity ± purchase, sale, return and physical-stock lines) is higher than the legacy running balance in `INV_StockRecordTAB`, typically by 2 to 11 units; the running balance is negative for 3,930 items, while the migration doc expected 15 negative items. The sum of the stock records' own quantities agrees with neither consistently. Which figure the legacy Closing Stock report shows decides the rule: the owner reads a few items (e.g. ABEA003, ABEA004, ABEA008) off the legacy Closing Stock report for this dump's date, and the signs in `opening.docTypes` are confirmed. Until then the opening's quantities are not to be trusted; costs and party balances are.
+
+## Checks (2026-11-04)
+
+- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`: pass.
+- `pnpm test`: 1,808 of 1,810 pass; the 2 failures are `CashDeskScreen.test.tsx` UI tests hitting the 5 s timeout when the whole suite runs at once (they pass alone, and in some full runs; this task doesn't touch the desk screen).
+- `pnpm test:integration`: 297 passed (28 files), including the new opening, wipe and generated-opening tests.
 
 ## Owner answers (2026-11-04)
 

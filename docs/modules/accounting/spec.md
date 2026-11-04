@@ -96,6 +96,18 @@ A void posts only once its bill has (`sale_not_posted` otherwise): push posts it
 
 A return or exchange is a sale document with negative lines, posted by `postSale` (source `sale`) in one entry: sold lines credit `SALES`, returned lines debit **`SALES_RETURNS`** at their refund, the bill discount and rounding as on a sale, and the payments as they are (a negative one credits cash in transit, the customer, or the method's bank). Each returned line comes back into its location (SHOP, or DAMAGED when defective) as a receipt at **`returnUnitCost`**: the original line's unit cost from its stock movement (D-044), or the current average for a no-receipt line or an original that left with no cost; with no cost at all it comes back at 0, leaves the average unknown and is flagged `no_cost`. COGS and inventory net to one pair of lines. A return whose original line is linked but hasn't posted **waits** (`original_not_posted` is never written): push posts it right after its original, and the catch-up excludes it until then and posts it after the original in the same pass. The rebuild takes the original's replayed movement.
 
+## 5e. The opening balances (posting rules §7, W1-14)
+
+`postOpening(opening, context, state)` (`packages/posting/src/opening.ts`, source `opening`, D-101): one entry dated the opening's business date (or the day after the lock date, `posted_after_lock`), memo `Opening <label>`. **Stock** lines come into their location, in line order: at the line's cost, else the current average, else 0 with `no_cost` and the average left unknown; a positive quantity sets the average by `averageAfterReceipt`; a negative one leaves at its own cost and sets the average only when none was known (not flagged: the opening reports list negative stock). `Dr INVENTORY` Σ the movements. **Customers** debit `AR_CONTROL` with the party (an advance credits it), **suppliers** credit `AP_CONTROL` (a supplier in debit debits it), each with a party entry due on the entry date; **account** lines (the counted drawer, the bank statements) go to their account; the balance goes to `OPENING_BALANCE_EQUITY`. A role is needed only when a line uses it (`role_unmapped`). The posting also carries each item's last purchase, written to `item_costs.last_cost`, `last_supplier_id`, `last_receipt_at`.
+
+The importer writes the opening as a **draft** and posts it with `postDocument(type 'opening')`; the catch-up never posts openings. A posted opening is never changed (a trigger, except as erp_owner for the pilot wipe). The rebuild replays it with its recorded context.
+
+**Writes are one statement per kind of row** (journal lines, movements, party entries and balances, costs, stock balances, floors), so a 20,000-line opening posts in seconds, also over a tunnel.
+
+**The floor from cost** (`item_floors`, D-092): whenever a posting sets an item's average, the layer writes `costFloor(avg, the category's floor_min_margin_bp)` when it changed, or marks the row deleted when the item has no cost or its category no margin. The rebuild marks every floor deleted and writes them again from the replay.
+
+**The pilot wipe** (`wipePilot`, `packages/posting/src/db/wipe.ts`, D-101) removes every table in `WIPED_TABLES`, zeroes the synced balances, marks the floors deleted and revokes the counters; every table is in `WIPED_TABLES` or `KEPT_TABLES` (a test checks the schema). `markLive` sets `go_live_at` and the lock date; the wipe is refused after it.
+
 ## 6. Known limits
 
 - **Arrival order** sets the cost of a late offline sale (D-017): recorded and reproducible, not re-costed (re-costing is Phase 2).

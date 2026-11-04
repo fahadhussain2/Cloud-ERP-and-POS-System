@@ -880,3 +880,19 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - The legacy bills would have put a second kind of original through the lookup, the quantities, the review, the posting and the print, plus an importer step, for about a month's benefit.
 - **Trade-off:** for about the first month after go-live, returns of pre-go-live parts need a manager's PIN, and nothing stops the same old part coming back twice beyond the manager's check of the legacy system.
 - **Status:** Accepted (with the W1-13 plan, owner answers 1–5)
+
+
+### D-101 Opening balances: a posted document, reconciled from the ledgers, the floor from cost on the counter, a throwaway pilot wiped before go-live (2026-11-04)
+- **Decision:**
+  - **The opening is a document** (`opening_balances` and its lines, migration 0015) posted by `postOpening` (source `opening`) like any other, so the ledgers stay rebuildable (rule 4): stock into Shop at the legacy cost (the latest valuation rate, else the cost price, else the opening rate, else none and `no_cost`), one AR or AP line and party entry per customer or supplier due on the entry date, the counted drawer and the bank statements, the balance to Opening balance equity (posting rules §7). The importer writes a **draft**, replaces it on a re-run, and posts it once (`pnpm legacy:opening … --post`); a posted opening is never changed (a trigger).
+  - **The legacy figures are pure, golden-tested rules** (`tools/legacy-import/src/transform/opening.ts`); **which legacy document types add or take away stock is in the mapping file**, and an unmapped type stops the run after its report.
+  - **The reconciliation report** (MIG-04) reads the tenant's own ledgers after posting, compares them with the legacy computation, the legacy running balance and the four legacy report totals the owner types in (owner answer 4), and lists the top 20 customers and suppliers for sign-off.
+  - **The floor from cost** (CAT-06, D-092): `costFloor` = average × (1 + the category's margin), half away from zero, written by the posting layer as the synced `item_floors` whenever an average is set, and pulled by the counters. The counter's floor is the item's own floor, else this, else the list price.
+  - **The pilot is throwaway** (owner answer 1): no cutover posting. Before the final run, `erp-tenant wipe-pilot` removes the shop's documents and everything derived from them (as erp_owner, one transaction, audited), keeps masters, staff, PINs and settings, and revokes the counters, which are cleared and enrolled again. **This is the one exception to rules 3 and 4, for pre-go-live data only:** refused while a counter has unsynced bills (rule 9) and once `erp-tenant go-live` has marked the shop live and set the lock date.
+  - **Real data on production for the pilot** (owner answer 3): masters before 1 Dec and the pilot opening when its dump arrives, loaded from the owner's PC over an SSH tunnel as the app role. The task is built and rehearsed on the Dec 2025 copy (owner answer 2).
+- **Why:**
+  - An opening written straight into the ledgers would show up as a difference in every rebuild check.
+  - A floor that moves with the average needs its own change feed (rule 8), and the item's own floor must still win.
+  - The pilot's sales are already in legacy; netting them in the books would add a posting type, used once, for nothing the shop keeps.
+- **Trade-off:** the wipe deletes finalized documents (rules 3 and 4) once, before go-live; and a part bought during the pilot comes back in January as a no-receipt return, like any pre-go-live part (D-100).
+- **Status:** Accepted (with the W1-14 plan, owner answers 1–5)

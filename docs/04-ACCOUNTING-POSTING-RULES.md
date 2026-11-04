@@ -173,6 +173,8 @@ A single opening entry dated **2027-01-01** with `source_type = 'opening'`, plus
 | `Dr <bank accounts>` | **Bank statement** balances at 31 Dec (the legacy GL is not trusted for this) |
 | `Cr OPENING_BALANCE_EQUITY` | The balancing figure |
 
+It is a document like any other (`opening_balances`, source `opening`, W1-14, D-101), posted by `postOpening`, so a rebuild reproduces it: a stock line without a cost comes in at the current average, else at 0 with `no_cost`; a negative quantity leaves at its own cost; each customer and supplier entry is due on the entry date (ageing starts at go-live). The shadow pilot's postings are not netted: the pilot is wiped before the final run (D-101).
+
 The accountant later reclassifies Opening Balance Equity into partners' capital and drawings with a journal voucher. Legacy equity and P&L balances are **not** carried over: the legacy books were periodic with no inventory, so they do not reconcile with a perpetual-inventory balance sheet.
 
 ## 8. Worked example

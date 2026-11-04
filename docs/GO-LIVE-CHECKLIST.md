@@ -9,7 +9,12 @@ Open items that must be settled before, or soon after, go-live. Each line names 
 - [ ] **Credit limits:** migrated credit customers start with no limit (D-085). Set limits from the `parties/credit-customers.csv` report.
 - [ ] **Mechanic tier:** mark which customers are mechanics (`partyTiers` in `tools/legacy-import/mapping/delux.json`) and re-run the import (W0-13 owner review).
 - [ ] **Bill header:** the legacy database has only the shop name. Give the real address, phone and other header lines; until then the receipt uses placeholder lines (W0-13 owner review).
-- [ ] **The 2026 dump:** a current dump in its own folder under `sql_dump/`, before the rehearsals (PRD Q11, W0-12).
+- [ ] **The 2026 dump:** a current dump in its own folder under `sql_dump/`, before the rehearsals (PRD Q11, W0-12). Then re-run rehearsal 1 on it: `legacy:stage`, `legacy:import`, `legacy:opening` (W1-14 owner answer 2).
+- [ ] **Legacy stock document types:** confirm the signs in `opening.docTypes` of `tools/legacy-import/mapping/delux.json` (proposed from the names in rehearsal 1), and which quantity is right for the items in `reports/opening/quantity-mismatch.csv` (W1-14).
+- [ ] **The pilot opening (by ~28 Nov):** a dump taken after a day close in the last days of November, its masters and opening loaded into production over an SSH tunnel, `posting-check prod delux` (W1-14 owner answers 2, 3).
+- [ ] **The legacy report totals** on each dump day: Closing Stock quantity and value, Customer and Supplier Outstanding into `legacy-totals.json` (W1-14 owner answer 4).
+- [ ] **Top 20 customer and supplier balances signed off** from the reconciliation report (migration doc §8).
+- [ ] **The final run (31 Dec, after the legacy day close):** every counter's outbox at 0 on the device health page; a production backup; `ssh -t … sudo erp-tenant wipe-pilot prod delux`; clear each pilot counter's site data and enrol it again; stage, import and `legacy:opening --post` the final dump with the counted drawer and bank statements; the reconciliation signed; `sudo erp-tenant go-live prod delux 2026-12-31`; `posting-check prod delux` (D-101). Rehearse it in rehearsal 2 (~22 Dec) on a copy of production.
 
 - [ ] **Bill print test at the shop** (speed and barcode scan) by mid-November, with real bills once checkout exists (W1-01, deferred; the printer is an HP LaserJet P1005, so lower risk than the dot-matrix assumption).
 
