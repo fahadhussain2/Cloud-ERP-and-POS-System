@@ -218,3 +218,162 @@ export function lastPurchases(
     [...latest].map(([itemId, p]) => ({ itemId, cost: p.cost, supplierCode: p.supplier, date: p.date })),
   );
 }
+
+export interface CompareClosingInput {
+  asOf: string;
+  docTypes: DocTypes;
+  openings: ClosingStockInput['openings'];
+  /** The purchase, sale, return and physical-stock document lines. */
+  lines: ClosingStockInput['movements'];
+  /** The INV_StockRecordTAB rows as movements (their own Quantity and type). */
+  records: ClosingStockInput['movements'];
+  /** Each item's latest running balance (latestStockRecords). */
+  running: { itemId: string; qty: number }[];
+  /** The legacy Item Wise Closing Stock report, as the owner ran it for the dump day. */
+  legacy: { itemId: string; qty: string }[];
+}
+
+export interface CompareClosingRow {
+  itemId: string;
+  legacy: number | null;
+  computed: number | null;
+  records: number | null;
+  running: number | null;
+  opening: number | null;
+  matches: ('records' | 'running')[];
+  byType: { docType: string; lines: number; records: number }[];
+}
+
+/**
+ * Our closing stock against the legacy Closing Stock report (W1-14 rehearsal 2): which figure the report shows and,
+ * per document type, where the document lines and the stock-record lines disagree. Quantities in thousandths.
+ */
+export function compareClosing(input: CompareClosingInput): {
+  counts: {
+    legacyItems: number;
+    same: number;
+    differ: number;
+    matchRecords: number;
+    matchRunning: number;
+    none: number;
+    notInReport: number;
+    notOurs: number;
+  };
+  totals: { legacy: number; computed: number; records: number };
+  rows: CompareClosingRow[];
+} {
+  const legacy = new Map<string, number>();
+  for (const l of input.legacy) {
+    const id = l.itemId.trim();
+    legacy.set(id, (legacy.get(id) ?? 0) + qtyOf(l.qty));
+  }
+  const toMap = (rows: { itemId: string; qty: number }[]) => new Map(rows.map((r) => [r.itemId, r.qty]));
+  const computed = toMap(closingStock({ ...input, movements: input.lines }));
+  const records = toMap(closingStock({ ...input, movements: input.records }));
+  const running = toMap(input.running.map((r) => ({ itemId: r.itemId.trim(), qty: r.qty })));
+  const openings = new Map<string, number>();
+  for (const o of input.openings) {
+    const id = o.itemId.trim();
+    openings.set(id, (openings.get(id) ?? 0) + qtyOf(o.qty));
+  }
+  // Per item and document type: the signed sum from the document lines and from the stock records.
+  const types = new Map<string, Map<string, { lines: number; records: number }>>();
+  const addType = (rows: CompareClosingInput['lines'], key: 'lines' | 'records') => {
+    for (const m of rows) {
+      if (dayOf(m.date) > input.asOf) continue;
+      const id = m.itemId.trim();
+      const t = m.docType.trim();
+      const byType = types.get(id) ?? new Map<string, { lines: number; records: number }>();
+      const v = byType.get(t) ?? { lines: 0, records: 0 };
+      v[key] += signOf(input.docTypes, t) * qtyOf(m.qty);
+      byType.set(t, v);
+      types.set(id, byType);
+    }
+  };
+  addType(input.lines, 'lines');
+  addType(input.records, 'records');
+
+  const ours = new Set([...computed.keys(), ...records.keys(), ...running.keys()]);
+  const counts = {
+    legacyItems: legacy.size,
+    same: 0,
+    differ: 0,
+    matchRecords: 0,
+    matchRunning: 0,
+    none: 0,
+    notInReport: 0,
+    notOurs: 0,
+  };
+  const totals = { legacy: 0, computed: 0, records: 0 };
+  for (const q of legacy.values()) totals.legacy += q;
+  for (const q of computed.values()) totals.computed += q;
+  for (const q of records.values()) totals.records += q;
+  const rows: CompareClosingRow[] = [];
+  for (const id of [...new Set([...ours, ...legacy.keys()])].sort()) {
+    const l = legacy.get(id) ?? null;
+    if (!ours.has(id)) {
+      counts.differ += 1;
+      counts.notOurs += 1;
+      rows.push({
+        itemId: id,
+        legacy: l,
+        computed: null,
+        records: null,
+        running: null,
+        opening: null,
+        matches: [],
+        byType: [],
+      });
+      continue;
+    }
+    const c = computed.get(id) ?? 0;
+    if (l === null) {
+      if (c === 0) continue;
+      counts.notInReport += 1;
+    } else if (l === c) {
+      counts.same += 1;
+      continue;
+    } else counts.differ += 1;
+    const rec = records.get(id) ?? 0;
+    const run = running.get(id) ?? null;
+    const matches: CompareClosingRow['matches'] = [];
+    if (l !== null) {
+      if (l === rec) matches.push('records');
+      if (l === run) matches.push('running');
+      if (matches.includes('records')) counts.matchRecords += 1;
+      else if (matches.includes('running')) counts.matchRunning += 1;
+      else counts.none += 1;
+    }
+    rows.push({
+      itemId: id,
+      legacy: l,
+      computed: c,
+      records: rec,
+      running: run,
+      opening: openings.get(id) ?? 0,
+      matches,
+      byType: [...(types.get(id) ?? new Map<string, { lines: number; records: number }>())]
+        .filter(([, v]) => v.lines !== v.records)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([docType, v]) => ({ docType, ...v })),
+    });
+  }
+  return { counts, totals, rows };
+}
+
+export interface OpeningMovementsInput {
+  /** The INV_StockRecordTAB rows as movements (their own Quantity and document type). */
+  records: ClosingStockInput['movements'];
+  /** The physical-stock count lines, with their signed quantities (a shortage is negative). */
+  physical: ClosingStockInput['movements'];
+}
+
+/**
+ * The movements the opening's closing stock counts (D-102, §4.1), as the legacy Closing Stock report does: the stock
+ * records, except physical-stock counts, whose records lose a shortage's sign, so those come from the count lines.
+ * Sale lines are never used: legacy stores their quantities negative.
+ */
+export function openingMovements(input: OpeningMovementsInput): ClosingStockInput['movements'] {
+  const counted = new Set(input.physical.map((m) => m.docType.trim()));
+  return [...input.records.filter((m) => !counted.has(m.docType.trim())), ...input.physical];
+}

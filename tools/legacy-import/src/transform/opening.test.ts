@@ -1,20 +1,26 @@
+import compareClosingCases from '../../golden/transform/compare-closing.json';
 import closingStockCases from '../../golden/transform/closing-stock.json';
 import lastPurchaseCases from '../../golden/transform/last-purchases.json';
 import legacyQtyCases from '../../golden/transform/legacy-qty.json';
+import openingMovementCases from '../../golden/transform/opening-movements.json';
 import openingCostCases from '../../golden/transform/opening-cost.json';
 import partyBalanceCases from '../../golden/transform/party-balances.json';
 import stockRecordCases from '../../golden/transform/stock-records.json';
 import { runGolden, type GoldenFile } from '../testing/golden';
 import {
   closingStock,
+  compareClosing,
   lastPurchases,
   latestStockRecords,
   legacyQty,
   openingCost,
+  openingMovements,
   partyBalances,
   type ClosingStockInput,
+  type CompareClosingInput,
   type LastPurchasesInput,
   type OpeningCostInput,
+  type OpeningMovementsInput,
   type PartyBalancesInput,
   type StockRecordsInput,
 } from './opening';
@@ -29,3 +35,5 @@ runGolden(stockRecordCases as GoldenFile<StockRecordsInput>, latestStockRecords)
 runGolden(openingCostCases as GoldenFile<OpeningCostInput>, openingCost);
 runGolden(partyBalanceCases as GoldenFile<PartyBalancesInput>, partyBalances);
 runGolden(lastPurchaseCases as GoldenFile<LastPurchasesInput>, lastPurchases);
+runGolden(compareClosingCases as GoldenFile<CompareClosingInput>, compareClosing);
+runGolden(openingMovementCases as GoldenFile<OpeningMovementsInput>, openingMovements);

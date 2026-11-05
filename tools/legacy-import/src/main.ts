@@ -92,6 +92,7 @@ try {
       post: o.post,
       inputs: (await optional<OpeningInputs>('opening-inputs.json')) ?? {},
       legacyTotals: await optional<LegacyTotals>('legacy-totals.json'),
+      legacyClosing: await legacyClosingOf(resolve(labelDir, 'legacy-closing.csv')),
       now: new Date(),
     });
     // An unmapped document type stops the run, but its report is written first, to decide the signs from.
@@ -109,6 +110,15 @@ try {
     console.info(`stock      ${t.stockLines} items, value ${rs(t.stockValue)}, ${t.noCost} without a cost`);
     console.info(`customers  ${t.customers}, total ${rs(t.customerTotal)}`);
     console.info(`suppliers  ${t.suppliers}, total ${rs(t.supplierTotal)}`);
+    const cc = result.closingCompare;
+    if (cc)
+      console.info(
+        `legacy report: ${Object.entries(cc.counts)
+          .map(([k, v]) => `${k} ${v}`)
+          .join(
+            ', ',
+          )}; totals legacy ${cc.totals.legacy / 1000}, computed ${cc.totals.computed / 1000}, records ${cc.totals.records / 1000}`,
+      );
     for (const c of result.checks) console.info(`${c.status.padEnd(8)} ${c.check}`);
     console.info(`took ${((Date.now() - started) / 1000).toFixed(1)} s. reconciliation: ${page}`);
   } else {
@@ -137,4 +147,27 @@ try {
   // DumpError messages name files, lines and columns, never values.
   console.error(`legacy-import: ${err instanceof DumpError ? err.message : (err as Error).message}`);
   process.exit(1);
+}
+
+/** legacy-closing.csv (item,qty): the legacy Item Wise Closing Stock report per item, for the dump day; optional. */
+async function legacyClosingOf(path: string): Promise<{ itemId: string; qty: string }[] | null> {
+  let text: string;
+  try {
+    text = await readFile(path, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw err;
+  }
+  const [header, ...lines] = text
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .filter((l) => l.trim() !== '');
+  const cols = (header ?? '').split(',').map((c) => c.trim().toLowerCase());
+  const item = cols.indexOf('item');
+  const qty = cols.indexOf('qty');
+  if (item < 0 || qty < 0) throw new Error('legacy-closing.csv needs the columns item and qty');
+  return lines.map((l) => {
+    const c = l.split(',');
+    return { itemId: (c[item] ?? '').trim(), qty: (c[qty] ?? '').trim() };
+  });
 }

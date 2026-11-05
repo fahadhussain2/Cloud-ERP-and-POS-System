@@ -115,6 +115,20 @@ About 2½ minutes end to end (rehearsal 2's limit: 1 hour). Reconciliation: item
 
 **Open: the stock quantity.** For **6,770 items** the computed closing stock (opening quantity ± purchase, sale, return and physical-stock lines) is higher than the legacy running balance in `INV_StockRecordTAB`, typically by 2 to 11 units; the running balance is negative for 3,930 items, while the migration doc expected 15 negative items. The sum of the stock records' own quantities agrees with neither consistently. Which figure the legacy Closing Stock report shows decides the rule: the owner reads a few items (e.g. ABEA003, ABEA004, ABEA008) off the legacy Closing Stock report for this dump's date, and the signs in `opening.docTypes` are confirmed. Until then the opening's quantities are not to be trusted; costs and party balances are.
 
+## Rehearsal 2 (2026-11-05, this PC, `nov2026`)
+
+The 2026 dump (`sql_dump/DLX_Inventory_2026`: period 07-2026, documents 1 Jul to 5 Nov 2026, 175,366 rows) into a fresh `erp_rehearsal2`, dry run, against the owner's Item Wise Closing Stock report as on 05/11/2026 (858 pages, 45,224.50 units, Rs 45,266,175.84), extracted per item into `out/nov2026/legacy-closing.csv` (git-ignored):
+
+| Rule | Units | Items equal to the report |
+|---|--:|--:|
+| Item opening ± document lines (rehearsal 1) | 130,334.5 | 14,205 |
+| Item opening ± stock records | 45,400.5 | 20,118 |
+| **Stock records, physical counts from the count sheet (D-102)** | **45,224.5** | **20,163 (all)** |
+
+- Legacy stores sale-line quantities negative, so the document-line rule added every sale; that explains rehearsal 1's open item.
+- The 45 items the stock records missed all had a counted shortage, which the stock record stores as a positive quantity.
+- **Open: the stock value.** Rs 45,654,495.69 at our cost (the latest valuation rate) against the report's Rs 45,266,175.84 at its "Average Rate" (0.9% higher). Per item: 15,115 same rate; 81 where the report's rate is 0 (+Rs 306,224); 865 with another rate (net +Rs 82,102). Checked with the owner: LAMI001 (report 0, ours 7,800) was bought 8 times in 2026 at 7,500–7,800, so the report fails to average it (a legacy bug); CLCD022 (report 8,000, ours 3,000, Retail 3,950) has no 2026 purchase and `OpeningRate` 8,000 against `CostPrice` 3,000 (a typing error in legacy). Our cost was right in both. Next (a follow-up PR): classify the 865 by which legacy rate the report's equals, for the owner to review only what that leaves.
+
 ## Checks (2026-11-04)
 
 - `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`: pass.

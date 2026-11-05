@@ -7,12 +7,15 @@ import { DumpError } from './errors';
 import type { Mapping } from './transform/mapping';
 import {
   closingStock,
+  compareClosing,
   lastPurchases,
   latestStockRecords,
   legacyQty,
   openingCost,
+  openingMovements,
   partyBalances,
   type ClosingStockInput,
+  type CompareClosingRow,
   type LastPurchasesInput,
   type PartyBalancesInput,
   type StockRecordsInput,
@@ -52,6 +55,8 @@ export interface OpeningOptions {
   post: boolean;
   inputs: OpeningInputs;
   legacyTotals: LegacyTotals | null;
+  /** The legacy Item Wise Closing Stock report for the dump day, per item (legacy-closing.csv), or null. */
+  legacyClosing: { itemId: string; qty: string }[] | null;
   now: Date;
 }
 
@@ -61,6 +66,15 @@ export interface DocTypeCount {
   name: string | null;
   rows: number;
   sign: number | null;
+}
+
+export interface PeriodRange {
+  /** 'period' = a row of Admin_Period; otherwise the staged table. */
+  source: string;
+  name: string | null;
+  from: string | null;
+  to: string | null;
+  rows: number;
 }
 
 export interface ReconciliationCheck {
@@ -88,6 +102,14 @@ export interface OpeningResult {
     supplierTotal: number;
   };
   docTypes: DocTypeCount[];
+  /** The legacy periods in the dump and each stock table's date range (dates only, no values). */
+  periods: PeriodRange[];
+  /** Per item against the legacy Closing Stock report, when legacy-closing.csv is given. */
+  closingCompare: {
+    counts: Record<string, number>;
+    totals: { legacy: number; computed: number; records: number };
+    rows: CompareClosingRow[];
+  } | null;
   checks: ReconciliationCheck[];
   /** For the report files only (party names and amounts stay on this PC, D-085). */
   detail: {
@@ -148,6 +170,7 @@ interface Staged {
   glLines: PartyBalancesInput['lines'];
   docTypeNames: Map<string, string>;
   stockRecordTypes: Map<string, number>;
+  periods: PeriodRange[];
 }
 
 async function readStaging(url: string, label: string): Promise<Staged> {
@@ -235,7 +258,34 @@ async function readStaging(url: string, label: string): Promise<Staged> {
       date: r.date,
       qty: r.quantity,
     }));
-    return { items, movements, stockRecords, recordMoves, glLines, docTypeNames, stockRecordTypes };
+    const periods: PeriodRange[] = [];
+    if (present.has('admin_period'))
+      for (const r of await q(
+        `SELECT period, startdate, enddate FROM ${schema}.admin_period ORDER BY startdate, periodid`,
+      ))
+        periods.push({
+          source: 'period',
+          name: r['period'] ?? null,
+          from: r['startdate'] ?? null,
+          to: r['enddate'] ?? null,
+          rows: 0,
+        });
+    // Staged datetimes are ISO-like text, so min and max sort as dates.
+    for (const t of [STAGED.purchases, STAGED.sales, STAGED.counts, STAGED.stockRecords, STAGED.gl]) {
+      const r = (
+        await q(
+          `SELECT min(documentdate) AS f, max(documentdate) AS t, count(*)::text AS n FROM ${schema}.${t}`,
+        )
+      )[0];
+      periods.push({
+        source: t,
+        name: null,
+        from: r?.['f'] ?? null,
+        to: r?.['t'] ?? null,
+        rows: Number(r?.['n'] ?? 0),
+      });
+    }
+    return { items, movements, stockRecords, recordMoves, glLines, docTypeNames, stockRecordTypes, periods };
   } finally {
     await c.end();
   }
@@ -291,12 +341,17 @@ export async function importOpening(opts: OpeningOptions): Promise<OpeningResult
   const docTypes = docTypesOf(staged, m);
 
   // The legacy figures (migration doc §4.1, §4.2, §5). An unmapped document type stops here, after the report.
-  const stockMoves = staged.movements.map((mv) => ({
+  // Closing stock as the legacy report computes it (D-102): the stock records, physical counts from the count lines.
+  const lineMoves = staged.movements.map((mv) => ({
     itemId: mv.itemId,
     docType: mv.docType,
     date: mv.date,
     qty: mv.qty,
   }));
+  const stockMoves = openingMovements({
+    records: staged.recordMoves,
+    physical: lineMoves.filter((_, i) => staged.movements[i]!.source === 'physical'),
+  });
   const closingInput: ClosingStockInput = {
     asOf: opts.asOf,
     docTypes: m.opening.docTypes,
@@ -323,6 +378,8 @@ export async function importOpening(opts: OpeningOptions): Promise<OpeningResult
       supplierTotal: 0,
     },
     docTypes,
+    periods: staged.periods,
+    closingCompare: null,
     checks: [],
     detail: {
       negative: [],
@@ -623,6 +680,22 @@ export async function importOpening(opts: OpeningOptions): Promise<OpeningResult
     }).catch((err: unknown) => {
       if (!(err instanceof DryRun)) throw err;
     });
+    if (opts.legacyClosing) {
+      const cmp = compareClosing({
+        ...closingInput,
+        lines: stockMoves,
+        records: staged.recordMoves,
+        running: [...records.values()].map((x) => ({ itemId: x.itemId, qty: x.runningQty })),
+        legacy: opts.legacyClosing,
+      });
+      result.closingCompare = cmp;
+      result.checks.push({
+        check: 'Stock per item = legacy Closing Stock report',
+        ours: `${cmp.counts.same} same, ${cmp.counts.differ} differ, ${cmp.counts.notInReport} not in the report`,
+        legacy: `${cmp.counts.legacyItems} items`,
+        status: cmp.counts.differ + cmp.counts.notInReport === 0 ? 'pass' : 'differs',
+      });
+    }
     return result;
   } finally {
     await pool.end();

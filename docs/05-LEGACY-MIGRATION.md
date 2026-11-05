@@ -125,12 +125,12 @@ Expense accounts used for cash-out at the desk become `expense_categories` (PRD 
 ## 4. Opening balances (as of close of business 31 Dec 2026)
 
 ### 4.1 Stock quantity and cost
-- **Quantity** per item = legacy closing stock as of 31 Dec 2026, computed the same way as the legacy `fn_INV_ClosingStock`: opening quantity + Σ purchase lines − Σ sale lines ± returns ± physical-stock adjustments within the period database. It is cross-checked against the legacy "Closing Stock" report total.
+- **Quantity** per item = legacy closing stock as of 31 Dec 2026, as the legacy Closing Stock report computes it (D-102): `INV_Item.OpeningQuantity` ± the `INV_StockRecordTAB` rows up to the cutoff, with physical-stock counts taken from the count sheet's signed lines. Sale lines are not summed (legacy stores their quantities negative). It is compared **per item** with the legacy Item Wise Closing Stock report on the dump day (rehearsal 2: all 20,163 items matched).
 - All of it goes into **SHOP**. Legacy has no godown split (PRD Q9: the godown is counted and transferred in January).
 - **Average cost** = the latest `INV_StockRecordTAB.ValuationRate` on or before the cutover (this mirrors legacy `fn_GetValuationRate`). Fallback: `INV_Item.CostPrice`, then `OpeningRate`. Items with no cost → flagged and valued at 0 until fixed.
 - **Negative quantities** (15 items in the Dec 2025 copy) → loaded as negative and listed for the first January cycle counts.
 - It is posted as an opening stock movement plus `Dr INVENTORY` in the opening entry.
-- **As built (W1-14, D-101):** the document types and their signs are in `opening.docTypes` of the mapping file (Dec 2025: 21 Purchase +, 32 Purchase return −, 31 Sale −, 22 Sale return +, 11 Physical stock + with signed quantities, proposed from the names and to be confirmed). Two cross-checks are reported per item: the legacy running balance (the latest `INV_StockRecordTAB.StockQuantity`) and the sum of the stock records' own quantities.
+- **As built (W1-14, D-101):** the document types and their signs are in `opening.docTypes` of the mapping file (Dec 2025: 21 Purchase +, 32 Purchase return −, 31 Sale −, 22 Sale return +, 11 Physical stock + with signed quantities, proposed from the names and to be confirmed). Two cross-checks are reported per item: the legacy running balance (the latest `INV_StockRecordTAB.StockQuantity`) and the sum of the stock records' own quantities. With `out/<label>/legacy-closing.csv` (item, qty, from the legacy report) the run also writes `closing-compare.csv`, and `periods.csv` gives the legacy period and each stock table's first and last date.
 
 ### 4.2 Customer and supplier balances
 - Balance per party = Σ (`AmountDR − AmountCR`) on GL lines for the control account (`10-03-0001` customers, `20-02-0001` suppliers) **grouped by `SubAccountCode`** (= party ID), including the legacy opening-balance voucher (doctype 10).
