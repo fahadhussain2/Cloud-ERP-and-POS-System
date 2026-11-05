@@ -106,9 +106,13 @@ export function App({ counter }: { counter: Counter }) {
         void counter.log('sync.revoked', {});
         setPhase({ name: 'revoked' });
       }
+      // An answer that arrives after the browser said offline was sent before it: it doesn't make the counter
+      // online (e2e 2026-11-05); the reconnect retry does, once the network is back.
       setConnection((c) =>
         r.ok
-          ? { state: 'online', offlineSince: null }
+          ? c.state === 'offline' && !navigator.onLine
+            ? c
+            : { state: 'online', offlineSince: null }
           : r.reason === 'refused' || r.reason === 'revoked'
             ? { state: 'refused', offlineSince: null }
             : { state: 'offline', offlineSince: c.offlineSince ?? new Date() },

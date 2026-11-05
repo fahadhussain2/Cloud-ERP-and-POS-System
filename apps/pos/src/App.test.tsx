@@ -410,6 +410,46 @@ describe('counter screens', () => {
     expect(f.calls.filter((c) => c === 'pull').length).toBe(pulls);
   });
 
+  // Bug (e2e, 2026-11-05): a pull that started online and answered after the browser went offline showed online
+  // again, so the cash desk hid "the queue is not updating" until the next pull, up to a minute later.
+  it('stays offline when an answer started before the network went arrives after it', async () => {
+    let answer: (r: { ok: true; rows: number }) => void = () => undefined;
+    let pulls = 0;
+    const f = fakeCounter({
+      pull: () =>
+        ++pulls === 1
+          ? Promise.resolve({ ok: true, rows: 0 })
+          : new Promise((resolve) => {
+              answer = resolve;
+            }),
+    });
+    show(f.counter);
+    expect(await screen.findByText(en.status.online)).toBeDefined();
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    vi.useFakeTimers();
+    try {
+      // A pull starts (the reconnect retry) and is still on its way when the network goes.
+      await act(async () => {
+        window.dispatchEvent(new Event('online'));
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(pulls).toBe(2);
+      onLine.mockReturnValue(false);
+      act(() => {
+        window.dispatchEvent(new Event('offline'));
+      });
+      expect(screen.getByText(/^Offline since/)).toBeDefined();
+      await act(async () => {
+        answer({ ok: true, rows: 0 });
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByText(/^Offline since/)).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+      onLine.mockRestore();
+    }
+  });
+
   it('when the network comes back, retries the pull until one succeeds and shows online', async () => {
     let online = false;
     const f = fakeCounter({
