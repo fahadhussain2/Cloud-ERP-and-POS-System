@@ -174,5 +174,7 @@ export interface CatalogLookups {
   suppliers: { id: string; code: string; name: string }[];
   /** The shop is marked live (D-101); until then the final import overwrites the catalog (owner answer 1). */
   live: boolean;
+  /** How the shop writes money (CLAUDE.md rule 10). */
+  money: { locale: string; currency: string; minorUnits: number };
   can: { editItems: boolean; editPrices: boolean; viewCost: boolean };
 }

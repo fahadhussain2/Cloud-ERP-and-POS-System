@@ -27,6 +27,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHook
 import type pg from 'pg';
 
 import { requireAnyPermission, requirePermission } from '../auth/routes';
+import { moneyOf } from '../reports/routes';
 
 // Catalog maintenance in the back office (W1-15 plan; CAT-01…CAT-05, CAT-07). Reading needs cat.item.edit or
 // cat.price.edit; details, codes, vehicles and new items need cat.item.edit; prices, floors and the category margin
@@ -696,6 +697,7 @@ export function registerCatalog(scope: FastifyInstance, { pool, now, requireAuth
            WHERE p.deleted_at IS NULL ORDER BY lower(p.name)`,
         ),
         live: live === true,
+        money: await moneyOf(c),
         can: {
           editItems: allowed(req, 'cat.item.edit'),
           editPrices: allowed(req, 'cat.price.edit'),

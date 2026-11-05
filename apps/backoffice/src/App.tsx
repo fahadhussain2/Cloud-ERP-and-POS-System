@@ -3,6 +3,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from './api';
+import { CategoriesScreen } from './catalog/CategoriesScreen';
+import { ItemScreen } from './catalog/ItemScreen';
+import { ItemsScreen } from './catalog/ItemsScreen';
+import { NewItemScreen } from './catalog/NewItemScreen';
 import { allowed, MENU, Shell } from './layout/Shell';
 import { useRoute, type Route } from './router';
 import { CountersScreen } from './screens/CountersScreen';
@@ -77,6 +81,14 @@ export function App({ api }: { api: Api }) {
         <DayReconciliationScreen api={api} permissions={me.permissions} />
       ) : shown.screen === 'cashVariance' ? (
         <CashVarianceScreen api={api} />
+      ) : shown.screen === 'items' ? (
+        <ItemsScreen api={api} />
+      ) : shown.screen === 'item' ? (
+        <ItemScreen key={shown.id} api={api} id={shown.id} />
+      ) : shown.screen === 'newItem' ? (
+        <NewItemScreen api={api} />
+      ) : shown.screen === 'categories' ? (
+        <CategoriesScreen api={api} />
       ) : (
         <StaffScreen api={api} permissions={me.permissions} />
       )}
