@@ -11,6 +11,8 @@ The architecture (§5) sets the principles. This spec fixes the contracts precis
 
 - Only an **enrolled, active device** with a valid device token (`Authorization: Device <tenantId>.<token>`, D-082). Revoking a device deletes its tokens, so its next call is a plain `401`; when it asks for a new token, the challenge answers **`401 { error: 'device_revoked' }`** (platform spec §2) and the counter stops with its bills kept (POS spec §4).
 - **Re-enable** (owner answer 3 to W1-07): a manager with `admin.devices` re-enables a revoked counter in the back office; it gets tokens again and pushes its waiting bills. The revocation is kept (`devices.last_revoked_at`, `reenabled_at`), and a document **created between the two** is accepted with a `revoked_device_doc` exception (§6.2).
+- The challenge and token calls are limited to 30 a minute **per device**, not per IP: a shop's counters and cash desk share one public IP, and a 429 reads as offline on the counter (fix of 2026-11-05).
+- **Offline wins over a late answer:** an answer that arrives after the browser said offline does not show the counter online; the reconnect retry does (fix of 2026-11-05).
 - Every query runs inside `withTenant` with the device's tenant (RLS, rule 5). Branch-scoped datasets are also filtered to the device's branch.
 
 ## 2. Pull

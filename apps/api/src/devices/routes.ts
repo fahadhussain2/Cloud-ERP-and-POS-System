@@ -32,6 +32,22 @@ export const ENROLL_FAILURES_PER_SHOP = 10;
 // Crockford base32: no I, L, O or U, so codes can't be misread.
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
+/**
+ * The challenge and token limit, per device rather than per IP: a shop's counters and cash desk share one public IP,
+ * so a per-IP limit let one busy counter (or every counter reconnecting after a power cut) lock out the others with
+ * 429, which a counter reads as offline. The device ID is in the body, so the limit runs once it is parsed; a body
+ * without one falls back to the IP.
+ */
+const PER_DEVICE = {
+  max: 30,
+  timeWindow: '1 minute',
+  hook: 'preHandler' as const,
+  keyGenerator: (req: { ip: string; body?: unknown }) => {
+    const id = (req.body as { deviceId?: unknown } | undefined)?.deviceId;
+    return typeof id === 'string' && id.length > 0 && id.length <= 64 ? `device:${id}` : `ip:${req.ip}`;
+  },
+};
+
 export interface DeviceContext {
   tenantId: string;
   deviceId: string;
@@ -238,69 +254,60 @@ export function registerDevices(scope: FastifyInstance, { pool, now, requireAuth
     },
   );
 
-  scope.post(
-    '/devices/challenge',
-    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
-    async (req, reply) => {
-      const body = ChallengeRequest.safeParse(req.body);
-      if (!body.success) return reply.code(400).send({ error: 'invalid_request' });
-      const { tenantId, deviceId } = body.data;
-      const t = now();
-      const nonce = toBase64Url(randomBytes(32));
-      const outcome = await withTenant(pool, { tenantId, requestId: req.id }, async (_db, c) => {
-        const d = await c.query<{ status: string }>(
-          'SELECT status FROM erp.devices WHERE id = $1 AND deleted_at IS NULL',
-          [deviceId],
-        );
-        const status = d.rows[0]?.status;
-        // A revoked counter is told so, so it can keep its unsynced bills and call a manager (sync spec §1, W1-07).
-        if (status !== 'active') return status === 'revoked' ? 'revoked' : 'refused';
-        await c.query(
-          'INSERT INTO erp.device_challenges (tenant_id, device_id, nonce_hash, expires_at) VALUES ($1, $2, $3, $4)',
-          [tenantId, deviceId, hashToken(nonce), new Date(t.getTime() + CHALLENGE_MS)],
-        );
-        return 'ok';
-      });
-      if (outcome === 'revoked') return reply.code(401).send({ error: 'device_revoked' });
-      if (outcome !== 'ok') return reply.code(401).send({ error: 'device_refused' });
-      return { nonce };
-    },
-  );
+  scope.post('/devices/challenge', { config: { rateLimit: PER_DEVICE } }, async (req, reply) => {
+    const body = ChallengeRequest.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'invalid_request' });
+    const { tenantId, deviceId } = body.data;
+    const t = now();
+    const nonce = toBase64Url(randomBytes(32));
+    const outcome = await withTenant(pool, { tenantId, requestId: req.id }, async (_db, c) => {
+      const d = await c.query<{ status: string }>(
+        'SELECT status FROM erp.devices WHERE id = $1 AND deleted_at IS NULL',
+        [deviceId],
+      );
+      const status = d.rows[0]?.status;
+      // A revoked counter is told so, so it can keep its unsynced bills and call a manager (sync spec §1, W1-07).
+      if (status !== 'active') return status === 'revoked' ? 'revoked' : 'refused';
+      await c.query(
+        'INSERT INTO erp.device_challenges (tenant_id, device_id, nonce_hash, expires_at) VALUES ($1, $2, $3, $4)',
+        [tenantId, deviceId, hashToken(nonce), new Date(t.getTime() + CHALLENGE_MS)],
+      );
+      return 'ok';
+    });
+    if (outcome === 'revoked') return reply.code(401).send({ error: 'device_revoked' });
+    if (outcome !== 'ok') return reply.code(401).send({ error: 'device_refused' });
+    return { nonce };
+  });
 
-  scope.post(
-    '/devices/token',
-    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
-    async (req, reply) => {
-      const body = TokenRequest.safeParse(req.body);
-      if (!body.success) return reply.code(400).send({ error: 'invalid_request' });
-      const { tenantId, deviceId, nonce, signature } = body.data;
-      const t = now();
-      const token = toBase64Url(randomBytes(32));
-      const expiresAt = new Date(t.getTime() + DEVICE_TOKEN_MS);
-      const ok = await withTenant(pool, { tenantId, requestId: req.id }, async (_db, c) => {
-        // The nonce is used up whatever happens next: one try per challenge.
-        const ch = await c.query<{ public_key: Buffer }>(
-          `UPDATE erp.device_challenges ch SET used_at = $1
+  scope.post('/devices/token', { config: { rateLimit: PER_DEVICE } }, async (req, reply) => {
+    const body = TokenRequest.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'invalid_request' });
+    const { tenantId, deviceId, nonce, signature } = body.data;
+    const t = now();
+    const token = toBase64Url(randomBytes(32));
+    const expiresAt = new Date(t.getTime() + DEVICE_TOKEN_MS);
+    const ok = await withTenant(pool, { tenantId, requestId: req.id }, async (_db, c) => {
+      // The nonce is used up whatever happens next: one try per challenge.
+      const ch = await c.query<{ public_key: Buffer }>(
+        `UPDATE erp.device_challenges ch SET used_at = $1
          FROM erp.devices d
          WHERE ch.nonce_hash = $2 AND ch.device_id = $3 AND ch.used_at IS NULL AND ch.expires_at > $1
            AND d.tenant_id = ch.tenant_id AND d.id = ch.device_id AND d.status = 'active' AND d.deleted_at IS NULL
          RETURNING d.public_key`,
-          [t, hashToken(nonce), deviceId],
-        );
-        const key = ch.rows[0]?.public_key;
-        if (!key) return false;
-        if (!(await verifyCanonical(toBase64Url(key), { tenantId, deviceId, nonce }, signature)))
-          return false;
-        await c.query(
-          'INSERT INTO erp.device_tokens (tenant_id, device_id, token_hash, created_at, expires_at) VALUES ($1, $2, $3, $4, $5)',
-          [tenantId, deviceId, hashToken(token), t, expiresAt],
-        );
-        return true;
-      });
-      if (!ok) return reply.code(401).send({ error: 'device_refused' });
-      return { accessToken: `${tenantId}.${token}`, expiresAt: expiresAt.toISOString() };
-    },
-  );
+        [t, hashToken(nonce), deviceId],
+      );
+      const key = ch.rows[0]?.public_key;
+      if (!key) return false;
+      if (!(await verifyCanonical(toBase64Url(key), { tenantId, deviceId, nonce }, signature))) return false;
+      await c.query(
+        'INSERT INTO erp.device_tokens (tenant_id, device_id, token_hash, created_at, expires_at) VALUES ($1, $2, $3, $4, $5)',
+        [tenantId, deviceId, hashToken(token), t, expiresAt],
+      );
+      return true;
+    });
+    if (!ok) return reply.code(401).send({ error: 'device_refused' });
+    return { accessToken: `${tenantId}.${token}`, expiresAt: expiresAt.toISOString() };
+  });
 
   scope.get('/devices/me', { preHandler: requireDevice }, (req) => req.device);
 
