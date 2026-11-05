@@ -8,6 +8,7 @@ import type { Mapping } from './transform/mapping';
 import {
   closingStock,
   compareClosing,
+  compareCost,
   lastPurchases,
   latestStockRecords,
   legacyQty,
@@ -16,6 +17,8 @@ import {
   partyBalances,
   type ClosingStockInput,
   type CompareClosingRow,
+  type CompareCostInput,
+  type CompareCostRow,
   type LastPurchasesInput,
   type PartyBalancesInput,
   type StockRecordsInput,
@@ -56,7 +59,7 @@ export interface OpeningOptions {
   inputs: OpeningInputs;
   legacyTotals: LegacyTotals | null;
   /** The legacy Item Wise Closing Stock report for the dump day, per item (legacy-closing.csv), or null. */
-  legacyClosing: { itemId: string; qty: string }[] | null;
+  legacyClosing: { itemId: string; qty: string; rate?: string }[] | null;
   now: Date;
 }
 
@@ -109,6 +112,13 @@ export interface OpeningResult {
     counts: Record<string, number>;
     totals: { legacy: number; computed: number; records: number };
     rows: CompareClosingRow[];
+  } | null;
+  /** Per item against the report's Average Rate, when legacy-closing.csv has a rate column. */
+  costCompare: {
+    counts: Record<string, number>;
+    values: { ours: number; report: number };
+    byKind: Record<string, number>;
+    rows: CompareCostRow[];
   } | null;
   checks: ReconciliationCheck[];
   /** For the report files only (party names and amounts stay on this PC, D-085). */
@@ -380,6 +390,7 @@ export async function importOpening(opts: OpeningOptions): Promise<OpeningResult
     docTypes,
     periods: staged.periods,
     closingCompare: null,
+    costCompare: null,
     checks: [],
     detail: {
       negative: [],
@@ -409,6 +420,12 @@ export async function importOpening(opts: OpeningOptions): Promise<OpeningResult
   const fromRecords = new Map(
     closingStock({ ...closingInput, movements: staged.recordMoves }).map((r) => [r.itemId, r.qty]),
   );
+  // The report's Average Rate per item (the first listing of a code), for the cost comparison.
+  const reportRates = new Map<string, string>();
+  for (const l of opts.legacyClosing ?? [])
+    if (l.rate !== undefined && l.rate !== '' && !reportRates.has(l.itemId.trim()))
+      reportRates.set(l.itemId.trim(), l.rate);
+  const costItems: CompareCostInput['items'] = [];
   const records = new Map(
     latestStockRecords({ asOf: opts.asOf, records: staged.stockRecords }).map((r) => [r.itemId, r]),
   );
@@ -535,10 +552,13 @@ export async function importOpening(opts: OpeningOptions): Promise<OpeningResult
           continue;
         }
         if (s.qty < 0) result.detail.negative.push({ code: s.itemId, qty: s.qty });
+        const p = last.get(s.itemId);
         const cost = openingCost({
           valuationRate: record?.valuationRate ?? null,
+          lastPurchase: p?.cost ?? null,
           costPrice: r?.['costprice'],
           openingRate: r?.['openingrate'],
+          retail: retail.get(itemId) ?? null,
         });
         if (cost.unitCost === null) {
           result.detail.noCost.push({ code: s.itemId, qty: s.qty });
@@ -548,7 +568,19 @@ export async function importOpening(opts: OpeningOptions): Promise<OpeningResult
           if (price !== undefined && cost.unitCost > price)
             result.detail.costAboveRetail.push({ code: s.itemId, cost: cost.unitCost, retail: price });
         }
-        const p = last.get(s.itemId);
+        const reportRate = reportRates.get(s.itemId);
+        if (reportRate !== undefined && cost.unitCost !== null)
+          costItems.push({
+            itemId: s.itemId,
+            qty: s.qty,
+            ours: cost.unitCost,
+            source: cost.source ?? '',
+            report: reportRate,
+            costPrice: r?.['costprice'],
+            openingRate: r?.['openingrate'],
+            lastPurchase: p?.cost ?? null,
+            retail: retail.get(itemId) ?? null,
+          });
         lines.push({
           kind: 'stock',
           item_id: itemId,
@@ -689,6 +721,16 @@ export async function importOpening(opts: OpeningOptions): Promise<OpeningResult
         legacy: opts.legacyClosing,
       });
       result.closingCompare = cmp;
+      if (costItems.length > 0) {
+        const cost = compareCost({ items: costItems });
+        result.costCompare = cost;
+        result.checks.push({
+          check: 'Unit cost per item = legacy Closing Stock report (Average Rate)',
+          ours: `${cost.counts.same} same, ${cost.rows.length} differ (${cost.counts.unexplained} unexplained)`,
+          legacy: `${cost.counts.items} items`,
+          status: cost.rows.length === 0 ? 'pass' : 'differs',
+        });
+      }
       result.checks.push({
         check: 'Stock per item = legacy Closing Stock report',
         ours: `${cmp.counts.same} same, ${cmp.counts.differ} differ, ${cmp.counts.notInReport} not in the report`,

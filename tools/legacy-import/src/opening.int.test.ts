@@ -277,13 +277,17 @@ describe('an opening from a staged dump', () => {
 
   it('compares each item with the legacy Closing Stock report and lists the dates in the dump', async () => {
     const r = await importOpening(
-      options({ write: false, legacyClosing: [{ itemId: 'ABEA001', qty: '999.00' }] }),
+      options({ write: false, legacyClosing: [{ itemId: 'ABEA001', qty: '999.00', rate: '1000.00' }] }),
     );
     expect(r.closingCompare?.counts.legacyItems).toBe(1);
     expect(r.closingCompare?.rows.find((x) => x.itemId === 'ABEA001')?.legacy).toBe(999_000);
     expect(r.checks).toContainEqual(
       expect.objectContaining({ check: 'Stock per item = legacy Closing Stock report', status: 'differs' }),
     );
+    // ABEA001's cost is the valuation rate 933.33; the report's 1000 is its last purchase rate.
+    expect(r.costCompare?.rows).toEqual([
+      expect.objectContaining({ itemId: 'ABEA001', ours: 93333, report: 100000, kind: 'last_purchase' }),
+    ]);
     const sales = r.periods.find((p) => p.source === 'inv_saleheader');
     expect(sales?.rows).toBeGreaterThan(0);
     expect(sales?.from).toMatch(/^\d{4}-\d{2}-\d{2}/);
@@ -433,6 +437,7 @@ describe('an opening from a staged dump', () => {
         'quantity-mismatch.csv',
         'periods.csv',
         'closing-compare.csv',
+        'cost-compare.csv',
         'summary.json',
         join('parties', 'top-customers.csv'),
       ]),

@@ -1,39 +1,114 @@
 {
-  "description": "An item's opening cost (migration doc §4.1): the latest valuation rate on or before the cutoff, else INV_Item.CostPrice, else INV_Item.OpeningRate, else none (flagged, valued at 0 until fixed). A rate of 0 or less, or empty, counts as none. Minor units, half away from zero.",
+  "description": "An item's opening cost (D-103, migration doc §4.1): the latest valuation rate on or before the cutoff; else the last purchase rate in the period; else INV_Item.OpeningRate (legacy's carried-forward average, as its Closing Stock report values old stock), unless it is above the Retail price (a typing error); else INV_Item.CostPrice; else the opening rate even above Retail; else none (flagged, valued at 0 until fixed). A rate of 0 or less, or empty, counts as none. Minor units, half away from zero.",
   "cases": [
     {
       "name": "the valuation rate",
-      "input": { "valuationRate": 310000, "costPrice": "3000.00", "openingRate": "2900.00" },
+      "input": {
+        "valuationRate": 310000,
+        "lastPurchase": 300000,
+        "costPrice": "3000.00",
+        "openingRate": "2900.00",
+        "retail": 400000
+      },
       "expected": { "unitCost": 310000, "source": "valuation_rate" }
     },
     {
-      "name": "no valuation rate: the cost price",
-      "input": { "valuationRate": null, "costPrice": "3000.00", "openingRate": "2900.00" },
+      "name": "no valuation rate: the last purchase (LAMI001)",
+      "input": {
+        "valuationRate": 0,
+        "lastPurchase": 780000,
+        "costPrice": "7800",
+        "openingRate": "7500",
+        "retail": 970000
+      },
+      "expected": { "unitCost": 780000, "source": "last_purchase" }
+    },
+    {
+      "name": "old stock, not bought this period: the opening rate (ACCE010)",
+      "input": {
+        "valuationRate": null,
+        "lastPurchase": null,
+        "costPrice": "250.00",
+        "openingRate": "231.25",
+        "retail": 35000
+      },
+      "expected": { "unitCost": 23125, "source": "opening_rate" }
+    },
+    {
+      "name": "an opening rate above Retail is a typing error: the cost price (CLCD022)",
+      "input": {
+        "valuationRate": null,
+        "lastPurchase": null,
+        "costPrice": "3000",
+        "openingRate": "8000",
+        "retail": 395000
+      },
       "expected": { "unitCost": 300000, "source": "cost_price" }
     },
     {
-      "name": "a valuation rate of 0: the cost price",
-      "input": { "valuationRate": 0, "costPrice": "3000.00", "openingRate": null },
+      "name": "an opening rate equal to Retail is still used",
+      "input": {
+        "valuationRate": null,
+        "lastPurchase": null,
+        "costPrice": "900",
+        "openingRate": "1000",
+        "retail": 100000
+      },
+      "expected": { "unitCost": 100000, "source": "opening_rate" }
+    },
+    {
+      "name": "no Retail price: the opening rate",
+      "input": {
+        "valuationRate": null,
+        "lastPurchase": null,
+        "costPrice": "900",
+        "openingRate": "1000",
+        "retail": null
+      },
+      "expected": { "unitCost": 100000, "source": "opening_rate" }
+    },
+    {
+      "name": "opening rate 0: the cost price",
+      "input": {
+        "valuationRate": null,
+        "lastPurchase": null,
+        "costPrice": "3000.00",
+        "openingRate": "0.00",
+        "retail": 400000
+      },
       "expected": { "unitCost": 300000, "source": "cost_price" }
     },
     {
-      "name": "cost price 0: the opening rate",
-      "input": { "valuationRate": null, "costPrice": "0.00", "openingRate": "2900.00" },
-      "expected": { "unitCost": 290000, "source": "opening_rate" }
-    },
-    {
-      "name": "a negative cost price is no cost: the opening rate",
-      "input": { "valuationRate": null, "costPrice": "-5.00", "openingRate": "12.505" },
+      "name": "an opening rate above Retail and no cost price: the opening rate, the only cost there is",
+      "input": {
+        "valuationRate": null,
+        "lastPurchase": null,
+        "costPrice": "-5.00",
+        "openingRate": "12.505",
+        "retail": 1000
+      },
       "expected": { "unitCost": 1251, "source": "opening_rate" }
     },
     {
       "name": "nothing: no cost",
-      "input": { "valuationRate": null, "costPrice": null, "openingRate": "0" },
+      "input": {
+        "valuationRate": null,
+        "lastPurchase": null,
+        "costPrice": null,
+        "openingRate": "0",
+        "retail": null
+      },
       "expected": { "unitCost": null, "source": null }
     },
     {
       "name": "a cost price that isn't a number stops the run",
-      "input": { "valuationRate": null, "costPrice": "abc", "openingRate": null },
+      "input": {
+        "valuationRate": null,
+        "lastPurchase": null,
+        "costPrice": "abc",
+        "openingRate": "0",
+        "retail": null
+      },
       "error": "bad_amount"
     }
   ]

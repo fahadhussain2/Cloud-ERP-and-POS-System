@@ -11,7 +11,7 @@ Open items that must be settled before, or soon after, go-live. Each line names 
 - [ ] **Bill header:** the legacy database has only the shop name. Give the real address, phone and other header lines; until then the receipt uses placeholder lines (W0-13 owner review).
 - [ ] **The 2026 dump:** a current dump in its own folder under `sql_dump/`, before the rehearsals (PRD Q11, W0-12). Then re-run rehearsal 1 on it: `legacy:stage`, `legacy:import`, `legacy:opening` (W1-14 owner answer 2).
 - [x] **Legacy stock document types and the quantity rule:** settled by rehearsal 2 (D-102): every item matched the legacy Closing Stock report of 5 Nov 2026.
-- [ ] **On each dump day:** run the legacy Item Wise Closing Stock report for the same day as the dump, after closing, and put it per item into `out/<label>/legacy-closing.csv`; `closing-compare.csv` must be empty (D-102).
+- [ ] **On each dump day:** run the legacy Item Wise Closing Stock report for the same day as the dump, after closing, and put it per item into `out/<label>/legacy-closing.csv`; `closing-compare.csv` must be empty (D-102), and `cost-compare.csv` reviewed: only `report_zero`, opening rates above Retail and a few rupees of rounding are expected (D-103).
 - [ ] **The pilot opening (by ~28 Nov):** a dump taken after a day close in the last days of November, its masters and opening loaded into production over an SSH tunnel, `posting-check prod delux` (W1-14 owner answers 2, 3).
 - [ ] **The legacy report totals** on each dump day: Closing Stock quantity and value, Customer and Supplier Outstanding into `legacy-totals.json` (W1-14 owner answer 4).
 - [ ] **Top 20 customer and supplier balances signed off** from the reconciliation report (migration doc §8).
