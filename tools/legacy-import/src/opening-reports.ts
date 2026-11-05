@@ -18,6 +18,7 @@ const csv = (header: string[], rows: Cell[][]) =>
 const rupees = (minor: number) => (minor / 100).toFixed(2);
 const units = (t: number) => (t / 1000).toFixed(3);
 const q = (t: number | null) => (t === null ? null : units(t));
+const m = (t: number | null) => (t === null ? null : rupees(t));
 const html = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -69,6 +70,37 @@ function reportsOf(r: OpeningResult): Report[] {
         q(x.opening),
         x.matches.join(' ') || (x.legacy === null || x.computed === null ? 'n/a' : 'none'),
         x.byType.map((t) => `${t.docType}: ${units(t.lines)} vs ${units(t.records)}`).join('; '),
+      ]),
+    },
+    {
+      file: 'opening/cost-compare.csv',
+      title: 'Items whose cost differs from the legacy Closing Stock report',
+      why: 'Kind: report_zero = the report shows 0 (no legacy average); opening_rate / cost_price = the report shows that typed figure; last_purchase = it shows the last purchase rate (ours may be wrong); unexplained = check with the Purchase Analysis report.',
+      header: [
+        'Item',
+        'Quantity',
+        'Our cost (Rs)',
+        'Our cost from',
+        'Report rate (Rs)',
+        'Kind',
+        'Opening rate (Rs)',
+        'Cost price (Rs)',
+        'Last purchase (Rs)',
+        'Retail (Rs)',
+        'Value difference (Rs)',
+      ],
+      rows: (r.costCompare?.rows ?? []).map((x) => [
+        x.itemId,
+        units(x.qty),
+        rupees(x.ours),
+        x.source,
+        rupees(x.report),
+        x.kind,
+        m(x.openingRate),
+        m(x.costPrice),
+        m(x.lastPurchase),
+        m(x.retail),
+        rupees(x.valueDiff),
       ]),
     },
     {
@@ -192,6 +224,11 @@ export async function writeOpeningReports(r: OpeningResult, labelDir: string): P
         closingCompare: r.closingCompare && {
           counts: r.closingCompare.counts,
           totals: r.closingCompare.totals,
+        },
+        costCompare: r.costCompare && {
+          counts: r.costCompare.counts,
+          values: r.costCompare.values,
+          byKind: r.costCompare.byKind,
         },
         findings: Object.fromEntries(reports.map((rep) => [rep.file, rep.rows.length])),
       },

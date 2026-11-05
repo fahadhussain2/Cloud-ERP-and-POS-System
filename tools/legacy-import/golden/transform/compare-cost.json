@@ -1,0 +1,223 @@
+{
+  "description": "Our opening cost per item against the legacy Closing Stock report's Average Rate (W1-14 rehearsal 2): for each item in stock whose rate differs, which legacy figure the report's rate equals. report_zero = the report shows 0 although we have a cost (LAMI001: purchases, but no average); opening_rate = it equals INV_Item.OpeningRate (CLCD022: a typed rate); cost_price = it equals INV_Item.CostPrice; last_purchase = it equals the last purchase rate (then ours may be the wrong one); unexplained = none of them. Money in paisa, quantity in thousandths; the value difference is qty × (ours − report), half away from zero. Rows in item-code order; items not on the report are left out.",
+  "cases": [
+    {
+      "name": "the same rate: counted, no row",
+      "input": {
+        "items": [
+          {
+            "itemId": "ABEA001",
+            "qty": 1000,
+            "ours": 400000,
+            "source": "valuation_rate",
+            "report": "4000.00",
+            "costPrice": "4000.00",
+            "openingRate": "0",
+            "lastPurchase": 400000,
+            "retail": 500000
+          }
+        ]
+      },
+      "expected": {
+        "counts": {
+          "items": 1,
+          "same": 1,
+          "report_zero": 0,
+          "opening_rate": 0,
+          "cost_price": 0,
+          "last_purchase": 0,
+          "unexplained": 0,
+          "aboveRetail": 0
+        },
+        "values": { "ours": 400000, "report": 400000 },
+        "byKind": {},
+        "rows": []
+      }
+    },
+    {
+      "name": "LAMI001 and CLCD022: the report's 0 and a typed opening rate",
+      "input": {
+        "items": [
+          {
+            "itemId": "CLCD022",
+            "qty": 1000,
+            "ours": 300000,
+            "source": "valuation_rate",
+            "report": "8000.00",
+            "costPrice": "3000",
+            "openingRate": "8000",
+            "lastPurchase": null,
+            "retail": 395000
+          },
+          {
+            "itemId": "LAMI001",
+            "qty": 4000,
+            "ours": 780000,
+            "source": "cost_price",
+            "report": "0.00",
+            "costPrice": "7800",
+            "openingRate": "0",
+            "lastPurchase": 780000,
+            "retail": 970000
+          }
+        ]
+      },
+      "expected": {
+        "counts": {
+          "items": 2,
+          "same": 0,
+          "report_zero": 1,
+          "opening_rate": 1,
+          "cost_price": 0,
+          "last_purchase": 0,
+          "unexplained": 0,
+          "aboveRetail": 0
+        },
+        "values": { "ours": 3420000, "report": 800000 },
+        "byKind": { "opening_rate": -500000, "report_zero": 3120000 },
+        "rows": [
+          {
+            "itemId": "CLCD022",
+            "qty": 1000,
+            "ours": 300000,
+            "source": "valuation_rate",
+            "report": 800000,
+            "openingRate": 800000,
+            "costPrice": 300000,
+            "lastPurchase": null,
+            "retail": 395000,
+            "kind": "opening_rate",
+            "valueDiff": -500000
+          },
+          {
+            "itemId": "LAMI001",
+            "qty": 4000,
+            "ours": 780000,
+            "source": "cost_price",
+            "report": 0,
+            "openingRate": 0,
+            "costPrice": 780000,
+            "lastPurchase": 780000,
+            "retail": 970000,
+            "kind": "report_zero",
+            "valueDiff": 3120000
+          }
+        ]
+      }
+    },
+    {
+      "name": "the report shows the cost price, the last purchase, or nothing we know; our cost above Retail is flagged",
+      "input": {
+        "items": [
+          {
+            "itemId": "AAA001",
+            "qty": 2000,
+            "ours": 100000,
+            "source": "valuation_rate",
+            "report": "1200.00",
+            "costPrice": "1200",
+            "openingRate": "0",
+            "lastPurchase": null,
+            "retail": 150000
+          },
+          {
+            "itemId": "BBB001",
+            "qty": 1500,
+            "ours": 100000,
+            "source": "valuation_rate",
+            "report": "900.00",
+            "costPrice": "0",
+            "openingRate": "0",
+            "lastPurchase": 90000,
+            "retail": 95000
+          },
+          {
+            "itemId": "CCC001",
+            "qty": 3000,
+            "ours": 33333,
+            "source": "valuation_rate",
+            "report": "366.82",
+            "costPrice": null,
+            "openingRate": null,
+            "lastPurchase": null,
+            "retail": null
+          }
+        ]
+      },
+      "expected": {
+        "counts": {
+          "items": 3,
+          "same": 0,
+          "report_zero": 0,
+          "opening_rate": 0,
+          "cost_price": 1,
+          "last_purchase": 1,
+          "unexplained": 1,
+          "aboveRetail": 1
+        },
+        "values": { "ours": 449999, "report": 485046 },
+        "byKind": { "cost_price": -40000, "last_purchase": 15000, "unexplained": -10047 },
+        "rows": [
+          {
+            "itemId": "AAA001",
+            "qty": 2000,
+            "ours": 100000,
+            "source": "valuation_rate",
+            "report": 120000,
+            "openingRate": 0,
+            "costPrice": 120000,
+            "lastPurchase": null,
+            "retail": 150000,
+            "kind": "cost_price",
+            "valueDiff": -40000
+          },
+          {
+            "itemId": "BBB001",
+            "qty": 1500,
+            "ours": 100000,
+            "source": "valuation_rate",
+            "report": 90000,
+            "openingRate": 0,
+            "costPrice": 0,
+            "lastPurchase": 90000,
+            "retail": 95000,
+            "kind": "last_purchase",
+            "valueDiff": 15000
+          },
+          {
+            "itemId": "CCC001",
+            "qty": 3000,
+            "ours": 33333,
+            "source": "valuation_rate",
+            "report": 36682,
+            "openingRate": null,
+            "costPrice": null,
+            "lastPurchase": null,
+            "retail": null,
+            "kind": "unexplained",
+            "valueDiff": -10047
+          }
+        ]
+      }
+    },
+    {
+      "name": "a report rate that isn't a number stops the run",
+      "input": {
+        "items": [
+          {
+            "itemId": "ABEA001",
+            "qty": 1000,
+            "ours": 1,
+            "source": "valuation_rate",
+            "report": "1,000.00",
+            "costPrice": null,
+            "openingRate": null,
+            "lastPurchase": null,
+            "retail": null
+          }
+        ]
+      },
+      "error": "bad_amount"
+    }
+  ]
+}

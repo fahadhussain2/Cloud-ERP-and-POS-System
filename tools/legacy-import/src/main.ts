@@ -119,6 +119,13 @@ try {
             ', ',
           )}; totals legacy ${cc.totals.legacy / 1000}, computed ${cc.totals.computed / 1000}, records ${cc.totals.records / 1000}`,
       );
+    const kc = result.costCompare;
+    if (kc)
+      console.info(
+        `legacy rates: ${Object.entries(kc.counts)
+          .map(([k, v]) => `${k} ${v}`)
+          .join(', ')}; value ours ${kc.values.ours / 100}, report ${kc.values.report / 100}`,
+      );
     for (const c of result.checks) console.info(`${c.status.padEnd(8)} ${c.check}`);
     console.info(`took ${((Date.now() - started) / 1000).toFixed(1)} s. reconciliation: ${page}`);
   } else {
@@ -149,8 +156,10 @@ try {
   process.exit(1);
 }
 
-/** legacy-closing.csv (item,qty): the legacy Item Wise Closing Stock report per item, for the dump day; optional. */
-async function legacyClosingOf(path: string): Promise<{ itemId: string; qty: string }[] | null> {
+/** legacy-closing.csv (item,qty[,rate]): the legacy Item Wise Closing Stock report per item, for the dump day; optional. */
+async function legacyClosingOf(
+  path: string,
+): Promise<{ itemId: string; qty: string; rate?: string }[] | null> {
   let text: string;
   try {
     text = await readFile(path, 'utf8');
@@ -166,8 +175,13 @@ async function legacyClosingOf(path: string): Promise<{ itemId: string; qty: str
   const item = cols.indexOf('item');
   const qty = cols.indexOf('qty');
   if (item < 0 || qty < 0) throw new Error('legacy-closing.csv needs the columns item and qty');
+  const rate = cols.indexOf('rate');
   return lines.map((l) => {
     const c = l.split(',');
-    return { itemId: (c[item] ?? '').trim(), qty: (c[qty] ?? '').trim() };
+    return {
+      itemId: (c[item] ?? '').trim(),
+      qty: (c[qty] ?? '').trim(),
+      ...(rate < 0 ? {} : { rate: (c[rate] ?? '').trim() }),
+    };
   });
 }

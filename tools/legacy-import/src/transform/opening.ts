@@ -1,3 +1,5 @@
+import { money, mulQty, qty } from '@erp/domain';
+
 import { DumpError } from '../errors';
 import { legacyMoney } from './rules';
 
@@ -103,28 +105,38 @@ export function latestStockRecords(
 }
 
 export interface OpeningCostInput {
-  /** Minor units, from `latestStockRecords`. */
   valuationRate: number | null;
+  /** The last purchase rate in the period (paisa), or null. */
+  lastPurchase: number | null;
   costPrice: Text;
   openingRate: Text;
+  /** The item's Retail price (paisa), or null: an opening rate above it is a typing error. */
+  retail: number | null;
 }
 
-/** The valuation rate, else the cost price, else the opening rate; 0 or less counts as none (§4.1). */
+/**
+ * The opening cost (D-103, §4.1): the valuation rate, else the last purchase, else the opening rate (legacy's
+ * carried-forward average) unless above Retail, else the cost price, else the opening rate anyway, else none.
+ */
 export function openingCost(input: OpeningCostInput): {
   unitCost: number | null;
-  source: 'valuation_rate' | 'cost_price' | 'opening_rate' | null;
+  source: 'valuation_rate' | 'last_purchase' | 'opening_rate' | 'cost_price' | null;
 } {
   if (input.valuationRate !== null && input.valuationRate > 0)
     return { unitCost: input.valuationRate, source: 'valuation_rate' };
-  const fallbacks = [
-    ['cost_price', input.costPrice],
-    ['opening_rate', input.openingRate],
-  ] as const;
-  for (const [source, text] of fallbacks) {
-    if (text === null || text === undefined || text.trim() === '') continue;
+  if (input.lastPurchase !== null && input.lastPurchase > 0)
+    return { unitCost: input.lastPurchase, source: 'last_purchase' };
+  const rate = (text: Text) => {
+    if (text === null || text === undefined || text.trim() === '') return null;
     const c = moneyOf(text);
-    if (c > 0) return { unitCost: c, source };
-  }
+    return c > 0 ? c : null;
+  };
+  const opening = rate(input.openingRate);
+  const cost = rate(input.costPrice);
+  if (opening !== null && (input.retail === null || opening <= input.retail))
+    return { unitCost: opening, source: 'opening_rate' };
+  if (cost !== null) return { unitCost: cost, source: 'cost_price' };
+  if (opening !== null) return { unitCost: opening, source: 'opening_rate' };
   return { unitCost: null, source: null };
 }
 
@@ -376,4 +388,105 @@ export interface OpeningMovementsInput {
 export function openingMovements(input: OpeningMovementsInput): ClosingStockInput['movements'] {
   const counted = new Set(input.physical.map((m) => m.docType.trim()));
   return [...input.records.filter((m) => !counted.has(m.docType.trim())), ...input.physical];
+}
+
+export type CostKind = 'report_zero' | 'opening_rate' | 'cost_price' | 'last_purchase' | 'unexplained';
+
+export interface CompareCostInput {
+  items: {
+    itemId: string;
+    /** Our opening quantity (thousandths) and unit cost (paisa), and where the cost came from (openingCost). */
+    qty: number;
+    ours: number;
+    source: string;
+    /** The legacy Closing Stock report's Average Rate, as printed (rupees). */
+    report: string;
+    costPrice: Text;
+    openingRate: Text;
+    /** The last purchase rate (paisa), or null. */
+    lastPurchase: number | null;
+    /** Our Retail price (paisa), or null. */
+    retail: number | null;
+  }[];
+}
+
+export interface CompareCostRow {
+  itemId: string;
+  qty: number;
+  ours: number;
+  source: string;
+  report: number;
+  openingRate: number | null;
+  costPrice: number | null;
+  lastPurchase: number | null;
+  retail: number | null;
+  kind: CostKind;
+  valueDiff: number;
+}
+
+/**
+ * Our opening cost against the legacy Closing Stock report's Average Rate (W1-14 rehearsal 2): for each item whose
+ * rate differs, which legacy figure the report's rate equals, so the owner reviews only what none explains.
+ */
+export function compareCost(input: CompareCostInput): {
+  counts: { items: number; same: number; aboveRetail: number } & Record<CostKind, number>;
+  values: { ours: number; report: number };
+  byKind: Partial<Record<CostKind, number>>;
+  rows: CompareCostRow[];
+} {
+  const counts = {
+    items: 0,
+    same: 0,
+    report_zero: 0,
+    opening_rate: 0,
+    cost_price: 0,
+    last_purchase: 0,
+    unexplained: 0,
+    aboveRetail: 0,
+  };
+  const values = { ours: 0, report: 0 };
+  const byKind: Partial<Record<CostKind, number>> = {};
+  const rows: CompareCostRow[] = [];
+  const opt = (t: Text) => (t === null || t === undefined || t.trim() === '' ? null : moneyOf(t));
+  const value = (q: number, unit: number) => mulQty(qty(q), money(unit));
+  for (const i of byItem([...input.items])) {
+    counts.items += 1;
+    const report = moneyOf(i.report);
+    values.ours += value(i.qty, i.ours);
+    values.report += value(i.qty, report);
+    if (i.retail !== null && i.ours > i.retail) counts.aboveRetail += 1;
+    if (report === i.ours) {
+      counts.same += 1;
+      continue;
+    }
+    const openingRate = opt(i.openingRate);
+    const costPrice = opt(i.costPrice);
+    const kind: CostKind =
+      report === 0
+        ? 'report_zero'
+        : report === openingRate
+          ? 'opening_rate'
+          : report === costPrice
+            ? 'cost_price'
+            : report === i.lastPurchase
+              ? 'last_purchase'
+              : 'unexplained';
+    counts[kind] += 1;
+    const valueDiff = value(i.qty, i.ours) - value(i.qty, report);
+    byKind[kind] = (byKind[kind] ?? 0) + valueDiff;
+    rows.push({
+      itemId: i.itemId,
+      qty: i.qty,
+      ours: i.ours,
+      source: i.source,
+      report,
+      openingRate,
+      costPrice,
+      lastPurchase: i.lastPurchase,
+      retail: i.retail,
+      kind,
+      valueDiff,
+    });
+  }
+  return { counts, values, byKind, rows };
 }
