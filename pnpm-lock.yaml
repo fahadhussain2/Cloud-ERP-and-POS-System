@@ -327,6 +327,9 @@ importers:
       '@erp/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@erp/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@erp/observability':
         specifier: workspace:*
         version: link:../../packages/observability

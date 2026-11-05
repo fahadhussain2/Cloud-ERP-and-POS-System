@@ -103,3 +103,19 @@ export type {
   DaySessionResponse,
   ReportMoney,
 } from './reports';
+export {
+  AddNameRequest,
+  CreateItemRequest,
+  IdentifierKind,
+  ItemStatus,
+  SetIdentifiersRequest,
+  SetPricesRequest,
+  SetVehiclesRequest,
+  UpdateCategoryRequest,
+  UpdateItemRequest,
+  VehicleTag,
+  type CatalogLookups,
+  type ItemDetail,
+  type ItemList,
+  type ItemRow,
+} from './catalog';

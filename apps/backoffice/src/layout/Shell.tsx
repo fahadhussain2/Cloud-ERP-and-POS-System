@@ -9,7 +9,7 @@ import { href, type Route } from '../router';
 // each later task adds its entry here.
 
 export interface MenuItem {
-  key: 'staff' | 'counters' | 'dayReconciliation' | 'cashVariance';
+  key: 'staff' | 'counters' | 'dayReconciliation' | 'cashVariance' | 'items' | 'categories';
   href: string;
   /** Any of these permissions opens the screen. */
   needs: readonly string[];
@@ -17,7 +17,10 @@ export interface MenuItem {
   screens: readonly Route['screen'][];
 }
 
-export const MENU: readonly { group: 'people' | 'shop' | 'reports'; items: readonly MenuItem[] }[] = [
+export const MENU: readonly {
+  group: 'people' | 'catalog' | 'shop' | 'reports';
+  items: readonly MenuItem[];
+}[] = [
   {
     group: 'people',
     items: [
@@ -26,6 +29,24 @@ export const MENU: readonly { group: 'people' | 'shop' | 'reports'; items: reado
         href: href.staff,
         needs: ['admin.users', 'admin.devices'],
         screens: ['staff', 'person'],
+      },
+    ],
+  },
+  {
+    // Catalog maintenance (W1-15): items with their codes, vehicles and prices; the categories' floor margin.
+    group: 'catalog',
+    items: [
+      {
+        key: 'items',
+        href: href.items,
+        needs: ['cat.item.edit', 'cat.price.edit'],
+        screens: ['items', 'item', 'newItem'],
+      },
+      {
+        key: 'categories',
+        href: href.categories,
+        needs: ['cat.item.edit', 'cat.price.edit'],
+        screens: ['categories'],
       },
     ],
   },

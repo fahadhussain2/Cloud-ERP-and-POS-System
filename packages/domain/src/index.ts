@@ -59,6 +59,22 @@ export {
 export { businessDate } from './business-date';
 export { costFloor } from './floor';
 export {
+  catalogCodeProblems,
+  itemProblems,
+  priceChange,
+  proposeTierPrices,
+  PRICE_REASONS,
+  type CatalogCodeProblem,
+  type CatalogCodesInput,
+  type IdentifierKind,
+  type ItemInput,
+  type ItemProblem,
+  type PriceChangeInput,
+  type PriceProblem,
+  type PriceReason,
+  type PriceSet,
+} from './catalog';
+export {
   buildSessionDocument,
   expectedCash,
   type CashSessionDocument,

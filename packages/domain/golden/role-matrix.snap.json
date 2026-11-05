@@ -57,7 +57,7 @@
     "cash.session.close": false,
     "cash.variance.approve": true,
     "cat.item.edit": true,
-    "cat.price.edit": true,
+    "cat.price.edit": false,
     "cat.label.print": true,
     "inv.adjust": true,
     "inv.transfer": true,

@@ -908,3 +908,14 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** rehearsal 2 against the owner's Closing Stock report of 5 Nov 2026 (16,061 items in stock). The report values old stock (no 2026 purchase) at the opening rate: 863 items, where the cost price came first before. 81 items show a rate of 0 although 69 of them were bought in 2026 (LAMI001: 8 purchases at 7,500–7,800, checked with the owner); their last purchase is their cost. Two opening rates are above Retail and are typing errors (CLCD022: 8,000 against `CostPrice` 3,000 and Retail 3,950, checked with the owner). With this rule 15,976 items equal the report; the rest are those 81, the 2 typing errors and 2 items within Rs 25.
 - **Trade-off:** our stock value is Rs 45.57 M against the report's Rs 45.27 M, on purpose (the 81 items the report values at 0). The owner reviews `cost-compare.csv` on each dump day.
 - **Status:** Accepted (owner, 2026-11-05). Replaces the cost order of D-101 and migration doc §4.1.
+
+### D-104 Catalog maintenance: legacy stays the master until go-live, only the owner prices, a price history (2026-11-06)
+- **Decision:**
+  - The back office maintains the catalog (W1-15): items, identifiers, vehicle tags, tier prices, the item's own floor and the category's floor margin, through `/api/catalog`, with the row version on every save (a stale save is refused with who saved in between). An item's code never changes; items are never deleted (dormant or discontinued).
+  - **Until the shop is live (`tenants.go_live_at`, D-101), the legacy app is where items change** (owner answer 1): the importer is unchanged, the final import overwrites the catalog, and every catalog screen says so.
+  - **Only the owner changes prices** (owner answer 3): `cat.price.edit` is no longer in the Manager template, and migration 0016 removes it from the Manager roles made from the template in every tenant. A manager adds an item without prices; the owner prices it.
+  - **`price_history`** (migration 0016, CAT-07): every changed tier price and own floor with old → new, who, when and, when a price goes down, a reason from a fixed list (supplier price dropped, market price, slow stock, correction, other with a note; owner answer 2). Added to only.
+  - A category's margin change re-writes its `item_floors` through `writeFloors` (`packages/posting`), in the same transaction.
+- **Why:** one master at a time keeps the pilot simple; one person decides prices; the history answers "who changed this price and why".
+- **Trade-off:** a price changed in the new back office before go-live is lost at the final import (the notice says so); managers can't fix a price without the owner.
+- **Status:** Accepted (with the W1-15 plan, owner answers 1–4)

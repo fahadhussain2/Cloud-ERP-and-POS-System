@@ -1,0 +1,21 @@
+{
+  "description": "The tier prices proposed for a new item from its Retail price (PRD Q1, D-085, W1-15): Mechanic = Retail − 5 %, Wholesale = Retail − 10 %, each rounded to Rs 1 half away from zero, as the importer does; the owner can change them before saving.",
+  "cases": [
+    {
+      "name": "Rs 4,000",
+      "input": 400000,
+      "expected": { "RETAIL": 400000, "MECHANIC": 380000, "WHOLESALE": 360000 }
+    },
+    {
+      "name": "Rs 3,950: 3,752.50 rounds up to 3,753, 3,555 exactly",
+      "input": 395000,
+      "expected": { "RETAIL": 395000, "MECHANIC": 375300, "WHOLESALE": 355500 }
+    },
+    {
+      "name": "Rs 15: 14.25 → 14, 13.50 → 14",
+      "input": 1500,
+      "expected": { "RETAIL": 1500, "MECHANIC": 1400, "WHOLESALE": 1400 }
+    },
+    { "name": "Rs 0", "input": 0, "expected": { "RETAIL": 0, "MECHANIC": 0, "WHOLESALE": 0 } }
+  ]
+}

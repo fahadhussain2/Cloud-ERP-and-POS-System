@@ -207,7 +207,7 @@ async function dayInput(
 }
 
 /** How the tenant writes money (the back office has no other way to know). */
-async function moneyOf(c: pg.ClientBase): Promise<ReportMoney> {
+export async function moneyOf(c: pg.ClientBase): Promise<ReportMoney> {
   const { rows } = await c.query<{ locale: string; base_currency: string; currency_minor_units: number }>(
     'SELECT locale, base_currency, currency_minor_units FROM erp.tenants',
   );

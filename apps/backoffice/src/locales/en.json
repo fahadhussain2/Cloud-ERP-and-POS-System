@@ -35,14 +35,17 @@
     "groups": {
       "people": "People",
       "shop": "Shop",
-      "reports": "Reports"
+      "reports": "Reports",
+      "catalog": "Catalog"
     },
     "staff": "Staff",
     "counters": "Counters",
     "signOut": "Sign out",
     "signedIn": "Signed in",
     "dayReconciliation": "Day reconciliation",
-    "cashVariance": "Cash variance"
+    "cashVariance": "Cash variance",
+    "items": "Items",
+    "categories": "Categories"
   },
   "home": {
     "nothing": "There is nothing here for your role yet."
@@ -270,6 +273,175 @@
       "sessions_one": "{{count}} session",
       "sessions_other": "{{count}} sessions",
       "sessionsTitle": "Sessions"
+    }
+  },
+  "catalog": {
+    "notLive": {
+      "title": "Change items in the legacy app until go-live",
+      "text": "Until the shop is live, the final import from the legacy app replaces the catalog. Changes made here before then are overwritten."
+    },
+    "items": {
+      "title": "Items",
+      "help": "Find an item by its code, name, brand, barcode or OEM number, as on the counter.",
+      "add": "New item",
+      "search": "Search",
+      "searchHint": "Code, name words, barcode or OEM number",
+      "all": "All",
+      "empty": "No items match.",
+      "retail": "Retail",
+      "count": "{{count}} items · page {{page}} of {{pages}}",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "fields": {
+      "code": "Code",
+      "name": "Name",
+      "brand": "Brand",
+      "origin": "Origin",
+      "category": "Category",
+      "unit": "Unit",
+      "status": "Status",
+      "supplier": "Default supplier",
+      "variant": "Position or size",
+      "spec": "Spec",
+      "bin": "Bin location",
+      "minQty": "Min quantity",
+      "maxQty": "Max quantity",
+      "excludeFromReorder": "Leave out of reorder lists",
+      "make": "Make",
+      "model": "Model",
+      "yearFrom": "From year",
+      "yearTo": "To year",
+      "note": "Note"
+    },
+    "status": {
+      "active": "Active",
+      "dormant": "Dormant",
+      "discontinued": "Discontinued"
+    },
+    "kinds": {
+      "barcode": "Barcode",
+      "oem": "OEM number",
+      "alternate": "Alternate",
+      "supplier_ref": "Supplier reference"
+    },
+    "reasons": {
+      "supplier_price": "Supplier price dropped",
+      "market_price": "Market price",
+      "slow_stock": "Slow stock",
+      "correction": "Correction",
+      "other": "Other"
+    },
+    "add": {
+      "brands": "Add a brand",
+      "origins": "Add an origin",
+      "makes": "Add a make",
+      "save": "Add"
+    },
+    "item": {
+      "back": "Items",
+      "notFound": "No such item.",
+      "updated": "Last changed by {{by}}, {{at}}",
+      "details": "Details",
+      "saveDetails": "Save details",
+      "codes": "Codes and vehicles",
+      "identifiers": "Barcodes and part numbers",
+      "kind": "Kind",
+      "value": "Number",
+      "remove": "Remove",
+      "addCode": "Add a number",
+      "saveCodes": "Save numbers",
+      "vehicles": "Vehicles",
+      "noVehicles": "No vehicles.",
+      "addVehicle": "Add a vehicle",
+      "saveVehicles": "Save vehicles",
+      "prices": "Prices and floor",
+      "pricesOwnerOnly": "Only the owner changes prices.",
+      "ownFloor": "Item's own floor",
+      "ownFloorHint": "Empty: cost + the category margin, else the list price",
+      "floorFrom": {
+        "item": "The counter's floor: {{floor}}, the item's own (cost + margin would be {{fromCost}}).",
+        "cost": "The counter's floor: {{floor}}, cost + the category margin.",
+        "list": "The counter's floor: {{floor}}, the list price (no cost yet)."
+      },
+      "reason": "Why the price goes down",
+      "note": "Note",
+      "savePrices": "Save prices",
+      "history": "Price history",
+      "noHistory": "No price changes yet.",
+      "savedDetails": "Details saved.",
+      "savedCodes": "Numbers saved.",
+      "savedVehicles": "Vehicles saved.",
+      "savedPrices": "Prices saved."
+    },
+    "cost": {
+      "average": "Average cost",
+      "last": "Last purchase",
+      "supplier": "Last supplier",
+      "date": "Received"
+    },
+    "history": {
+      "at": "When",
+      "price": "Price",
+      "old": "Was",
+      "new": "Now",
+      "why": "Why",
+      "by": "By",
+      "sources": {
+        "manual": "Back office",
+        "import": "Import",
+        "repricing": "Repricing"
+      }
+    },
+    "newItem": {
+      "title": "New item",
+      "help": "The item's code becomes its barcode, as on the legacy labels.",
+      "codeHint": "Letters, digits and dashes, up to 20. It can't be changed later.",
+      "ownerPrices": "The owner sets the prices after you save.",
+      "create": "Create item"
+    },
+    "categories": {
+      "title": "Categories",
+      "help": "The floor margin: the counter's floor is the item's cost plus this much, unless the item has its own floor.",
+      "margin": "Floor margin",
+      "marginOf": "Floor margin of {{code}}",
+      "save": "Save",
+      "saved": "{{code}} saved. Its floors follow the new margin."
+    },
+    "problems": {
+      "row": "Row {{row}}: {{text}}",
+      "code_required": "Type a code.",
+      "code_format": "A code has letters, digits and dashes only, up to 20.",
+      "name_required": "Type a name.",
+      "name_too_long": "The name is too long (120 at most).",
+      "category_required": "Pick a category.",
+      "unit_required": "Pick a unit.",
+      "qty_negative": "Quantities can't be negative.",
+      "qty_fraction": "This unit has no fractions.",
+      "qty_number": "A quantity is not a number.",
+      "min_above_max": "The min is above the max.",
+      "code_barcode_missing": "The item's own code must stay as a barcode.",
+      "value_required": "Type the number.",
+      "duplicate": "This number is there twice.",
+      "tag_empty": "Pick a make, or type a model or a year.",
+      "year_out_of_range": "That year isn't possible.",
+      "year_range": "The years are the wrong way round.",
+      "retail_required": "Retail needs a price.",
+      "price_invalid": "A price is not valid.",
+      "price_number": "A price is not a number.",
+      "reason_unknown": "Pick a reason from the list.",
+      "reason_required": "Say why a price goes down.",
+      "note_required": "Add a note for \"Other\".",
+      "floor_above_retail": "The floor is above Retail: every sale at Retail will need a manager."
+    },
+    "errors": {
+      "stale": "{{by}} changed this in the meantime. Reload to see it, then make your change again.",
+      "someone": "Someone",
+      "code_taken": "An item has this code already.",
+      "barcode_taken": "Item {{code}} has this barcode.",
+      "not_found": "No such item.",
+      "forbidden": "You can't make this change.",
+      "invalid_request": "That can't be saved."
     }
   }
 }

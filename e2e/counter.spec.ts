@@ -787,3 +787,44 @@ test('offline, a customer buys on account up to the day’s cap without a PIN; p
   await context.setOffline(false);
   await expect(page.getByText('0 bills waiting to sync')).toBeVisible({ timeout: 15000 });
 });
+
+// W1-15 plan: the owner changes an item's Retail price and adds a new item in the back office; the counter has both
+// after its next pull (sync spec §3).
+test('the owner changes a price and adds an item in the back office; the counter sells both after its next pull', async ({
+  page,
+  browser,
+}) => {
+  const office = await browser.newContext();
+  const bop = await office.newPage();
+  await signIn(bop, OWNER.username, OWNER_PASSWORD);
+  await bop.getByRole('navigation', { name: bo.nav.menu }).getByRole('link', { name: bo.nav.items }).click();
+  await expect(bop.getByText(bo.catalog.notLive.title)).toBeVisible();
+  await bop.getByLabel(bo.catalog.items.search).fill('enol001');
+  await bop.getByRole('link', { name: 'ENOL001' }).click();
+  await bop.getByLabel('Retail').fill('7200');
+  await bop.getByRole('button', { name: bo.catalog.item.savePrices }).click();
+  await expect(bop.getByRole('status').filter({ hasText: bo.catalog.item.savedPrices })).toBeVisible();
+  await expect(bop.getByRole('table', { name: bo.catalog.item.history })).toContainText(/Rs\s?7,200/);
+
+  await bop.getByRole('link', { name: `← ${bo.catalog.item.back}` }).click();
+  await bop.getByRole('link', { name: bo.catalog.items.add }).click();
+  await bop.getByLabel(bo.catalog.fields.code).fill('abea050');
+  await bop.getByLabel(bo.catalog.fields.name).fill('ADJUSTER BEARING VITZ');
+  await bop.getByLabel(bo.catalog.fields.category).selectOption({ label: 'BRPD · BRPD' });
+  await bop.getByLabel(bo.catalog.fields.unit).selectOption({ label: 'PCS' });
+  await bop.getByLabel('Retail').fill('3950');
+  await expect(bop.getByLabel('Mechanic')).toHaveValue('3753');
+  await bop.getByRole('button', { name: bo.catalog.newItem.create }).click();
+  await expect(bop.getByRole('heading', { name: /ABEA050/ })).toBeVisible();
+  await office.close();
+
+  await page.goto(POS);
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  const results = page.getByRole('listbox', { name: pos.search.results });
+  await expect(async () => {
+    await page.getByRole('combobox').fill('abea050');
+    await expect(results.getByRole('option').first()).toContainText(/Rs\s?3,950/, { timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
+  await page.getByRole('combobox').fill('enol001');
+  await expect(results.getByRole('option').first()).toContainText(/Rs\s?7,200/);
+});
