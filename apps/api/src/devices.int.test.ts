@@ -68,8 +68,8 @@ async function login(username: string, shop = SHOP) {
   return c.value;
 }
 
-const post = (url: string, payload: unknown, cookie?: string) =>
-  app().inject({
+const post = (url: string, payload: unknown, cookie?: string, server = app()) =>
+  server.inject({
     method: 'POST',
     url,
     headers: { origin: ORIGIN, host: HOST },
@@ -91,12 +91,13 @@ async function enroll(code: string, keys?: DeviceKeys, shop = SHOP) {
   return { res, keys: k };
 }
 
-async function deviceToken(deviceId: string, keys: DeviceKeys, tenantId = tenant) {
-  const ch = await post('/api/devices/challenge', { tenantId, deviceId });
+/** A device token; `server` keeps one app, so its rate limits add up across calls (each app() starts afresh). */
+async function deviceToken(deviceId: string, keys: DeviceKeys, tenantId = tenant, server = app()) {
+  const ch = await post('/api/devices/challenge', { tenantId, deviceId }, undefined, server);
   if (ch.statusCode !== 200) return { status: ch.statusCode, token: null };
   const { nonce } = ch.json<{ nonce: string }>();
   const signature = await signCanonical(keys.privateKey, { tenantId, deviceId, nonce });
-  const res = await post('/api/devices/token', { tenantId, deviceId, nonce, signature });
+  const res = await post('/api/devices/token', { tenantId, deviceId, nonce, signature }, undefined, server);
   return {
     status: res.statusCode,
     token: res.statusCode === 200 ? res.json<{ accessToken: string }>().accessToken : null,
@@ -239,6 +240,18 @@ describe('device tokens', () => {
     expect(me.json()).toMatchObject({ deviceId, tenantId: tenant, branchId: branch });
     later(15 * 60_000 + 1000);
     expect((await deviceMe(token!)).statusCode).toBe(401);
+  });
+
+  it("are limited per device, so one counter can't lock out the others behind the shop's one IP", async () => {
+    const cookie = await login('maria');
+    const a = await enroll(await newCode(cookie));
+    const b = await enroll(await newCode(cookie));
+    const idA = a.res.json<{ deviceId: string }>().deviceId;
+    const idB = b.res.json<{ deviceId: string }>().deviceId;
+    const server = app();
+    for (let i = 0; i < 30; i++) expect((await deviceToken(idA, a.keys, tenant, server)).status).toBe(200);
+    expect((await deviceToken(idA, a.keys, tenant, server)).status).toBe(429);
+    expect((await deviceToken(idB, b.keys, tenant, server)).status).toBe(200);
   });
 
   it("refuse another device's key, a wrong signature, an expired nonce and a reused nonce", async () => {
