@@ -86,6 +86,8 @@ export const KEPT_TABLES = [
   'item_identifiers',
   'item_compatibility',
   'item_prices',
+  // The prices are kept, so their history is too (W1-15, D-104).
+  'price_history',
 ] as const;
 /** Every table is in exactly one list (a test checks it against the schema), so a new table needs a decision. */
 export const WIPED_TABLES = [...DOCUMENT_TABLES, ...BALANCE_TABLES];

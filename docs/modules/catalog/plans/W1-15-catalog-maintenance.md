@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#60](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/60) |
 | **Module** | catalog (back-office screens and API), with sync (the counters pull the edits through the existing change feed), accounting (`writeFloors` from `packages/posting` when a category's margin changes) and platform (only the owner changes prices) |
-| **Status** | Accepted (2026-11-05) with the owner's answers 1–4 (below) |
+| **Status** | Accepted (2026-11-05) with the owner's answers 1–4 (below). Built (2026-11-06) on `w1-15-catalog` |
 | **Refs** | CAT-01, CAT-02 (edited here; search was W1-03), CAT-03, CAT-04, CAT-05, CAT-07; data model §4; sync spec §3; PRD Q1 (Mechanic −5 %, Wholesale −10 %), Q2 (floor = cost + 5 %); CLAUDE.md rules 1, 5, 8, 10; D-014, D-019, D-055, D-085, D-092, D-101, D-103 |
 | **Depends on** | W1-03 (catalog on the counter), W1-04 (back-office shell, staff screens), W1-14 (`item_floors`, `writeFloors`) |
 | **Size** | about 3 days: item list and search ½, item screen and the API 1¼, prices, floor and history ¾, categories ¼, e2e and docs ¼ |
@@ -65,6 +65,25 @@ Migration and schema → domain golden files → API with integration tests → 
 | Someone changes an item in the new back office during the pilot and the final import overwrites it | The notice on every catalog screen until go-live (owner answer 1) |
 | A category margin change writes thousands of floors at once | One statement per category through `writeFloors`; measured on the largest category |
 | A price change reaches some counters later than others | The nudge (W1-07) and the 60-second pull; the bill uses the price it had when the line was added (POS spec) |
+
+## Changes during the build
+
+| Change | Why |
+|---|---|
+| `price_history` keeps `tier_id` (null = the floor) rather than a text target | A foreign key to the tier; the API answers with the tier code |
+| `price_history` has no audit trigger; it records `user_id` and `at` itself, and the app role can't update or delete it | It is the audit of prices |
+| Migration 0016's role change reads the tenants with the roles' RLS lifted, like 0012 and 0013, with its own test (`manager-price-role.int.test.ts`) | The first version looped over `erp.tenants` under forced RLS and changed nothing |
+| The lookups also carry the shop's money format and what this person may do | The back office has no other way to know (rule 10) |
+| The back office depends on `@erp/domain` | The same checks as the API (item details, price change, proposed tier prices) |
+| Brands, origins and vehicle makes are added inline from the item screen (`POST /api/catalog/brands`, `origins`, `makes`) | As planned, no screens of their own |
+
+## Checks (2026-11-06)
+
+- `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 1,861 tests; `packages/domain` at 100 % branch coverage.
+- `pnpm test:integration`: 317 passed (30 files), including the catalog API (17) and the Manager role migration.
+- `pnpm e2e` (Edge): 48 passed, including "the owner changes a price and adds an item in the back office; the counter sells both after its next pull".
+- On `erp_dev`: migration 0016 took `cat.price.edit` from the Delux Manager role.
+- The pilot wipe keeps `price_history` with the prices (a test checks every table is kept or wiped).
 
 ## Owner answers (2026-11-05)
 

@@ -4,36 +4,90 @@
     {
       "name": "Retail up: no reason needed",
       "input": {
-        "before": { "tiers": { "RETAIL": 400000, "MECHANIC": 380000, "WHOLESALE": 360000 }, "floor": null },
-        "after": { "tiers": { "RETAIL": 420000, "MECHANIC": 380000, "WHOLESALE": 360000 }, "floor": null },
+        "before": {
+          "tiers": {
+            "RETAIL": 400000,
+            "MECHANIC": 380000,
+            "WHOLESALE": 360000
+          },
+          "floor": null
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 420000,
+            "MECHANIC": 380000,
+            "WHOLESALE": 360000
+          },
+          "floor": null
+        },
         "reason": null,
         "note": null
       },
       "expected": {
         "problems": [],
         "warnings": [],
-        "changes": [{ "target": "RETAIL", "old": 400000, "new": 420000 }]
+        "changes": [
+          {
+            "target": "RETAIL",
+            "old": 400000,
+            "new": 420000
+          }
+        ]
       }
     },
     {
       "name": "Mechanic down without a reason is refused",
       "input": {
-        "before": { "tiers": { "RETAIL": 400000, "MECHANIC": 380000, "WHOLESALE": 360000 }, "floor": null },
-        "after": { "tiers": { "RETAIL": 400000, "MECHANIC": 370000, "WHOLESALE": 360000 }, "floor": null },
+        "before": {
+          "tiers": {
+            "RETAIL": 400000,
+            "MECHANIC": 380000,
+            "WHOLESALE": 360000
+          },
+          "floor": null
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 400000,
+            "MECHANIC": 370000,
+            "WHOLESALE": 360000
+          },
+          "floor": null
+        },
         "reason": null,
         "note": null
       },
       "expected": {
         "problems": ["reason_required"],
         "warnings": [],
-        "changes": [{ "target": "MECHANIC", "old": 380000, "new": 370000 }]
+        "changes": [
+          {
+            "target": "MECHANIC",
+            "old": 380000,
+            "new": 370000
+          }
+        ]
       }
     },
     {
       "name": "down with a reason; a floor set for the first time",
       "input": {
-        "before": { "tiers": { "RETAIL": 400000, "MECHANIC": 380000, "WHOLESALE": 360000 }, "floor": null },
-        "after": { "tiers": { "RETAIL": 390000, "MECHANIC": 380000, "WHOLESALE": 360000 }, "floor": 330000 },
+        "before": {
+          "tiers": {
+            "RETAIL": 400000,
+            "MECHANIC": 380000,
+            "WHOLESALE": 360000
+          },
+          "floor": null
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 390000,
+            "MECHANIC": 380000,
+            "WHOLESALE": 360000
+          },
+          "floor": 330000
+        },
         "reason": "market_price",
         "note": null
       },
@@ -41,44 +95,98 @@
         "problems": [],
         "warnings": [],
         "changes": [
-          { "target": "RETAIL", "old": 400000, "new": 390000 },
-          { "target": "floor", "old": null, "new": 330000 }
+          {
+            "target": "RETAIL",
+            "old": 400000,
+            "new": 390000
+          },
+          {
+            "target": "floor",
+            "old": null,
+            "new": 330000
+          }
         ]
       }
     },
     {
       "name": "clearing the item's own floor is not a price going down",
       "input": {
-        "before": { "tiers": { "RETAIL": 400000 }, "floor": 350000 },
-        "after": { "tiers": { "RETAIL": 400000 }, "floor": null },
+        "before": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": 350000
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": null
+        },
         "reason": null,
         "note": null
       },
       "expected": {
         "problems": [],
         "warnings": [],
-        "changes": [{ "target": "floor", "old": 350000, "new": null }]
+        "changes": [
+          {
+            "target": "floor",
+            "old": 350000,
+            "new": null
+          }
+        ]
       }
     },
     {
       "name": "other needs a note; a floor above Retail warns",
       "input": {
-        "before": { "tiers": { "RETAIL": 400000 }, "floor": 380000 },
-        "after": { "tiers": { "RETAIL": 400000 }, "floor": 410000 },
+        "before": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": 380000
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": 410000
+        },
         "reason": "other",
         "note": " "
       },
       "expected": {
         "problems": ["note_required"],
         "warnings": ["floor_above_retail"],
-        "changes": [{ "target": "floor", "old": 380000, "new": 410000 }]
+        "changes": [
+          {
+            "target": "floor",
+            "old": 380000,
+            "new": 410000
+          }
+        ]
       }
     },
     {
       "name": "a price for a tier that had none; Retail cleared, a negative and a fractional price",
       "input": {
-        "before": { "tiers": { "RETAIL": 400000, "MECHANIC": null, "WHOLESALE": 360000 }, "floor": null },
-        "after": { "tiers": { "RETAIL": null, "MECHANIC": 380000, "WHOLESALE": -1 }, "floor": 1.5 },
+        "before": {
+          "tiers": {
+            "RETAIL": 400000,
+            "MECHANIC": null,
+            "WHOLESALE": 360000
+          },
+          "floor": null
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": null,
+            "MECHANIC": 380000,
+            "WHOLESALE": -1
+          },
+          "floor": 1.5
+        },
         "reason": "correction",
         "note": null
       },
@@ -86,22 +194,82 @@
         "problems": ["retail_required", "price_invalid"],
         "warnings": [],
         "changes": [
-          { "target": "RETAIL", "old": 400000, "new": null },
-          { "target": "MECHANIC", "old": null, "new": 380000 },
-          { "target": "WHOLESALE", "old": 360000, "new": -1 },
-          { "target": "floor", "old": null, "new": 1.5 }
+          {
+            "target": "RETAIL",
+            "old": 400000,
+            "new": null
+          },
+          {
+            "target": "MECHANIC",
+            "old": null,
+            "new": 380000
+          },
+          {
+            "target": "WHOLESALE",
+            "old": 360000,
+            "new": -1
+          },
+          {
+            "target": "floor",
+            "old": null,
+            "new": 1.5
+          }
         ]
       }
     },
     {
       "name": "an unknown reason is refused; nothing changed needs no reason",
       "input": {
-        "before": { "tiers": { "RETAIL": 400000 }, "floor": null },
-        "after": { "tiers": { "RETAIL": 400000 }, "floor": null },
+        "before": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": null
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": null
+        },
         "reason": "cheaper_somewhere",
         "note": null
       },
-      "expected": { "problems": ["reason_unknown"], "warnings": [], "changes": [] }
+      "expected": {
+        "problems": ["reason_unknown"],
+        "warnings": [],
+        "changes": []
+      }
+    },
+    {
+      "name": "other with no note at all needs one",
+      "input": {
+        "before": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": null
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 390000
+          },
+          "floor": null
+        },
+        "reason": "other",
+        "note": null
+      },
+      "expected": {
+        "problems": ["note_required"],
+        "warnings": [],
+        "changes": [
+          {
+            "target": "RETAIL",
+            "old": 400000,
+            "new": 390000
+          }
+        ]
+      }
     }
   ]
 }

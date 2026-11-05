@@ -130,7 +130,7 @@ Built in migration `0006` (W0-13). Every catalog table has `legacy jsonb`: the o
 
 **opening_balances** (W1-14, D-101): `label` (unique), `branch_id`, `as_of`, `business_date`, `status` (draft → posted), `posted_at`, `legacy` (run totals, no personal data). **opening_balance_lines**: `line_no`, `kind` (stock · customer · supplier · account), `item_id, location_id, qty, unit_cost (null = none known), last_cost, last_supplier_id, last_receipt_at` or `party_id, amount` or `account_id, amount`. A posted opening is never changed.
 
-**price_history:** `item_id, target (tier_id | 'floor'), old_value, new_value, source (manual|repricing|import), source_id, user_id, at`
+**price_history** (built in W1-15, migration 0016, D-104): `item_id, tier_id (null = the item's own floor), old_value, new_value, source (manual|import|repricing), reason_code (when a price went down), note, user_id, at`. Added to only; not synced.
 
 **tax_codes:** `code, name, rate_bp, is_default` (Delux: one code at 0 bp, the default; an item without its own code uses it, and each sale line records the code that applied, ACC-09)
 

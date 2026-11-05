@@ -47,6 +47,7 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 ## Staff and user admin (W1-04, D-091)
 
 - **Who:** people are managed with **`admin.users`** (Owner by template, owner answer 1); **temporary PINs stay with `admin.devices`** (Manager and Owner). One *Staff* screen for both: the actions shown follow the permissions.
+- **Prices are the owner's** (W1-15, D-104): `cat.price.edit` is not in the Manager template; migration 0016 removed it from the existing template Manager roles. Managers keep `cat.item.edit` (details, codes, vehicles, new items).
 - **API** (`apps/api/src/admin/users.ts`):
 
   | Route | Permission | What |
