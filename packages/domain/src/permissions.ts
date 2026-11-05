@@ -91,7 +91,7 @@ export const ROLE_TEMPLATES: Readonly<Record<RoleTemplateKey, RoleTemplate>> = {
       'pos.override.approve',
       'cash.variance.approve',
       'cat.item.edit',
-      'cat.price.edit',
+      // Not cat.price.edit: only the owner changes prices (owner answer 3 to W1-15).
       'cat.label.print',
       'inv.adjust',
       'inv.transfer',

@@ -811,6 +811,21 @@ export const itemFloors = erp.table('item_floors', {
   ...syncColumns,
 });
 
+/** Every price change: who, when, old → new and why (CAT-07, W1-15); added to only. */
+export const priceHistory = erp.table('price_history', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  tierId: uuid('tier_id'),
+  oldValue: bigint('old_value', { mode: 'number' }),
+  newValue: bigint('new_value', { mode: 'number' }),
+  source: text('source').notNull(),
+  reasonCode: text('reason_code'),
+  note: text('note'),
+  userId: uuid('user_id'),
+  at: timestamp('at', { withTimezone: true }).notNull(),
+});
+
 /** The opening balances at cutover (MIG-02, posting rules §7, W1-14): a draft until it is posted, then never changed. */
 export const openingBalances = erp.table('opening_balances', {
   id: uuid('id').primaryKey(),

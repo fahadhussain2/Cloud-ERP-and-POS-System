@@ -6,6 +6,7 @@ import type pg from 'pg';
 import { registerAdmin } from './admin/routes';
 import { registerUsers } from './admin/users';
 import { registerAuth } from './auth/routes';
+import { registerCatalog } from './catalog/routes';
 import { registerDevices } from './devices/routes';
 import { registerEvents } from './sync/events';
 import { registerReports } from './reports/routes';
@@ -85,6 +86,7 @@ export function buildApp({
         registerAdmin(api, { pool, requireAuth });
         registerUsers(api, { pool, now, requireAuth });
         registerReports(api, { pool, now, requireAuth });
+        registerCatalog(api, { pool, now, requireAuth });
       },
       { prefix: '/api' },
     );
