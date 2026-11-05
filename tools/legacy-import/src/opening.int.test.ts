@@ -128,9 +128,14 @@ async function stage(label: string, extraSale = false) {
         'valuationrate',
       ],
       [
+        // Every stock document has its stock record: the opening counts these (D-102).
         ['ABEA001', '3', '2026-11-02 10:00:00.000', '1', '5.00', '15.00', '933.3333'],
+        ['ABEA002', '3', '2026-11-02 10:00:00.000', '1', '2.00', '2.00', '300.00'],
+        ['ABEA001', '4', '2026-11-03 10:00:00.000', '2', '1.00', '14.00', '933.3333'],
+        ['ABEA002', '5', '2026-11-20 12:00:00.000', '1', '2.00', '0.00', '300.00'],
         ['ABEA001', '5', '2026-11-25 12:00:00.000', '2', '1.00', '13.00', '933.3333'],
         ['BBCD001', '5', '2026-11-25 12:00:00.000', '2', '4.00', '-3.00', null],
+        ...(extraSale ? [['ABEA001', '5', '2026-11-26 12:00:00.000', '3', '1.00', '12.00', '933.3333']] : []),
       ],
     );
     await table(
@@ -183,6 +188,7 @@ const options = (over: Partial<OpeningOptions> = {}): OpeningOptions => ({
   post: false,
   inputs: {},
   legacyTotals: null,
+  legacyClosing: null,
   now: new Date('2026-11-30T20:00:00Z'),
   ...over,
 });
@@ -266,6 +272,21 @@ describe('an opening from a staged dump', () => {
   it('computes without writing on a dry run', async () => {
     const r = await importOpening(options({ write: false }));
     expect(r.status).toBe('computed');
+    expect(await q('SELECT 1 FROM erp.opening_balances')).toEqual([]);
+  });
+
+  it('compares each item with the legacy Closing Stock report and lists the dates in the dump', async () => {
+    const r = await importOpening(
+      options({ write: false, legacyClosing: [{ itemId: 'ABEA001', qty: '999.00' }] }),
+    );
+    expect(r.closingCompare?.counts.legacyItems).toBe(1);
+    expect(r.closingCompare?.rows.find((x) => x.itemId === 'ABEA001')?.legacy).toBe(999_000);
+    expect(r.checks).toContainEqual(
+      expect.objectContaining({ check: 'Stock per item = legacy Closing Stock report', status: 'differs' }),
+    );
+    const sales = r.periods.find((p) => p.source === 'inv_saleheader');
+    expect(sales?.rows).toBeGreaterThan(0);
+    expect(sales?.from).toMatch(/^\d{4}-\d{2}-\d{2}/);
     expect(await q('SELECT 1 FROM erp.opening_balances')).toEqual([]);
   });
 
@@ -410,6 +431,8 @@ describe('an opening from a staged dump', () => {
         'negative-stock.csv',
         'zero-stock-recent-sales.csv',
         'quantity-mismatch.csv',
+        'periods.csv',
+        'closing-compare.csv',
         'summary.json',
         join('parties', 'top-customers.csv'),
       ]),

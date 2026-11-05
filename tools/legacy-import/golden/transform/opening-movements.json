@@ -1,0 +1,52 @@
+{
+  "description": "The stock movements the opening counts (D-102, migration doc §4.1), as the legacy Closing Stock report does: the INV_StockRecordTAB rows with their own Quantity and document type, except physical-stock counts, whose stock records lose the sign of a shortage, so they come from the count sheet's signed lines instead. A physical-stock type is any type that appears on the count sheet's lines. Sale lines are never used (legacy stores their quantities negative). Order: the stock records as given, then the count lines.",
+  "cases": [
+    {
+      "name": "purchases and sales come from the stock records",
+      "input": {
+        "records": [
+          { "itemId": "ABEA001", "docType": "21", "date": "2026-07-02 10:00:00.000", "qty": "5.00" },
+          { "itemId": "ABEA001", "docType": "31", "date": "2026-07-03 10:00:00.000", "qty": "2.00" }
+        ],
+        "physical": []
+      },
+      "expected": [
+        { "itemId": "ABEA001", "docType": "21", "date": "2026-07-02 10:00:00.000", "qty": "5.00" },
+        { "itemId": "ABEA001", "docType": "31", "date": "2026-07-03 10:00:00.000", "qty": "2.00" }
+      ]
+    },
+    {
+      "name": "a counted shortage: the count sheet's −2, not the stock record's +2",
+      "input": {
+        "records": [
+          { "itemId": "ARPR014", "docType": "21", "date": "2026-07-02 10:00:00.000", "qty": "6.00" },
+          { "itemId": "ARPR014", "docType": "11", "date": "2026-10-01 10:00:00.000", "qty": "2.00" }
+        ],
+        "physical": [
+          { "itemId": "ARPR014", "docType": "11", "date": "2026-10-01 10:00:00.000", "qty": "-2.00" }
+        ]
+      },
+      "expected": [
+        { "itemId": "ARPR014", "docType": "21", "date": "2026-07-02 10:00:00.000", "qty": "6.00" },
+        { "itemId": "ARPR014", "docType": "11", "date": "2026-10-01 10:00:00.000", "qty": "-2.00" }
+      ]
+    },
+    {
+      "name": "a counted surplus and a physical-stock record of another item are both replaced by the count lines",
+      "input": {
+        "records": [
+          { "itemId": "BRK010", "docType": "11", "date": "2026-10-01 10:00:00.000", "qty": "3.00" },
+          { "itemId": "OIL050", "docType": "11", "date": "2026-10-01 10:00:00.000", "qty": "1.00" }
+        ],
+        "physical": [
+          { "itemId": "BRK010", "docType": "11", "date": "2026-10-01 10:00:00.000", "qty": "3.00" },
+          { "itemId": "OIL050", "docType": "11", "date": "2026-10-01 10:00:00.000", "qty": "-1.00" }
+        ]
+      },
+      "expected": [
+        { "itemId": "BRK010", "docType": "11", "date": "2026-10-01 10:00:00.000", "qty": "3.00" },
+        { "itemId": "OIL050", "docType": "11", "date": "2026-10-01 10:00:00.000", "qty": "-1.00" }
+      ]
+    }
+  ]
+}

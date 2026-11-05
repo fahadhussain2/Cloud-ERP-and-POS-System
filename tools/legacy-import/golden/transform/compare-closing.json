@@ -1,0 +1,196 @@
+{
+  "description": "Our closing stock per item against the legacy Item Wise Closing Stock report (W1-14 rehearsal 2): which of our three figures the report shows (the computation from the document lines, the item opening ± the stock-record lines, the latest running balance), and, per document type, where the document lines and the stock-record lines disagree. Rows only for items whose report quantity differs from the computation, in item-code order; an item missing from the report counts as not listed, a code listed twice is added up.",
+  "cases": [
+    {
+      "name": "the report agrees with the computation: no rows",
+      "input": {
+        "asOf": "2026-11-05",
+        "docTypes": { "21": 1, "31": -1 },
+        "openings": [{ "itemId": "ABEA001", "qty": "2.00" }],
+        "lines": [{ "itemId": "ABEA001", "docType": "31", "date": "2026-08-01 10:00:00.000", "qty": "1.00" }],
+        "records": [
+          { "itemId": "ABEA001", "docType": "31", "date": "2026-08-01 10:00:00.000", "qty": "1.00" }
+        ],
+        "running": [{ "itemId": "ABEA001", "qty": 1000 }],
+        "legacy": [{ "itemId": "ABEA001", "qty": "1.00" }]
+      },
+      "expected": {
+        "counts": {
+          "legacyItems": 1,
+          "same": 1,
+          "differ": 0,
+          "matchRecords": 0,
+          "matchRunning": 0,
+          "none": 0,
+          "notInReport": 0,
+          "notOurs": 0
+        },
+        "totals": { "legacy": 1000, "computed": 1000, "records": 1000 },
+        "rows": []
+      }
+    },
+    {
+      "name": "the report shows the stock-record figure; the sales differ between lines and records",
+      "input": {
+        "asOf": "2026-11-05",
+        "docTypes": { "21": 1, "31": -1 },
+        "openings": [{ "itemId": "ABEA004", "qty": "1.00" }],
+        "lines": [
+          { "itemId": "ABEA004", "docType": "21", "date": "2026-07-02 10:00:00.000", "qty": "5.00" },
+          { "itemId": "ABEA004", "docType": "31", "date": "2026-08-01 10:00:00.000", "qty": "2.00" }
+        ],
+        "records": [
+          { "itemId": "ABEA004", "docType": "21", "date": "2026-07-02 10:00:00.000", "qty": "5.00" },
+          { "itemId": "ABEA004", "docType": "31", "date": "2026-08-01 10:00:00.000", "qty": "4.00" }
+        ],
+        "running": [{ "itemId": "ABEA004", "qty": 3000 }],
+        "legacy": [{ "itemId": "ABEA004", "qty": "2.00" }]
+      },
+      "expected": {
+        "counts": {
+          "legacyItems": 1,
+          "same": 0,
+          "differ": 1,
+          "matchRecords": 1,
+          "matchRunning": 0,
+          "none": 0,
+          "notInReport": 0,
+          "notOurs": 0
+        },
+        "totals": { "legacy": 2000, "computed": 4000, "records": 2000 },
+        "rows": [
+          {
+            "itemId": "ABEA004",
+            "legacy": 2000,
+            "computed": 4000,
+            "records": 2000,
+            "running": 3000,
+            "opening": 1000,
+            "matches": ["records"],
+            "byType": [{ "docType": "31", "lines": -2000, "records": -4000 }]
+          }
+        ]
+      }
+    },
+    {
+      "name": "the report shows the running balance; and one matching none, without a stock record",
+      "input": {
+        "asOf": "2026-11-05",
+        "docTypes": { "21": 1 },
+        "openings": [],
+        "lines": [
+          { "itemId": "ACES005", "docType": "21", "date": "2026-07-02 10:00:00.000", "qty": "9.00" },
+          { "itemId": "ACES006", "docType": "21", "date": "2026-07-02 10:00:00.000", "qty": "4.00" }
+        ],
+        "records": [],
+        "running": [{ "itemId": "ACES005", "qty": 7000 }],
+        "legacy": [
+          { "itemId": "ACES005", "qty": "7.00" },
+          { "itemId": "ACES006", "qty": "1.00" }
+        ]
+      },
+      "expected": {
+        "counts": {
+          "legacyItems": 2,
+          "same": 0,
+          "differ": 2,
+          "matchRecords": 0,
+          "matchRunning": 1,
+          "none": 1,
+          "notInReport": 0,
+          "notOurs": 0
+        },
+        "totals": { "legacy": 8000, "computed": 13000, "records": 0 },
+        "rows": [
+          {
+            "itemId": "ACES005",
+            "legacy": 7000,
+            "computed": 9000,
+            "records": 0,
+            "running": 7000,
+            "opening": 0,
+            "matches": ["running"],
+            "byType": [{ "docType": "21", "lines": 9000, "records": 0 }]
+          },
+          {
+            "itemId": "ACES006",
+            "legacy": 1000,
+            "computed": 4000,
+            "records": 0,
+            "running": null,
+            "opening": 0,
+            "matches": [],
+            "byType": [{ "docType": "21", "lines": 4000, "records": 0 }]
+          }
+        ]
+      }
+    },
+    {
+      "name": "an item in stock missing from the report, a report item we don't have, a code listed twice, and the cutoff",
+      "input": {
+        "asOf": "2026-11-05",
+        "docTypes": { "21": 1 },
+        "openings": [{ "itemId": "OIL050", "qty": "3.00" }],
+        "lines": [
+          { "itemId": "BRK010", "docType": "21", "date": "2026-07-02 10:00:00.000", "qty": "2.00" },
+          { "itemId": "OIL050", "docType": "21", "date": "2026-11-06 09:00:00.000", "qty": "5.00" }
+        ],
+        "records": [],
+        "running": [],
+        "legacy": [
+          { "itemId": "OIL050", "qty": "1.00" },
+          { "itemId": "OIL050", "qty": "2.00" },
+          { "itemId": "ZZZ999", "qty": "1.50" }
+        ]
+      },
+      "expected": {
+        "counts": {
+          "legacyItems": 2,
+          "same": 1,
+          "differ": 1,
+          "matchRecords": 0,
+          "matchRunning": 0,
+          "none": 0,
+          "notInReport": 1,
+          "notOurs": 1
+        },
+        "totals": { "legacy": 4500, "computed": 5000, "records": 3000 },
+        "rows": [
+          {
+            "itemId": "BRK010",
+            "legacy": null,
+            "computed": 2000,
+            "records": 0,
+            "running": null,
+            "opening": 0,
+            "matches": [],
+            "byType": [{ "docType": "21", "lines": 2000, "records": 0 }]
+          },
+          {
+            "itemId": "ZZZ999",
+            "legacy": 1500,
+            "computed": null,
+            "records": null,
+            "running": null,
+            "opening": null,
+            "matches": [],
+            "byType": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "a report quantity that isn't a number stops the run",
+      "input": {
+        "asOf": "2026-11-05",
+        "docTypes": {},
+        "openings": [],
+        "lines": [],
+        "records": [],
+        "running": [],
+        "legacy": [{ "itemId": "ABEA001", "qty": "1,000.00" }]
+      },
+      "error": "bad_quantity"
+    }
+  ]
+}

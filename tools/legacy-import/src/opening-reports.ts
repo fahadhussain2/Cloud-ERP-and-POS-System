@@ -17,6 +17,7 @@ const csv = (header: string[], rows: Cell[][]) =>
   '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 const rupees = (minor: number) => (minor / 100).toFixed(2);
 const units = (t: number) => (t / 1000).toFixed(3);
+const q = (t: number | null) => (t === null ? null : units(t));
 const html = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -37,6 +38,38 @@ function reportsOf(r: OpeningResult): Report[] {
       why: 'Confirm each sign (+1 adds stock, −1 takes it away) in opening.docTypes of the mapping file.',
       header: ['Table', 'Type', 'Name', 'Rows', 'Sign in the mapping'],
       rows: r.docTypes.map((t) => [t.source, t.docType, t.name, t.rows, t.sign ?? 'none']),
+    },
+    {
+      file: 'opening/periods.csv',
+      title: 'Legacy periods and the dates in the dump',
+      why: 'Check the dump covers the days you expect (first and last document per table).',
+      header: ['Source', 'Period', 'From', 'To', 'Rows'],
+      rows: r.periods.map((p) => [p.source, p.name, p.from, p.to, p.source === 'period' ? null : p.rows]),
+    },
+    {
+      file: 'opening/closing-compare.csv',
+      title: 'Items that differ from the legacy Closing Stock report',
+      why: 'Which figure the report shows (records = item opening ± stock-record lines; running = latest balance), and per document type where the document lines and the stock records disagree.',
+      header: [
+        'Item',
+        'Legacy report',
+        'Computed',
+        'From the stock records',
+        'Running balance',
+        'Item opening',
+        'Report equals',
+        'Lines vs records by type',
+      ],
+      rows: (r.closingCompare?.rows ?? []).map((x) => [
+        x.itemId,
+        q(x.legacy),
+        q(x.computed),
+        q(x.records),
+        q(x.running),
+        q(x.opening),
+        x.matches.join(' ') || (x.legacy === null || x.computed === null ? 'n/a' : 'none'),
+        x.byType.map((t) => `${t.docType}: ${units(t.lines)} vs ${units(t.records)}`).join('; '),
+      ]),
     },
     {
       file: 'opening/negative-stock.csv',
@@ -156,6 +189,10 @@ export async function writeOpeningReports(r: OpeningResult, labelDir: string): P
         differences: r.differences,
         totals: r.totals,
         checks: r.checks,
+        closingCompare: r.closingCompare && {
+          counts: r.closingCompare.counts,
+          totals: r.closingCompare.totals,
+        },
         findings: Object.fromEntries(reports.map((rep) => [rep.file, rep.rows.length])),
       },
       null,
