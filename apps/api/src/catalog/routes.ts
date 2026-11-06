@@ -40,6 +40,11 @@ interface Deps {
   requireAuth: preHandlerAsyncHookHandler;
 }
 
+/** A 201 answer, sent by `run` once the transaction has committed (never from inside it). */
+class Created {
+  constructor(readonly body: unknown) {}
+}
+
 class Refusal extends Error {
   constructor(
     readonly status: number,
@@ -165,11 +170,12 @@ export function registerCatalog(scope: FastifyInstance, { pool, now, requireAuth
   /** One transaction as the signed-in person; a Refusal rolls back and becomes the answer. */
   const run = async <T>(req: FastifyRequest, reply: FastifyReply, fn: (c: Client) => Promise<T>) => {
     try {
-      return await withTenant(
+      const out = await withTenant(
         pool,
         { tenantId: req.auth!.tenantId, userId: req.auth!.userId, requestId: req.id },
         (_db, c) => fn(c),
       );
+      return out instanceof Created ? reply.code(201).send(out.body) : out;
     } catch (err) {
       if (err instanceof Refusal) return reply.code(err.status).send(err.body);
       const e = err as { code?: string };
@@ -457,7 +463,7 @@ export function registerCatalog(scope: FastifyInstance, { pool, now, requireAuth
         [req.auth!.tenantId, id, code, normalizeIdentifier(code)],
       );
       await writePrices(c, req.auth!.tenantId, id, tiers, changes, { reason: null, note: null });
-      return reply.code(201).send({ id });
+      return new Created({ id });
     });
   });
 
@@ -730,7 +736,7 @@ export function registerCatalog(scope: FastifyInstance, { pool, now, requireAuth
           `INSERT INTO erp.${table} (tenant_id, name) VALUES ($1, $2) RETURNING id, name`,
           [req.auth!.tenantId, name],
         );
-        return reply.code(201).send(rows[0]);
+        return new Created(rows[0]);
       });
     });
 

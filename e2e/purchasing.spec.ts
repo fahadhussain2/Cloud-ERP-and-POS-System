@@ -1,12 +1,16 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
+import { expect, test } from './counter-test';
 import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
 
 // W1-16 plan: the owner adds a supplier, types the supplier's bill with a bill discount (Post waits until the lines
 // equal the bill), posts it, returns part of it, pays by bank, and reads it all on the supplier's ledger. Back office
 // only; after counter.spec, so the owner's own password is set. ENOL001 is not sold by any other flow.
+// It uses the shared fixtures (./counter-test), so every flow runs in one worker with one counter profile: a file with
+// other fixtures ran in a worker of its own, and the flows after it got a fresh counter (staging CI, 2026-11-06). The
+// back office gets its own browser context, as in counter.spec, so the counter's profile stays as it was.
 
 const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
 
@@ -36,8 +40,10 @@ const menu = (page: Page, name: string) =>
   page.getByRole('navigation', { name: bo.nav.menu }).getByRole('link', { name }).click();
 
 test('the owner records a supplier bill with a bill discount, returns part of it and pays by bank', async ({
-  page,
+  browser,
 }) => {
+  const office = await browser.newContext();
+  const page = await office.newPage();
   await signIn(page);
 
   // The supplier.
@@ -104,4 +110,5 @@ test('the owner records a supplier bill with a bill discount, returns part of it
   await expect(ledger).toContainText('PR000001');
   await expect(ledger).toContainText('SP000001');
   await expect(page.getByText(/The shop owes Rs\s?29,200/)).toBeVisible();
+  await office.close();
 });

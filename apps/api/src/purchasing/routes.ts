@@ -41,6 +41,11 @@ interface Deps {
   requireAuth: preHandlerAsyncHookHandler;
 }
 
+/** A 201 answer, sent by `run` once the transaction has committed (never from inside it). */
+class Created {
+  constructor(readonly body: unknown) {}
+}
+
 class Refusal extends Error {
   constructor(
     readonly status: number,
@@ -139,11 +144,12 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
 
   const run = async <T>(req: FastifyRequest, reply: FastifyReply, fn: (c: Client) => Promise<T>) => {
     try {
-      return await withTenant(
+      const out = await withTenant(
         pool,
         { tenantId: req.auth!.tenantId, userId: req.auth!.userId, requestId: req.id },
         (_db, c) => fn(c),
       );
+      return out instanceof Created ? reply.code(201).send(out.body) : out;
     } catch (err) {
       if (err instanceof Refusal) return reply.code(err.status).send(err.body);
       const e = err as { code?: string; constraint?: string };
@@ -328,7 +334,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
         'INSERT INTO erp.supplier_accounts (tenant_id, party_id, payment_terms_days) VALUES ($1, $2, $3)',
         [req.auth!.tenantId, id, b.termsDays ?? null],
       );
-      return reply.code(201).send({ id });
+      return new Created({ id });
     });
   });
 
@@ -523,7 +529,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
         [req.auth!.tenantId, branch, ...receiptHeader(b)],
       );
       await writeReceiptLines(c, req.auth!.tenantId, rows[0]!.id, b);
-      return reply.code(201).send({ id: rows[0]!.id, rowVersion: rows[0]!.rv });
+      return new Created({ id: rows[0]!.id, rowVersion: rows[0]!.rv });
     });
   });
 
@@ -767,8 +773,10 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
   scope.post('/purchasing/returns', { preHandler: receive }, async (req, reply) => {
     const parsed = ReturnDraft.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
-    return run(req, reply, async (c) =>
-      reply.code(201).send(await writeReturn(c, req.auth!.tenantId, null, parsed.data)),
+    return run(
+      req,
+      reply,
+      async (c) => new Created(await writeReturn(c, req.auth!.tenantId, null, parsed.data)),
     );
   });
 
@@ -843,7 +851,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
         [req.auth!.tenantId, number, branch, b.supplierId, b.bankAccountId, b.amount, b.paidOn, b.reference],
       );
       await post(req, c, 'supplier_payment', rows[0]!.id);
-      return reply.code(201).send({ id: rows[0]!.id, number });
+      return new Created({ id: rows[0]!.id, number });
     });
   });
 }
