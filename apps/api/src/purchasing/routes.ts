@@ -15,7 +15,14 @@ import {
   type SupplierRow,
 } from '@erp/contracts';
 import { withTenant } from '@erp/db';
-import { can, checkReceipt, checkReturn, receiptTotals, type Permission } from '@erp/domain';
+import {
+  can,
+  checkReceipt,
+  checkReturn,
+  normalizeIdentifier,
+  receiptTotals,
+  type Permission,
+} from '@erp/domain';
 import { postDocument } from '@erp/posting';
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
 import type pg from 'pg';
@@ -49,6 +56,8 @@ type Row = Record<string, unknown>;
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const thousandths = (v: unknown) => Math.round(Number(v) * 1000);
 const units = (t: number) => t / 1000;
+/** Text for a LIKE pattern, its wildcards taken literally. */
+const likeEscape = (s: string) => s.replace(/[\\%_]/g, (x) => `\\${x}`);
 /** A date column read as text (`::text`), or null. */
 const day = (v: unknown) => (typeof v === 'string' ? v : null);
 
@@ -190,6 +199,31 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     }),
   );
 
+  // Items for a receipt or return line: code, name, barcode or OEM number, with what the checks need. The catalog's
+  // own search needs a catalog permission a purchaser doesn't have.
+  scope.get('/purchasing/items', { preHandler: receive }, async (req, reply) => {
+    const text = ((req.query as Record<string, string | undefined>)['q'] ?? '').trim();
+    if (text === '') return { items: [] };
+    const words = text.split(/\s+/).map((w) => `%${likeEscape(w)}%`);
+    const normalized = likeEscape(normalizeIdentifier(text));
+    return run(req, reply, async (c) => {
+      const { rows } = await c.query<{ id: string }>(
+        `SELECT i.id FROM erp.items i
+         WHERE i.deleted_at IS NULL AND i.status <> 'discontinued'
+           AND (NOT EXISTS (SELECT 1 FROM unnest($1::text[]) w WHERE NOT (i.code ILIKE w OR i.name ILIKE w))
+             OR EXISTS (SELECT 1 FROM erp.item_identifiers x WHERE x.item_id = i.id AND x.deleted_at IS NULL
+                        AND x.normalized_value LIKE $2 || '%'))
+         ORDER BY i.code LIMIT 20`,
+        [words, normalized],
+      );
+      const facts = await itemFacts(
+        c,
+        rows.map((r) => r.id),
+      );
+      return { items: rows.map((r) => ({ id: r.id, ...facts.get(r.id)! })) };
+    });
+  });
+
   // ---- Suppliers (PUR-01) ----
 
   const supplierRow = (r: Row): SupplierRow => ({
@@ -214,7 +248,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       const { rows } = await c.query<Row>(
         `${SUPPLIERS} AND ($1 = '' OR p.code ILIKE '%' || $1 || '%' OR p.name ILIKE '%' || $1 || '%')
          ORDER BY lower(p.name) LIMIT 500`,
-        [text.replace(/[\\%_]/g, (x) => `\\${x}`)],
+        [likeEscape(text)],
       );
       return { suppliers: rows.map(supplierRow) };
     });

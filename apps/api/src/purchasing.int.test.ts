@@ -176,6 +176,18 @@ describe('suppliers (PUR-01)', () => {
   });
 });
 
+describe('items for a receipt line', () => {
+  it('are found by code or name words, with their unit rule, last cost and Retail', async () => {
+    const r = (await send('GET', '/api/purchasing/items?q=bearing%20every', 'maria')).json<{
+      items: { code: string; allowsFraction: boolean; retail: number | null }[];
+    }>();
+    expect(r.items).toEqual([
+      expect.objectContaining({ code: 'ABEA002', allowsFraction: false, retail: 60000 }),
+    ]);
+    expect((await send('GET', '/api/purchasing/items?q=oil', 'sara')).statusCode).toBe(403);
+  });
+});
+
 describe('a goods receipt (PUR-02)', () => {
   const draft = (over: Record<string, unknown> = {}) => ({
     supplierId: naveed,
