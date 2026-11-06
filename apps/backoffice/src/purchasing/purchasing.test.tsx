@@ -1,0 +1,218 @@
+import type { PurchasingLookups, ReceiptView, SupplierDetail } from '@erp/contracts';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { I18nextProvider } from 'react-i18next';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import type { Api } from '../api';
+import { i18n } from '../i18n';
+import en from '../locales/en.json';
+import { ReceiptScreen } from './ReceiptScreen';
+import { SupplierScreen } from './SuppliersScreen';
+
+// The purchasing screens (W1-16) over a fake API: a receipt checked against the bill as you type (the difference,
+// line warnings, Post waiting until it matches), the supplier's ledger with its running balance, and Pay by bank only
+// for those who may (owner answer 2).
+
+const MONEY = { locale: 'en-PK', currency: 'PKR', minorUnits: 2 };
+const lookups = (over: Partial<PurchasingLookups> = {}): PurchasingLookups => ({
+  locations: [
+    { id: 'shop', code: 'SHOP', name: 'Shop' },
+    { id: 'godown', code: 'GODOWN', name: 'Godown' },
+  ],
+  bankAccounts: [{ id: 'hbl', code: 'hbl', name: 'Bank: HBL' }],
+  suppliers: [{ id: 's1', code: '0210', name: 'Naveed Glass' }],
+  live: false,
+  money: MONEY,
+  can: { receive: true, payByBank: false },
+  ...over,
+});
+const DRAFT: ReceiptView = {
+  receipt: {
+    id: 'r1',
+    number: null,
+    status: 'draft',
+    supplierId: 's1',
+    supplierName: 'Naveed Glass',
+    billNo: 'INV-4471',
+    billDate: '2026-11-05',
+    receivedOn: '2026-11-06',
+    locationId: 'shop',
+    paidFrom: null,
+    billDiscount: 0,
+    billTotal: 1340000,
+    total: null,
+    dueDate: null,
+    notes: null,
+    rowVersion: '3',
+    postedAt: null,
+  },
+  lines: [
+    {
+      id: 'l1',
+      lineNo: 1,
+      itemId: 'i1',
+      code: 'ABEA001',
+      name: 'ADJUSTER BEARING SALOON',
+      qty: 10000,
+      unitCost: 125000,
+      lineDiscount: 0,
+      value: null,
+      netUnitCost: null,
+      allowsFraction: false,
+      lastCost: 100000,
+      retail: 160000,
+    },
+    {
+      id: 'l2',
+      lineNo: 2,
+      itemId: 'i2',
+      code: 'ABEA002',
+      name: 'ADJUSTER BEARING EVERY',
+      qty: 2000,
+      unitCost: 45050,
+      lineDiscount: 0,
+      value: null,
+      netUnitCost: null,
+      allowsFraction: false,
+      lastCost: null,
+      retail: null,
+    },
+  ],
+  check: { problems: [], warnings: [], total: null, difference: null },
+};
+const LEDGER: SupplierDetail = {
+  supplier: {
+    id: 's1',
+    code: '0210',
+    name: 'Naveed Glass',
+    phones: [],
+    termsDays: 30,
+    labelAbbr: 'NG',
+    status: 'active',
+    balance: 1090100,
+    contactPerson: null,
+    address: null,
+    city: null,
+    notes: null,
+    rowVersion: '5',
+  },
+  balance: 1090100,
+  ledger: [
+    {
+      entryDate: '2026-11-06',
+      dueDate: '2026-12-05',
+      kind: 'goods_receipt',
+      sourceId: 'r1',
+      number: 'GR000001',
+      amount: 1340100,
+      balance: 1340100,
+    },
+    {
+      entryDate: '2026-11-06',
+      dueDate: '2026-11-06',
+      kind: 'purchase_return',
+      sourceId: 'p1',
+      number: 'PR000001',
+      amount: -250000,
+      balance: 1090100,
+    },
+  ],
+};
+
+function fakeApi(l: PurchasingLookups, answers: Record<string, { status: number; body: unknown }> = {}) {
+  const calls: { method: string; path: string; body: unknown }[] = [];
+  const api: Api = (method, path, body) => {
+    calls.push({ method, path, body });
+    const key = `${method} ${path.split('?')[0]}`;
+    if (answers[key]) return Promise.resolve(answers[key]);
+    if (key === 'GET /api/purchasing/lookups') return Promise.resolve({ status: 200, body: l });
+    if (key === 'GET /api/purchasing/receipts/r1') return Promise.resolve({ status: 200, body: DRAFT });
+    if (key === 'GET /api/purchasing/suppliers/s1') return Promise.resolve({ status: 200, body: LEDGER });
+    return Promise.resolve({ status: 200, body: { rowVersion: '4' } });
+  };
+  return { api, calls };
+}
+
+const show = (ui: ReactElement) => render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
+afterEach(cleanup);
+
+describe('a goods receipt', () => {
+  it('shows the difference from the printed total and keeps Post waiting until it matches', async () => {
+    const f = fakeApi(lookups());
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    const totals = await screen.findByLabelText(en.purchasing.receipts.totals);
+    // 10 × 1,250 + 2 × 450.50 = 13,401; the bill says 13,400.
+    expect(within(totals).getByRole('status').textContent).toMatch(/-Rs\s?1/);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post }).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(en.purchasing.fields.billTotal), { target: { value: '13401' } });
+    expect(within(totals).getByRole('status').textContent).toBe(en.purchasing.totals.matches);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post }).disabled).toBe(false);
+  });
+
+  it('warns when a cost is more than 10 % above the last one', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    expect(await screen.findByText(en.purchasing.warnings.cost_up)).toBeDefined();
+  });
+
+  it('saves the draft with the row version, then posts it', async () => {
+    const f = fakeApi(lookups(), {
+      'POST /api/purchasing/receipts/r1/post': { status: 200, body: { number: 'GR000001' } },
+    });
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    fireEvent.change(await screen.findByLabelText(en.purchasing.fields.billTotal), {
+      target: { value: '13401' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.post }));
+    await waitFor(() =>
+      expect(f.calls.some((c) => c.path === '/api/purchasing/receipts/r1/post')).toBe(true),
+    );
+    expect(f.calls.find((c) => c.method === 'PUT')).toMatchObject({
+      body: {
+        rowVersion: '3',
+        billTotal: 1340100,
+        lines: [
+          { itemId: 'i1', qty: 10000, unitCost: 125000 },
+          { itemId: 'i2', qty: 2000, unitCost: 45050 },
+        ],
+      },
+    });
+    expect(f.calls.find((c) => c.path.endsWith('/post'))!.body).toEqual({ rowVersion: '4' });
+  });
+
+  it('says a cash bill is paid at the desk, and warns until go-live', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    expect(await screen.findByText(en.purchasing.receipts.cashHint)).toBeDefined();
+    expect(screen.getByText(en.purchasing.notLive.title)).toBeDefined();
+  });
+});
+
+describe('a supplier', () => {
+  it('shows the ledger with its running balance, and Pay by bank only with acc.payment.create', async () => {
+    const f = fakeApi(lookups());
+    show(<SupplierScreen api={f.api} id="s1" />);
+    const ledger = await screen.findByRole('table', { name: en.purchasing.ledger.title });
+    expect(within(ledger).getByText('GR000001')).toBeDefined();
+    expect(within(ledger).getAllByText(/Rs\s?10,901/).length).toBe(1);
+    expect(screen.queryByRole('button', { name: en.purchasing.pay.action })).toBeNull();
+    cleanup();
+    show(<SupplierScreen api={fakeApi(lookups({ can: { receive: false, payByBank: true } })).api} id="s1" />);
+    expect(await screen.findByRole('button', { name: en.purchasing.pay.action })).toBeDefined();
+  });
+
+  it('pays by bank with the amount in paisa', async () => {
+    const f = fakeApi(lookups({ can: { receive: false, payByBank: true } }), {
+      'POST /api/purchasing/payments': { status: 201, body: { id: 'p9', number: 'SP000001' } },
+    });
+    show(<SupplierScreen api={f.api} id="s1" />);
+    fireEvent.click(await screen.findByRole('button', { name: en.purchasing.pay.action }));
+    fireEvent.change(screen.getByLabelText(en.purchasing.pay.amount), { target: { value: '5000' } });
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.pay.confirm }));
+    expect(await screen.findByText('SP000001 recorded.')).toBeDefined();
+    expect(f.calls.find((c) => c.method === 'POST')!.body).toMatchObject({
+      supplierId: 's1',
+      bankAccountId: 'hbl',
+      amount: 500000,
+    });
+  });
+});

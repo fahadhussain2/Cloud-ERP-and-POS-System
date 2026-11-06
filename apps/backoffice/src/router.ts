@@ -13,7 +13,13 @@ export type Route =
   | { screen: 'items' }
   | { screen: 'item'; id: string }
   | { screen: 'newItem' }
-  | { screen: 'categories' };
+  | { screen: 'categories' }
+  | { screen: 'suppliers' }
+  | { screen: 'supplier'; id: string }
+  | { screen: 'receipts' }
+  | { screen: 'receipt'; id: string }
+  | { screen: 'purchaseReturns' }
+  | { screen: 'purchaseReturn'; id: string };
 
 export const href = {
   staff: '#/staff',
@@ -25,6 +31,14 @@ export const href = {
   item: (id: string) => `#/catalog/items/${encodeURIComponent(id)}`,
   newItem: '#/catalog/new',
   categories: '#/catalog/categories',
+  suppliers: '#/purchasing/suppliers',
+  supplier: (id: string) => `#/purchasing/suppliers/${encodeURIComponent(id)}`,
+  receipts: '#/purchasing/receipts',
+  /** `new` for a new receipt. */
+  receipt: (id: string) => `#/purchasing/receipts/${encodeURIComponent(id)}`,
+  purchaseReturns: '#/purchasing/returns',
+  /** `new`, or `new-<receipt id>` for a return from that receipt. */
+  purchaseReturn: (id: string) => `#/purchasing/returns/${encodeURIComponent(id)}`,
 } as const;
 
 export function parseHash(hash: string): Route {
@@ -39,6 +53,15 @@ export function parseHash(hash: string): Route {
   if (parts[0] === 'catalog' && parts[1] === 'new') return { screen: 'newItem' };
   if (parts[0] === 'catalog' && parts[1] === 'categories') return { screen: 'categories' };
   if (parts[0] === 'catalog') return { screen: 'items' };
+  if (parts[0] === 'purchasing' && parts[1] === 'suppliers' && parts[2])
+    return { screen: 'supplier', id: decodeURIComponent(parts[2]) };
+  if (parts[0] === 'purchasing' && parts[1] === 'suppliers') return { screen: 'suppliers' };
+  if (parts[0] === 'purchasing' && parts[1] === 'receipts' && parts[2])
+    return { screen: 'receipt', id: decodeURIComponent(parts[2]) };
+  if (parts[0] === 'purchasing' && parts[1] === 'receipts') return { screen: 'receipts' };
+  if (parts[0] === 'purchasing' && parts[1] === 'returns' && parts[2])
+    return { screen: 'purchaseReturn', id: decodeURIComponent(parts[2]) };
+  if (parts[0] === 'purchasing' && parts[1] === 'returns') return { screen: 'purchaseReturns' };
   return { screen: 'home' };
 }
 
@@ -51,4 +74,9 @@ export function useRoute(): Route {
     return () => window.removeEventListener('hashchange', follow);
   }, []);
   return parseHash(hash);
+}
+
+/** Goes to another screen (the address changes, the route follows). */
+export function navigate(to: string): void {
+  window.location.hash = to;
 }
