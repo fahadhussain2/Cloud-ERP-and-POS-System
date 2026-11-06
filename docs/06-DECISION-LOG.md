@@ -919,3 +919,15 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** one master at a time keeps the pilot simple; one person decides prices; the history answers "who changed this price and why".
 - **Trade-off:** a price changed in the new back office before go-live is lost at the final import (the notice says so); managers can't fix a price without the owner.
 - **Status:** Accepted (with the W1-15 plan, owner answers 1–4)
+
+### D-105 Purchasing: receipts and returns as drafts posted once, the bill discount capitalized exactly, cash paid at the desk (2026-11-06)
+- **Decision:**
+  - **Goods receipts and purchase returns are typed as drafts** in the back office and **posted once** (rule 3; a trigger refuses any change after posting, the pilot wipe excepted, D-101). A draft has no number; posting takes `GR`, `PR` or `SP` + six digits from a per-tenant counter in the same transaction, so abandoned drafts leave no gap.
+  - **A receipt can't be posted until its lines equal the bill total as printed** (PUR-02). The bill discount is spread over the lines' nets by largest remainder and capitalized into each line's exact value; the stock movement carries that value and the average is computed from it (`averageAfterValue`), so a rounded unit cost never shifts the books. Warnings (not blocking): a net cost more than 10 % off the last cost, Retail at or below the net cost.
+  - **Cash purchases are paid by the cashier at the desk** (owner answer 1): the receipt puts the bill on the supplier's account and the desk's supplier payment (W1-11) pays it, so the drawer count stays right. A receipt can be marked paid by bank, posting the payment with it. A supplier payment by bank is its own document (`supplier_payments`, posted when made).
+  - **A purchase return** goes out at the item's average; the supplier takes it back at the return's unit cost (offered from the receipt line's net cost); the difference goes to Purchase price variance (posting rules §5.2). Linked to a receipt, it can't return more than the line still has.
+  - **Permissions** (owner answer 2): suppliers, receipts and returns with `pur.receive` (owner, manager, purchaser); payments by bank with `acc.payment.create` (owner, accountant). Return reasons (owner answer 3): damaged, wrong item, excess quantity, poor quality, price dispute, other with a note.
+  - **Until go-live, purchases go into the legacy app** (owner answer 4); the purchasing screens say so, and anything entered here before then is removed by the pilot wipe.
+- **Why:** the supplier's bill is what the shop checks against; exact values keep the stock ledger equal to the bills; one place handles cash.
+- **Trade-off:** two steps for a cash purchase (receipt, then the desk), and a posted mistake is corrected by a return or a journal voucher, never an edit.
+- **Status:** Accepted (with the W1-16 plan, owner answers 1–5)

@@ -7,6 +7,9 @@ import { CategoriesScreen } from './catalog/CategoriesScreen';
 import { ItemScreen } from './catalog/ItemScreen';
 import { ItemsScreen } from './catalog/ItemsScreen';
 import { NewItemScreen } from './catalog/NewItemScreen';
+import { ReceiptScreen, ReceiptsScreen } from './purchasing/ReceiptScreen';
+import { ReturnScreen, ReturnsScreen } from './purchasing/ReturnScreen';
+import { SupplierScreen, SuppliersScreen } from './purchasing/SuppliersScreen';
 import { allowed, MENU, Shell } from './layout/Shell';
 import { useRoute, type Route } from './router';
 import { CountersScreen } from './screens/CountersScreen';
@@ -89,6 +92,18 @@ export function App({ api }: { api: Api }) {
         <NewItemScreen api={api} />
       ) : shown.screen === 'categories' ? (
         <CategoriesScreen api={api} />
+      ) : shown.screen === 'suppliers' ? (
+        <SuppliersScreen api={api} />
+      ) : shown.screen === 'supplier' ? (
+        <SupplierScreen key={shown.id} api={api} id={shown.id} />
+      ) : shown.screen === 'receipts' ? (
+        <ReceiptsScreen api={api} />
+      ) : shown.screen === 'receipt' ? (
+        <ReceiptScreen key={shown.id} api={api} id={shown.id} />
+      ) : shown.screen === 'purchaseReturns' ? (
+        <ReturnsScreen api={api} />
+      ) : shown.screen === 'purchaseReturn' ? (
+        <ReturnScreen key={shown.id} api={api} id={shown.id} />
       ) : (
         <StaffScreen api={api} permissions={me.permissions} />
       )}

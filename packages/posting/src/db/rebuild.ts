@@ -4,16 +4,20 @@ import { emptyState, withChanges } from '../replay';
 import { postCashMovement, postCollection, postSession } from '../cash';
 import { postHandover } from '../handover';
 import { postOpening } from '../opening';
+import { postGoodsReceipt, postPurchaseReturn, postSupplierPayment } from '../purchasing';
 import { postSale } from '../sale';
 import { postVoid } from '../void';
 import type { LedgerState, Posting, PostingContext, PostingResult } from '../types';
 import {
   loadCashMovement,
   loadCollection,
+  loadGoodsReceipt,
   loadHandover,
   loadOpening,
+  loadPurchaseReturn,
   loadSale,
   loadSessionEvent,
+  loadSupplierPayment,
   loadVoid,
   withReturnCosts,
   type LineCost,
@@ -80,6 +84,15 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
     } else if (r.source_type === 'opening') {
       const doc = await loadOpening(c, r.source_id);
       result = doc ? postOpening(doc, r.context, state) : null;
+    } else if (r.source_type === 'goods_receipt') {
+      const doc = await loadGoodsReceipt(c, r.source_id);
+      result = doc ? postGoodsReceipt(doc, r.context, state) : null;
+    } else if (r.source_type === 'purchase_return') {
+      const doc = await loadPurchaseReturn(c, r.source_id);
+      result = doc ? postPurchaseReturn(doc, r.context, state) : null;
+    } else if (r.source_type === 'supplier_payment') {
+      const doc = await loadSupplierPayment(c, r.source_id);
+      result = doc ? postSupplierPayment(doc, r.context) : null;
     } else if (r.source_type === 'sales_void') {
       const v = await loadVoid(c, r.source_id);
       const original = v ? sales.get(v.saleId) : undefined;

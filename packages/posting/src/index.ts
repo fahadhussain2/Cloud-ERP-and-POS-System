@@ -14,6 +14,7 @@ export { applyRebuild, checkRebuild, RebuildRefused, type RebuildCheck } from '.
 export { KEPT_TABLES, markLive, WIPED_TABLES, WipeRefused, wipePilot, type WipeReport } from './db/wipe';
 export { postHandover } from './handover';
 export { postOpening } from './opening';
+export { postGoodsReceipt, postPurchaseReturn, postSupplierPayment } from './purchasing';
 export { emptyState, replay, type ReplayStep } from './replay';
 export { postSale } from './sale';
 export { postVoid } from './void';

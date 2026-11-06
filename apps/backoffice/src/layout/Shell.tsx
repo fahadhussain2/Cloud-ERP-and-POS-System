@@ -9,7 +9,16 @@ import { href, type Route } from '../router';
 // each later task adds its entry here.
 
 export interface MenuItem {
-  key: 'staff' | 'counters' | 'dayReconciliation' | 'cashVariance' | 'items' | 'categories';
+  key:
+    | 'staff'
+    | 'counters'
+    | 'dayReconciliation'
+    | 'cashVariance'
+    | 'items'
+    | 'categories'
+    | 'suppliers'
+    | 'receipts'
+    | 'purchaseReturns';
   href: string;
   /** Any of these permissions opens the screen. */
   needs: readonly string[];
@@ -18,7 +27,7 @@ export interface MenuItem {
 }
 
 export const MENU: readonly {
-  group: 'people' | 'catalog' | 'shop' | 'reports';
+  group: 'people' | 'catalog' | 'purchasing' | 'shop' | 'reports';
   items: readonly MenuItem[];
 }[] = [
   {
@@ -47,6 +56,25 @@ export const MENU: readonly {
         href: href.categories,
         needs: ['cat.item.edit', 'cat.price.edit'],
         screens: ['categories'],
+      },
+    ],
+  },
+  {
+    // Purchasing (W1-16): suppliers and their ledgers, goods receipts, purchase returns.
+    group: 'purchasing',
+    items: [
+      {
+        key: 'suppliers',
+        href: href.suppliers,
+        needs: ['pur.receive', 'acc.payment.create'],
+        screens: ['suppliers', 'supplier'],
+      },
+      { key: 'receipts', href: href.receipts, needs: ['pur.receive'], screens: ['receipts', 'receipt'] },
+      {
+        key: 'purchaseReturns',
+        href: href.purchaseReturns,
+        needs: ['pur.receive'],
+        screens: ['purchaseReturns', 'purchaseReturn'],
       },
     ],
   },

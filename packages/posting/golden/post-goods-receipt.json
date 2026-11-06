@@ -1,0 +1,385 @@
+{
+  "description": "Posting a goods receipt (posting rules §5.1, PUR-02, W1-16): one stock movement per line into its location at the line's exact net value (the bill discount already capitalized), unit cost = value ÷ qty half away from zero; each item's average re-computed from the value, (on hand × average + value) ÷ (on hand + qty), or value ÷ qty when nothing (or less) was on hand or no cost was known; the last purchase per item. Journal: Dr INVENTORY Σ values, Cr AP_CONTROL (the supplier) the total, due on the due date. Paid by bank (owner answer 1): then also Dr AP_CONTROL (the supplier) / Cr the bank's account, and the supplier owes back the same on the entry date. Σ values must equal the total; a bank without an account is target_unmapped.",
+  "cases": [
+    {
+      "name": "on credit: two items into Shop, nothing on hand before",
+      "input": {
+        "receipt": {
+          "id": "gr-1",
+          "number": "GR000001",
+          "branchId": "br-main",
+          "businessDate": "2026-11-05",
+          "supplierId": "sup-naveed",
+          "dueDate": "2026-12-05",
+          "total": 1340100,
+          "receivedAt": "2026-11-05T09:30:00.000Z",
+          "paidFrom": null,
+          "lines": [
+            { "id": "grl-1", "itemId": "item-a", "locationId": "loc-shop", "qty": 10000, "value": 1250000 },
+            { "id": "grl-2", "itemId": "item-b", "locationId": "loc-shop", "qty": 2000, "value": 90100 }
+          ]
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-05",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "GR000001",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 1340100, "credit": 0 },
+              { "accountId": "2100", "partyId": "sup-naveed", "debit": 0, "credit": 1340100 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "grl-1",
+              "itemId": "item-a",
+              "locationId": "loc-shop",
+              "qtyDelta": 10000,
+              "unitCost": 125000,
+              "valueDelta": 1250000,
+              "avgCostAfter": 125000
+            },
+            {
+              "sourceLineId": "grl-2",
+              "itemId": "item-b",
+              "locationId": "loc-shop",
+              "qtyDelta": 2000,
+              "unitCost": 45050,
+              "valueDelta": 90100,
+              "avgCostAfter": 45050
+            }
+          ],
+          "partyEntries": [
+            { "partyId": "sup-naveed", "role": "supplier", "amount": 1340100, "dueDate": "2026-12-05" }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-a": { "avgCost": 125000, "onHand": 10000 },
+              "item-b": { "avgCost": 45050, "onHand": 2000 }
+            },
+            "balances": { "loc-shop": { "item-a": 10000, "item-b": 2000 } }
+          },
+          "lastPurchases": [
+            {
+              "itemId": "item-a",
+              "lastCost": 125000,
+              "lastSupplierId": "sup-naveed",
+              "lastReceiptAt": "2026-11-05T09:30:00.000Z"
+            },
+            {
+              "itemId": "item-b",
+              "lastCost": 45050,
+              "lastSupplierId": "sup-naveed",
+              "lastReceiptAt": "2026-11-05T09:30:00.000Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "into Godown, on top of 10 in Shop at Rs 1,200: the average moves to Rs 1,225; the line's own value, not a rounded cost",
+      "input": {
+        "receipt": {
+          "id": "gr-2",
+          "number": "GR000002",
+          "branchId": "br-main",
+          "businessDate": "2026-11-06",
+          "supplierId": "sup-naveed",
+          "dueDate": "2026-12-06",
+          "total": 1250000,
+          "receivedAt": "2026-11-06T09:30:00.000Z",
+          "paidFrom": null,
+          "lines": [
+            { "id": "grl-3", "itemId": "item-a", "locationId": "loc-godown", "qty": 10000, "value": 1250000 }
+          ]
+        },
+        "state": {
+          "costs": { "item-a": { "avgCost": 120000, "onHand": 10000 } },
+          "balances": { "loc-shop": { "item-a": 10000 } }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-06",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "GR000002",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 1250000, "credit": 0 },
+              { "accountId": "2100", "partyId": "sup-naveed", "debit": 0, "credit": 1250000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "grl-3",
+              "itemId": "item-a",
+              "locationId": "loc-godown",
+              "qtyDelta": 10000,
+              "unitCost": 125000,
+              "valueDelta": 1250000,
+              "avgCostAfter": 122500
+            }
+          ],
+          "partyEntries": [
+            { "partyId": "sup-naveed", "role": "supplier", "amount": 1250000, "dueDate": "2026-12-06" }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-a": { "avgCost": 122500, "onHand": 20000 } },
+            "balances": { "loc-godown": { "item-a": 10000 } }
+          },
+          "lastPurchases": [
+            {
+              "itemId": "item-a",
+              "lastCost": 125000,
+              "lastSupplierId": "sup-naveed",
+              "lastReceiptAt": "2026-11-06T09:30:00.000Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "on hand was below 0: the average is the receipt's own; 3 at Rs 28,408 total = Rs 9,469.33 shown as Rs 9,469",
+      "input": {
+        "receipt": {
+          "id": "gr-3",
+          "number": "GR000003",
+          "branchId": "br-main",
+          "businessDate": "2026-11-06",
+          "supplierId": "sup-hafeez",
+          "dueDate": "2026-11-06",
+          "total": 28408,
+          "receivedAt": "2026-11-06T10:00:00.000Z",
+          "paidFrom": null,
+          "lines": [
+            { "id": "grl-4", "itemId": "item-c", "locationId": "loc-shop", "qty": 3000, "value": 28408 }
+          ]
+        },
+        "state": {
+          "costs": { "item-c": { "avgCost": 9000, "onHand": -2000 } },
+          "balances": { "loc-shop": { "item-c": -2000 } }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-06",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "GR000003",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 28408, "credit": 0 },
+              { "accountId": "2100", "partyId": "sup-hafeez", "debit": 0, "credit": 28408 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "grl-4",
+              "itemId": "item-c",
+              "locationId": "loc-shop",
+              "qtyDelta": 3000,
+              "unitCost": 9469,
+              "valueDelta": 28408,
+              "avgCostAfter": 9469
+            }
+          ],
+          "partyEntries": [
+            { "partyId": "sup-hafeez", "role": "supplier", "amount": 28408, "dueDate": "2026-11-06" }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-c": { "avgCost": 9469, "onHand": 1000 } },
+            "balances": { "loc-shop": { "item-c": 1000 } }
+          },
+          "lastPurchases": [
+            {
+              "itemId": "item-c",
+              "lastCost": 9469,
+              "lastSupplierId": "sup-hafeez",
+              "lastReceiptAt": "2026-11-06T10:00:00.000Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "paid by bank: the bill and its payment, so the supplier's account shows both and owes nothing",
+      "input": {
+        "receipt": {
+          "id": "gr-4",
+          "number": "GR000004",
+          "branchId": "br-main",
+          "businessDate": "2026-11-06",
+          "supplierId": "sup-bilal",
+          "dueDate": "2026-11-21",
+          "total": 4998,
+          "receivedAt": "2026-11-06T11:00:00.000Z",
+          "paidFrom": "bank-hbl",
+          "lines": [
+            { "id": "grl-5", "itemId": "item-oil", "locationId": "loc-shop", "qty": 2500, "value": 4998 }
+          ]
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-06",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "GR000004",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 4998, "credit": 0 },
+              { "accountId": "2100", "partyId": "sup-bilal", "debit": 0, "credit": 4998 },
+              { "accountId": "2100", "partyId": "sup-bilal", "debit": 4998, "credit": 0 },
+              { "accountId": "1160", "partyId": null, "debit": 0, "credit": 4998 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "grl-5",
+              "itemId": "item-oil",
+              "locationId": "loc-shop",
+              "qtyDelta": 2500,
+              "unitCost": 1999,
+              "valueDelta": 4998,
+              "avgCostAfter": 1999
+            }
+          ],
+          "partyEntries": [
+            { "partyId": "sup-bilal", "role": "supplier", "amount": 4998, "dueDate": "2026-11-21" },
+            { "partyId": "sup-bilal", "role": "supplier", "amount": -4998, "dueDate": "2026-11-06" }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-oil": { "avgCost": 1999, "onHand": 2500 } },
+            "balances": { "loc-shop": { "item-oil": 2500 } }
+          },
+          "lastPurchases": [
+            {
+              "itemId": "item-oil",
+              "lastCost": 1999,
+              "lastSupplierId": "sup-bilal",
+              "lastReceiptAt": "2026-11-06T11:00:00.000Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "the same item twice on one bill: the average follows both lines in order; one last purchase, the later line's",
+      "input": {
+        "receipt": {
+          "id": "gr-5",
+          "number": "GR000005",
+          "branchId": "br-main",
+          "businessDate": "2026-11-06",
+          "supplierId": "sup-naveed",
+          "dueDate": "2026-12-06",
+          "total": 30000,
+          "receivedAt": "2026-11-06T12:00:00.000Z",
+          "paidFrom": null,
+          "lines": [
+            { "id": "grl-6", "itemId": "item-d", "locationId": "loc-shop", "qty": 1000, "value": 10000 },
+            { "id": "grl-7", "itemId": "item-d", "locationId": "loc-shop", "qty": 1000, "value": 20000 }
+          ]
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-06",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "GR000005",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 30000, "credit": 0 },
+              { "accountId": "2100", "partyId": "sup-naveed", "debit": 0, "credit": 30000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "grl-6",
+              "itemId": "item-d",
+              "locationId": "loc-shop",
+              "qtyDelta": 1000,
+              "unitCost": 10000,
+              "valueDelta": 10000,
+              "avgCostAfter": 10000
+            },
+            {
+              "sourceLineId": "grl-7",
+              "itemId": "item-d",
+              "locationId": "loc-shop",
+              "qtyDelta": 1000,
+              "unitCost": 20000,
+              "valueDelta": 20000,
+              "avgCostAfter": 15000
+            }
+          ],
+          "partyEntries": [
+            { "partyId": "sup-naveed", "role": "supplier", "amount": 30000, "dueDate": "2026-12-06" }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-d": { "avgCost": 15000, "onHand": 2000 } },
+            "balances": { "loc-shop": { "item-d": 2000 } }
+          },
+          "lastPurchases": [
+            {
+              "itemId": "item-d",
+              "lastCost": 20000,
+              "lastSupplierId": "sup-naveed",
+              "lastReceiptAt": "2026-11-06T12:00:00.000Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "paid from a bank with no account is refused",
+      "input": {
+        "receipt": {
+          "id": "gr-6",
+          "number": "GR000006",
+          "branchId": "br-main",
+          "businessDate": "2026-11-06",
+          "supplierId": "sup-bilal",
+          "dueDate": "2026-11-06",
+          "total": 100,
+          "receivedAt": "2026-11-06T11:00:00.000Z",
+          "paidFrom": "bank-unknown",
+          "lines": [
+            { "id": "grl-8", "itemId": "item-oil", "locationId": "loc-shop", "qty": 1000, "value": 100 }
+          ]
+        }
+      },
+      "expected": { "ok": false, "error": { "code": "target_unmapped", "targetId": "bank-unknown" } }
+    },
+    {
+      "name": "lines that don't add up to the total are refused",
+      "input": {
+        "receipt": {
+          "id": "gr-7",
+          "number": "GR000007",
+          "branchId": "br-main",
+          "businessDate": "2026-11-06",
+          "supplierId": "sup-bilal",
+          "dueDate": "2026-11-06",
+          "total": 101,
+          "receivedAt": "2026-11-06T11:00:00.000Z",
+          "paidFrom": null,
+          "lines": [
+            { "id": "grl-9", "itemId": "item-oil", "locationId": "loc-shop", "qty": 1000, "value": 100 }
+          ]
+        }
+      },
+      "expected": { "ok": false, "error": { "code": "total_mismatch" } }
+    }
+  ]
+}

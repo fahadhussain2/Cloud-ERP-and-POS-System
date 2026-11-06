@@ -1,0 +1,54 @@
+{
+  "description": "Posting a supplier payment by bank from the back office (posting rules §6, PUR-09, W1-16): Dr AP_CONTROL (the supplier) / Cr the bank's account; the supplier is owed less on the entry date. A bank without an account is target_unmapped. No stock. (Cash paid at the desk is a cash movement, W1-11.)",
+  "cases": [
+    {
+      "name": "Rs 25,000 to a supplier from HBL",
+      "input": {
+        "payment": {
+          "id": "sp-1",
+          "number": "SP000001",
+          "branchId": "br-main",
+          "businessDate": "2026-11-07",
+          "supplierId": "sup-naveed",
+          "amount": 2500000,
+          "bankAccountId": "bank-hbl"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-07",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "SP000001",
+            "lines": [
+              { "accountId": "2100", "partyId": "sup-naveed", "debit": 2500000, "credit": 0 },
+              { "accountId": "1160", "partyId": null, "debit": 0, "credit": 2500000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [
+            { "partyId": "sup-naveed", "role": "supplier", "amount": -2500000, "dueDate": "2026-11-07" }
+          ],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "a bank with no account is refused",
+      "input": {
+        "payment": {
+          "id": "sp-2",
+          "number": "SP000002",
+          "branchId": "br-main",
+          "businessDate": "2026-11-07",
+          "supplierId": "sup-naveed",
+          "amount": 100,
+          "bankAccountId": "bank-unknown"
+        }
+      },
+      "expected": { "ok": false, "error": { "code": "target_unmapped", "targetId": "bank-unknown" } }
+    }
+  ]
+}

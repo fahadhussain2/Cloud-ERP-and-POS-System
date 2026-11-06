@@ -55,6 +55,47 @@ export interface PostingCollection {
 }
 
 /** A stored cash-out or safe movement as posting needs it (posting rules §4.5, W1-11). */
+/** A posted goods receipt as posting needs it (posting rules §5.1, W1-16). */
+export interface PostingGoodsReceipt {
+  id: string;
+  number: string;
+  branchId: string;
+  /** The day the goods were received. */
+  businessDate: string;
+  supplierId: string;
+  /** The bill date + the supplier's terms. */
+  dueDate: string;
+  /** The bill total; Σ line values must equal it. */
+  total: Money;
+  /** When it was received, as an instant, for the last purchase. */
+  receivedAt: string;
+  /** The bank account it was paid from (`PostingContext.accounts.targets`); null = on the supplier's account. */
+  paidFrom: string | null;
+  lines: { id: string; itemId: string; locationId: string; qty: Qty; value: Money }[];
+}
+
+/** A posted purchase return (debit note, posting rules §5.2, W1-16); quantities positive = going back. */
+export interface PostingPurchaseReturn {
+  id: string;
+  number: string;
+  branchId: string;
+  businessDate: string;
+  supplierId: string;
+  lines: { id: string; itemId: string; locationId: string; qty: Qty; unitCost: Money }[];
+}
+
+/** A supplier payment by bank from the back office (posting rules §6, W1-16). */
+export interface PostingSupplierPayment {
+  id: string;
+  number: string;
+  branchId: string;
+  businessDate: string;
+  supplierId: string;
+  amount: Money;
+  /** Its account is in `PostingContext.accounts.targets`. */
+  bankAccountId: string;
+}
+
 export interface PostingCashMovement {
   id: string;
   number: string;
@@ -222,6 +263,8 @@ export type PostingError =
   | { code: 'on_account_without_customer' }
   | { code: 'target_unmapped'; targetId: string | null }
   | { code: 'party_missing' }
+  /** A goods receipt whose lines don't add up to its total (W1-16). */
+  | { code: 'total_mismatch' }
   /** A void whose sale has no posting yet: it waits for it (W1-12). */
   | { code: 'sale_not_posted' }
   /** A return whose original bill has no posting yet: it waits for it (W1-13). */

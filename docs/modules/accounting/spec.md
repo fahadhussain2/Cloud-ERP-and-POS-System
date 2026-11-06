@@ -108,6 +108,10 @@ The importer writes the opening as a **draft** and posts it with `postDocument(t
 
 **The pilot wipe** (`wipePilot`, `packages/posting/src/db/wipe.ts`, D-101) removes every table in `WIPED_TABLES`, zeroes the synced balances, marks the floors deleted and revokes the counters; every table is in `WIPED_TABLES` or `KEPT_TABLES` (a test checks the schema). `markLive` sets `go_live_at` and the lock date; the wipe is refused after it.
 
+## 5f. Purchasing (posting rules §5.1, §5.2, §6, W1-16)
+
+Three more sources, posted by the back office in the transaction that posts the document (a posting that fails refuses the post): `goods_receipt` (`postGoodsReceipt`: stock at each line's exact value, the average from that value, the last purchase, AP with the due date, paid by bank or not), `purchase_return` (`postPurchaseReturn`: out at the average, the difference to Purchase price variance) and `supplier_payment` (`postSupplierPayment`: by bank). The context records the bank's account, so the rebuild replays them as posted. The pilot wipe removes them and their counters (D-101).
+
 ## 6. Known limits
 
 - **Arrival order** sets the cost of a late offline sale (D-017): recorded and reproducible, not re-costed (re-costing is Phase 2).

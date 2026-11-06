@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Not started (build on hold, D-068) |
+| **Status** | W1-16 built (D-105): suppliers, goods receipts with the bill-total check, purchase returns, the supplier ledger, payments by bank. POs, sharing, the run sheet, reorder and repricing are Wave 2 |
 | **Requirements** | 9 (PUR-01…PUR-09) |
 | **Feature spec needed** | No: the prototype and PRD are enough |
 

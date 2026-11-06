@@ -248,11 +248,17 @@ Held bills are **device-local only** and never sent to the server.
 
 **purchase_order_lines:** `po_id, item_id, qty_ordered, qty_received†, expected_unit_cost`
 
-**goods_receipts:** `number, supplier_party_id, po_id (nullable), supplier_bill_no, supplier_bill_date, payment_mode (credit|cash|bank), location_id (default SHOP), subtotal, line_discount_total, bill_discount, total, due_date, label_abbr_snapshot`
+**Built in W1-16 (migration 0017, D-105):** `goods_receipts`, `goods_receipt_lines`, `purchase_returns`, `purchase_return_lines`, `supplier_payments` and `document_counters` as below. Receipts and returns are drafts (no number, `row_version` counted by each save) until posted (`status`, `posted_at`, then never changed: a trigger); posting writes each receipt line's exact `value`. `business_date` is the day received, returned or paid. Not synced. Purchase orders, price suggestions and reorder suggestions wait for Wave 2.
 
-**goods_receipt_lines:** `receipt_id, po_line_id (nullable), item_id, qty, unit_cost, line_discount, net_unit_cost (after allocating the bill discount), line_total`
+**goods_receipts:** `number (GR000001, at posting), branch_id, supplier_party_id, supplier_bill_no, supplier_bill_date, business_date, location_id, paid_from_bank_account_id (null = on account; cash is paid at the desk), bill_discount, bill_total (as printed), total and due_date (at posting), notes, status, posted_at, exception_count, row_version` (the PO link waits for PUR-04)
 
-**purchase_returns** + lines: `number, supplier_party_id, goods_receipt_id (nullable), reason_code` / `item_id, location_id, qty, unit_cost`
+**goods_receipt_lines:** `receipt_id, line_no, item_id, qty, unit_cost, line_discount, value` (the net value after the bill discount, exact; the net unit cost is value ÷ qty, shown only)
+
+**purchase_returns** + lines: `number (PR…), supplier_party_id, goods_receipt_id (nullable), location_id, business_date, reason_code, note, total, status` / `line_no, item_id, receipt_line_id (nullable), qty, unit_cost`
+
+**supplier_payments** (by bank): `number (SP…), supplier_party_id, bank_account_id, amount, business_date, reference`
+
+**document_counters:** `family (GR|PR|SP), last_no` per tenant
 
 **price_suggestions:** `goods_receipt_id, item_id, target (tier_id|'floor'), current_value, suggested_value, approved_value, status (pending|approved|rejected), decided_by_user_id`
 

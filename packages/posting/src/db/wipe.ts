@@ -43,6 +43,13 @@ const DOCUMENT_TABLES = [
   'party_ledger_entries',
   'opening_balance_lines',
   'opening_balances',
+  // Purchasing (W1-16): returns before the receipts they point at; the numbers start again.
+  'purchase_return_lines',
+  'purchase_returns',
+  'goods_receipt_lines',
+  'goods_receipts',
+  'supplier_payments',
+  'document_counters',
   'postings',
   'posting_state',
   'item_costs',
