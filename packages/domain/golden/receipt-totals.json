@@ -1,0 +1,88 @@
+{
+  "description": "A goods receipt's totals (PUR-02, posting rules §5.1, W1-16). Each line: gross = qty × unit cost (thousandths × paisa, half away from zero, D-079), net = gross − its line discount. The bill discount is spread over the lines' nets by largest remainder (allocate) and capitalized: each line's value = net − its share, exact; Σ values = the total. The net unit cost = value ÷ qty, half away from zero, for showing only. A line discount below 0 or above its gross, or a bill discount below 0 or above Σ nets, is invalid_discount.",
+  "cases": [
+    {
+      "name": "two lines, no discounts",
+      "input": {
+        "lines": [
+          { "qty": 10000, "unitCost": 125000, "lineDiscount": 0 },
+          { "qty": 2000, "unitCost": 45050, "lineDiscount": 0 }
+        ],
+        "billDiscount": 0
+      },
+      "expected": {
+        "lines": [
+          { "gross": 1250000, "net": 1250000, "value": 1250000, "netUnitCost": 125000 },
+          { "gross": 90100, "net": 90100, "value": 90100, "netUnitCost": 45050 }
+        ],
+        "subtotal": 1340100,
+        "lineDiscountTotal": 0,
+        "billDiscount": 0,
+        "total": 1340100
+      }
+    },
+    {
+      "name": "a line discount and an odd bill discount: the leftover paisa goes to the largest remainder; a free line takes none",
+      "input": {
+        "lines": [
+          { "qty": 3000, "unitCost": 10000, "lineDiscount": 1000 },
+          { "qty": 1000, "unitCost": 20001, "lineDiscount": 0 },
+          { "qty": 2000, "unitCost": 0, "lineDiscount": 0 }
+        ],
+        "billDiscount": 1001
+      },
+      "expected": {
+        "lines": [
+          { "gross": 30000, "net": 29000, "value": 28408, "netUnitCost": 9469 },
+          { "gross": 20001, "net": 20001, "value": 19592, "netUnitCost": 19592 },
+          { "gross": 0, "net": 0, "value": 0, "netUnitCost": 0 }
+        ],
+        "subtotal": 50001,
+        "lineDiscountTotal": 1000,
+        "billDiscount": 1001,
+        "total": 48000
+      }
+    },
+    {
+      "name": "litres: 2.5 at Rs 19.99 = Rs 49.975 → Rs 49.98",
+      "input": { "lines": [{ "qty": 2500, "unitCost": 1999, "lineDiscount": 0 }], "billDiscount": 0 },
+      "expected": {
+        "lines": [{ "gross": 4998, "net": 4998, "value": 4998, "netUnitCost": 1999 }],
+        "subtotal": 4998,
+        "lineDiscountTotal": 0,
+        "billDiscount": 0,
+        "total": 4998
+      }
+    },
+    {
+      "name": "the whole bill free of charge: a bill discount of Σ nets leaves every value at 0",
+      "input": {
+        "lines": [
+          { "qty": 1000, "unitCost": 5000, "lineDiscount": 0 },
+          { "qty": 1000, "unitCost": 3000, "lineDiscount": 0 }
+        ],
+        "billDiscount": 8000
+      },
+      "expected": {
+        "lines": [
+          { "gross": 5000, "net": 5000, "value": 0, "netUnitCost": 0 },
+          { "gross": 3000, "net": 3000, "value": 0, "netUnitCost": 0 }
+        ],
+        "subtotal": 8000,
+        "lineDiscountTotal": 0,
+        "billDiscount": 8000,
+        "total": 0
+      }
+    },
+    {
+      "name": "a line discount above the line",
+      "input": { "lines": [{ "qty": 1000, "unitCost": 5000, "lineDiscount": 5001 }], "billDiscount": 0 },
+      "error": "invalid_discount"
+    },
+    {
+      "name": "a bill discount above Σ nets",
+      "input": { "lines": [{ "qty": 1000, "unitCost": 5000, "lineDiscount": 0 }], "billDiscount": 5001 },
+      "error": "invalid_discount"
+    }
+  ]
+}
