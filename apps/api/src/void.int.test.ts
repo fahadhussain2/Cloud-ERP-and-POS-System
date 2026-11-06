@@ -17,6 +17,7 @@ import {
   buildSaleDocument,
   buildSessionDocument,
   buildVoidDocument,
+  businessDate,
   money,
   ROLE_TEMPLATES,
   type Bill,
@@ -164,8 +165,18 @@ async function enroll(kind: 'counter' | 'cash_desk'): Promise<Device> {
   return { token, deviceId: enrolled.deviceId, code: enrolled.code, keys, seq: {} };
 }
 
+/**
+ * The test's clock: now, unless the shop's business day (04:00 Karachi) began less than 15 minutes ago; then 20
+ * minutes earlier, so a bill made minutes before its void is never on the day before (CI ran at 23:01 UTC).
+ */
+const clock = () => {
+  const t = Date.now();
+  const day = (ms: number) => businessDate(ms, 'Asia/Karachi', 4);
+  return day(t - 15 * 60_000) === day(t) ? t : t - 20 * 60_000;
+};
+
 const next = (d: Device, family: DocumentFamily) => (d.seq[family] = (d.seq[family] ?? 0) + 1);
-const context = (d: Device, family: DocumentFamily, atMs = Date.now() - 60_000) => ({
+const context = (d: Device, family: DocumentFamily, atMs = clock() - 60_000) => ({
   id: uuidv7(),
   seq: next(d, family),
   deviceId: d.deviceId,
@@ -210,7 +221,7 @@ function sale(units: number, method: 'cash' | 'raast' = 'cash', reissueOf?: Sale
     credit: null,
     creditApproval: null,
     reissueOf: reissueOf ? { id: reissueOf.id, number: reissueOf.number } : null,
-    context: { ...context(counter, 'S', Date.now() - 120_000), increment: money(100) },
+    context: { ...context(counter, 'S', clock() - 120_000), increment: money(100) },
   });
 }
 
@@ -245,7 +256,7 @@ function openSession(): CashSessionDocument {
     grants: CASHIER_GRANTS,
     openingFloat: money(0),
     handovers: [],
-    context: { ...context(desk, 'Z', Date.now() - 600_000), increment: money(100) },
+    context: { ...context(desk, 'Z', clock() - 600_000), increment: money(100) },
   });
   session = { id: z.id, cashierId: shop.cashier, openingFloat: money(0), status: 'open' };
   return z;
@@ -512,7 +523,7 @@ describe('cash at the desk for a voided bill (D-059)', () => {
   it('a void after an offline scan of the bill is flagged, the scan made before it', async () => {
     const s = sale(1);
     await push(counter, [s]);
-    const h = scan(s, Date.now() - 90_000);
+    const h = scan(s, clock() - 90_000);
     await push(desk, [h]);
     const v = voidOf(s, 'unknown');
     expect(results(await push(counter, [v]))).toEqual([['accepted', null, ['cash_received_for_void']]]);
@@ -527,7 +538,7 @@ describe('cash at the desk for a voided bill (D-059)', () => {
     await push(counter, [s]);
     const v = voidOf(s);
     await push(counter, [v]);
-    const h = scan(s, Date.now());
+    const h = scan(s, clock());
     expect(results(await push(desk, [h]))).toEqual([['accepted', null, ['cash_received_for_void']]]);
     expect((await exceptionsOf(h.id))[0]).toMatchObject({
       kind: 'cash_received_for_void',
@@ -562,7 +573,7 @@ describe('the live cash desk check (GET /api/sync/bills/status)', () => {
       handedOverAt: null,
       cashierName: null,
     });
-    const h = scan(s, Date.now() - 30_000);
+    const h = scan(s, clock() - 30_000);
     await push(desk, [h]);
     expect((await status(counter, s.number)).json<BillStatusResponse>()).toEqual({
       known: true,
@@ -575,7 +586,7 @@ describe('the live cash desk check (GET /api/sync/bills/status)', () => {
 
   it("sees an offline scan whose bill hasn't arrived, and knows nothing of a bill never seen", async () => {
     const s = sale(1);
-    const h = scan(s, Date.now() - 30_000);
+    const h = scan(s, clock() - 30_000);
     await push(desk, [h]);
     expect((await status(counter, s.number)).json<BillStatusResponse>()).toMatchObject({
       known: false,
