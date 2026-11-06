@@ -139,6 +139,8 @@ A handover always posts the bill's **cash due** (or refund amount). The salesman
 - If on_hand > 0: `new_avg = (on_hand × avg + qty × net_unit_cost) / (on_hand + qty)`, rounded to minor units.
 - If on_hand ≤ 0 before the receipt: `new_avg = net_unit_cost`.
 
+**As built (W1-16, D-105):** `postGoodsReceipt` posts each line's exact net value (the bill discount already in it) and computes the average from that value; paid by bank adds `Dr AP_CONTROL / Cr <bank>` in the same entry. A cash purchase is paid at the desk (§4.5).
+
 ### 5.2 Purchase return (debit note)
 `Dr AP_CONTROL (party)`: return value at the return line's unit_cost (normally the original purchase cost).
 `Cr INVENTORY`: qty × current avg cost.
@@ -151,6 +153,8 @@ Any difference goes to `PURCHASE_PRICE_VARIANCE` (Dr or Cr).
 
 ### 5.4 Transfer between locations
 Stock ledger only (out of one location, into another, at the same cost). **No GL entry**, because both locations are the same Inventory account.
+
+**As built (W1-16):** `postPurchaseReturn`; with no cost known the stock leaves at the return's cost (flagged `no_cost`), and stock below 0 is flagged, never refused.
 
 ## 6. Back-office documents
 | Document | Entry |

@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#61](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/61) |
 | **Module** | purchasing (back-office screens and API), with accounting (three new posting sources in `packages/posting`) and platform (permissions) |
-| **Status** | Accepted (2026-11-06) with the owner's answers 1–5 (below) |
+| **Status** | Accepted (2026-11-06) with the owner's answers 1–5 (below). Built (2026-11-06) on `w1-16-purchasing` |
 | **Refs** | PUR-01, PUR-02, PUR-03, PUR-09; PRD W11.4, W11.7, W12; data model §3, §8; posting rules §1, §5.1, §5.2, §6; CLAUDE.md rules 1, 2 (pure rules), 3, 4, 5, 10; D-015 (Shop, Godown, Damaged), D-017 (average cost), D-020, D-079 (rounding), D-095, D-101 (pilot wipe), D-104 |
 | **Depends on** | W1-08 (posting engine), W1-11 (the desk's supplier payment, CSH-06), W1-15 (back-office catalog, item search) |
 | **Size** | about 4½ days (the task list says 4): suppliers ½, goods receipt rules and posting 1, receipt screen and API 1¼, purchase return ¾, supplier ledger and bank payment ¾, e2e and docs ¼ |
@@ -68,6 +68,24 @@ Migration and schema → domain golden files → posting golden files → postin
 | A receipt posted twice, or edited after posting | `postDocument`'s lock and the posted-document trigger (as in D-101) |
 | A return against an old receipt when the average has moved a lot | The difference goes to Purchase price variance, as the posting rules say; the return screen shows it before posting |
 | A cash purchase paid from the drawer without the desk knowing breaks the drawer count | Cash is paid only at the desk, as a supplier payment (owner answer 1) |
+
+## Changes during the build
+
+| Change | Why |
+|---|---|
+| `checkReceipt` gives problems and warnings together (instead of `receiptProblems` and `receiptWarnings`) | The warnings need the totals the check computes |
+| The return reasons are `PURCHASE_RETURN_REASONS` | `RETURN_REASONS` is the counter's (W1-13) |
+| The document date columns are `business_date` (received, returned, paid on) | The posting engine reads every source's `business_date` |
+| `GET /api/purchasing/items` searches items under `pur.receive` | The catalog's search needs a catalog permission a purchaser doesn't have |
+| A supplier payment can't be deleted by the app role; a mistake is a journal voucher (W1-19) | Like a posted document |
+| The item picker's result list has its own label ("Items found") | Two elements with one label (found by the e2e) |
+| The return test returns 11 pieces, not 10.001 | 10.001 pieces is also a fraction of a piece |
+
+## Checks (2026-11-06)
+
+- `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 1,902 tests; `packages/domain` at 100 % branch coverage.
+- `pnpm test:integration`: 330 passed (31 files), including the purchasing API (13) with the rebuild check finding no difference.
+- `pnpm e2e` (Edge): 49 passed, including "the owner records a supplier bill with a bill discount, returns part of it and pays by bank".
 
 ## Owner answers (2026-11-06)
 

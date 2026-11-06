@@ -6,6 +6,7 @@ Open items that must be settled before, or soon after, go-live. Each line names 
 
 - [x] **Raast and bank-transfer payments:** both post to HBL for now (W1-08 owner answer 1, D-095). Changing the bank later is an edit to `infra/db/tenants/delux.json` and a setup re-run.
 - [ ] **Re-run the Delux setup on production** after W1-08 is released: it adds 1190 *Posting suspense*, marks the default tax code and maps Raast and bank transfer to HBL (`sudo erp-tenant setup prod delux`), then `sudo erp-tenant posting-check prod delux`.
+- [ ] **From go-live, purchases are entered only in the new back office** (D-105): supplier bills as goods receipts, returns, bank payments; cash for a supplier is paid at the desk. Until then in the legacy app.
 - [ ] **From go-live, items and prices change only in the new back office** (D-104): until then in the legacy app, since the final import overwrites the catalog. Tell the staff on the go-live day.
 - [ ] **Credit limits:** migrated credit customers start with no limit (D-085). Set limits from the `parties/credit-customers.csv` report.
 - [ ] **Mechanic tier:** mark which customers are mechanics (`partyTiers` in `tools/legacy-import/mapping/delux.json`) and re-run the import (W0-13 owner review).

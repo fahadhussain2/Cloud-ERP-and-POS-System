@@ -572,7 +572,8 @@
       "value": "Value",
       "returnCost": "Unit cost back",
       "add": "Add a line",
-      "remove": "Remove"
+      "remove": "Remove",
+      "results": "Items found"
     },
     "totals": {
       "subtotal": "Lines",

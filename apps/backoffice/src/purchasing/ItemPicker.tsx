@@ -90,7 +90,7 @@ export function ItemPicker({
         <ul
           id={listId}
           role="listbox"
-          aria-label={label}
+          aria-label={t('purchasing.line.results')}
           className="absolute inset-x-0 top-full z-10 m-0 max-h-64 list-none overflow-auto rounded-md border border-input bg-surface p-1 shadow-md"
         >
           {found.map((i) => (

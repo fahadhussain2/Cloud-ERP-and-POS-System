@@ -31,7 +31,12 @@
           }
         ]
       },
-      "expected": { "problems": [], "warnings": [], "total": 1340100, "difference": 0 }
+      "expected": {
+        "problems": [],
+        "warnings": [],
+        "total": 1340100,
+        "difference": 0
+      }
     },
     {
       "name": "the printed total differs: posting waits, the difference shows",
@@ -64,7 +69,12 @@
         ]
       },
       "expected": {
-        "problems": [{ "problem": "total_mismatch", "row": null }],
+        "problems": [
+          {
+            "problem": "total_mismatch",
+            "row": null
+          }
+        ],
         "warnings": [],
         "total": 1340100,
         "difference": -100
@@ -83,12 +93,30 @@
       },
       "expected": {
         "problems": [
-          { "problem": "supplier_required", "row": null },
-          { "problem": "bill_no_required", "row": null },
-          { "problem": "bill_date_required", "row": null },
-          { "problem": "location_required", "row": null },
-          { "problem": "lines_required", "row": null },
-          { "problem": "total_required", "row": null }
+          {
+            "problem": "supplier_required",
+            "row": null
+          },
+          {
+            "problem": "bill_no_required",
+            "row": null
+          },
+          {
+            "problem": "bill_date_required",
+            "row": null
+          },
+          {
+            "problem": "location_required",
+            "row": null
+          },
+          {
+            "problem": "lines_required",
+            "row": null
+          },
+          {
+            "problem": "total_required",
+            "row": null
+          }
         ],
         "warnings": [],
         "total": 0,
@@ -154,12 +182,30 @@
       },
       "expected": {
         "problems": [
-          { "problem": "item_required", "row": 0 },
-          { "problem": "qty_positive", "row": 1 },
-          { "problem": "qty_fraction", "row": 2 },
-          { "problem": "cost_invalid", "row": 2 },
-          { "problem": "cost_invalid", "row": 3 },
-          { "problem": "discount_invalid", "row": 4 }
+          {
+            "problem": "item_required",
+            "row": 0
+          },
+          {
+            "problem": "qty_positive",
+            "row": 1
+          },
+          {
+            "problem": "qty_fraction",
+            "row": 2
+          },
+          {
+            "problem": "cost_invalid",
+            "row": 2
+          },
+          {
+            "problem": "cost_invalid",
+            "row": 3
+          },
+          {
+            "problem": "discount_invalid",
+            "row": 4
+          }
         ],
         "warnings": [],
         "total": null,
@@ -188,7 +234,12 @@
         ]
       },
       "expected": {
-        "problems": [{ "problem": "bill_discount_invalid", "row": null }],
+        "problems": [
+          {
+            "problem": "bill_discount_invalid",
+            "row": null
+          }
+        ],
         "warnings": [],
         "total": null,
         "difference": null
@@ -254,9 +305,18 @@
       "expected": {
         "problems": [],
         "warnings": [
-          { "warning": "cost_up", "row": 1 },
-          { "warning": "cost_down", "row": 3 },
-          { "warning": "retail_at_or_below_cost", "row": 4 }
+          {
+            "warning": "cost_up",
+            "row": 1
+          },
+          {
+            "warning": "cost_down",
+            "row": 3
+          },
+          {
+            "warning": "retail_at_or_below_cost",
+            "row": 4
+          }
         ],
         "total": 4100100,
         "difference": 0
@@ -283,7 +343,45 @@
           }
         ]
       },
-      "expected": { "problems": [], "warnings": [], "total": 10000, "difference": 0 }
+      "expected": {
+        "problems": [],
+        "warnings": [],
+        "total": 10000,
+        "difference": 0
+      }
+    },
+    {
+      "name": "no bill number at all",
+      "input": {
+        "supplierId": "s1",
+        "billNo": null,
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 0,
+        "billTotal": 100,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "unitCost": 100,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "bill_no_required",
+            "row": null
+          }
+        ],
+        "warnings": [],
+        "total": 100,
+        "difference": 0
+      }
     }
   ]
 }
