@@ -4,6 +4,7 @@ import type pg from 'pg';
 import { postCashMovement, postCollection, postSession } from '../cash';
 import { postHandover } from '../handover';
 import { postOpening } from '../opening';
+import { postGoodsReceipt, postPurchaseReturn, postSupplierPayment } from '../purchasing';
 import { postSale } from '../sale';
 import { postVoid } from '../void';
 import type { PostingContext, PostingException, PostingResult } from '../types';
@@ -11,14 +12,17 @@ import {
   loadCashMovement,
   loadCollection,
   loadContext,
+  loadGoodsReceipt,
   loadHandover,
   loadLineCosts,
   loadOpening,
+  loadPurchaseReturn,
   loadSale,
   loadSalePosting,
   loadSessionEvent,
   loadState,
   loadStateOf,
+  loadSupplierPayment,
   loadVoid,
   withReturnCosts,
 } from './load';
@@ -31,7 +35,16 @@ import { writePosting } from './write';
 // exception.
 
 export type SourceType =
-  'sale' | 'cash_handover' | 'payment' | 'cash_movement' | 'cash_session' | 'sales_void' | 'opening';
+  | 'sale'
+  | 'cash_handover'
+  | 'payment'
+  | 'cash_movement'
+  | 'cash_session'
+  | 'sales_void'
+  | 'opening'
+  | 'goods_receipt'
+  | 'purchase_return'
+  | 'supplier_payment';
 
 /**
  * Where each kind of document lives, which row holds it, and whom an exception on it belongs to. Constants, never
@@ -54,6 +67,17 @@ const SOURCES: Record<
   sales_void: { table: 'sales_voids', documentType: 'sales_void', userColumn: 'voided_by_user_id' },
   // Posted by the importer, never by the catch-up (W1-14).
   opening: { table: 'opening_balances', documentType: 'opening_balance', userColumn: 'created_by_user_id' },
+  goods_receipt: { table: 'goods_receipts', documentType: 'goods_receipt', userColumn: 'created_by_user_id' },
+  purchase_return: {
+    table: 'purchase_returns',
+    documentType: 'purchase_return',
+    userColumn: 'created_by_user_id',
+  },
+  supplier_payment: {
+    table: 'supplier_payments',
+    documentType: 'supplier_payment',
+    userColumn: 'created_by_user_id',
+  },
 };
 
 /** The SQL that finds a source's row by the document id in `$n`. */
@@ -216,6 +240,34 @@ async function compute(
       opening.stock.map((l) => l.locationId),
     );
     return { context, result: postOpening(opening, context, state) };
+  }
+  if (type === 'goods_receipt') {
+    const doc = await loadGoodsReceipt(c, id);
+    if (!doc) throw missing();
+    const context = await loadContext(c, null, doc.paidFrom);
+    const state = await loadStateOf(
+      c,
+      doc.lines.map((l) => l.itemId),
+      doc.lines.map((l) => l.locationId),
+    );
+    return { context, result: postGoodsReceipt(doc, context, state) };
+  }
+  if (type === 'purchase_return') {
+    const doc = await loadPurchaseReturn(c, id);
+    if (!doc) throw missing();
+    const context = await loadContext(c, null);
+    const state = await loadStateOf(
+      c,
+      doc.lines.map((l) => l.itemId),
+      doc.lines.map((l) => l.locationId),
+    );
+    return { context, result: postPurchaseReturn(doc, context, state) };
+  }
+  if (type === 'supplier_payment') {
+    const doc = await loadSupplierPayment(c, id);
+    if (!doc) throw missing();
+    const context = await loadContext(c, null, doc.bankAccountId);
+    return { context, result: postSupplierPayment(doc, context) };
   }
   if (type === 'sales_void') {
     // A duplicate, or a void whose bill hasn't arrived, loads as null: it never posts (W1-12).

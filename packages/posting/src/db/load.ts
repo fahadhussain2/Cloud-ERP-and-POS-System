@@ -13,6 +13,9 @@ import type {
   PostingSale,
   PostingSessionEvent,
   PostingVoid,
+  PostingGoodsReceipt,
+  PostingPurchaseReturn,
+  PostingSupplierPayment,
 } from '../types';
 
 // Reading what a posting needs from the database (W1-08). Money comes back as bigint text and quantities as
@@ -542,4 +545,130 @@ export async function loadOpening(c: pg.ClientBase, id: string): Promise<Posting
     else opening.parties.push({ id: r.id, partyId: r.party_id!, role: r.kind, amount: toMoney(r.amount!) });
   }
   return opening;
+}
+
+/** A posted goods receipt as posting needs it (W1-16): its lines' values were written when it was posted. */
+export async function loadGoodsReceipt(c: pg.ClientBase, id: string): Promise<PostingGoodsReceipt | null> {
+  const head = await c.query<{
+    number: string;
+    branch_id: string;
+    business_date: string;
+    supplier_party_id: string;
+    due_date: string;
+    total: string;
+    posted_at: Date;
+    paid_from_bank_account_id: string | null;
+  }>(
+    `SELECT number, branch_id, business_date::text, supplier_party_id, due_date::text, total, posted_at,
+       paid_from_bank_account_id
+     FROM erp.goods_receipts WHERE id = $1 AND status = 'posted'`,
+    [id],
+  );
+  const h = head.rows[0];
+  if (!h) return null;
+  const lines = await c.query<{
+    id: string;
+    item_id: string;
+    qty: string;
+    value: string;
+    location_id: string;
+  }>(
+    `SELECT l.id, l.item_id, (l.qty * 1000)::bigint AS qty, l.value, r.location_id
+     FROM erp.goods_receipt_lines l JOIN erp.goods_receipts r ON r.id = l.receipt_id
+     WHERE l.receipt_id = $1 ORDER BY l.line_no`,
+    [id],
+  );
+  return {
+    id,
+    number: h.number,
+    branchId: h.branch_id,
+    businessDate: h.business_date,
+    supplierId: h.supplier_party_id,
+    dueDate: h.due_date,
+    total: money(h.total),
+    receivedAt: h.posted_at.toISOString(),
+    paidFrom: h.paid_from_bank_account_id,
+    lines: lines.rows.map((l) => ({
+      id: l.id,
+      itemId: l.item_id,
+      locationId: l.location_id,
+      qty: qty(Number(l.qty)),
+      value: money(l.value),
+    })),
+  };
+}
+
+/** A posted purchase return as posting needs it (W1-16). */
+export async function loadPurchaseReturn(
+  c: pg.ClientBase,
+  id: string,
+): Promise<PostingPurchaseReturn | null> {
+  const head = await c.query<{
+    number: string;
+    branch_id: string;
+    business_date: string;
+    supplier_party_id: string;
+  }>(
+    `SELECT number, branch_id, business_date::text, supplier_party_id FROM erp.purchase_returns
+     WHERE id = $1 AND status = 'posted'`,
+    [id],
+  );
+  const h = head.rows[0];
+  if (!h) return null;
+  const lines = await c.query<{
+    id: string;
+    item_id: string;
+    qty: string;
+    unit_cost: string;
+    location_id: string;
+  }>(
+    `SELECT l.id, l.item_id, (l.qty * 1000)::bigint AS qty, l.unit_cost, r.location_id
+     FROM erp.purchase_return_lines l JOIN erp.purchase_returns r ON r.id = l.return_id
+     WHERE l.return_id = $1 ORDER BY l.line_no`,
+    [id],
+  );
+  return {
+    id,
+    number: h.number,
+    branchId: h.branch_id,
+    businessDate: h.business_date,
+    supplierId: h.supplier_party_id,
+    lines: lines.rows.map((l) => ({
+      id: l.id,
+      itemId: l.item_id,
+      locationId: l.location_id,
+      qty: qty(Number(l.qty)),
+      unitCost: money(l.unit_cost),
+    })),
+  };
+}
+
+/** A supplier payment by bank as posting needs it (W1-16). */
+export async function loadSupplierPayment(
+  c: pg.ClientBase,
+  id: string,
+): Promise<PostingSupplierPayment | null> {
+  const { rows } = await c.query<{
+    number: string;
+    branch_id: string;
+    business_date: string;
+    supplier_party_id: string;
+    amount: string;
+    bank_account_id: string;
+  }>(
+    `SELECT number, branch_id, business_date::text, supplier_party_id, amount, bank_account_id
+     FROM erp.supplier_payments WHERE id = $1`,
+    [id],
+  );
+  const h = rows[0];
+  if (!h) return null;
+  return {
+    id,
+    number: h.number,
+    branchId: h.branch_id,
+    businessDate: h.business_date,
+    supplierId: h.supplier_party_id,
+    amount: money(h.amount),
+    bankAccountId: h.bank_account_id,
+  };
 }

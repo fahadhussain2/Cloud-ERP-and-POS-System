@@ -59,6 +59,20 @@ export {
 export { businessDate } from './business-date';
 export { costFloor } from './floor';
 export {
+  checkReceipt,
+  checkReturn,
+  receiptTotals,
+  PURCHASE_RETURN_REASONS,
+  type ReceiptCheckInput,
+  type ReceiptProblem,
+  type ReceiptTotals,
+  type ReceiptTotalsInput,
+  type ReceiptWarning,
+  type ReturnCheckInput,
+  type ReturnProblem,
+  type PurchaseReturnReason,
+} from './purchasing';
+export {
   catalogCodeProblems,
   itemProblems,
   priceChange,

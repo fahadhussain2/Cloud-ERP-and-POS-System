@@ -356,7 +356,7 @@ describe('a purchase return (PUR-03)', () => {
         note: null,
         lines: [{ itemId: line.itemId, receiptLineId: line.id, qty, unitCost: line.netUnitCost }],
       });
-    const tooMany = (await create(10001)).json<{ id: string }>().id;
+    const tooMany = (await create(11000)).json<{ id: string }>().id;
     const rvOf = async (id: string) =>
       (await send('GET', `/api/purchasing/returns/${id}`, 'maria')).json<{
         purchaseReturn: { rowVersion: string };

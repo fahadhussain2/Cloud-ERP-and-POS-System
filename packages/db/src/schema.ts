@@ -811,6 +811,98 @@ export const itemFloors = erp.table('item_floors', {
   ...syncColumns,
 });
 
+/** The next number per document family, taken when a back-office document is posted (W1-16). */
+export const documentCounters = erp.table('document_counters', {
+  tenantId: uuid('tenant_id').notNull(),
+  family: text('family').notNull(),
+  lastNo: bigint('last_no', { mode: 'number' }).notNull(),
+});
+
+/** A goods receipt with the supplier's bill (PUR-02, W1-16): a draft until posted, then never changed. */
+export const goodsReceipts = erp.table('goods_receipts', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number'),
+  branchId: uuid('branch_id').notNull(),
+  supplierPartyId: uuid('supplier_party_id'),
+  supplierBillNo: text('supplier_bill_no'),
+  supplierBillDate: date('supplier_bill_date'),
+  businessDate: date('business_date').notNull(),
+  locationId: uuid('location_id').notNull(),
+  paidFromBankAccountId: uuid('paid_from_bank_account_id'),
+  billDiscount: bigint('bill_discount', { mode: 'number' }).notNull(),
+  billTotal: bigint('bill_total', { mode: 'number' }),
+  total: bigint('total', { mode: 'number' }),
+  dueDate: date('due_date'),
+  notes: text('notes'),
+  status: text('status').notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  rowVersion: bigint('row_version', { mode: 'bigint' }).notNull(),
+  ...auditColumns,
+});
+
+export const goodsReceiptLines = erp.table('goods_receipt_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  receiptId: uuid('receipt_id').notNull(),
+  lineNo: integer('line_no').notNull(),
+  itemId: uuid('item_id'),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+  unitCost: bigint('unit_cost', { mode: 'number' }).notNull(),
+  lineDiscount: bigint('line_discount', { mode: 'number' }).notNull(),
+  value: bigint('value', { mode: 'number' }),
+});
+
+/** A purchase return / debit note (PUR-03, W1-16): a draft until posted, then never changed. */
+export const purchaseReturns = erp.table('purchase_returns', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number'),
+  branchId: uuid('branch_id').notNull(),
+  supplierPartyId: uuid('supplier_party_id'),
+  goodsReceiptId: uuid('goods_receipt_id'),
+  locationId: uuid('location_id').notNull(),
+  businessDate: date('business_date').notNull(),
+  reasonCode: text('reason_code'),
+  note: text('note'),
+  total: bigint('total', { mode: 'number' }),
+  status: text('status').notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  rowVersion: bigint('row_version', { mode: 'bigint' }).notNull(),
+  ...auditColumns,
+});
+
+export const purchaseReturnLines = erp.table('purchase_return_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  returnId: uuid('return_id').notNull(),
+  lineNo: integer('line_no').notNull(),
+  itemId: uuid('item_id'),
+  receiptLineId: uuid('receipt_line_id'),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+  unitCost: bigint('unit_cost', { mode: 'number' }).notNull(),
+});
+
+/** A supplier payment by bank from the back office (PUR-09, W1-16), posted when made. */
+export const supplierPayments = erp.table('supplier_payments', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  supplierPartyId: uuid('supplier_party_id').notNull(),
+  bankAccountId: uuid('bank_account_id').notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  businessDate: date('business_date').notNull(),
+  reference: text('reference'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  ...auditColumns,
+});
+
 /** Every price change: who, when, old → new and why (CAT-07, W1-15); added to only. */
 export const priceHistory = erp.table('price_history', {
   id: uuid('id').primaryKey(),
