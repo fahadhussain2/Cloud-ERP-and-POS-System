@@ -31,6 +31,7 @@ Data in this document is grouped by area. Fields marked † are derived and main
 ## 2. Platform
 
 **tenants:** `name, legal_name, base_currency (ISO 4217), currency_minor_units, timezone (e.g. Asia/Karachi), locale, fiscal_year_start_month (1–12), fiscal_year_locked bool, tax_mode (none|inclusive|exclusive), cash_rounding_increment (minor units, e.g. 100 = Rs 1), day_cutoff_hour (Delux 4), closing_time (Delux 20:00), cash_handover_mode (required|off; Delux: required), return_window_days (Delux 30, PRD Q3; W1-13), lock_date, settings jsonb, status`
+- `settings.labels` (W1-17, D-106): the label template: `widthMm, heightMm, marginMm, shopAbbr, showName, labelMakerBarcoded`; missing keys take the defaults in `@erp/domain` (`DEFAULT_LABEL_TEMPLATE`).
 
 **branches:** `code, name, address, phone, receipt_header jsonb`
 

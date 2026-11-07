@@ -333,6 +333,9 @@ importers:
       '@erp/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@erp/print':
+        specifier: workspace:*
+        version: link:../../packages/print
       '@erp/ui':
         specifier: workspace:*
         version: link:../../packages/ui

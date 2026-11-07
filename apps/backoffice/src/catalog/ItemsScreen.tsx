@@ -1,6 +1,7 @@
 import type { ItemList } from '@erp/contracts';
 import {
   Button,
+  Checkbox,
   formatMoney,
   Input,
   LABEL_CLASS,
@@ -44,6 +45,10 @@ export function ItemsScreen({ api }: { api: Api }) {
   const [status, setStatus] = useState(NONE);
   const [page, setPage] = useState(1);
   const [list, setList] = useState<ItemList | null>(null);
+  // Items picked for a relabel (W1-17), kept across pages and searches, in the order picked.
+  const [picked, setPicked] = useState<string[]>([]);
+  const pick = (id: string, on: boolean) =>
+    setPicked((p) => (on ? (p.includes(id) ? p : [...p, id]) : p.filter((x) => x !== id)));
   const searchId = useId();
   const categoryId = useId();
   const statusId = useId();
@@ -78,11 +83,23 @@ export function ItemsScreen({ api }: { api: Api }) {
         title={t('catalog.items.title')}
         help={t('catalog.items.help')}
         actions={
-          lookups?.can.editItems && (
-            <Button asChild size="lg">
-              <a href={href.newItem}>{t('catalog.items.add')}</a>
-            </Button>
-          )
+          <span className="flex flex-wrap gap-2">
+            {lookups?.can.printLabels &&
+              (picked.length > 0 ? (
+                <Button asChild size="lg" variant="outline">
+                  <a href={href.itemLabels(picked)}>{`${t('labels.makeLabels')} (${picked.length})`}</a>
+                </Button>
+              ) : (
+                <Button size="lg" variant="outline" disabled>
+                  {`${t('labels.makeLabels')} (0)`}
+                </Button>
+              ))}
+            {lookups?.can.editItems && (
+              <Button asChild size="lg">
+                <a href={href.newItem}>{t('catalog.items.add')}</a>
+              </Button>
+            )}
+          </span>
         }
       />
       {lookups && <LiveNotice lookups={lookups} />}
@@ -143,6 +160,7 @@ export function ItemsScreen({ api }: { api: Api }) {
             <Table aria-label={t('catalog.items.title')}>
               <TableHeader>
                 <TableRow>
+                  {lookups.can.printLabels && <TableHead className="w-10" />}
                   <TableHead>{t('catalog.fields.code')}</TableHead>
                   <TableHead>{t('catalog.fields.name')}</TableHead>
                   <TableHead>{t('catalog.fields.brand')}</TableHead>
@@ -154,6 +172,15 @@ export function ItemsScreen({ api }: { api: Api }) {
               <TableBody>
                 {list.items.map((i) => (
                   <TableRow key={i.id}>
+                    {lookups.can.printLabels && (
+                      <TableCell>
+                        <Checkbox
+                          aria-label={t('labels.pick', { code: i.code })}
+                          checked={picked.includes(i.id)}
+                          onCheckedChange={(v) => pick(i.id, v === true)}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="font-mono">
                       <a
                         href={href.item(i.id)}

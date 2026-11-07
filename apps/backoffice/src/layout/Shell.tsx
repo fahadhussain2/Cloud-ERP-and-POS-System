@@ -16,6 +16,7 @@ export interface MenuItem {
     | 'cashVariance'
     | 'items'
     | 'categories'
+    | 'labels'
     | 'suppliers'
     | 'receipts'
     | 'purchaseReturns';
@@ -57,6 +58,8 @@ export const MENU: readonly {
         needs: ['cat.item.edit', 'cat.price.edit'],
         screens: ['categories'],
       },
+      // Item labels (W1-17): from a posted receipt or a relabel.
+      { key: 'labels', href: href.labels, needs: ['cat.label.print'], screens: ['labels'] },
     ],
   },
   {

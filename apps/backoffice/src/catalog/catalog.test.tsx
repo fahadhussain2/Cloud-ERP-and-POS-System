@@ -40,7 +40,7 @@ const lookups = (over: Partial<CatalogLookups> = {}): CatalogLookups => ({
   suppliers: [],
   live: false,
   money: MONEY,
-  can: { editItems: true, editPrices: true, viewCost: true },
+  can: { editItems: true, editPrices: true, viewCost: true, printLabels: true },
   ...over,
 });
 const DETAIL: ItemDetail = {
@@ -136,11 +136,27 @@ describe('the item list', () => {
   });
 
   it('shows no notice once the shop is live, and no New item without cat.item.edit', async () => {
-    const f = fakeApi(lookups({ live: true, can: { editItems: false, editPrices: true, viewCost: true } }));
+    const f = fakeApi(
+      lookups({
+        live: true,
+        can: { editItems: false, editPrices: true, viewCost: true, printLabels: false },
+      }),
+    );
     show(<ItemsScreen api={f.api} />);
     expect(await screen.findByRole('link', { name: 'ABEA001' })).toBeDefined();
     expect(screen.queryByText(en.catalog.notLive.title)).toBeNull();
     expect(screen.queryByRole('link', { name: en.catalog.items.add })).toBeNull();
+    // Nor a relabel without cat.label.print.
+    expect(screen.queryByRole('checkbox', { name: 'Label ABEA001' })).toBeNull();
+  });
+
+  it('picks items for a relabel and opens the label screen with them (W1-17)', async () => {
+    show(<ItemsScreen api={fakeApi(lookups()).api} />);
+    const none = await screen.findByRole('button', { name: `${en.labels.makeLabels} (0)` });
+    expect((none as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Label ABEA001' }));
+    const ready = screen.getByRole('link', { name: `${en.labels.makeLabels} (1)` });
+    expect(ready.getAttribute('href')).toBe('#/catalog/labels/items/i1');
   });
 });
 
@@ -179,9 +195,12 @@ describe('an item', () => {
   it('keeps the price form read-only for a manager, and hides the cost without cost.view', async () => {
     const noCost: ItemDetail = { ...DETAIL };
     delete noCost.cost;
-    const f = fakeApi(lookups({ can: { editItems: true, editPrices: false, viewCost: false } }), {
-      'GET /api/catalog/items/i1': { status: 200, body: noCost },
-    });
+    const f = fakeApi(
+      lookups({ can: { editItems: true, editPrices: false, viewCost: false, printLabels: false } }),
+      {
+        'GET /api/catalog/items/i1': { status: 200, body: noCost },
+      },
+    );
     show(<ItemScreen api={f.api} id="i1" />);
     expect(await screen.findByText(en.catalog.item.pricesOwnerOnly)).toBeDefined();
     expect(screen.getByLabelText('Retail').matches(':disabled')).toBe(true);
@@ -229,7 +248,11 @@ describe('a new item', () => {
   it('a manager adds one without prices', async () => {
     show(
       <NewItemScreen
-        api={fakeApi(lookups({ can: { editItems: true, editPrices: false, viewCost: false } })).api}
+        api={
+          fakeApi(
+            lookups({ can: { editItems: true, editPrices: false, viewCost: false, printLabels: false } }),
+          ).api
+        }
       />,
     );
     expect(await screen.findByText(en.catalog.newItem.ownerPrices)).toBeDefined();

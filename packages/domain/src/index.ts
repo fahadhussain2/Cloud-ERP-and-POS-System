@@ -73,6 +73,22 @@ export {
   type PurchaseReturnReason,
 } from './purchasing';
 export {
+  DEFAULT_LABEL_TEMPLATE,
+  itemLabels,
+  labelPages,
+  labelTemplateProblems,
+  receiptLabels,
+  type LabelItem,
+  type LabelLine,
+  type LabelPage,
+  type LabelProblem,
+  type LabelTemplate,
+  type LabelTemplateProblem,
+  type LabelWarning,
+  type ReceiptLabelSource,
+  type ReceiptLabelsInput,
+} from './labels';
+export {
   catalogCodeProblems,
   itemProblems,
   priceChange,

@@ -1,0 +1,260 @@
+{
+  "description": "The labels a posted goods receipt starts with (CAT-08, W1-17): one per piece received for an item counted in whole pieces, one per line for an item sold in fractions (a litre of oil is one container). An item that carries the maker's barcode (a barcode other than its own code) starts at 0, unless the shop labels those too (the template's labelMakerBarcoded; Delux: on). The code is upper-cased; one Code 39 can't carry is a problem (the line is not printed); a supplier without a label abbreviation is a warning (the label prints without it). Every count can still be changed before printing.",
+  "cases": [
+    {
+      "name": "one label per piece, with the receipt's supplier",
+      "input": {
+        "labelMakerBarcoded": false,
+        "lines": [
+          {
+            "itemId": "i1",
+            "code": "BDPR160",
+            "name": "STEERING NECK",
+            "qty": 2000,
+            "allowsFraction": false,
+            "makerBarcode": false,
+            "supplierAbbr": "GLST"
+          },
+          {
+            "itemId": "i2",
+            "code": "DASH032",
+            "name": "DASHBOARD LOCK",
+            "qty": 10000,
+            "allowsFraction": false,
+            "makerBarcode": false,
+            "supplierAbbr": "GLST"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "itemId": "i1",
+          "code": "BDPR160",
+          "name": "STEERING NECK",
+          "supplierAbbr": "GLST",
+          "count": 2,
+          "problems": [],
+          "warnings": []
+        },
+        {
+          "itemId": "i2",
+          "code": "DASH032",
+          "name": "DASHBOARD LOCK",
+          "supplierAbbr": "GLST",
+          "count": 10,
+          "problems": [],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "name": "an item with the maker's barcode starts at 0 when the shop doesn't label those",
+      "input": {
+        "labelMakerBarcoded": false,
+        "lines": [
+          {
+            "itemId": "i1",
+            "code": "OIL050",
+            "name": "ENGINE OIL 4L",
+            "qty": 6000,
+            "allowsFraction": false,
+            "makerBarcode": true,
+            "supplierAbbr": "DCEN"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "itemId": "i1",
+          "code": "OIL050",
+          "name": "ENGINE OIL 4L",
+          "supplierAbbr": "DCEN",
+          "count": 0,
+          "problems": [],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "name": "an item with the maker's barcode gets one per piece when the shop labels everything (Delux)",
+      "input": {
+        "labelMakerBarcoded": true,
+        "lines": [
+          {
+            "itemId": "i1",
+            "code": "OIL050",
+            "name": "ENGINE OIL 4L",
+            "qty": 6000,
+            "allowsFraction": false,
+            "makerBarcode": true,
+            "supplierAbbr": "DCEN"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "itemId": "i1",
+          "code": "OIL050",
+          "name": "ENGINE OIL 4L",
+          "supplierAbbr": "DCEN",
+          "count": 6,
+          "problems": [],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "name": "an item sold in fractions gets one label per line",
+      "input": {
+        "labelMakerBarcoded": true,
+        "lines": [
+          {
+            "itemId": "i1",
+            "code": "OILLOOSE",
+            "name": "LOOSE OIL",
+            "qty": 20500,
+            "allowsFraction": true,
+            "makerBarcode": false,
+            "supplierAbbr": "DCEN"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "itemId": "i1",
+          "code": "OILLOOSE",
+          "name": "LOOSE OIL",
+          "supplierAbbr": "DCEN",
+          "count": 1,
+          "problems": [],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "name": "a lower-case code is upper-cased; a supplier without an abbreviation is a warning",
+      "input": {
+        "labelMakerBarcoded": true,
+        "lines": [
+          {
+            "itemId": "i1",
+            "code": "aces0021",
+            "name": "REVERSE CAMERA",
+            "qty": 1000,
+            "allowsFraction": false,
+            "makerBarcode": false,
+            "supplierAbbr": null
+          },
+          {
+            "itemId": "i2",
+            "code": "ACES0022",
+            "name": "PARKING SENSOR",
+            "qty": 1000,
+            "allowsFraction": false,
+            "makerBarcode": false,
+            "supplierAbbr": "  "
+          }
+        ]
+      },
+      "expected": [
+        {
+          "itemId": "i1",
+          "code": "ACES0021",
+          "name": "REVERSE CAMERA",
+          "supplierAbbr": null,
+          "count": 1,
+          "problems": [],
+          "warnings": ["supplier_abbr_missing"]
+        },
+        {
+          "itemId": "i2",
+          "code": "ACES0022",
+          "name": "PARKING SENSOR",
+          "supplierAbbr": null,
+          "count": 1,
+          "problems": [],
+          "warnings": ["supplier_abbr_missing"]
+        }
+      ]
+    },
+    {
+      "name": "a code Code 39 can't carry is a problem",
+      "input": {
+        "labelMakerBarcoded": true,
+        "lines": [
+          {
+            "itemId": "i1",
+            "code": "AB#12",
+            "name": "OLD LEGACY CODE",
+            "qty": 3000,
+            "allowsFraction": false,
+            "makerBarcode": false,
+            "supplierAbbr": "GLST"
+          },
+          {
+            "itemId": "i2",
+            "code": "AB*12",
+            "name": "A STAR IN THE CODE",
+            "qty": 1000,
+            "allowsFraction": false,
+            "makerBarcode": false,
+            "supplierAbbr": "GLST"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "itemId": "i1",
+          "code": "AB#12",
+          "name": "OLD LEGACY CODE",
+          "supplierAbbr": "GLST",
+          "count": 3,
+          "problems": ["code_unprintable"],
+          "warnings": []
+        },
+        {
+          "itemId": "i2",
+          "code": "AB*12",
+          "name": "A STAR IN THE CODE",
+          "supplierAbbr": "GLST",
+          "count": 1,
+          "problems": ["code_unprintable"],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "name": "codes with the other characters Code 39 carries print",
+      "input": {
+        "labelMakerBarcoded": true,
+        "lines": [
+          {
+            "itemId": "i1",
+            "code": "SP-10/A.2",
+            "name": "SPRING",
+            "qty": 1000,
+            "allowsFraction": false,
+            "makerBarcode": false,
+            "supplierAbbr": "GLST"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "itemId": "i1",
+          "code": "SP-10/A.2",
+          "name": "SPRING",
+          "supplierAbbr": "GLST",
+          "count": 1,
+          "problems": [],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "name": "no lines, no labels",
+      "input": { "labelMakerBarcoded": true, "lines": [] },
+      "expected": []
+    }
+  ]
+}

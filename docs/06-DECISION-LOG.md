@@ -102,7 +102,7 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 
 ### D-019 Labels keep the legacy format, printed per goods receipt
 - **Decision:** Code128 of the item code plus the supplier abbreviation of the delivering supplier. This preserves the per-unit supplier trace for future warranty claims.
-- **Status:** Accepted
+- **Status:** Accepted; the barcode is **Code 39**, not Code128 (D-055, D-106). Built in W1-17.
 
 ## Purchasing
 
@@ -932,3 +932,15 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Trade-off:** two steps for a cash purchase (receipt, then the desk), and a posted mistake is corrected by a return or a journal voucher, never an edit.
 - **Owner review (2026-11-07):** a supplier is deactivated (only when nothing is owed) or, if never used anywhere, deleted (marked deleted); the forms open as dialogs; a receipt line takes the item's last purchase cost.
 - **Status:** Accepted (with the W1-16 plan, owner answers 1–5)
+
+### D-106 Item labels: the legacy 40 × 28 mm roll label, every piece of a receipt, a shop setting for the maker's barcode (2026-11-07)
+- **Evidence:** the owner's photos and a legacy label PDF: a Zebra GX420t thermal-transfer printer with a roll of single 40 × 28 mm labels; on each label the shop's abbreviation (DCAC, Delux City Auto Corner) top left, the supplier's abbreviation top right, the item code as a Code 39 barcode with the code under it, and the item name on one line.
+- **Decision:**
+  - Labels print from the back office with the browser, one label per page of the roll, in the legacy layout. No A4 sheets (owner answer 1).
+  - From a **posted goods receipt** (by its number, or its Print labels button): one label per piece received, the receipt's supplier abbreviation; an item sold in fractions gets one per line. A **relabel** of items picked on the items screen: one each, the last purchase supplier, else the default supplier. Every count and abbreviation can be changed before printing; nothing is stored about what was printed.
+  - **The maker's barcode is a shop setting** ("label items that already carry the maker's barcode"). Off (a new shop's default, CAT-08), an item with a barcode other than its own code starts at 0. **Delux: on**, the shop labels every piece (owner answer 4).
+  - The template (size, margin, shop abbreviation, the name, the maker's-barcode setting) lives in `tenants.settings.labels`, changed by the owner only (`admin.settings`, owner answer 5).
+  - A code Code 39 can't carry is listed and not printed.
+- **Why:** the shop keeps its labels and scanners as they are; another shop that relies on the maker's barcode doesn't waste labels; the browser prints the way the bill already does (D-055).
+- **Trade-off:** the browser's print dialog must be set once per PC (the label printer, margins none, scale 100 %); printing straight to the Zebra without a dialog would need a local helper.
+- **Status:** Accepted (with the W1-17 plan, owner answers 1–5)

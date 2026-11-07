@@ -1,0 +1,137 @@
+{
+  "description": "Checking the label template the owner saves (CAT-08, W1-17): a roll of single labels, width 20–104 mm (the Zebra GX420t prints up to 104 mm) and height 10–200 mm; a margin of 0–5 mm that leaves at least 10 mm of label each way; the shop's abbreviation up to 10 characters, trimmed and upper case (empty = none). Problems in a fixed order.",
+  "cases": [
+    {
+      "name": "the Delux label",
+      "input": {
+        "widthMm": 40,
+        "heightMm": 28,
+        "marginMm": 1,
+        "shopAbbr": " dcac ",
+        "showName": true,
+        "labelMakerBarcoded": true
+      },
+      "expected": {
+        "template": {
+          "widthMm": 40,
+          "heightMm": 28,
+          "marginMm": 1,
+          "shopAbbr": "DCAC",
+          "showName": true,
+          "labelMakerBarcoded": true
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "no shop abbreviation is allowed",
+      "input": {
+        "widthMm": 50,
+        "heightMm": 25,
+        "marginMm": 0,
+        "shopAbbr": "",
+        "showName": false,
+        "labelMakerBarcoded": false
+      },
+      "expected": {
+        "template": {
+          "widthMm": 50,
+          "heightMm": 25,
+          "marginMm": 0,
+          "shopAbbr": "",
+          "showName": false,
+          "labelMakerBarcoded": false
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "too small, too large, a margin out of range and a long abbreviation",
+      "input": {
+        "widthMm": 19,
+        "heightMm": 201,
+        "marginMm": 6,
+        "shopAbbr": "DELUXCITYAUTO",
+        "showName": true,
+        "labelMakerBarcoded": true
+      },
+      "expected": {
+        "template": {
+          "widthMm": 19,
+          "heightMm": 201,
+          "marginMm": 6,
+          "shopAbbr": "DELUXCITYAUTO",
+          "showName": true,
+          "labelMakerBarcoded": true
+        },
+        "problems": ["width_out_of_range", "height_out_of_range", "margin_out_of_range", "shop_abbr_too_long"]
+      }
+    },
+    {
+      "name": "the largest label the printer takes",
+      "input": {
+        "widthMm": 104,
+        "heightMm": 200,
+        "marginMm": 5,
+        "shopAbbr": "ABCDEFGHIJ",
+        "showName": true,
+        "labelMakerBarcoded": true
+      },
+      "expected": {
+        "template": {
+          "widthMm": 104,
+          "heightMm": 200,
+          "marginMm": 5,
+          "shopAbbr": "ABCDEFGHIJ",
+          "showName": true,
+          "labelMakerBarcoded": true
+        },
+        "problems": []
+      }
+    },
+    {
+      "name": "a margin that leaves less than 10 mm of label",
+      "input": {
+        "widthMm": 20,
+        "heightMm": 12,
+        "marginMm": 2,
+        "shopAbbr": "",
+        "showName": true,
+        "labelMakerBarcoded": true
+      },
+      "expected": {
+        "template": {
+          "widthMm": 20,
+          "heightMm": 12,
+          "marginMm": 2,
+          "shopAbbr": "",
+          "showName": true,
+          "labelMakerBarcoded": true
+        },
+        "problems": ["margin_out_of_range"]
+      }
+    },
+    {
+      "name": "sizes in tenths of a millimetre are allowed, a negative margin is not",
+      "input": {
+        "widthMm": 40.5,
+        "heightMm": 27.9,
+        "marginMm": -1,
+        "shopAbbr": "",
+        "showName": true,
+        "labelMakerBarcoded": true
+      },
+      "expected": {
+        "template": {
+          "widthMm": 40.5,
+          "heightMm": 27.9,
+          "marginMm": -1,
+          "shopAbbr": "",
+          "showName": true,
+          "labelMakerBarcoded": true
+        },
+        "problems": ["margin_out_of_range"]
+      }
+    }
+  ]
+}

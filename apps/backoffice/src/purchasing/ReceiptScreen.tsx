@@ -381,9 +381,15 @@ function ReceiptForm({
         actions={
           posted &&
           r && (
-            <Button asChild variant="outline">
-              <a href={href.purchaseReturn(`new-${r.id}`)}>{t('purchasing.returns.fromReceipt')}</a>
-            </Button>
+            <span className="flex flex-wrap gap-2">
+              {/* W1-17: the received pieces' labels (CAT-08). */}
+              <Button asChild variant="outline">
+                <a href={href.receiptLabels(r.id)}>{t('labels.makeLabels')}</a>
+              </Button>
+              <Button asChild variant="outline">
+                <a href={href.purchaseReturn(`new-${r.id}`)}>{t('purchasing.returns.fromReceipt')}</a>
+              </Button>
+            </span>
           )
         }
       />
