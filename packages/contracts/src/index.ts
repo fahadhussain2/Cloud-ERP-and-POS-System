@@ -137,3 +137,23 @@ export {
   type SupplierRow,
 } from './purchasing';
 export { LabelItemsRequest, LabelTemplateRequest, type LabelLineView, type LabelsView } from './labels';
+export {
+  AdjustmentDraft,
+  InventorySettingsRequest,
+  ReceiveTransferRequest,
+  RejectAdjustmentRequest,
+  SaveAdjustmentRequest,
+  SaveTransferRequest,
+  StockPostRequest,
+  TransferDraft,
+  type AdjustmentStatus,
+  type AdjustmentView,
+  type InventoryItem,
+  type InventoryLookups,
+  type LocationKindName,
+  type StockCardView,
+  type StockDocumentRow,
+  type TransferNeededRow,
+  type TransferStatus,
+  type TransferView,
+} from './inventory';

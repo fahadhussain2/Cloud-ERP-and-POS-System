@@ -1,0 +1,118 @@
+{
+  "description": "Checking a stock transfer before it is posted or sent (INV-04, W1-18). Problems: a from and a to location, not the same one, neither the In transit location (stock gets there only by sending); at least one line; each line an item, a quantity above 0 (whole for pieces), each item once. Warning, never a problem (INV-03): a line takes more than the source has (available null = not known), so the source goes below 0.",
+  "cases": [
+    {
+      "name": "Godown to Shop, within what the Godown has",
+      "input": {
+        "fromLocationId": "godown",
+        "toLocationId": "shop",
+        "fromKind": "storage",
+        "toKind": "shop",
+        "lines": [
+          { "itemId": "i1", "qty": 5000, "allowsFraction": false, "available": 12000 },
+          { "itemId": "i2", "qty": 2500, "allowsFraction": true, "available": null }
+        ]
+      },
+      "expected": { "problems": [], "warnings": [] }
+    },
+    {
+      "name": "more than the Godown has: a warning, still allowed",
+      "input": {
+        "fromLocationId": "godown",
+        "toLocationId": "shop",
+        "fromKind": "storage",
+        "toKind": "shop",
+        "lines": [{ "itemId": "i1", "qty": 5000, "allowsFraction": false, "available": 3000 }]
+      },
+      "expected": { "problems": [], "warnings": [{ "warning": "below_zero", "row": 0 }] }
+    },
+    {
+      "name": "no locations and no lines",
+      "input": {
+        "fromLocationId": null,
+        "toLocationId": null,
+        "fromKind": null,
+        "toKind": null,
+        "lines": []
+      },
+      "expected": {
+        "problems": [
+          { "problem": "from_required", "row": null },
+          { "problem": "to_required", "row": null },
+          { "problem": "lines_required", "row": null }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "name": "the same location twice",
+      "input": {
+        "fromLocationId": "shop",
+        "toLocationId": "shop",
+        "fromKind": "shop",
+        "toKind": "shop",
+        "lines": [{ "itemId": "i1", "qty": 1000, "allowsFraction": false, "available": 4000 }]
+      },
+      "expected": { "problems": [{ "problem": "same_location", "row": null }], "warnings": [] }
+    },
+    {
+      "name": "into or out of In transit by hand",
+      "input": {
+        "fromLocationId": "transit",
+        "toLocationId": "shop",
+        "fromKind": "transit",
+        "toKind": "shop",
+        "lines": [{ "itemId": "i1", "qty": 1000, "allowsFraction": false, "available": 4000 }]
+      },
+      "expected": { "problems": [{ "problem": "transit_location", "row": null }], "warnings": [] }
+    },
+    {
+      "name": "to In transit by hand",
+      "input": {
+        "fromLocationId": "shop",
+        "toLocationId": "transit",
+        "fromKind": "shop",
+        "toKind": "transit",
+        "lines": [{ "itemId": "i1", "qty": 1000, "allowsFraction": false, "available": 4000 }]
+      },
+      "expected": { "problems": [{ "problem": "transit_location", "row": null }], "warnings": [] }
+    },
+    {
+      "name": "Shop to Damaged and back are both transfers",
+      "input": {
+        "fromLocationId": "damaged",
+        "toLocationId": "shop",
+        "fromKind": "damaged",
+        "toKind": "shop",
+        "lines": [{ "itemId": "i1", "qty": 1000, "allowsFraction": false, "available": 1000 }]
+      },
+      "expected": { "problems": [], "warnings": [] }
+    },
+    {
+      "name": "a line with no item, a zero, a fraction of pieces and an item twice",
+      "input": {
+        "fromLocationId": "godown",
+        "toLocationId": "shop",
+        "fromKind": "storage",
+        "toKind": "shop",
+        "lines": [
+          { "itemId": null, "qty": 1000, "allowsFraction": false, "available": null },
+          { "itemId": "i1", "qty": 0, "allowsFraction": false, "available": 5000 },
+          { "itemId": "i2", "qty": 1500, "allowsFraction": false, "available": 5000 },
+          { "itemId": "i1", "qty": 1000, "allowsFraction": false, "available": 5000 },
+          { "itemId": "i3", "qty": 1.5, "allowsFraction": true, "available": null }
+        ]
+      },
+      "expected": {
+        "problems": [
+          { "problem": "item_required", "row": 0 },
+          { "problem": "qty_positive", "row": 1 },
+          { "problem": "qty_fraction", "row": 2 },
+          { "problem": "item_repeated", "row": 3 },
+          { "problem": "qty_positive", "row": 4 }
+        ],
+        "warnings": []
+      }
+    }
+  ]
+}

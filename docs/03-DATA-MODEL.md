@@ -31,6 +31,7 @@ Data in this document is grouped by area. Fields marked † are derived and main
 ## 2. Platform
 
 **tenants:** `name, legal_name, base_currency (ISO 4217), currency_minor_units, timezone (e.g. Asia/Karachi), locale, fiscal_year_start_month (1–12), fiscal_year_locked bool, tax_mode (none|inclusive|exclusive), cash_rounding_increment (minor units, e.g. 100 = Rs 1), day_cutoff_hour (Delux 4), closing_time (Delux 20:00), cash_handover_mode (required|off; Delux: required), return_window_days (Delux 30, PRD Q3; W1-13), lock_date, settings jsonb, status`
+- `settings.inventory` (W1-18, D-107): `adjustmentApprovalLimit` (minor units; a loss above it waits for the owner; missing = Rs 10,000).
 - `settings.labels` (W1-17, D-106): the label template: `widthMm, heightMm, marginMm, shopAbbr, showName, labelMakerBarcoded`; missing keys take the defaults in `@erp/domain` (`DEFAULT_LABEL_TEMPLATE`).
 
 **branches:** `code, name, address, phone, receipt_header jsonb`
@@ -232,9 +233,15 @@ Held bills are **device-local only** and never sent to the server.
 
 **stock_balances**†: `item_id, location_id, qty`. PK `(tenant_id, item_id, location_id)`. Synced to devices.
 
-**stock_transfers** + **stock_transfer_lines:** `number, from_location_id, to_location_id, status (posted|cancelled), created_by` / `item_id, qty`
+**Built in W1-18 (migration 0018, D-107):** transfers and adjustments, drafts until posted, then never changed (rule 3). Numbers `TR000001` / `AD000001` from `document_counters` when posted.
 
-**stock_adjustments** + lines: `number, reason_code, approved_by_user_id, note` / `item_id, location_id, qty_delta`
+**locations:** kind `transit` added: one **In transit** location per branch, never sellable, where sent stock waits until it is received.
+
+**transfer_routes:** `from_location_id, to_location_id, needs_receiving`. A route with no row moves at once. Owner's setting.
+
+**stock_transfers** + **stock_transfer_lines:** `number, branch_id, from_location_id, to_location_id, business_date, note, status (draft|posted|in_transit|received), posted_at, posted_by_user_id, receipt_id (the receiving's posting source), received_on, received_at, received_by_user_id` / `line_no, item_id, qty, received_qty`
+
+**stock_adjustments** + **stock_adjustment_lines:** `number, branch_id, location_id, business_date, reason_code (found|lost|damaged|theft|count_correction|write_off|other), note, stock_transfer_id (a shortfall on arrival), status (draft|awaiting_approval|posted), loss_value, submitted_*, approved_*, rejected_*, rejection_note, posted_at, posted_by_user_id` / `line_no, item_id, qty (+ found, − gone)`
 
 **stock_counts:** `number, scope jsonb (category/bin/supplier/items), location_id, status (open|counting|review|posted|cancelled), started_at, posted_at, approved_by_user_id`
 

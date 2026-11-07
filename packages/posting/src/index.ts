@@ -17,6 +17,7 @@ export { postOpening } from './opening';
 export { postGoodsReceipt, postPurchaseReturn, postSupplierPayment } from './purchasing';
 export { emptyState, replay, type ReplayStep } from './replay';
 export { postSale } from './sale';
+export { postStockAdjustment, postStockTransfer } from './stock';
 export { postVoid } from './void';
 export type {
   CostState,
@@ -37,6 +38,8 @@ export type {
   PostingSale,
   PostingSaleLine,
   PostingSessionEvent,
+  PostingStockAdjustment,
+  PostingStockTransfer,
   PostingVoid,
   StockMovement,
 } from './types';

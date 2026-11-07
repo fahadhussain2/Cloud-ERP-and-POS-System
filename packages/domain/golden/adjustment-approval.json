@@ -1,0 +1,65 @@
+{
+  "description": "An adjustment's value and whether it waits for the owner (owner answer 3 to W1-18). Each line at qty × the item's average (half away from zero; no cost known = 0). The gain is the found lines, the loss the gone ones (both ≥ 0). It waits for approval when the one posting it can't approve (inv.adjust.approve) and its loss is above the limit; gains never wait, and a loss equal to the limit doesn't.",
+  "cases": [
+    {
+      "name": "the manager's Rs 12,000 loss: above Rs 10,000, it waits",
+      "input": {
+        "canApprove": false,
+        "limit": 1000000,
+        "lines": [{ "qty": -3000, "avgCost": 400000 }]
+      },
+      "expected": { "gain": 0, "loss": 1200000, "needsApproval": true }
+    },
+    {
+      "name": "the owner's own Rs 12,000 loss posts at once",
+      "input": {
+        "canApprove": true,
+        "limit": 1000000,
+        "lines": [{ "qty": -3000, "avgCost": 400000 }]
+      },
+      "expected": { "gain": 0, "loss": 1200000, "needsApproval": false }
+    },
+    {
+      "name": "exactly the limit doesn't wait",
+      "input": {
+        "canApprove": false,
+        "limit": 1000000,
+        "lines": [{ "qty": -2500, "avgCost": 400000 }]
+      },
+      "expected": { "gain": 0, "loss": 1000000, "needsApproval": false }
+    },
+    {
+      "name": "a large gain never waits",
+      "input": {
+        "canApprove": false,
+        "limit": 1000000,
+        "lines": [{ "qty": 50000, "avgCost": 400000 }]
+      },
+      "expected": { "gain": 20000000, "loss": 0, "needsApproval": false }
+    },
+    {
+      "name": "gains don't offset losses: the loss alone is judged",
+      "input": {
+        "canApprove": false,
+        "limit": 1000000,
+        "lines": [
+          { "qty": 10000, "avgCost": 400000 },
+          { "qty": -3000, "avgCost": 400000 }
+        ]
+      },
+      "expected": { "gain": 4000000, "loss": 1200000, "needsApproval": true }
+    },
+    {
+      "name": "no cost known counts as 0, a fraction rounds half away from zero",
+      "input": {
+        "canApprove": false,
+        "limit": 1000000,
+        "lines": [
+          { "qty": -5000, "avgCost": null },
+          { "qty": -1500, "avgCost": 333 }
+        ]
+      },
+      "expected": { "gain": 0, "loss": 500, "needsApproval": false }
+    }
+  ]
+}

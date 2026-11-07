@@ -93,6 +93,13 @@ export function ItemScreen({ api, id }: { api: Api; id: string }) {
             <StatusChip tone={statusTone[detail.item.status] ?? 'neutral'}>
               {t(`catalog.status.${detail.item.status}`)}
             </StatusChip>
+            {/* Every movement of this item (W1-18, INV-07). */}
+            <a
+              href={href.stockCard(detail.item.id)}
+              className="font-medium underline-offset-4 hover:underline"
+            >
+              {t('catalog.item.stockCard')}
+            </a>
             {detail.item.updatedBy && (
               <span>
                 {t('catalog.item.updated', {

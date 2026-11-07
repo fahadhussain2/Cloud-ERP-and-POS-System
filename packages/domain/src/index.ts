@@ -73,6 +73,23 @@ export {
   type PurchaseReturnReason,
 } from './purchasing';
 export {
+  ADJUSTMENT_REASONS,
+  adjustmentApproval,
+  checkAdjustment,
+  checkTransfer,
+  checkTransferReceipt,
+  type AdjustmentApprovalInput,
+  type AdjustmentCheckInput,
+  type AdjustmentProblem,
+  type AdjustmentReason,
+  type LocationKind,
+  type StockWarning,
+  type TransferCheckInput,
+  type TransferProblem,
+  type TransferReceiptInput,
+  type TransferReceiptProblem,
+} from './inventory';
+export {
   DEFAULT_LABEL_TEMPLATE,
   itemLabels,
   labelPages,

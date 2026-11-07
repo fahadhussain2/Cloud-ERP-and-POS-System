@@ -37,7 +37,8 @@
       "shop": "Shop",
       "reports": "Reports",
       "catalog": "Catalog",
-      "purchasing": "Purchasing"
+      "purchasing": "Purchasing",
+      "stock": "Stock"
     },
     "staff": "Staff",
     "counters": "Counters",
@@ -50,7 +51,12 @@
     "suppliers": "Suppliers",
     "receipts": "Goods receipts",
     "purchaseReturns": "Purchase returns",
-    "labels": "Print labels"
+    "labels": "Print labels",
+    "transfers": "Transfers",
+    "adjustments": "Adjustments",
+    "stockCard": "Stock card",
+    "transferNeeded": "Transfer needed",
+    "stockSettings": "Stock settings"
   },
   "home": {
     "nothing": "There is nothing here for your role yet."
@@ -377,7 +383,8 @@
       "savedDetails": "Details saved.",
       "savedCodes": "Numbers saved.",
       "savedVehicles": "Vehicles saved.",
-      "savedPrices": "Prices saved."
+      "savedPrices": "Prices saved.",
+      "stockCard": "Stock card"
     },
     "cost": {
       "average": "Average cost",
@@ -704,5 +711,181 @@
     },
     "makeLabels": "Print labels",
     "pick": "Label {{code}}"
+  },
+  "inventory": {
+    "notLive": {
+      "title": "Move and correct stock in the legacy app until go-live",
+      "text": "Until the shop is live, transfers and adjustments go into the legacy app. The ones entered here before then are practice: they are removed before go-live."
+    },
+    "inTransit": "In transit",
+    "draft": "Draft",
+    "saveDraft": "Save draft",
+    "saved": "Saved.",
+    "post": "Post",
+    "status": {
+      "draft": "Draft",
+      "posted": "Posted",
+      "in_transit": "On the way",
+      "received": "Received",
+      "awaiting_approval": "Awaiting approval"
+    },
+    "fields": {
+      "number": "Number",
+      "date": "Date",
+      "from": "From",
+      "to": "To",
+      "lines": "Lines",
+      "location": "Location",
+      "reason": "Reason",
+      "loss": "Loss",
+      "note": "Note",
+      "movedOn": "Moved on",
+      "receivedOn": "Received on",
+      "adjustedOn": "Date"
+    },
+    "line": {
+      "item": "Item",
+      "itemOf": "Item of line {{row}}",
+      "qty": "Quantity",
+      "qtyOf": "Quantity of line {{row}}",
+      "received": "Received",
+      "receivedOf": "Received of line {{row}}",
+      "available": "Has now",
+      "onHand": "Has now",
+      "change": "Change (+ found, − gone)",
+      "changeOf": "Change of line {{row}}",
+      "add": "Add a line"
+    },
+    "reasons": {
+      "found": "Found",
+      "lost": "Lost / missing",
+      "damaged": "Broken / damaged",
+      "theft": "Theft",
+      "count_correction": "Count correction",
+      "write_off": "Write-off (damaged goods)",
+      "other": "Other"
+    },
+    "problems": {
+      "row": "Line {{row}}: {{text}}",
+      "from_required": "Pick where the stock comes from.",
+      "to_required": "Pick where the stock goes.",
+      "same_location": "From and To are the same place.",
+      "transit_location": "Stock goes into and out of In transit only by sending and receiving.",
+      "lines_required": "Add at least one line.",
+      "item_required": "Pick the item.",
+      "qty_positive": "Type a quantity above 0.",
+      "qty_fraction": "This item has no fractions.",
+      "item_repeated": "This item is on another line already.",
+      "received_invalid": "Type what arrived, 0 or more.",
+      "more_than_sent": "More than was sent.",
+      "location_required": "Pick the location.",
+      "reason_required": "Pick a reason.",
+      "reason_unknown": "Pick a reason from the list.",
+      "note_required": "Add a note for \"Other\".",
+      "write_off_not_damaged": "A write-off is out of Damaged: transfer the goods there first.",
+      "write_off_gain": "A write-off takes stock out: type it below 0.",
+      "qty_zero": "Type a change other than 0."
+    },
+    "warnings": {
+      "below_zero": "More than it has now: it goes below 0. It still posts."
+    },
+    "errors": {
+      "stale": "{{by}} changed this in the meantime. Reload it, then make your change again.",
+      "someone": "Someone",
+      "posted": "It is posted and can't be changed.",
+      "in_transit": "It has been sent. Receive it instead.",
+      "awaiting_approval": "It is waiting for the owner's approval.",
+      "draft": "It is still a draft.",
+      "not_found": "Not found.",
+      "in_use": "It records a shortfall on arrival, so it stays. Post it, or send it to the owner.",
+      "invalid_request": "That can't be saved.",
+      "forbidden": "You can't do this.",
+      "posting_failed": "It couldn't be posted ({{code}}). Nothing was changed."
+    },
+    "transfers": {
+      "title": "Transfers",
+      "help": "Stock moved between the Godown, the Shop and Damaged. The storekeeper types a transfer; the owner or the manager posts it.",
+      "add": "New transfer",
+      "new": "New transfer",
+      "notFound": "This transfer was not found.",
+      "empty": "No transfers yet.",
+      "show": "Show",
+      "filter": {
+        "all": "All",
+        "in_transit": "On the way",
+        "draft": "Drafts"
+      },
+      "lines": "Transfer lines",
+      "send": "Send",
+      "receive": "Receive",
+      "receiveHint": "Type what arrived on each line. Anything short is recorded as lost on the way.",
+      "needsReceiving": "This route needs receiving: posting sends the goods, and they reach the other side when someone receives them.",
+      "postedBy": "Posted by {{name}}",
+      "receivedBy": "Received by {{name}} on {{date}}",
+      "shortfall": "Short on arrival:"
+    },
+    "adjustments": {
+      "title": "Adjustments",
+      "help": "Stock found, lost or broken, with a reason, valued at the average cost and posted to the books.",
+      "add": "New adjustment",
+      "new": "New adjustment",
+      "notFound": "This adjustment was not found.",
+      "empty": "No adjustments yet.",
+      "lines": "Adjustment lines",
+      "value": "Gain {{gain}} · Loss {{loss}}",
+      "willWait": "The loss is more than {{limit}}: it will wait for the owner's approval before it posts.",
+      "sendForApproval": "Send for approval",
+      "awaiting": "Waiting for the owner's approval (sent by {{name}})",
+      "awaitingHelp": "Stock and the books don't change until it is approved.",
+      "approve": "Approve and post",
+      "reject": "Send back",
+      "rejectNote": "Why it goes back",
+      "rejected": "Sent back by {{name}}",
+      "approvedBy": "Approved by {{name}}",
+      "ofTransfer": "Short on arrival of {{number}}"
+    },
+    "card": {
+      "title": "Stock card",
+      "help": "Every movement of an item, newest first, with the balance at its location and in total.",
+      "item": "Item",
+      "everywhere": "Every location",
+      "none": "None in stock.",
+      "empty": "No movements yet.",
+      "movements": "Movements",
+      "document": "Document",
+      "in": "In",
+      "out": "Out",
+      "cost": "Unit cost",
+      "value": "Value",
+      "balance": "Balance",
+      "total": "Total",
+      "older": "Older movements",
+      "kinds": {
+        "sale": "Sale",
+        "sales_void": "Void",
+        "opening": "Opening"
+      }
+    },
+    "needed": {
+      "title": "Transfer needed",
+      "help": "Items the Shop has sold below 0 while the Godown still has some.",
+      "transfer": "Transfer them from the Godown",
+      "empty": "Nothing to move.",
+      "shop": "Shop",
+      "godown": "Godown",
+      "suggested": "To move"
+    },
+    "settings": {
+      "title": "Stock settings",
+      "help": "Only the owner changes these.",
+      "limit": "Approval limit",
+      "limitHelp": "A loss above this, posted by anyone but the owner, waits for the owner's approval.",
+      "routes": "Routes that need receiving",
+      "routesHelp": "Tick a route when goods spend time on the way (sent, then received). Unticked routes move at once.",
+      "to": "To {{name}}",
+      "needsReceiving": "{{from}} to {{to}} needs receiving",
+      "save": "Save settings"
+    },
+    "unnumbered": "Not posted yet"
   }
 }

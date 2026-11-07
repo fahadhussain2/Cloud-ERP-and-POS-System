@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#63](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/63) |
 | **Module** | inventory (back-office screens and API), with accounting (`packages/posting`: two new posting sources) and sync (stock balances already reach the counters) |
-| **Status** | Accepted (2026-11-07) with the owner's answers 1–4 (below) |
+| **Status** | Accepted (2026-11-07) with the owner's answers 1–4 (below). Built (2026-11-08) on `w1-18-stock-operations` |
 | **Refs** | INV-04, INV-05, INV-07, INV-03 (negative stock allowed); PRD W13; posting rules §5.3, §5.4; data model §2 (locations), §7; CLAUDE.md rules 1, 3, 4, 5; D-015, D-017, D-095, D-105; D-107 (new, below) |
 | **Depends on** | W1-08 (stock ledger, balances, average cost, posting engine), W1-16 (document numbering, the draft → post pattern, the item picker) |
 | **Size** | about 3½ days: migration, posting and golden files ¾; API with integration tests 1; the screens 1¼ (transfers with receiving, adjustments with approval, stock card, transfer needed, on the way); e2e and docs ½ |
@@ -120,6 +120,27 @@ New decision **D-107** records answers 2–4: the purchaser drafts, the owner or
   - an adjustment under the limit and one over it, approved by the owner;
   - the item's stock card;
   - a route switched to "needs receiving", a send and a receive, then switched back.
+
+## Changes during the build
+
+| Change | Why |
+|---|---|
+| Received stock moves out of In transit at the item's **average when received**, not the cost it was sent at | The average is per item, not per location (D-017); no journal either way, so only the movement's value differs |
+| An adjustment posts its **net** value as one pair (a count correction up on one item and down on another nets) | One journal per document, balanced; the stock movements keep each line's value |
+| A draft transfer may name the same place twice; the database refuses it only once moved | The check says why it can't post, instead of a save that fails |
+| The stock card's **Total** is the total after the whole posting; within a posting, lines in line order, a transfer's out before its in | A transfer moves stock and never changes how much there is |
+| Transfer needed's button opens one Godown → Shop draft with every item it lists, the quantities filled in | One transfer for the morning's shortfalls |
+| A shortfall adjustment can't be deleted, only posted or sent to the owner | The stock is gone from In transit whether or not anyone posts it |
+| The item picker takes the search address; the stock screens search `/api/inventory/items` (with stock per location and, with `cost.view`, the average) | One picker for purchasing and stock |
+| The purchasing screens' locations leave out In transit | Goods are never received into it |
+| The posting helpers (accounts by role, the lock date, the stock state) moved from `purchasing.ts` to `build.ts` | Shared by purchasing and stock postings |
+| The item screen links to the item's stock card | As the scope says |
+
+## Checks (2026-11-08)
+
+- `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 1,995 tests.
+- `pnpm test:integration`: 370 passed (36 files), including the stock API (18) and the migration and guard (4).
+- `pnpm e2e` (Edge): 50 passed; the new stock flow covers the manager's transfer and −1 broken, a Rs 14,700 loss waiting for the owner, the owner's approval, Transfer needed and the stock card.
 
 ## Order
 

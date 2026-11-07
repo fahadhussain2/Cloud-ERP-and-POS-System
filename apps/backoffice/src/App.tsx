@@ -8,6 +8,9 @@ import { ItemScreen } from './catalog/ItemScreen';
 import { ItemsScreen } from './catalog/ItemsScreen';
 import { LabelsScreen } from './catalog/LabelsScreen';
 import { NewItemScreen } from './catalog/NewItemScreen';
+import { AdjustmentScreen, AdjustmentsScreen } from './inventory/AdjustmentScreen';
+import { StockCardScreen, StockSettingsScreen, TransferNeededScreen } from './inventory/StockScreens';
+import { TransferScreen, TransfersScreen } from './inventory/TransferScreen';
 import { ReceiptScreen, ReceiptsScreen } from './purchasing/ReceiptScreen';
 import { ReturnScreen, ReturnsScreen } from './purchasing/ReturnScreen';
 import { SupplierScreen, SuppliersScreen } from './purchasing/SuppliersScreen';
@@ -112,6 +115,20 @@ export function App({ api }: { api: Api }) {
         <ReturnsScreen api={api} />
       ) : shown.screen === 'purchaseReturn' ? (
         <ReturnScreen key={shown.id} api={api} id={shown.id} />
+      ) : shown.screen === 'transfers' ? (
+        <TransfersScreen api={api} />
+      ) : shown.screen === 'transfer' ? (
+        <TransferScreen key={shown.id} api={api} id={shown.id} />
+      ) : shown.screen === 'adjustments' ? (
+        <AdjustmentsScreen api={api} />
+      ) : shown.screen === 'adjustment' ? (
+        <AdjustmentScreen key={shown.id} api={api} id={shown.id} />
+      ) : shown.screen === 'stockCard' ? (
+        <StockCardScreen key={shown.itemId ?? ''} api={api} itemId={shown.itemId ?? null} />
+      ) : shown.screen === 'transferNeeded' ? (
+        <TransferNeededScreen api={api} />
+      ) : shown.screen === 'stockSettings' ? (
+        <StockSettingsScreen api={api} />
       ) : (
         <StaffScreen api={api} permissions={me.permissions} />
       )}

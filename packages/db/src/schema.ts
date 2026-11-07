@@ -84,7 +84,7 @@ export const locations = erp.table('locations', {
   branchId: uuid('branch_id').notNull(),
   code: text('code').notNull(),
   name: text('name').notNull(),
-  kind: text('kind', { enum: ['shop', 'storage', 'damaged'] }).notNull(),
+  kind: text('kind', { enum: ['shop', 'storage', 'damaged', 'transit'] }).notNull(),
   isSellable: boolean('is_sellable').notNull(),
   ...syncColumns,
   ...auditColumns,
@@ -901,6 +901,85 @@ export const supplierPayments = erp.table('supplier_payments', {
   deviceId: uuid('device_id'),
   exceptionCount: integer('exception_count').notNull(),
   ...auditColumns,
+});
+
+/** Which transfer routes need receiving (W1-18, owner answer 4); a route with no row moves at once. */
+export const transferRoutes = erp.table('transfer_routes', {
+  tenantId: uuid('tenant_id').notNull(),
+  fromLocationId: uuid('from_location_id').notNull(),
+  toLocationId: uuid('to_location_id').notNull(),
+  needsReceiving: boolean('needs_receiving').notNull(),
+  ...auditColumns,
+});
+
+/** A stock transfer between locations (INV-04, W1-18): a draft, then posted at once or sent and received. */
+export const stockTransfers = erp.table('stock_transfers', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number'),
+  branchId: uuid('branch_id').notNull(),
+  fromLocationId: uuid('from_location_id').notNull(),
+  toLocationId: uuid('to_location_id').notNull(),
+  businessDate: date('business_date').notNull(),
+  note: text('note'),
+  status: text('status').notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  postedByUserId: uuid('posted_by_user_id'),
+  receiptId: uuid('receipt_id'),
+  receivedOn: date('received_on'),
+  receivedAt: timestamp('received_at', { withTimezone: true }),
+  receivedByUserId: uuid('received_by_user_id'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  rowVersion: bigint('row_version', { mode: 'bigint' }).notNull(),
+  ...auditColumns,
+});
+
+export const stockTransferLines = erp.table('stock_transfer_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  transferId: uuid('transfer_id').notNull(),
+  lineNo: integer('line_no').notNull(),
+  itemId: uuid('item_id'),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+  receivedQty: numeric('received_qty', { precision: 14, scale: 3 }),
+});
+
+/** A stock adjustment (INV-05, W1-18): a draft, awaiting the owner's approval when large, then posted. */
+export const stockAdjustments = erp.table('stock_adjustments', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number'),
+  branchId: uuid('branch_id').notNull(),
+  locationId: uuid('location_id').notNull(),
+  businessDate: date('business_date').notNull(),
+  reasonCode: text('reason_code'),
+  note: text('note'),
+  stockTransferId: uuid('stock_transfer_id'),
+  status: text('status').notNull(),
+  lossValue: bigint('loss_value', { mode: 'number' }),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  submittedByUserId: uuid('submitted_by_user_id'),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  approvedByUserId: uuid('approved_by_user_id'),
+  rejectedAt: timestamp('rejected_at', { withTimezone: true }),
+  rejectedByUserId: uuid('rejected_by_user_id'),
+  rejectionNote: text('rejection_note'),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  postedByUserId: uuid('posted_by_user_id'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  rowVersion: bigint('row_version', { mode: 'bigint' }).notNull(),
+  ...auditColumns,
+});
+
+export const stockAdjustmentLines = erp.table('stock_adjustment_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  adjustmentId: uuid('adjustment_id').notNull(),
+  lineNo: integer('line_no').notNull(),
+  itemId: uuid('item_id'),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
 });
 
 /** Every price change: who, when, old → new and why (CAT-07, W1-15); added to only. */

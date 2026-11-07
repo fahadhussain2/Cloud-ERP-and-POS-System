@@ -182,7 +182,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       const out: PurchasingLookups = {
         locations: (
           await c.query<{ id: string; code: string; name: string }>(
-            'SELECT id, code, name FROM erp.locations WHERE deleted_at IS NULL ORDER BY code',
+            "SELECT id, code, name FROM erp.locations WHERE deleted_at IS NULL AND kind <> 'transit' ORDER BY code",
           )
         ).rows,
         bankAccounts: (

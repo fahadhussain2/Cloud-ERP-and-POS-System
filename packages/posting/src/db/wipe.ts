@@ -49,6 +49,11 @@ const DOCUMENT_TABLES = [
   'goods_receipt_lines',
   'goods_receipts',
   'supplier_payments',
+  // Stock operations (W1-18): adjustments before the transfers whose shortfall they record.
+  'stock_adjustment_lines',
+  'stock_adjustments',
+  'stock_transfer_lines',
+  'stock_transfers',
   'document_counters',
   'postings',
   'posting_state',
@@ -95,6 +100,8 @@ export const KEPT_TABLES = [
   'item_prices',
   // The prices are kept, so their history is too (W1-15, D-104).
   'price_history',
+  // Which routes need receiving is a setting (W1-18).
+  'transfer_routes',
 ] as const;
 /** Every table is in exactly one list (a test checks it against the schema), so a new table needs a decision. */
 export const WIPED_TABLES = [...DOCUMENT_TABLES, ...BALANCE_TABLES];

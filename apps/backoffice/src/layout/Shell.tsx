@@ -19,7 +19,12 @@ export interface MenuItem {
     | 'labels'
     | 'suppliers'
     | 'receipts'
-    | 'purchaseReturns';
+    | 'purchaseReturns'
+    | 'transfers'
+    | 'adjustments'
+    | 'stockCard'
+    | 'transferNeeded'
+    | 'stockSettings';
   href: string;
   /** Any of these permissions opens the screen. */
   needs: readonly string[];
@@ -28,7 +33,7 @@ export interface MenuItem {
 }
 
 export const MENU: readonly {
-  group: 'people' | 'catalog' | 'purchasing' | 'shop' | 'reports';
+  group: 'people' | 'catalog' | 'purchasing' | 'stock' | 'shop' | 'reports';
   items: readonly MenuItem[];
 }[] = [
   {
@@ -78,6 +83,42 @@ export const MENU: readonly {
         href: href.purchaseReturns,
         needs: ['pur.receive'],
         screens: ['purchaseReturns', 'purchaseReturn'],
+      },
+    ],
+  },
+  {
+    // Stock operations (W1-18): transfers, adjustments, an item's stock card, Transfer needed, the owner's settings.
+    group: 'stock',
+    items: [
+      {
+        key: 'transfers',
+        href: href.transfers,
+        needs: ['inv.transfer', 'inv.transfer.post'],
+        screens: ['transfers', 'transfer'],
+      },
+      {
+        key: 'adjustments',
+        href: href.adjustments,
+        needs: ['inv.adjust', 'inv.adjust.approve'],
+        screens: ['adjustments', 'adjustment'],
+      },
+      {
+        key: 'stockCard',
+        href: href.stockCards,
+        needs: ['inv.transfer', 'inv.adjust', 'cost.view'],
+        screens: ['stockCard'],
+      },
+      {
+        key: 'transferNeeded',
+        href: href.transferNeeded,
+        needs: ['inv.transfer', 'inv.transfer.post'],
+        screens: ['transferNeeded'],
+      },
+      {
+        key: 'stockSettings',
+        href: href.stockSettings,
+        needs: ['admin.settings'],
+        screens: ['stockSettings'],
       },
     ],
   },

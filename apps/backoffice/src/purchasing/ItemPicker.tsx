@@ -5,43 +5,51 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../api';
 import type { PickedItem } from './data';
 
-// The item of a receipt or return line: type a code, name words, a barcode or an OEM number and pick from the list
-// (W1-16). Searches a moment after the last key.
+// The item of a receipt, return, transfer or adjustment line: type a code, name words, a barcode or an OEM number and
+// pick from the list (W1-16, W1-18). Searches a moment after the last key, at `url` (purchasing's search by default).
+
+interface Found {
+  id: string;
+  code: string;
+  name: string;
+}
 
 const WAIT_MS = 200;
 
-export function ItemPicker({
+export function ItemPicker<T extends Found = PickedItem>({
   api,
   label,
   picked,
   onPick,
   disabled,
+  url = '/api/purchasing/items',
 }: {
   api: Api;
   label: string;
   picked: { code: string | null; name: string | null } | null;
-  onPick: (item: PickedItem) => void;
+  onPick: (item: T) => void;
   disabled?: boolean;
+  url?: string;
 }) {
   const { t } = useTranslation();
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
-  const [found, setFound] = useState<PickedItem[]>([]);
+  const [found, setFound] = useState<T[]>([]);
   const listId = useId();
 
   useEffect(() => {
     if (!open || text.trim() === '') return;
     let live = true;
     const timer = setTimeout(() => {
-      void api('GET', `/api/purchasing/items?q=${encodeURIComponent(text)}`).then(
-        (r) => live && setFound(r.status === 200 ? (r.body as { items: PickedItem[] }).items : []),
+      void api('GET', `${url}?q=${encodeURIComponent(text)}`).then(
+        (r) => live && setFound(r.status === 200 ? (r.body as { items: T[] }).items : []),
       );
     }, WAIT_MS);
     return () => {
       live = false;
       clearTimeout(timer);
     };
-  }, [api, text, open]);
+  }, [api, text, open, url]);
 
   if (!open)
     return (

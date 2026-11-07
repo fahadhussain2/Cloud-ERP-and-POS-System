@@ -22,6 +22,8 @@ Open items that must be settled before, or soon after, go-live. Each line names 
 - [ ] **Bill print test at the shop** (speed and barcode scan) by mid-November, with real bills once checkout exists (W1-01, deferred; the printer is an HP LaserJet P1005, so lower risk than the dot-matrix assumption).
 - [ ] **Label template on production** (W1-17, D-106): the owner opens Catalog → Print labels → Label template and sets the shop abbreviation **DCAC** and **Label items that already carry the maker's barcode: on** (40 × 28 mm, 1 mm margin, the name printed).
 - [ ] **Label print test on the Zebra** (W1-17): on the PC that prints labels, print a posted receipt's labels (print dialog: the Zebra, Margins: None, Scale: 100 %); scan three at a counter (the item comes up) and compare with a legacy label side by side.
+- [ ] **Stock settings on production** (W1-18, D-107): the owner opens Stock → Stock settings and checks that the approval limit is **Rs 10,000** and that **no route needs receiving** (the Godown is in the same building).
+- [ ] **Staff roles for stock** (W1-18): the storekeeper has the Purchaser role (drafts transfers); only the owner and the manager post transfers and adjustments.
 
 ## After go-live
 

@@ -1,0 +1,275 @@
+{
+  "description": "Posting a stock transfer step (posting rules §5.4, INV-04, W1-18): per line, out of its from location and into its to location at the item's current average (no cost known: at 0), the average and the quantity on hand unchanged. No journal: every location is the same Inventory account. The same function posts a transfer that moves at once (from → to), its sending (from → In transit) and its receiving (In transit → to, what arrived). Stock below 0 at the from location is flagged negative_stock, never refused (INV-03).",
+  "cases": [
+    {
+      "name": "5 from the Godown to the Shop at the Rs 1,225 average",
+      "input": {
+        "transfer": {
+          "id": "tr-1",
+          "number": "TR000001",
+          "branchId": "br-main",
+          "businessDate": "2026-11-08",
+          "lines": [
+            {
+              "id": "trl-1",
+              "itemId": "item-a",
+              "fromLocationId": "loc-godown",
+              "toLocationId": "loc-shop",
+              "qty": 5000
+            }
+          ]
+        },
+        "state": {
+          "costs": { "item-a": { "avgCost": 122500, "onHand": 12000 } },
+          "balances": { "loc-godown": { "item-a": 12000 } }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-08",
+          "journal": { "branchId": "br-main", "memo": "TR000001", "lines": [] },
+          "movements": [
+            {
+              "sourceLineId": "trl-1",
+              "itemId": "item-a",
+              "locationId": "loc-godown",
+              "qtyDelta": -5000,
+              "unitCost": 122500,
+              "valueDelta": -612500,
+              "avgCostAfter": 122500
+            },
+            {
+              "sourceLineId": "trl-1",
+              "itemId": "item-a",
+              "locationId": "loc-shop",
+              "qtyDelta": 5000,
+              "unitCost": 122500,
+              "valueDelta": 612500,
+              "avgCostAfter": 122500
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": { "loc-godown": { "item-a": 7000 }, "loc-shop": { "item-a": 5000 } }
+          }
+        }
+      }
+    },
+    {
+      "name": "more than the Godown has: it goes below 0, flagged",
+      "input": {
+        "transfer": {
+          "id": "tr-2",
+          "number": "TR000002",
+          "branchId": "br-main",
+          "businessDate": "2026-11-08",
+          "lines": [
+            {
+              "id": "trl-2",
+              "itemId": "item-a",
+              "fromLocationId": "loc-godown",
+              "toLocationId": "loc-shop",
+              "qty": 5000
+            }
+          ]
+        },
+        "state": {
+          "costs": { "item-a": { "avgCost": 122500, "onHand": 3000 } },
+          "balances": { "loc-godown": { "item-a": 3000 } }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-08",
+          "journal": { "branchId": "br-main", "memo": "TR000002", "lines": [] },
+          "movements": [
+            {
+              "sourceLineId": "trl-2",
+              "itemId": "item-a",
+              "locationId": "loc-godown",
+              "qtyDelta": -5000,
+              "unitCost": 122500,
+              "valueDelta": -612500,
+              "avgCostAfter": 122500
+            },
+            {
+              "sourceLineId": "trl-2",
+              "itemId": "item-a",
+              "locationId": "loc-shop",
+              "qtyDelta": 5000,
+              "unitCost": 122500,
+              "valueDelta": 612500,
+              "avgCostAfter": 122500
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [
+            {
+              "kind": "negative_stock",
+              "details": { "itemId": "item-a", "locationId": "loc-godown", "balance": -2000 }
+            }
+          ],
+          "state": {
+            "costs": {},
+            "balances": { "loc-godown": { "item-a": -2000 }, "loc-shop": { "item-a": 5000 } }
+          }
+        }
+      }
+    },
+    {
+      "name": "sent: two items out of the Godown into In transit; one with no cost known moves at 0",
+      "input": {
+        "transfer": {
+          "id": "tr-3",
+          "number": "TR000003",
+          "branchId": "br-main",
+          "businessDate": "2026-11-08",
+          "lines": [
+            {
+              "id": "trl-3",
+              "itemId": "item-a",
+              "fromLocationId": "loc-godown",
+              "toLocationId": "loc-transit",
+              "qty": 2000
+            },
+            {
+              "id": "trl-4",
+              "itemId": "item-b",
+              "fromLocationId": "loc-godown",
+              "toLocationId": "loc-transit",
+              "qty": 1500
+            }
+          ]
+        },
+        "state": {
+          "costs": {
+            "item-a": { "avgCost": 122500, "onHand": 12000 },
+            "item-b": { "avgCost": null, "onHand": 4000 }
+          },
+          "balances": { "loc-godown": { "item-a": 12000, "item-b": 4000 } }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-08",
+          "journal": { "branchId": "br-main", "memo": "TR000003", "lines": [] },
+          "movements": [
+            {
+              "sourceLineId": "trl-3",
+              "itemId": "item-a",
+              "locationId": "loc-godown",
+              "qtyDelta": -2000,
+              "unitCost": 122500,
+              "valueDelta": -245000,
+              "avgCostAfter": 122500
+            },
+            {
+              "sourceLineId": "trl-3",
+              "itemId": "item-a",
+              "locationId": "loc-transit",
+              "qtyDelta": 2000,
+              "unitCost": 122500,
+              "valueDelta": 245000,
+              "avgCostAfter": 122500
+            },
+            {
+              "sourceLineId": "trl-4",
+              "itemId": "item-b",
+              "locationId": "loc-godown",
+              "qtyDelta": -1500,
+              "unitCost": 0,
+              "valueDelta": 0,
+              "avgCostAfter": null
+            },
+            {
+              "sourceLineId": "trl-4",
+              "itemId": "item-b",
+              "locationId": "loc-transit",
+              "qtyDelta": 1500,
+              "unitCost": 0,
+              "valueDelta": 0,
+              "avgCostAfter": null
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {
+              "loc-godown": { "item-a": 10000, "item-b": 2500 },
+              "loc-transit": { "item-a": 2000, "item-b": 1500 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "received: the 4 that arrived out of In transit into the Shop, a day after the lock date moved it",
+      "input": {
+        "transfer": {
+          "id": "tr-3-received",
+          "number": "TR000003",
+          "branchId": "br-main",
+          "businessDate": "2026-11-09",
+          "lines": [
+            {
+              "id": "trl-3",
+              "itemId": "item-a",
+              "fromLocationId": "loc-transit",
+              "toLocationId": "loc-shop",
+              "qty": 4000
+            }
+          ]
+        },
+        "state": {
+          "costs": { "item-a": { "avgCost": 122500, "onHand": 12000 } },
+          "balances": { "loc-transit": { "item-a": 5000 }, "loc-shop": { "item-a": 1000 } }
+        },
+        "lockDate": "2026-11-10"
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-11",
+          "journal": { "branchId": "br-main", "memo": "TR000003", "lines": [] },
+          "movements": [
+            {
+              "sourceLineId": "trl-3",
+              "itemId": "item-a",
+              "locationId": "loc-transit",
+              "qtyDelta": -4000,
+              "unitCost": 122500,
+              "valueDelta": -490000,
+              "avgCostAfter": 122500
+            },
+            {
+              "sourceLineId": "trl-3",
+              "itemId": "item-a",
+              "locationId": "loc-shop",
+              "qtyDelta": 4000,
+              "unitCost": 122500,
+              "valueDelta": 490000,
+              "avgCostAfter": 122500
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [
+            {
+              "kind": "posted_after_lock",
+              "details": { "businessDate": "2026-11-09", "lockDate": "2026-11-10" }
+            }
+          ],
+          "state": {
+            "costs": {},
+            "balances": { "loc-transit": { "item-a": 1000 }, "loc-shop": { "item-a": 5000 } }
+          }
+        }
+      }
+    }
+  ]
+}
