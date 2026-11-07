@@ -241,8 +241,21 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     labelAbbr: (r['label_abbr'] as string | null) ?? null,
     status: r['status'] as SupplierRow['status'],
     balance: Number(r['balance'] ?? 0),
+    deletable: r['deletable'] === true,
   });
-  const SUPPLIERS = `SELECT p.*, s.payment_terms_days, p.row_version::text AS rv,
+  /** SQL: the party `p` appears nowhere a deleted supplier would leave something pointing at nothing. */
+  const UNUSED = `NOT EXISTS (SELECT 1 FROM erp.party_ledger_entries x WHERE x.party_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM erp.goods_receipts x WHERE x.supplier_party_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM erp.purchase_returns x WHERE x.supplier_party_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM erp.supplier_payments x WHERE x.supplier_party_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM erp.cash_movements x WHERE x.party_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM erp.payments x WHERE x.party_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM erp.sales_documents x WHERE x.customer_party_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM erp.opening_balance_lines x WHERE x.party_id = p.id OR x.last_supplier_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM erp.items x WHERE x.default_supplier_id = p.id AND x.deleted_at IS NULL)
+      AND NOT EXISTS (SELECT 1 FROM erp.item_costs x WHERE x.last_supplier_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM erp.customer_accounts x WHERE x.party_id = p.id AND x.deleted_at IS NULL)`;
+  const SUPPLIERS = `SELECT p.*, s.payment_terms_days, p.row_version::text AS rv, (${UNUSED}) AS deletable,
       coalesce((SELECT sum(e.amount) FROM erp.party_ledger_entries e
                 WHERE e.party_id = p.id AND e.role = 'supplier'), 0) AS balance
     FROM erp.parties p JOIN erp.supplier_accounts s ON s.party_id = p.id AND s.deleted_at IS NULL
@@ -353,6 +366,19 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       ).rows[0];
       if (!cur) throw new Refusal(404, { error: 'not_found' });
       if (cur['rv'] !== b.rowVersion) throw new Refusal(409, { error: 'stale', by: cur['by'] ?? null });
+      // A supplier the shop still owes (or who owes it) stays active, or the balance would drop out of sight.
+      if (b.status === 'inactive' && cur['status'] !== 'inactive') {
+        const balance = Number(
+          (
+            await c.query<{ b: string }>(
+              `SELECT coalesce(sum(amount), 0)::text AS b FROM erp.party_ledger_entries
+               WHERE party_id = $1 AND role = 'supplier'`,
+              [id],
+            )
+          ).rows[0]!.b,
+        );
+        if (balance !== 0) throw new Refusal(409, { error: 'balance_open', balance });
+      }
       const pick = (k: keyof typeof b, col: string) => (b[k] !== undefined ? b[k] : cur[col]);
       const { rows } = await c.query<{ rv: string }>(
         `UPDATE erp.parties SET name = $2, contact_person = $3, phones = $4, address = $5, city = $6, label_abbr = $7,
@@ -375,6 +401,24 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
           b.termsDays,
         ]);
       return { rowVersion: rows[0]!.rv };
+    });
+  });
+
+  // A supplier added by mistake: only one never used anywhere, marked deleted (parties are synced, rule 8).
+  scope.delete('/purchasing/suppliers/:id', { preHandler: receive }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    return run(req, reply, async (c) => {
+      const r = (
+        await c.query<{ deletable: boolean }>(
+          `SELECT (${UNUSED}) AS deletable FROM erp.parties p WHERE p.id = $1 AND p.deleted_at IS NULL`,
+          [id],
+        )
+      ).rows[0];
+      if (!r) throw new Refusal(404, { error: 'not_found' });
+      if (!r.deletable) throw new Refusal(409, { error: 'in_use' });
+      await c.query('UPDATE erp.supplier_accounts SET deleted_at = now() WHERE party_id = $1', [id]);
+      await c.query('UPDATE erp.parties SET deleted_at = now() WHERE id = $1', [id]);
+      return { deleted: true };
     });
   });
 

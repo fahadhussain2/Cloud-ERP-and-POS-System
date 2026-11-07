@@ -420,6 +420,72 @@ describe('a supplier payment by bank (PUR-09)', () => {
   });
 });
 
+describe('deactivating and deleting a supplier', () => {
+  const add = async (code: string) =>
+    (await send('POST', '/api/purchasing/suppliers', 'maria', { code, name: `Supplier ${code}` })).json<{
+      id: string;
+    }>().id;
+  const rowVersion = async (id: string) =>
+    (await send('GET', `/api/purchasing/suppliers/${id}`, 'maria')).json<{
+      supplier: { rowVersion: string };
+    }>().supplier.rowVersion;
+  const status = (id: string, value: 'active' | 'inactive') =>
+    rowVersion(id).then((rv) =>
+      send('PATCH', `/api/purchasing/suppliers/${id}`, 'maria', { rowVersion: rv, status: value }),
+    );
+
+  it('is refused while the shop owes the supplier anything', async () => {
+    const res = await status(naveed, 'inactive');
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ error: 'balance_open' });
+  });
+
+  it('a supplier owed nothing is deactivated, left out of the pickers, and active again', async () => {
+    const id = await add('0300');
+    expect((await status(id, 'inactive')).statusCode).toBe(200);
+    const pickers = (await send('GET', '/api/purchasing/lookups', 'maria')).json<{
+      suppliers: { id: string }[];
+    }>();
+    expect(pickers.suppliers.map((x) => x.id)).not.toContain(id);
+    const list = (await send('GET', '/api/purchasing/suppliers', 'maria')).json<{
+      suppliers: { id: string; status: string }[];
+    }>();
+    expect(list.suppliers.find((x) => x.id === id)).toMatchObject({ status: 'inactive' });
+    expect((await status(id, 'active')).statusCode).toBe(200);
+  });
+
+  it('only a supplier never used can be deleted; the list says which can', async () => {
+    const unused = await add('0301');
+    const list = (await send('GET', '/api/purchasing/suppliers', 'maria')).json<{
+      suppliers: { id: string; deletable: boolean }[];
+    }>();
+    expect(list.suppliers.find((x) => x.id === unused)?.deletable).toBe(true);
+    expect(list.suppliers.find((x) => x.id === naveed)?.deletable).toBe(false);
+    const used = await send('DELETE', `/api/purchasing/suppliers/${naveed}`, 'maria');
+    expect(used.statusCode).toBe(409);
+    expect(used.json()).toMatchObject({ error: 'in_use' });
+    expect((await send('DELETE', `/api/purchasing/suppliers/${unused}`, 'maria')).statusCode).toBe(200);
+    expect((await send('GET', `/api/purchasing/suppliers/${unused}`, 'maria')).statusCode).toBe(404);
+    // Kept in the database, marked deleted (parties are synced: never removed, rule 8).
+    expect(await q('SELECT deleted_at IS NOT NULL AS gone FROM erp.parties WHERE id = $1', [unused])).toEqual(
+      [{ gone: true }],
+    );
+  });
+
+  it("a supplier that is some item's default supplier can't be deleted", async () => {
+    const id = await add('0302');
+    await withTenant(pool, { tenantId: tenant }, (_db, c) =>
+      c.query('UPDATE erp.items SET default_supplier_id = $1 WHERE id = $2', [id, items['OIL050']]),
+    );
+    expect((await send('DELETE', `/api/purchasing/suppliers/${id}`, 'maria')).statusCode).toBe(409);
+  });
+
+  it('a salesman may do neither', async () => {
+    const id = await add('0303');
+    expect((await send('DELETE', `/api/purchasing/suppliers/${id}`, 'sara')).statusCode).toBe(403);
+  });
+});
+
 describe('the books', () => {
   it('rebuild from the documents without a difference', async () => {
     expect((await checkRebuild(pool, tenant)).differences).toEqual([]);

@@ -26,8 +26,8 @@ import { ALL_BRANCHES, branchFromValue, branchValue, refusalText, toggleRole, ty
 
 // The Staff dialogs (W1-04). Each ends with the D-053 bar: Cancel (Esc) and a main button named after its action.
 
-/** A dialog around a form: title, optional text, the fields, the D-053 bar. */
-function FormDialog({
+/** A dialog around a form: title, optional text, the fields, the D-053 bar. Also used by the purchasing screens. */
+export function FormDialog({
   open,
   onOpenChange,
   title,
@@ -36,6 +36,7 @@ function FormDialog({
   busy,
   onSubmit,
   children,
+  cancelLabel,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -45,6 +46,7 @@ function FormDialog({
   busy: boolean;
   onSubmit: () => void;
   children?: ReactNode;
+  cancelLabel?: string;
 }) {
   const { t } = useTranslation();
   // These dialogs open from state, not a DialogTrigger, so Radix can't know where focus came from: remember it and
@@ -74,7 +76,11 @@ function FormDialog({
             {description && <DialogDescription>{description}</DialogDescription>}
           </DialogHeader>
           {children}
-          <DialogActions cancelLabel={t('staff.cancel')} actionLabel={actionLabel} busy={busy} />
+          <DialogActions
+            cancelLabel={cancelLabel ?? t('staff.cancel')}
+            actionLabel={actionLabel}
+            busy={busy}
+          />
         </form>
       </DialogContent>
     </Dialog>

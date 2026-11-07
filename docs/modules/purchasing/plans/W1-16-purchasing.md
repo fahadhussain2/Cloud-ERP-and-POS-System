@@ -81,6 +81,17 @@ Migration and schema → domain golden files → posting golden files → postin
 | The item picker's result list has its own label ("Items found") | Two elements with one label (found by the e2e) |
 | The return test returns 11 pieces, not 10.001 | 10.001 pieces is also a fraction of a piece |
 
+## Owner review on staging (2026-11-07)
+
+| Change | Why |
+|---|---|
+| A receipt line's cells align at the top; a line not filled in yet is not flagged and doesn't stop the totals (it isn't checked or saved until something is typed in it) | The fields slid down under the messages, and an empty new line blanked every line's net cost and value |
+| Picking an item fills in its last purchase cost when the cost is empty; still editable | Most items come at the last price; the bill-total check catches a cost that changed |
+| Add supplier, Edit details and Pay by bank open as dialogs (the staff screens' `FormDialog`) | As Staff → Add person; the list stays where it was |
+| The suppliers table has an actions column: Edit, Deactivate or Reactivate, and Delete for a supplier never used | A supplier added by mistake can go; one that was used is deactivated, never deleted, so its documents keep pointing at it |
+| Deactivate is refused while the shop owes the supplier anything (`balance_open`, with the amount) | An open balance must not drop out of sight |
+| Delete only when the party appears nowhere (documents, ledgers, the opening, items' default supplier or last purchase, a customer account); it is marked deleted, not removed (rule 8) | Nothing may point at a deleted supplier |
+
 ## Checks (2026-11-06)
 
 - `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 1,902 tests; `packages/domain` at 100 % branch coverage.
