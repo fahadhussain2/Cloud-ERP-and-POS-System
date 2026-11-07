@@ -423,8 +423,16 @@ describe('counter screens', () => {
               answer = resolve;
             }),
     });
+    const listens = vi.spyOn(window, 'addEventListener');
     show(f.counter);
     expect(await screen.findByText(en.status.online)).toBeDefined();
+    // Online can show before the start-up pull or the network listener is in place (a busy CI, 2026-11-07): wait
+    // for both, or the reconnect below has no listener, or its pull is the first one.
+    await waitFor(() => {
+      expect(pulls).toBe(1);
+      expect(listens.mock.calls.some(([type]) => type === 'online')).toBe(true);
+    });
+    listens.mockRestore();
     const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
     vi.useFakeTimers();
     try {

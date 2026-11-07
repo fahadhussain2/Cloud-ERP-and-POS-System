@@ -120,7 +120,8 @@ describe('labels for a posted receipt', () => {
     await screen.findByText(/GR000001/);
     fireEvent.click(screen.getByRole('button', { name: en.labels.print }));
     expect(print).toHaveBeenCalledOnce();
-    expect(document.head.innerHTML).toContain('size: 40mm 28mm');
+    // The page size is added by an effect once the labels are drawn, which a busy CI can run late (2026-11-07).
+    await waitFor(() => expect(document.head.innerHTML).toContain('size: 40mm 28mm'));
     print.mockRestore();
   });
 
