@@ -108,7 +108,7 @@ export function LabelsScreen({
           )
         }
       />
-      <Panel>
+      <Panel className="p-3.5">
         <form
           className="flex flex-wrap items-end gap-3"
           onSubmit={(e: FormEvent) => {
@@ -132,7 +132,7 @@ export function LabelsScreen({
       </Panel>
 
       {view ? (
-        <Panel>
+        <Panel className="p-3.5">
           <p className="m-0 mb-3 font-medium">
             {view.source
               ? t('labels.from', { number: view.source.number, supplier: view.source.supplier })
