@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#62](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/62) |
 | **Module** | catalog (label printing in the back office), with purchasing (labels from a posted goods receipt) and print (`packages/print`, the Code 39 encoder from W1-06) |
-| **Status** | Accepted (2026-11-07) with the owner's answers 1–5 (below). Built (2026-11-07) on `w1-17-labels` |
+| **Status** | Done (2026-11-07): built in PR #116 and fixed after the owner's review in PRs #118 and #120, all merged to staging; the owner verified it on staging (below) |
 | **Refs** | CAT-08, PUR-01 (supplier label abbreviation), PRD §5 step 6, PRD Q7 (label printer and size, still open); data model §4 (every item has a barcode identifier = its code); CLAUDE.md rule 10; D-019, D-055, PLT-13 (labels always print light) |
 | **Depends on** | W1-15 (items screen and search), W1-16 (goods receipts, supplier `label_abbr`) |
 | **Size** | about 1 day: the label page and template ½, from items and from a receipt ¼, tests, e2e and docs ¼ |
@@ -75,6 +75,22 @@ Label list (pure) → API with integration tests → print screen, preview and t
 - `pnpm test:integration`: 346 passed (33 files), including the labels API (10).
 - `pnpm e2e` (Edge): 49 passed; the purchasing flow now opens the posted receipt's labels (10 cans → 10 labels with NG and the barcode).
 - **Not yet:** printing on the shop's Zebra and scanning at a counter (go-live checklist).
+
+## Owner review on staging (2026-11-07)
+
+The owner tested the screens, the template and the labels on staging: **working as expected**, after three fixes.
+
+| Finding | Fix |
+|---|---|
+| The two panels on Print labels had no inner padding | Padding as on the other back-office screens (PR #118) |
+| The name sat at the start of the label; legacy centres it | The name centred, a long one cut at both ends (PR #118) |
+| The code under the barcode was plain text; legacy prints `*CODE*` across the bars, each character under its own bars | `*CODE*`, inset by the barcode's quiet zones (`code39Width` in `@erp/print`), each character centred in its own cell (PRs #118, #120) |
+
+Two UI tests that flaked on CI during the review now wait for their preconditions (PR #119).
+
+**Still on the go-live checklist:**
+- printing on the shop's Zebra with the final template (DCAC, maker's barcode on);
+- scanning a printed label at a counter.
 
 ## Evidence (owner, 2026-11-07)
 
