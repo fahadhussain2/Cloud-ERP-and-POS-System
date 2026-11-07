@@ -7,6 +7,8 @@ import { migrate } from '../migrate';
 // Test-only role passwords for throwaway databases; never used on a server.
 const OWNER = { name: 'erp_owner', password: 'erp_owner_test' };
 const APP = { name: 'erp_app', password: 'erp_app_test' };
+/** How long drop() lets the test's connections close before it terminates them. */
+const DROP_WAIT_MS = 5_000;
 
 export interface TestDatabase {
   name: string;
@@ -70,6 +72,17 @@ export async function createTestDatabase(opts: { name?: string } = {}): Promise<
       const c = new pg.Client({ connectionString: base });
       await c.connect();
       try {
+        // pool.end() resolves before its connections have closed: let them close (up to a few seconds) before
+        // FORCE terminates what is left, or pg reports the termination as an unhandled error (CI, PR #116).
+        const deadline = Date.now() + DROP_WAIT_MS;
+        while (Date.now() < deadline) {
+          const { rows } = await c.query<{ n: number }>(
+            'SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()',
+            [name],
+          );
+          if (rows[0]!.n === 0) break;
+          await new Promise((r) => setTimeout(r, 50));
+        }
         await c.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
       } finally {
         await c.end();
