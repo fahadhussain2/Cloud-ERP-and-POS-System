@@ -20,6 +20,8 @@ Open items that must be settled before, or soon after, go-live. Each line names 
 - [ ] **The final run (31 Dec, after the legacy day close):** every counter's outbox at 0 on the device health page; a production backup; `ssh -t … sudo erp-tenant wipe-pilot prod delux`; clear each pilot counter's site data and enrol it again; stage, import and `legacy:opening --post` the final dump with the counted drawer and bank statements; the reconciliation signed; `sudo erp-tenant go-live prod delux 2026-12-31`; `posting-check prod delux` (D-101). Rehearse it in rehearsal 2 (~22 Dec) on a copy of production.
 
 - [ ] **Bill print test at the shop** (speed and barcode scan) by mid-November, with real bills once checkout exists (W1-01, deferred; the printer is an HP LaserJet P1005, so lower risk than the dot-matrix assumption).
+- [ ] **Label template on production** (W1-17, D-106): the owner opens Catalog → Print labels → Label template and sets the shop abbreviation **DCAC** and **Label items that already carry the maker's barcode: on** (40 × 28 mm, 1 mm margin, the name printed).
+- [ ] **Label print test on the Zebra** (W1-17): on the PC that prints labels, print a posted receipt's labels (print dialog: the Zebra, Margins: None, Scale: 100 %); scan three at a counter (the item comes up) and compare with a legacy label side by side.
 
 ## After go-live
 

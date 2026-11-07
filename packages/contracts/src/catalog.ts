@@ -176,5 +176,6 @@ export interface CatalogLookups {
   live: boolean;
   /** How the shop writes money (CLAUDE.md rule 10). */
   money: { locale: string; currency: string; minorUnits: number };
-  can: { editItems: boolean; editPrices: boolean; viewCost: boolean };
+  /** printLabels: cat.label.print, a relabel from the items list (W1-17). */
+  can: { editItems: boolean; editPrices: boolean; viewCost: boolean; printLabels: boolean };
 }

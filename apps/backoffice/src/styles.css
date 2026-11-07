@@ -13,3 +13,68 @@ body,
 #root {
   min-block-size: 100%;
 }
+
+/*
+ * Item labels (W1-17, CAT-08): the legacy layout (owner answer 3), black on white whatever the theme (PLT-13). On
+ * screen a dashed edge shows the label's size; printed, each label is one page of the roll (owner answer 1) and only
+ * the labels print.
+ */
+.item-label {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  border: 1px dashed var(--border);
+}
+.item-label-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 700;
+  line-height: 1;
+}
+.item-label-shop {
+  font-size: 12pt;
+}
+.item-label-supplier {
+  font-size: 8pt;
+}
+.item-label-bars {
+  flex: 1;
+  min-block-size: 0;
+  margin-block-start: 1mm;
+}
+.item-label-bars svg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+.item-label-code {
+  text-align: center;
+  font-size: 8pt;
+  line-height: 1.1;
+}
+.item-label-name {
+  font-size: 6pt;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.label-print {
+  display: none;
+}
+@media print {
+  body:has(> .label-print) > :not(.label-print) {
+    display: none !important;
+  }
+  .label-print {
+    display: block;
+  }
+  .label-print .item-label {
+    border: 0;
+    break-after: page;
+  }
+}

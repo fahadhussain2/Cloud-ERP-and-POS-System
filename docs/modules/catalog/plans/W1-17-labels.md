@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#62](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/62) |
 | **Module** | catalog (label printing in the back office), with purchasing (labels from a posted goods receipt) and print (`packages/print`, the Code 39 encoder from W1-06) |
-| **Status** | Accepted (2026-11-07) with the owner's answers 1–5 (below) |
+| **Status** | Accepted (2026-11-07) with the owner's answers 1–5 (below). Built (2026-11-07) on `w1-17-labels` |
 | **Refs** | CAT-08, PUR-01 (supplier label abbreviation), PRD §5 step 6, PRD Q7 (label printer and size, still open); data model §4 (every item has a barcode identifier = its code); CLAUDE.md rule 10; D-019, D-055, PLT-13 (labels always print light) |
 | **Depends on** | W1-15 (items screen and search), W1-16 (goods receipts, supplier `label_abbr`) |
 | **Size** | about 1 day: the label page and template ½, from items and from a receipt ¼, tests, e2e and docs ¼ |
@@ -55,6 +55,26 @@ Label list (pure) → API with integration tests → print screen, preview and t
 | The browser adds its own margins or scales the page, so labels drift off the stickers | `@page` size and margins in mm; the screen says to choose "Margins: none" and "Scale 100 %"; checked on the shop's printer before sign-off |
 | A long code makes the barcode too wide for the label | The barcode narrows its bar width to fit, down to the narrowest the scanner reads; below that, a problem line instead of a bad barcode |
 | Labels printed before go-live for stock received in legacy | Allowed: labels only need items and suppliers, which the importer brings |
+
+## Changes during the build
+
+| Change | Why |
+|---|---|
+| The API: `GET /api/catalog/labels/receipt?receipt=<id or number>`, `POST /api/catalog/labels/items`, `GET`/`PUT /api/catalog/labels/template` | One address for a receipt typed by number (as the legacy screen) or opened from the receipt |
+| Reading the template needs `cat.label.print` or `admin.settings`; saving it `admin.settings` | The owner's only (owner answer 5); the printers need it for the layout |
+| A template's limits: width 20–104 mm (the GX420t's widest), height 10–200 mm, margin 0–5 mm leaving 10 mm of label, the shop's abbreviation up to 10 characters | So a typo can't produce a label the printer can't take |
+| The supplier abbreviation is printed in capitals | As the legacy labels; abbreviations were typed either way |
+| The relabel is on the items screen, so it needs the items screen's permissions too (`cat.item.edit` or `cat.price.edit`) as well as `cat.label.print`; a purchaser prints from a receipt or by its number | The items screen is the catalog's; a relabel is rare |
+| The back office depends on `@erp/print` (the Code 39 drawing the counter's bill uses) | One barcode drawing for bills and labels |
+| The preview shows up to 60 labels; all of them print | A receipt of 500 pieces stays quick on screen |
+| Recorded as D-106; D-019 points at Code 39 | CAT-08 stays as written, with the shop setting for the maker's barcode |
+
+## Checks (2026-11-07)
+
+- `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 1,936 tests.
+- `pnpm test:integration`: 346 passed (33 files), including the labels API (10).
+- `pnpm e2e` (Edge): 49 passed; the purchasing flow now opens the posted receipt's labels (10 cans → 10 labels with NG and the barcode).
+- **Not yet:** printing on the shop's Zebra and scanning at a counter (go-live checklist).
 
 ## Evidence (owner, 2026-11-07)
 

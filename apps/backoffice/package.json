@@ -13,6 +13,7 @@
     "@erp/contracts": "workspace:*",
     "@erp/domain": "workspace:*",
     "@erp/observability": "workspace:*",
+    "@erp/print": "workspace:*",
     "@erp/ui": "workspace:*",
     "i18next": "catalog:",
     "react": "catalog:",

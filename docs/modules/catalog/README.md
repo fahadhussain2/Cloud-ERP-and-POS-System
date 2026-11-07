@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Tables and import built (W0-13); on the counter: pull and search (W1-03, CAT-02); back-office maintenance built (W1-15, D-104): items, codes, vehicles, prices, floors, price history, the category margin. Only the owner prices; until go-live, items change in the legacy app |
+| **Status** | Tables and import built (W0-13); on the counter: pull and search (W1-03, CAT-02); back-office maintenance built (W1-15, D-104): items, codes, vehicles, prices, floors, price history, the category margin; labels built (W1-17, D-106): from a posted receipt or a relabel, the owner's template. Only the owner prices; until go-live, items change in the legacy app |
 | **Requirements** | 9 (CAT-01…CAT-09) |
 | **Feature spec needed** | No: the PRD and data model are enough |
 

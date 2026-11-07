@@ -708,6 +708,7 @@ export function registerCatalog(scope: FastifyInstance, { pool, now, requireAuth
           editItems: allowed(req, 'cat.item.edit'),
           editPrices: allowed(req, 'cat.price.edit'),
           viewCost: allowed(req, 'cost.view'),
+          printLabels: allowed(req, 'cat.label.print'),
         },
       };
       return out;

@@ -49,7 +49,8 @@
     "categories": "Categories",
     "suppliers": "Suppliers",
     "receipts": "Goods receipts",
-    "purchaseReturns": "Purchase returns"
+    "purchaseReturns": "Purchase returns",
+    "labels": "Print labels"
   },
   "home": {
     "nothing": "There is nothing here for your role yet."
@@ -645,5 +646,63 @@
       "posting_failed": "It couldn't be posted ({{code}}). Nothing was changed.",
       "balance_open": "The shop still owes this supplier {{amount}}. Settle it first, then deactivate."
     }
+  },
+  "labels": {
+    "title": "Print labels",
+    "help": "Labels for a posted goods receipt, one per piece, or for items picked on the items screen. Check the counts, then print on the label printer.",
+    "receiptNumber": "Goods receipt number",
+    "load": "Load",
+    "from": "{{number}} · {{supplier}}",
+    "relabel": "Relabel of the items picked",
+    "lines": "Labels to print",
+    "columns": {
+      "code": "Code",
+      "item": "Item",
+      "supplierAbbr": "Supplier abbr.",
+      "labels": "Labels"
+    },
+    "countFor": "Labels for {{code}}",
+    "abbrFor": "Supplier abbreviation for {{code}}",
+    "labelOf": "Label {{code}}",
+    "count_one": "{{count}} label",
+    "count_other": "{{count}} labels",
+    "preview": "Preview",
+    "more": "and {{count}} more",
+    "print": "Print",
+    "printHint": "In the print dialog choose the label printer, Margins: None and Scale: 100 %.",
+    "empty": "Type a goods receipt number, or pick items on the items screen.",
+    "problems": {
+      "code_unprintable": "This code can't be printed as a Code 39 barcode; it is left off."
+    },
+    "warnings": {
+      "supplier_abbr_missing": "No supplier abbreviation: type one, or the label prints without it."
+    },
+    "errors": {
+      "not_posted": "This goods receipt is not posted yet. Post it first, then print its labels.",
+      "not_found": "No goods receipt with that number."
+    },
+    "template": {
+      "edit": "Label template",
+      "title": "Label template",
+      "description": "One label on the roll, laid out as the legacy label. Every label printed follows it.",
+      "width": "Width (mm)",
+      "height": "Height (mm)",
+      "margin": "Margin (mm)",
+      "shopAbbr": "Shop abbreviation",
+      "shopAbbrHint": "Printed top left, e.g. DCAC",
+      "showName": "Print the item name",
+      "labelMakerBarcoded": "Label items that already carry the maker's barcode",
+      "save": "Save template",
+      "cancel": "Cancel",
+      "invalidNumber": "Width, height and margin must be numbers.",
+      "problems": {
+        "width_out_of_range": "The width must be 20–104 mm.",
+        "height_out_of_range": "The height must be 10–200 mm.",
+        "margin_out_of_range": "The margin must be 0–5 mm and leave at least 10 mm of label.",
+        "shop_abbr_too_long": "The shop abbreviation can be at most 10 characters."
+      }
+    },
+    "makeLabels": "Print labels",
+    "pick": "Label {{code}}"
   }
 }

@@ -91,6 +91,19 @@ test('the owner records a supplier bill with a bill discount, returns part of it
     )
     .toEqual([{ avg: '490000', last: '490000' }]);
 
+  // W1-17: the received cans' labels, one per piece, with the supplier's abbreviation and the Code 39 barcode.
+  await page.getByRole('main').getByRole('link', { name: bo.labels.makeLabels }).click();
+  await expect(page.getByText('GR000001 · Naveed Glass')).toBeVisible();
+  await expect(page.getByLabel('Labels for ENOL001')).toHaveValue('10');
+  const preview = page.getByRole('region', { name: bo.labels.preview });
+  await expect(preview.getByRole('img', { name: 'Label ENOL001' })).toHaveCount(10);
+  await expect(preview.getByRole('img', { name: 'Label ENOL001' }).first()).toContainText('NG');
+  await expect(preview.locator('svg rect').first()).toBeAttached();
+  await page.getByLabel('Labels for ENOL001').fill('3');
+  await expect(page.getByText('3 labels')).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'GR000001' })).toBeVisible();
+
   // Two back to the supplier, from this receipt.
   await page.getByRole('link', { name: bo.purchasing.returns.fromReceipt }).click();
   await page.getByLabel('Quantity of line 1').fill('2');

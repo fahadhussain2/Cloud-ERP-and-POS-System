@@ -6,6 +6,7 @@ import type { Api } from './api';
 import { CategoriesScreen } from './catalog/CategoriesScreen';
 import { ItemScreen } from './catalog/ItemScreen';
 import { ItemsScreen } from './catalog/ItemsScreen';
+import { LabelsScreen } from './catalog/LabelsScreen';
 import { NewItemScreen } from './catalog/NewItemScreen';
 import { ReceiptScreen, ReceiptsScreen } from './purchasing/ReceiptScreen';
 import { ReturnScreen, ReturnsScreen } from './purchasing/ReturnScreen';
@@ -92,6 +93,13 @@ export function App({ api }: { api: Api }) {
         <NewItemScreen api={api} />
       ) : shown.screen === 'categories' ? (
         <CategoriesScreen api={api} />
+      ) : shown.screen === 'labels' ? (
+        <LabelsScreen
+          key={JSON.stringify(shown.source)}
+          api={api}
+          source={shown.source}
+          permissions={me.permissions}
+        />
       ) : shown.screen === 'suppliers' ? (
         <SuppliersScreen api={api} />
       ) : shown.screen === 'supplier' ? (

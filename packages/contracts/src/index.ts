@@ -136,3 +136,4 @@ export {
   type SupplierDetail,
   type SupplierRow,
 } from './purchasing';
+export { LabelItemsRequest, LabelTemplateRequest, type LabelLineView, type LabelsView } from './labels';
