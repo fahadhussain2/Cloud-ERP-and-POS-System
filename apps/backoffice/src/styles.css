@@ -52,11 +52,16 @@ body,
   inline-size: 100%;
   block-size: 100%;
 }
+/* Each character centred under its own bars; --quiet is the quiet zone on each side, set per code. */
 .item-label-code {
   display: flex;
-  justify-content: space-between;
+  padding-inline: var(--quiet, 0);
   font-size: 8pt;
   line-height: 1.1;
+}
+.item-label-code > span {
+  flex: 1 1 0;
+  text-align: center;
 }
 /* Centred; a name too long for the label is cut at both ends, as legacy prints it. */
 .item-label-name {
