@@ -501,7 +501,21 @@
       "inactive": "Inactive",
       "notFound": "No such supplier.",
       "days_one": "{{count}} day",
-      "days_other": "{{count}} days"
+      "days_other": "{{count}} days",
+      "actions": "Actions",
+      "deactivate": "Deactivate",
+      "reactivate": "Reactivate",
+      "delete": "Delete",
+      "deactivateTitle": "Deactivate {{name}}?",
+      "deactivateText": "It is left out of the supplier lists on new receipts and returns. Its ledger and documents stay, and you can reactivate it at any time.",
+      "reactivateTitle": "Reactivate {{name}}?",
+      "reactivateText": "It appears in the supplier lists on new receipts and returns again.",
+      "deleteTitle": "Delete {{name}}?",
+      "deleteText": "It has never been used, so it is removed from the lists for good.",
+      "deactivated": "{{name}} is deactivated.",
+      "reactivated": "{{name}} is active again.",
+      "deleted": "{{name}} is deleted.",
+      "saved": "{{name}} saved."
     },
     "ledger": {
       "title": "Ledger",
@@ -625,10 +639,11 @@
       "posted": "It is posted and can't be changed.",
       "not_found": "Not found.",
       "code_taken": "A supplier or customer has this code already.",
-      "in_use": "A purchase return points at it.",
+      "in_use": "It has been used (receipts, payments, its ledger or items), so it can't be deleted. Deactivate it instead.",
       "invalid_request": "That can't be saved.",
       "forbidden": "You can't do this.",
-      "posting_failed": "It couldn't be posted ({{code}}). Nothing was changed."
+      "posting_failed": "It couldn't be posted ({{code}}). Nothing was changed.",
+      "balance_open": "The shop still owes this supplier {{amount}}. Settle it first, then deactivate."
     }
   }
 }

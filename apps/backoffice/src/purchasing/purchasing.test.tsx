@@ -1,4 +1,4 @@
-import type { PurchasingLookups, ReceiptView, SupplierDetail } from '@erp/contracts';
+import type { PurchasingLookups, ReceiptView, SupplierDetail, SupplierRow } from '@erp/contracts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
@@ -8,7 +8,7 @@ import type { Api } from '../api';
 import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import { ReceiptScreen } from './ReceiptScreen';
-import { SupplierScreen } from './SuppliersScreen';
+import { SupplierScreen, SuppliersScreen } from './SuppliersScreen';
 
 // The purchasing screens (W1-16) over a fake API: a receipt checked against the bill as you type (the difference,
 // line warnings, Post waiting until it matches), the supplier's ledger with its running balance, and Pay by bank only
@@ -96,6 +96,7 @@ const LEDGER: SupplierDetail = {
     city: null,
     notes: null,
     rowVersion: '5',
+    deletable: false,
   },
   balance: 1090100,
   ledger: [
@@ -214,5 +215,133 @@ describe('a supplier', () => {
       bankAccountId: 'hbl',
       amount: 500000,
     });
+  });
+});
+
+// Owner review of W1-16 on staging (2026-11-07): a line not filled in yet, the last cost on picking an item, the
+// supplier dialogs and the suppliers table's actions.
+
+describe('a receipt line (owner review)', () => {
+  it('a new empty line is not flagged, keeps its fields in line, and the totals still show', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    fireEvent.click(await screen.findByRole('button', { name: en.purchasing.line.add }));
+    expect(screen.queryByText(en.purchasing.problems.item_required)).toBeNull();
+    expect(screen.queryByText(en.purchasing.problems.qty_positive)).toBeNull();
+    const rows = within(screen.getByRole('table', { name: en.purchasing.receipts.lines })).getAllByRole(
+      'row',
+    );
+    for (const row of rows.slice(1)) expect(row.className).toContain('align-top');
+    // 10 × Rs 1,250 = Rs 12,500 on the first line, with the empty third line there.
+    expect(within(rows[1]!).getAllByText(/Rs\s?12,500/).length).toBe(1);
+  });
+
+  it('picking an item fills in its last purchase cost, which stays editable', async () => {
+    const f = fakeApi(lookups(), {
+      'GET /api/purchasing/items': {
+        status: 200,
+        body: {
+          items: [
+            {
+              id: 'i3',
+              code: 'OIL050',
+              name: 'ENGINE OIL',
+              allowsFraction: true,
+              lastCost: 245000,
+              retail: 300000,
+            },
+          ],
+        },
+      },
+    });
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    fireEvent.click(await screen.findByRole('button', { name: en.purchasing.line.add }));
+    fireEvent.click(screen.getByRole('button', { name: 'Item of line 3' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Item of line 3' }), { target: { value: 'oil' } });
+    fireEvent.click(await screen.findByRole('button', { name: /OIL050/ }));
+    const cost = screen.getByLabelText<HTMLInputElement>('Unit cost of line 3');
+    expect(cost.value).toBe('2450');
+    fireEvent.change(cost, { target: { value: '2500' } });
+    expect(cost.value).toBe('2500');
+  });
+});
+
+const row = (over: Partial<SupplierRow>): SupplierRow => ({
+  id: 's1',
+  code: '0210',
+  name: 'Naveed Glass',
+  phones: [],
+  termsDays: 30,
+  labelAbbr: 'NG',
+  status: 'active',
+  balance: 1090100,
+  deletable: false,
+  ...over,
+});
+
+describe('the suppliers table (owner review)', () => {
+  const listApi = (answers: Record<string, { status: number; body: unknown }> = {}) =>
+    fakeApi(lookups(), {
+      'GET /api/purchasing/suppliers': {
+        status: 200,
+        body: {
+          suppliers: [
+            row({}),
+            row({ id: 's2', code: '0301', name: 'Typo Traders', balance: 0, deletable: true }),
+          ],
+        },
+      },
+      ...answers,
+    });
+
+  it('opens Add supplier in a dialog', async () => {
+    show(<SuppliersScreen api={listApi().api} />);
+    fireEvent.click(await screen.findByRole('button', { name: en.purchasing.suppliers.add }));
+    expect(within(screen.getByRole('dialog')).getByLabelText(en.purchasing.fields.code)).toBeDefined();
+  });
+
+  it('offers Edit and Deactivate on every row, Delete only on a supplier never used', async () => {
+    show(<SuppliersScreen api={listApi().api} />);
+    expect(
+      await screen.findByRole('button', { name: `${en.purchasing.suppliers.edit} Naveed Glass` }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole('button', { name: `${en.purchasing.suppliers.deactivate} Naveed Glass` }),
+    ).toBeDefined();
+    expect(
+      screen.queryByRole('button', { name: `${en.purchasing.suppliers.delete} Naveed Glass` }),
+    ).toBeNull();
+    expect(
+      screen.getByRole('button', { name: `${en.purchasing.suppliers.delete} Typo Traders` }),
+    ).toBeDefined();
+  });
+
+  it('says what the shop still owes when Deactivate is refused', async () => {
+    const f = listApi({
+      'PATCH /api/purchasing/suppliers/s1': {
+        status: 409,
+        body: { error: 'balance_open', balance: 1090100 },
+      },
+    });
+    show(<SuppliersScreen api={f.api} />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: `${en.purchasing.suppliers.deactivate} Naveed Glass` }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: en.purchasing.suppliers.deactivate }));
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(
+      /still owes this supplier Rs\s?10,901/,
+    );
+    expect(f.calls.find((c) => c.method === 'PATCH')!.body).toEqual({ rowVersion: '5', status: 'inactive' });
+  });
+
+  it('deletes a supplier never used, after asking', async () => {
+    const f = listApi({ 'DELETE /api/purchasing/suppliers/s2': { status: 200, body: { deleted: true } } });
+    show(<SuppliersScreen api={f.api} />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: `${en.purchasing.suppliers.delete} Typo Traders` }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: en.purchasing.suppliers.delete }));
+    expect(await screen.findByText('Typo Traders is deleted.')).toBeDefined();
   });
 });

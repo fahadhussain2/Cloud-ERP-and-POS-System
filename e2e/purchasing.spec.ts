@@ -50,12 +50,13 @@ test('the owner records a supplier bill with a bill discount, returns part of it
   await menu(page, bo.nav.suppliers);
   await expect(page.getByText(bo.purchasing.notLive.title)).toBeVisible();
   await page.getByRole('button', { name: bo.purchasing.suppliers.add }).click();
-  const form = page.getByRole('region', { name: bo.purchasing.suppliers.add });
+  // Add supplier opens a dialog (owner review, 2026-11-07).
+  const form = page.getByRole('dialog');
   await form.getByLabel(bo.purchasing.fields.code).fill('S100');
   await form.getByLabel(bo.purchasing.fields.name).fill('Naveed Glass');
   await form.getByLabel(bo.purchasing.fields.terms).fill('30');
   await form.getByLabel(bo.purchasing.fields.labelAbbr).fill('NG');
-  await form.getByRole('button', { name: bo.purchasing.suppliers.create }).click();
+  await form.getByRole('button', { name: new RegExp(`^${bo.purchasing.suppliers.create}`) }).click();
   await expect(page.getByRole('heading', { name: 'Naveed Glass' })).toBeVisible();
 
   // The bill: 10 × Rs 5,000 less Rs 1,000 on the whole bill = Rs 49,000.
@@ -102,8 +103,9 @@ test('the owner records a supplier bill with a bill discount, returns part of it
   await menu(page, bo.nav.suppliers);
   await page.getByRole('link', { name: 'Naveed Glass' }).click();
   await page.getByRole('button', { name: bo.purchasing.pay.action }).click();
-  await page.getByLabel(bo.purchasing.pay.amount).fill('10000');
-  await page.getByRole('button', { name: bo.purchasing.pay.confirm }).click();
+  const pay = page.getByRole('dialog');
+  await pay.getByLabel(bo.purchasing.pay.amount).fill('10000');
+  await pay.getByRole('button', { name: new RegExp(`^${bo.purchasing.pay.confirm}`) }).click();
   await expect(page.getByRole('status')).toContainText('SP000001');
   const ledger = page.getByRole('table', { name: bo.purchasing.ledger.title });
   await expect(ledger).toContainText('GR000001');

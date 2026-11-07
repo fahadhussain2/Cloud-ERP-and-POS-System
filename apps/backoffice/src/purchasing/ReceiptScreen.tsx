@@ -255,15 +255,23 @@ function ReceiptForm({
   // The same check as the server's, as you type (a field that isn't a number counts as an invalid one).
   // Empty counts as 0, not a number as NaN (an invalid value for the check).
   const n = (v: number | null | undefined) => (v === undefined ? Number.NaN : (v ?? 0));
-  const parsed = lines.map((l) => ({
-    itemId: l.item.id,
-    qty: n(qtyValue(l.qty)),
-    unitCost: n(moneyValue(l.unitCost, m.minorUnits)),
-    lineDiscount: n(moneyValue(l.lineDiscount, m.minorUnits) ?? 0),
-    allowsFraction: l.item.allowsFraction,
-    lastCost: posted ? null : l.item.lastCost,
-    retail: l.item.retail,
-  }));
+  // A line not filled in yet (no item, nothing typed) is not checked, totalled or saved: just a line to come.
+  const blank = (l: LineForm) =>
+    l.item.id === null && l.qty.trim() === '' && l.unitCost.trim() === '' && l.lineDiscount.trim() === '';
+  const used = lines.flatMap((l, i) => (blank(l) ? [] : [i]));
+  /** The checked row of displayed line `i`, or -1 for a line not filled in yet. */
+  const rowOf = (i: number) => used.indexOf(i);
+  const parsed = used
+    .map((i) => lines[i]!)
+    .map((l) => ({
+      itemId: l.item.id,
+      qty: n(qtyValue(l.qty)),
+      unitCost: n(moneyValue(l.unitCost, m.minorUnits)),
+      lineDiscount: n(moneyValue(l.lineDiscount, m.minorUnits) ?? 0),
+      allowsFraction: l.item.allowsFraction,
+      lastCost: posted ? null : l.item.lastCost,
+      retail: l.item.retail,
+    }));
   const billTotal = moneyValue(h.billTotal, m.minorUnits);
   const check = checkReceipt({
     supplierId: h.supplierId || null,
@@ -298,14 +306,12 @@ function ReceiptForm({
     billDiscount: moneyValue(h.billDiscount, m.minorUnits) ?? 0,
     billTotal: typeof billTotal === 'number' ? billTotal : null,
     notes: h.notes,
-    lines: parsed
-      .filter((p, i) => p.itemId !== null || lines[i]!.qty !== '' || lines[i]!.unitCost !== '')
-      .map((p) => ({
-        itemId: p.itemId,
-        qty: Number.isFinite(p.qty) ? p.qty : 0,
-        unitCost: Number.isFinite(p.unitCost) ? p.unitCost : 0,
-        lineDiscount: Number.isFinite(p.lineDiscount) ? p.lineDiscount : 0,
-      })),
+    lines: parsed.map((p) => ({
+      itemId: p.itemId,
+      qty: Number.isFinite(p.qty) ? p.qty : 0,
+      unitCost: Number.isFinite(p.unitCost) ? p.unitCost : 0,
+      lineDiscount: Number.isFinite(p.lineDiscount) ? p.lineDiscount : 0,
+    })),
   });
 
   /** Saves the draft; returns its id and row version, or null after showing why not. */
@@ -354,8 +360,8 @@ function ReceiptForm({
   const header = check.problems.filter(
     (p) => p.row === null && p.problem !== 'total_mismatch' && p.problem !== 'total_required',
   );
-  const warningsOf = (row: number) => check.warnings.filter((w) => w.row === row);
-  const problemsOf = (row: number) => check.problems.filter((p) => p.row === row);
+  const warningsOf = (i: number) => check.warnings.filter((w) => rowOf(i) >= 0 && w.row === rowOf(i));
+  const problemsOf = (i: number) => check.problems.filter((p) => rowOf(i) >= 0 && p.row === rowOf(i));
 
   return (
     <>
@@ -491,14 +497,23 @@ function ReceiptForm({
           </TableHeader>
           <TableBody>
             {lines.map((l, i) => (
-              <TableRow key={i}>
+              // Every cell at the top, so a line's messages under its item don't push its fields down.
+              <TableRow key={i} className="align-top">
                 <TableCell>
                   <ItemPicker
                     api={api}
                     label={t('purchasing.line.itemOf', { row: i + 1 })}
                     picked={l.item}
                     disabled={!can}
-                    onPick={(item) => put(i, { item })}
+                    onPick={(item) =>
+                      put(i, {
+                        item,
+                        unitCost:
+                          l.unitCost.trim() === '' && item.lastCost !== null
+                            ? moneyText(item.lastCost, m.minorUnits)
+                            : l.unitCost,
+                      })
+                    }
                   />
                   {[
                     ...problemsOf(i).map((p) => ({
@@ -545,11 +560,11 @@ function ReceiptForm({
                     onChange={(e) => put(i, { lineDiscount: e.target.value })}
                   />
                 </TableCell>
-                <TableCell className="text-end tabular-nums">
-                  {show(totals?.lines[i]?.netUnitCost ?? null)}
+                <TableCell className="text-end leading-9 tabular-nums">
+                  {show(totals?.lines[rowOf(i)]?.netUnitCost ?? null)}
                 </TableCell>
-                <TableCell className="text-end tabular-nums">
-                  {show(totals?.lines[i]?.value ?? null)}
+                <TableCell className="text-end leading-9 tabular-nums">
+                  {show(totals?.lines[rowOf(i)]?.value ?? null)}
                 </TableCell>
                 <TableCell>
                   {can && lines.length > 1 && (

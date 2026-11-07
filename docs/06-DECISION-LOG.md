@@ -930,4 +930,5 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - **Until go-live, purchases go into the legacy app** (owner answer 4); the purchasing screens say so, and anything entered here before then is removed by the pilot wipe.
 - **Why:** the supplier's bill is what the shop checks against; exact values keep the stock ledger equal to the bills; one place handles cash.
 - **Trade-off:** two steps for a cash purchase (receipt, then the desk), and a posted mistake is corrected by a return or a journal voucher, never an edit.
+- **Owner review (2026-11-07):** a supplier is deactivated (only when nothing is owed) or, if never used anywhere, deleted (marked deleted); the forms open as dialogs; a receipt line takes the item's last purchase cost.
 - **Status:** Accepted (with the W1-16 plan, owner answers 1–5)

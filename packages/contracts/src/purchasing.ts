@@ -95,6 +95,8 @@ export interface SupplierRow {
   status: 'active' | 'inactive';
   /** What the shop owes them (paisa); below 0 = they owe the shop. */
   balance: number;
+  /** Never used anywhere (no documents, ledger entries, items or customer account): it may be deleted. */
+  deletable: boolean;
 }
 
 export interface SupplierDetail {

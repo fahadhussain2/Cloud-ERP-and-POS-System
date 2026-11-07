@@ -190,8 +190,13 @@ function ReturnForm({
   const ids = { supplier: useId(), location: useId(), reason: useId() };
   const exists = (k: string) => t(k) !== k;
   const nan = (v: number | null | undefined) => (v === undefined ? Number.NaN : (v ?? 0));
-  // Lines from a receipt with no quantity typed are not being returned.
-  const used = lines.filter((l) => l.qty.trim() !== '' || l.receiptLineId === null);
+  // Lines from a receipt with no quantity typed are not being returned; a free line not filled in yet is just a line
+  // to come (owner review, 2026-11-07).
+  const used = lines.filter((l) =>
+    l.receiptLineId !== null
+      ? l.qty.trim() !== ''
+      : l.item.id !== null || l.qty.trim() !== '' || l.unitCost.trim() !== '',
+  );
   const check = checkReturn({
     supplierId: h.supplierId || null,
     locationId: h.locationId || null,
@@ -353,7 +358,7 @@ function ReturnForm({
                 typeof q === 'number' && typeof c === 'number' ? mulQty(qtyOf(q), money(c)) : null;
               const row = used.indexOf(l);
               return (
-                <TableRow key={i}>
+                <TableRow key={i} className="align-top">
                   <TableCell>
                     {l.receiptLineId ? (
                       <span>
@@ -397,7 +402,7 @@ function ReturnForm({
                       onChange={(e) => put(i, { unitCost: e.target.value })}
                     />
                   </TableCell>
-                  <TableCell className="text-end tabular-nums">
+                  <TableCell className="text-end leading-9 tabular-nums">
                     {value === null ? '—' : formatMoney(value, m)}
                   </TableCell>
                 </TableRow>

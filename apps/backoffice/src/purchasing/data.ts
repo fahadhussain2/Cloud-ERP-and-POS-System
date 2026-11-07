@@ -1,4 +1,5 @@
 import type { PurchasingLookups } from '@erp/contracts';
+import { formatMoney } from '@erp/ui';
 import type { TFunction } from 'i18next';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -34,18 +35,26 @@ export function problemText(
   return row === null ? text : t('purchasing.problems.row', { row: row + 1, text });
 }
 
-/** The words for a refusal from the purchasing API. */
-export function purchasingRefusal(t: TFunction, exists: (key: string) => boolean, body: unknown): string {
+/** The words for a refusal from the purchasing API; `money` formats an amount in it (a supplier's open balance). */
+export function purchasingRefusal(
+  t: TFunction,
+  exists: (key: string) => boolean,
+  body: unknown,
+  money?: PurchasingLookups['money'],
+): string {
   const b = body as {
     error?: string;
     problems?: { problem: string; row: number | null }[];
     by?: string | null;
     code?: string;
+    balance?: number;
   } | null;
   if (b?.error === 'invalid' && b.problems?.length)
     return b.problems.map((p) => problemText(t, exists, p.problem, p.row)).join(' ');
   if (b?.error === 'stale')
     return t('purchasing.errors.stale', { by: b.by ?? t('purchasing.errors.someone') });
+  if (b?.error === 'balance_open' && b.balance !== undefined && money)
+    return t('purchasing.errors.balance_open', { amount: formatMoney(b.balance, money) });
   if (b?.error === 'posting_failed') return t('purchasing.errors.posting_failed', { code: b.code ?? '' });
   if (b?.error && exists(`purchasing.errors.${b.error}`)) return t(`purchasing.errors.${b.error}`);
   return t('app.error');
