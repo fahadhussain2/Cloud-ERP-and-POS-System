@@ -3,6 +3,7 @@ export {
   CODE39_CHARACTERS,
   Code39Error,
   code39Svg,
+  code39Width,
   encodeCode39,
   type Code39Options,
   type Code39Problem,

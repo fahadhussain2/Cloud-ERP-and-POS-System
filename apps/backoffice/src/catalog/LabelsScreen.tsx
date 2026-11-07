@@ -1,6 +1,6 @@
 import type { LabelLineView, LabelsView, LabelTemplateRequest } from '@erp/contracts';
 import { labelPages, type LabelPage } from '@erp/domain';
-import { code39Svg } from '@erp/print';
+import { code39Svg, code39Width } from '@erp/print';
 import {
   Button,
   Checkbox,
@@ -16,7 +16,7 @@ import {
   TableRow,
   TextField,
 } from '@erp/ui';
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type CSSProperties, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -236,10 +236,15 @@ export function LabelsScreen({
   );
 }
 
+/** The barcode's proportions: wide bars 2.5 × narrow, a quiet zone of 10 narrow on each side. */
+const BARCODE = { narrow: 1, wide: 2.5, height: 30, quiet: 10 };
+
 /** One label as printed: the legacy layout (owner answer 3), sized in millimetres. */
 function ItemLabel({ page, template }: { page: LabelPage; template: LabelTemplateRequest }) {
   const { t } = useTranslation();
-  const svg = code39Svg(page.code, { narrow: 1, wide: 2.5, height: 30, quiet: 10 });
+  const svg = code39Svg(page.code, BARCODE);
+  // The code under the bars spans the bars only, not the quiet zones on each side (owner review, 2026-11-07).
+  const quiet = `${Math.round((BARCODE.quiet * BARCODE.narrow * 100_000) / code39Width(page.code, BARCODE)) / 1000}%`;
   return (
     <div
       role="img"
@@ -257,8 +262,8 @@ function ItemLabel({ page, template }: { page: LabelPage; template: LabelTemplat
       </div>
       {/* code39Svg draws only rects from a code checked against the Code 39 characters. */}
       <div className="item-label-bars" dangerouslySetInnerHTML={{ __html: svg }} />
-      {/* As legacy prints it: between the start and stop stars, spread across the label's width. */}
-      <div className="item-label-code">
+      {/* As legacy prints it: between the start and stop stars, each character under its own bars. */}
+      <div className="item-label-code" style={{ '--quiet': quiet } as CSSProperties}>
         {[...`*${page.code}*`].map((c, i) => (
           <span key={i}>{c}</span>
         ))}

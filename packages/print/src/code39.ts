@@ -58,6 +58,20 @@ export function encodeCode39(text: string): string[] {
 // Rounded so fractional widths don't print as 0.30000000000000004.
 const unit = (n: number) => String(Math.round(n * 1000) / 1000);
 
+/**
+ * The width of `code39Svg`'s drawing, in the options' units: the elements, a narrow gap between characters and the
+ * two quiet zones. The text printed under the bars uses it to line up with them.
+ */
+export function code39Width(text: string, options: Code39Options): number {
+  const { narrow, wide, quiet } = options;
+  const patterns = encodeCode39(text);
+  const elements = patterns.reduce(
+    (sum, p) => sum + [...p].reduce((w, e) => w + (e === 'w' ? wide : narrow), 0),
+    0,
+  );
+  return Number(unit(elements + (patterns.length - 1) * narrow + 2 * quiet * narrow));
+}
+
 /** An SVG image of the barcode, black bars on nothing, sized in the options' units. */
 export function code39Svg(text: string, options: Code39Options): string {
   const { narrow, wide, height, quiet } = options;

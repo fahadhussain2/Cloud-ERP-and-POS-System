@@ -90,6 +90,8 @@ describe('labels for a posted receipt', () => {
     const code = first.querySelector('.item-label-code')!;
     expect(code.textContent).toBe('*ABEA001*');
     expect(code.children).toHaveLength(9);
+    // Under the bars only, not under the quiet zones (owner review, 2026-11-07): 10 of 149.5 units on each side.
+    expect((code as HTMLElement).style.getPropertyValue('--quiet')).toBe('6.689%');
     expect(within(first).getByText('ADJUSTER BEARING SALOON')).toBeDefined();
     expect(first.querySelector('svg rect')).not.toBeNull();
     expect(screen.getByText(en.labels.problems.code_unprintable)).toBeDefined();

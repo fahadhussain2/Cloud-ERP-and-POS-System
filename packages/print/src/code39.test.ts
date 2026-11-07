@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import cases from '../golden/code39.json';
-import { Code39Error, code39Svg, encodeCode39 } from './code39';
+import { Code39Error, code39Svg, code39Width, encodeCode39 } from './code39';
 
 // Golden cases as in packages/domain: an input and either the expected patterns or the error code.
 describe(cases.description, () => {
@@ -43,5 +43,17 @@ describe('code39Svg', () => {
 
   it('refuses what encodeCode39 refuses', () => {
     expect(() => code39Svg('a', { narrow: 1, wide: 3, height: 50, quiet: 10 })).toThrow(Code39Error);
+  });
+});
+
+describe('code39Width', () => {
+  it('is the width of the drawing, quiet zones included, so the text under the bars can line up with them', () => {
+    const options = { narrow: 1, wide: 3, height: 50, quiet: 10 };
+    expect(code39Width('A', options)).toBe(67);
+    expect(code39Svg('AB-1', options)).toContain(`viewBox="0 0 ${code39Width('AB-1', options)} 50"`);
+  });
+
+  it('refuses what encodeCode39 refuses', () => {
+    expect(() => code39Width('a', { narrow: 1, wide: 3, height: 50, quiet: 10 })).toThrow(Code39Error);
   });
 });
