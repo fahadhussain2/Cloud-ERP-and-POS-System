@@ -108,7 +108,7 @@ export function LabelsScreen({
           )
         }
       />
-      <Panel>
+      <Panel className="p-3.5">
         <form
           className="flex flex-wrap items-end gap-3"
           onSubmit={(e: FormEvent) => {
@@ -132,7 +132,7 @@ export function LabelsScreen({
       </Panel>
 
       {view ? (
-        <Panel>
+        <Panel className="p-3.5">
           <p className="m-0 mb-3 font-medium">
             {view.source
               ? t('labels.from', { number: view.source.number, supplier: view.source.supplier })
@@ -257,8 +257,17 @@ function ItemLabel({ page, template }: { page: LabelPage; template: LabelTemplat
       </div>
       {/* code39Svg draws only rects from a code checked against the Code 39 characters. */}
       <div className="item-label-bars" dangerouslySetInnerHTML={{ __html: svg }} />
-      <div className="item-label-code">{page.code}</div>
-      {template.showName && <div className="item-label-name">{page.name}</div>}
+      {/* As legacy prints it: between the start and stop stars, spread across the label's width. */}
+      <div className="item-label-code">
+        {[...`*${page.code}*`].map((c, i) => (
+          <span key={i}>{c}</span>
+        ))}
+      </div>
+      {template.showName && (
+        <div className="item-label-name">
+          <span>{page.name}</span>
+        </div>
+      )}
     </div>
   );
 }
