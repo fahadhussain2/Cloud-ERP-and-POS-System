@@ -86,7 +86,10 @@ describe('labels for a posted receipt', () => {
     const first = labels[0]!;
     expect(within(first).getByText('DCAC')).toBeDefined();
     expect(within(first).getByText('NG')).toBeDefined();
-    expect(within(first).getByText('ABEA001')).toBeDefined();
+    // The code as legacy prints it: between Code 39's start and stop stars, one character per cell across the width.
+    const code = first.querySelector('.item-label-code')!;
+    expect(code.textContent).toBe('*ABEA001*');
+    expect(code.children).toHaveLength(9);
     expect(within(first).getByText('ADJUSTER BEARING SALOON')).toBeDefined();
     expect(first.querySelector('svg rect')).not.toBeNull();
     expect(screen.getByText(en.labels.problems.code_unprintable)).toBeDefined();
