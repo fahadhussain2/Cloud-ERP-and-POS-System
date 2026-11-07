@@ -266,6 +266,13 @@ export async function setupTenant(
         differs(`location ${l.code}`, 'is_sellable', row.is_sellable, l.isSellable);
       }
     }
+    // Stock on its way between locations (W1-18, D-107): every branch has one, never sold from.
+    const transit = await c.query(
+      `INSERT INTO erp.locations (tenant_id, branch_id, code, name, kind, is_sellable)
+       VALUES ($1, $2, 'TRANSIT', 'In transit', 'transit', false) ON CONFLICT DO NOTHING`,
+      [tenantId, branchId],
+    );
+    if (transit.rowCount) created.push('location TRANSIT');
 
     // The chart of accounts, parents before children.
     const existing = new Map(

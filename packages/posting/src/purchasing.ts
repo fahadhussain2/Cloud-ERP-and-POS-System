@@ -1,20 +1,16 @@
-import { money, mulQty, negate, qty, sum, type Money, type Qty } from '@erp/domain';
+import { money, mulQty, negate, qty, sum } from '@erp/domain';
 
+import { bankOf, credit, debit, dated, guarded, roleOf, signed, stockState } from './build';
 import { averageAfterValue } from './cost';
-import { entryDateOf } from './dates';
 import type {
-  CostState,
   JournalLine,
   LastPurchase,
   LedgerState,
   PartyEntry,
   PostingContext,
-  PostingError,
-  PostingException,
   PostingGoodsReceipt,
   PostingPurchaseReturn,
   PostingResult,
-  PostingRole,
   PostingSupplierPayment,
   StockMovement,
 } from './types';
@@ -23,74 +19,6 @@ import type {
 // value, the average from that value, the supplier's bill, paid by bank or not), a purchase return (out at the
 // average, the difference to purchase price variance) and a supplier payment by bank. Never throws for a business
 // reason.
-
-class Unposted extends Error {
-  constructor(readonly error: PostingError) {
-    super(error.code);
-  }
-}
-
-const roleOf = (context: PostingContext, r: PostingRole): string => {
-  const account = context.accounts.roles[r];
-  if (account === undefined) throw new Unposted({ code: 'role_unmapped', role: r });
-  return account;
-};
-const bankOf = (context: PostingContext, id: string): string => {
-  const account = context.accounts.targets?.[id];
-  if (account === undefined) throw new Unposted({ code: 'target_unmapped', targetId: id });
-  return account;
-};
-const debit = (accountId: string, partyId: string | null, amount: Money): JournalLine => ({
-  accountId,
-  partyId,
-  debit: amount,
-  credit: money(0),
-});
-const credit = (accountId: string, partyId: string | null, amount: Money): JournalLine => ({
-  accountId,
-  partyId,
-  debit: money(0),
-  credit: amount,
-});
-/** `net` > 0 debits, < 0 credits, 0 is left out. */
-const signed = (accountId: string, partyId: string | null, net: Money): JournalLine[] =>
-  net === 0 ? [] : [net > 0 ? debit(accountId, partyId, net) : credit(accountId, partyId, negate(net))];
-
-/** The entry date, and the lock-date exception when it moved. */
-function dated(businessDate: string, context: PostingContext) {
-  const entryDate = entryDateOf(businessDate, context.lockDate);
-  const exceptions: PostingException[] =
-    entryDate === businessDate
-      ? []
-      : [{ kind: 'posted_after_lock', details: { businessDate, lockDate: context.lockDate! } }];
-  return { entryDate, exceptions };
-}
-
-function guarded(build: () => PostingResult): PostingResult {
-  try {
-    return build();
-  } catch (err) {
-    if (err instanceof Unposted) return { ok: false, error: err.error };
-    throw err;
-  }
-}
-
-/** Costs and balances as the lines change them, each line seeing the ones before it. */
-function stockState(state: LedgerState) {
-  const costs: Record<string, CostState> = {};
-  const balances: Record<string, Record<string, Qty>> = {};
-  return {
-    costs,
-    balances,
-    costNow: (item: string): CostState =>
-      costs[item] ?? state.costs[item] ?? { avgCost: null, onHand: qty(0) },
-    move: (loc: string, item: string, delta: Qty): Qty => {
-      const now = qty((balances[loc]?.[item] ?? state.balances[loc]?.[item] ?? qty(0)) + delta);
-      (balances[loc] ??= {})[item] = now;
-      return now;
-    },
-  };
-}
 
 /** Dr INVENTORY Σ values, Cr AP_CONTROL (the supplier) the total; paid by bank also Dr AP_CONTROL / Cr the bank. */
 export function postGoodsReceipt(

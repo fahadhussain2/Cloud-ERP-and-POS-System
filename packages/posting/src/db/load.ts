@@ -15,6 +15,8 @@ import type {
   PostingVoid,
   PostingGoodsReceipt,
   PostingPurchaseReturn,
+  PostingStockAdjustment,
+  PostingStockTransfer,
   PostingSupplierPayment,
 } from '../types';
 
@@ -670,5 +672,133 @@ export async function loadSupplierPayment(
     supplierId: h.supplier_party_id,
     amount: money(h.amount),
     bankAccountId: h.bank_account_id,
+  };
+}
+
+/** A transfer's lines: thousandths, in line order. */
+async function transferLines(c: pg.ClientBase, id: string) {
+  const { rows } = await c.query<{ id: string; item_id: string; qty: string; received: string | null }>(
+    `SELECT id, item_id, (qty * 1000)::bigint AS qty, (received_qty * 1000)::bigint AS received
+     FROM erp.stock_transfer_lines WHERE transfer_id = $1 ORDER BY line_no`,
+    [id],
+  );
+  return rows;
+}
+
+/**
+ * A transfer's first step as posting needs it (W1-18): moved at once (from → to) or sent (from → the branch's
+ * In transit location); null for a draft.
+ */
+export async function loadStockTransfer(c: pg.ClientBase, id: string): Promise<PostingStockTransfer | null> {
+  const { rows } = await c.query<{
+    number: string;
+    branch_id: string;
+    business_date: string;
+    from_location_id: string;
+    to_location_id: string;
+    sent: boolean;
+    transit_id: string | null;
+  }>(
+    `SELECT t.number, t.branch_id, t.business_date::text, t.from_location_id, t.to_location_id,
+       t.status IN ('in_transit', 'received') AS sent,
+       (SELECT l.id FROM erp.locations l WHERE l.branch_id = t.branch_id AND l.kind = 'transit'
+        AND l.deleted_at IS NULL) AS transit_id
+     FROM erp.stock_transfers t WHERE t.id = $1 AND t.status <> 'draft'`,
+    [id],
+  );
+  const h = rows[0];
+  if (!h) return null;
+  if (h.sent && h.transit_id === null) throw new Error(`branch ${h.branch_id} has no In transit location`);
+  const to = h.sent ? h.transit_id! : h.to_location_id;
+  return {
+    id,
+    number: h.number,
+    branchId: h.branch_id,
+    businessDate: h.business_date,
+    lines: (await transferLines(c, id)).map((l) => ({
+      id: l.id,
+      itemId: l.item_id,
+      fromLocationId: h.from_location_id,
+      toLocationId: to,
+      qty: toQty(l.qty),
+    })),
+  };
+}
+
+/**
+ * A sent transfer's receiving as posting needs it (W1-18), by its `receipt_id`: what arrived, out of In transit into
+ * the destination, on the day it was received. A line where nothing arrived has nothing to move.
+ */
+export async function loadStockTransferReceipt(
+  c: pg.ClientBase,
+  receiptId: string,
+): Promise<PostingStockTransfer | null> {
+  const { rows } = await c.query<{
+    id: string;
+    number: string;
+    branch_id: string;
+    received_on: string;
+    to_location_id: string;
+    transit_id: string | null;
+  }>(
+    `SELECT t.id, t.number, t.branch_id, t.received_on::text, t.to_location_id,
+       (SELECT l.id FROM erp.locations l WHERE l.branch_id = t.branch_id AND l.kind = 'transit'
+        AND l.deleted_at IS NULL) AS transit_id
+     FROM erp.stock_transfers t WHERE t.receipt_id = $1 AND t.status = 'received'`,
+    [receiptId],
+  );
+  const h = rows[0];
+  if (!h) return null;
+  if (h.transit_id === null) throw new Error(`branch ${h.branch_id} has no In transit location`);
+  return {
+    id: receiptId,
+    number: h.number,
+    branchId: h.branch_id,
+    businessDate: h.received_on,
+    lines: (await transferLines(c, h.id))
+      .filter((l) => l.received !== null && Number(l.received) > 0)
+      .map((l) => ({
+        id: l.id,
+        itemId: l.item_id,
+        fromLocationId: h.transit_id!,
+        toLocationId: h.to_location_id,
+        qty: toQty(l.received!),
+      })),
+  };
+}
+
+/** A posted stock adjustment as posting needs it (W1-18). */
+export async function loadStockAdjustment(
+  c: pg.ClientBase,
+  id: string,
+): Promise<PostingStockAdjustment | null> {
+  const head = await c.query<{
+    number: string;
+    branch_id: string;
+    business_date: string;
+    location_id: string;
+  }>(
+    `SELECT number, branch_id, business_date::text, location_id FROM erp.stock_adjustments
+     WHERE id = $1 AND status = 'posted'`,
+    [id],
+  );
+  const h = head.rows[0];
+  if (!h) return null;
+  const lines = await c.query<{ id: string; item_id: string; qty: string }>(
+    `SELECT id, item_id, (qty * 1000)::bigint AS qty FROM erp.stock_adjustment_lines
+     WHERE adjustment_id = $1 ORDER BY line_no`,
+    [id],
+  );
+  return {
+    id,
+    number: h.number,
+    branchId: h.branch_id,
+    businessDate: h.business_date,
+    lines: lines.rows.map((l) => ({
+      id: l.id,
+      itemId: l.item_id,
+      locationId: h.location_id,
+      qty: toQty(l.qty),
+    })),
   };
 }

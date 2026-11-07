@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: stock ledger, balances, average cost and negative-stock alerts built with the posting engine in W1-08 (in review, [accounting spec](../accounting/spec.md)) |
+| **Status** | In progress: stock ledger, balances, average cost and negative-stock alerts built with the posting engine in W1-08 ([accounting spec](../accounting/spec.md)); transfers (at once or sent and received), adjustments with the owner's approval above a limit, the item stock card and Transfer needed built in W1-18 (D-107). Cycle counts (INV-06) are Wave 2 |
 | **Requirements** | 7 (INV-01…INV-07) |
 | **Feature spec needed** | No |
 
@@ -26,7 +26,7 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 
 ## Related
 
-PRD W13–W14; data model §7; posting rules §5.3–5.4; D-015, D-017, D-018
+PRD W13–W14; data model §7; posting rules §5.3–5.4; D-015, D-017, D-018, D-107
 
 ## Work in this module
 

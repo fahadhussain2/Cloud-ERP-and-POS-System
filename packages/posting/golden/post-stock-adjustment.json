@@ -1,0 +1,275 @@
+{
+  "description": "Posting a stock adjustment (posting rules §5.3, INV-05, W1-18): per line, into (found, qty > 0) or out of (gone, qty < 0) its location at the item's current average, the average unchanged and the quantity on hand moved. The net value posts as one pair: a gain Dr INVENTORY / Cr INVENTORY_ADJUSTMENT, a loss Dr INVENTORY_ADJUSTMENT / Cr INVENTORY; a net of 0 has no journal. An item with no cost known moves at 0, flagged no_cost once; stock below 0 is flagged negative_stock, never refused. A write-off is a loss out of Damaged.",
+  "cases": [
+    {
+      "name": "3 lost from the Shop at the Rs 4,000 average",
+      "input": {
+        "adjustment": {
+          "id": "ad-1",
+          "number": "AD000001",
+          "branchId": "br-main",
+          "businessDate": "2026-11-08",
+          "lines": [{ "id": "adl-1", "itemId": "item-a", "locationId": "loc-shop", "qty": -3000 }]
+        },
+        "state": {
+          "costs": { "item-a": { "avgCost": 400000, "onHand": 10000 } },
+          "balances": { "loc-shop": { "item-a": 6000 } }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-08",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "AD000001",
+            "lines": [
+              { "accountId": "5200", "partyId": null, "debit": 1200000, "credit": 0 },
+              { "accountId": "1300", "partyId": null, "debit": 0, "credit": 1200000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "adl-1",
+              "itemId": "item-a",
+              "locationId": "loc-shop",
+              "qtyDelta": -3000,
+              "unitCost": 400000,
+              "valueDelta": -1200000,
+              "avgCostAfter": 400000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-a": { "avgCost": 400000, "onHand": 7000 } },
+            "balances": { "loc-shop": { "item-a": 3000 } }
+          }
+        }
+      }
+    },
+    {
+      "name": "2 found in the Godown",
+      "input": {
+        "adjustment": {
+          "id": "ad-2",
+          "number": "AD000002",
+          "branchId": "br-main",
+          "businessDate": "2026-11-08",
+          "lines": [{ "id": "adl-2", "itemId": "item-a", "locationId": "loc-godown", "qty": 2000 }]
+        },
+        "state": {
+          "costs": { "item-a": { "avgCost": 400000, "onHand": 10000 } },
+          "balances": { "loc-godown": { "item-a": 4000 } }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-08",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "AD000002",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 800000, "credit": 0 },
+              { "accountId": "5200", "partyId": null, "debit": 0, "credit": 800000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "adl-2",
+              "itemId": "item-a",
+              "locationId": "loc-godown",
+              "qtyDelta": 2000,
+              "unitCost": 400000,
+              "valueDelta": 800000,
+              "avgCostAfter": 400000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-a": { "avgCost": 400000, "onHand": 12000 } },
+            "balances": { "loc-godown": { "item-a": 6000 } }
+          }
+        }
+      }
+    },
+    {
+      "name": "a count correction, one up and one down: the net loss posts",
+      "input": {
+        "adjustment": {
+          "id": "ad-3",
+          "number": "AD000003",
+          "branchId": "br-main",
+          "businessDate": "2026-11-08",
+          "lines": [
+            { "id": "adl-3", "itemId": "item-b", "locationId": "loc-shop", "qty": 1000 },
+            { "id": "adl-4", "itemId": "item-a", "locationId": "loc-shop", "qty": -2000 }
+          ]
+        },
+        "state": {
+          "costs": {
+            "item-a": { "avgCost": 400000, "onHand": 10000 },
+            "item-b": { "avgCost": 100000, "onHand": 0 }
+          },
+          "balances": { "loc-shop": { "item-a": 6000 } }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-08",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "AD000003",
+            "lines": [
+              { "accountId": "5200", "partyId": null, "debit": 700000, "credit": 0 },
+              { "accountId": "1300", "partyId": null, "debit": 0, "credit": 700000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "adl-3",
+              "itemId": "item-b",
+              "locationId": "loc-shop",
+              "qtyDelta": 1000,
+              "unitCost": 100000,
+              "valueDelta": 100000,
+              "avgCostAfter": 100000
+            },
+            {
+              "sourceLineId": "adl-4",
+              "itemId": "item-a",
+              "locationId": "loc-shop",
+              "qtyDelta": -2000,
+              "unitCost": 400000,
+              "valueDelta": -800000,
+              "avgCostAfter": 400000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "item-b": { "avgCost": 100000, "onHand": 1000 },
+              "item-a": { "avgCost": 400000, "onHand": 8000 }
+            },
+            "balances": { "loc-shop": { "item-b": 1000, "item-a": 4000 } }
+          }
+        }
+      }
+    },
+    {
+      "name": "one gone of an item with no cost known: quantity only, flagged, and below 0",
+      "input": {
+        "adjustment": {
+          "id": "ad-4",
+          "number": "AD000004",
+          "branchId": "br-main",
+          "businessDate": "2026-11-08",
+          "lines": [{ "id": "adl-5", "itemId": "item-c", "locationId": "loc-shop", "qty": -1000 }]
+        },
+        "state": { "costs": {}, "balances": {} }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-08",
+          "journal": { "branchId": "br-main", "memo": "AD000004", "lines": [] },
+          "movements": [
+            {
+              "sourceLineId": "adl-5",
+              "itemId": "item-c",
+              "locationId": "loc-shop",
+              "qtyDelta": -1000,
+              "unitCost": 0,
+              "valueDelta": 0,
+              "avgCostAfter": null
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [
+            { "kind": "no_cost", "details": { "itemId": "item-c" } },
+            {
+              "kind": "negative_stock",
+              "details": { "itemId": "item-c", "locationId": "loc-shop", "balance": -1000 }
+            }
+          ],
+          "state": {
+            "costs": { "item-c": { "avgCost": null, "onHand": -1000 } },
+            "balances": { "loc-shop": { "item-c": -1000 } }
+          }
+        }
+      }
+    },
+    {
+      "name": "writing off 2 damaged out of Damaged, after the lock date",
+      "input": {
+        "adjustment": {
+          "id": "ad-5",
+          "number": "AD000005",
+          "branchId": "br-main",
+          "businessDate": "2026-11-08",
+          "lines": [{ "id": "adl-6", "itemId": "item-a", "locationId": "loc-damaged", "qty": -2000 }]
+        },
+        "state": {
+          "costs": { "item-a": { "avgCost": 50000, "onHand": 10000 } },
+          "balances": { "loc-damaged": { "item-a": 2000 } }
+        },
+        "lockDate": "2026-11-30"
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-12-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "AD000005",
+            "lines": [
+              { "accountId": "5200", "partyId": null, "debit": 100000, "credit": 0 },
+              { "accountId": "1300", "partyId": null, "debit": 0, "credit": 100000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "adl-6",
+              "itemId": "item-a",
+              "locationId": "loc-damaged",
+              "qtyDelta": -2000,
+              "unitCost": 50000,
+              "valueDelta": -100000,
+              "avgCostAfter": 50000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [
+            {
+              "kind": "posted_after_lock",
+              "details": { "businessDate": "2026-11-08", "lockDate": "2026-11-30" }
+            }
+          ],
+          "state": {
+            "costs": { "item-a": { "avgCost": 50000, "onHand": 8000 } },
+            "balances": { "loc-damaged": { "item-a": 0 } }
+          }
+        }
+      }
+    },
+    {
+      "name": "an adjustment with INVENTORY_ADJUSTMENT unmapped doesn't post",
+      "input": {
+        "adjustment": {
+          "id": "ad-6",
+          "number": "AD000006",
+          "branchId": "br-main",
+          "businessDate": "2026-11-08",
+          "lines": [{ "id": "adl-7", "itemId": "item-a", "locationId": "loc-shop", "qty": -1000 }]
+        },
+        "state": { "costs": { "item-a": { "avgCost": 400000, "onHand": 1000 } }, "balances": {} },
+        "unmapped": true
+      },
+      "expected": { "ok": false, "error": { "code": "role_unmapped", "role": "INVENTORY_ADJUSTMENT" } }
+    }
+  ]
+}

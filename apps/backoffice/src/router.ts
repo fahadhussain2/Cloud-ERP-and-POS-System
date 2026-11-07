@@ -20,7 +20,14 @@ export type Route =
   | { screen: 'receipts' }
   | { screen: 'receipt'; id: string }
   | { screen: 'purchaseReturns' }
-  | { screen: 'purchaseReturn'; id: string };
+  | { screen: 'purchaseReturn'; id: string }
+  | { screen: 'transfers' }
+  | { screen: 'transfer'; id: string }
+  | { screen: 'adjustments' }
+  | { screen: 'adjustment'; id: string }
+  | { screen: 'stockCard'; itemId: string | null }
+  | { screen: 'transferNeeded' }
+  | { screen: 'stockSettings' };
 
 export const href = {
   staff: '#/staff',
@@ -45,6 +52,16 @@ export const href = {
   purchaseReturns: '#/purchasing/returns',
   /** `new`, or `new-<receipt id>` for a return from that receipt. */
   purchaseReturn: (id: string) => `#/purchasing/returns/${encodeURIComponent(id)}`,
+  transfers: '#/stock/transfers',
+  /** `new`, or `needed` for a Godown → Shop transfer of what Transfer needed lists. */
+  transfer: (id: string) => `#/stock/transfers/${encodeURIComponent(id)}`,
+  adjustments: '#/stock/adjustments',
+  /** `new` for a new adjustment. */
+  adjustment: (id: string) => `#/stock/adjustments/${encodeURIComponent(id)}`,
+  stockCards: '#/stock/card',
+  stockCard: (itemId: string) => `#/stock/card/${encodeURIComponent(itemId)}`,
+  transferNeeded: '#/stock/needed',
+  stockSettings: '#/stock/settings',
 } as const;
 
 export function parseHash(hash: string): Route {
@@ -78,6 +95,16 @@ export function parseHash(hash: string): Route {
   if (parts[0] === 'purchasing' && parts[1] === 'returns' && parts[2])
     return { screen: 'purchaseReturn', id: decodeURIComponent(parts[2]) };
   if (parts[0] === 'purchasing' && parts[1] === 'returns') return { screen: 'purchaseReturns' };
+  if (parts[0] === 'stock' && parts[1] === 'transfers' && parts[2])
+    return { screen: 'transfer', id: decodeURIComponent(parts[2]) };
+  if (parts[0] === 'stock' && parts[1] === 'transfers') return { screen: 'transfers' };
+  if (parts[0] === 'stock' && parts[1] === 'adjustments' && parts[2])
+    return { screen: 'adjustment', id: decodeURIComponent(parts[2]) };
+  if (parts[0] === 'stock' && parts[1] === 'adjustments') return { screen: 'adjustments' };
+  if (parts[0] === 'stock' && parts[1] === 'card')
+    return { screen: 'stockCard', itemId: parts[2] ? decodeURIComponent(parts[2]) : null };
+  if (parts[0] === 'stock' && parts[1] === 'needed') return { screen: 'transferNeeded' };
+  if (parts[0] === 'stock' && parts[1] === 'settings') return { screen: 'stockSettings' };
   return { screen: 'home' };
 }
 

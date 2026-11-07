@@ -154,6 +154,11 @@ Any difference goes to `PURCHASE_PRICE_VARIANCE` (Dr or Cr).
 ### 5.4 Transfer between locations
 Stock ledger only (out of one location, into another, at the same cost). **No GL entry**, because both locations are the same Inventory account.
 
+**As built (W1-18, D-107):**
+- `postStockTransfer` moves each line out of its from location and into its to location at the item's current average (no cost known: 0), with no journal; the average and the quantity on hand don't change. It posts a transfer that moves at once, the sending (from → In transit) and the receiving (In transit → to, what arrived) as separate postings (`stock_transfer`, `stock_transfer_receipt`).
+- `postStockAdjustment` moves each line in or out at the average and posts the **net** value as one pair (gain: Dr INVENTORY / Cr INVENTORY_ADJUSTMENT; loss: the reverse; none when it nets to 0). An item with no cost moves at 0, flagged `no_cost`.
+- Stock below 0 is flagged `negative_stock`, never refused.
+
 **As built (W1-16):** `postPurchaseReturn`; with no cost known the stock leaves at the return's cost (flagged `no_cost`), and stock below 0 is flagged, never refused.
 
 ## 6. Back-office documents

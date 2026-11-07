@@ -944,3 +944,29 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** the shop keeps its labels and scanners as they are; another shop that relies on the maker's barcode doesn't waste labels; the browser prints the way the bill already does (D-055).
 - **Trade-off:** the browser's print dialog must be set once per PC (the label printer, margins none, scale 100 %); printing straight to the Zebra without a dialog would need a local helper.
 - **Status:** Accepted (with the W1-17 plan, owner answers 1–5)
+
+### D-107 Stock operations: the storekeeper drafts, the owner or manager posts; the owner approves large losses; receiving per route (2026-11-08)
+- **Context:** W1-18 (INV-04, INV-05, INV-07). Delux's Godown is in the same building as the shop; other shops keep stock elsewhere.
+- **Decision:**
+  - **Transfers:**
+    - The purchaser/storekeeper (`inv.transfer`) types a transfer as a draft. Only the owner or the manager (`inv.transfer.post`, new) posts it (owner answer 2).
+    - Each route (from → to) is either "moves at once" (the default) or "needs receiving", an owner's setting (`transfer_routes`, owner answer 4).
+    - On a route that needs receiving, posting **sends** the stock into the branch's **In transit** location (new location kind `transit`, never sellable, one per branch). **Receiving** moves what arrived into the destination.
+    - A shortfall becomes a loss adjustment out of In transit (reason *lost*), under the same approval rule.
+  - **Adjustments:**
+    - Adjustments are the owner's and the manager's (`inv.adjust`).
+    - When the losses at the average come to more than the shop's limit (`tenants.settings.inventory.adjustmentApprovalLimit`, default Rs 10,000), and the poster can't approve (`inv.adjust.approve`, new, the owner only), it waits: stock and books don't move.
+    - The owner approves it (it posts) or sends it back to a draft with a note. Gains never wait (owner answer 3).
+  - **Postings:**
+    - A transfer step moves stock at the item's average with no journal (posting rules §5.4).
+    - An adjustment posts its net value against `INVENTORY_ADJUSTMENT` (§5.3). Each step is its own posting (`stock_transfer`, `stock_transfer_receipt`, `stock_adjustment`) and replays in a rebuild.
+  - The adjustment reasons are the owner's list: found, lost / missing, broken / damaged, theft, count correction, write-off (damaged goods, only out of Damaged), other with a note (owner answer 1).
+- **Why:**
+  - A transfer is recorded when the goods move, but stock changes only on a responsible person's post.
+  - A mistyped loss can't reach the books unseen.
+  - A setting per route can't be picked wrongly on each transfer.
+  - The same code serves a shop whose store is down the road.
+- **Trade-off:**
+  - Drafts can pile up unposted; the transfers list shows them first, and Transfer needed shows what that costs the Shop.
+  - A route that needs receiving leaves stock invisible to both ends until it is received; the On the way list shows how long.
+- **Status:** Accepted (with the W1-18 plan, owner answers 1–4)

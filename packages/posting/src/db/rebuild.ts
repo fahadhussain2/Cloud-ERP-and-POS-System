@@ -6,6 +6,7 @@ import { postHandover } from '../handover';
 import { postOpening } from '../opening';
 import { postGoodsReceipt, postPurchaseReturn, postSupplierPayment } from '../purchasing';
 import { postSale } from '../sale';
+import { postStockAdjustment, postStockTransfer } from '../stock';
 import { postVoid } from '../void';
 import type { LedgerState, Posting, PostingContext, PostingResult } from '../types';
 import {
@@ -17,6 +18,9 @@ import {
   loadPurchaseReturn,
   loadSale,
   loadSessionEvent,
+  loadStockAdjustment,
+  loadStockTransfer,
+  loadStockTransferReceipt,
   loadSupplierPayment,
   loadVoid,
   withReturnCosts,
@@ -93,6 +97,15 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
     } else if (r.source_type === 'supplier_payment') {
       const doc = await loadSupplierPayment(c, r.source_id);
       result = doc ? postSupplierPayment(doc, r.context) : null;
+    } else if (r.source_type === 'stock_transfer') {
+      const doc = await loadStockTransfer(c, r.source_id);
+      result = doc ? postStockTransfer(doc, r.context, state) : null;
+    } else if (r.source_type === 'stock_transfer_receipt') {
+      const doc = await loadStockTransferReceipt(c, r.source_id);
+      result = doc ? postStockTransfer(doc, r.context, state) : null;
+    } else if (r.source_type === 'stock_adjustment') {
+      const doc = await loadStockAdjustment(c, r.source_id);
+      result = doc ? postStockAdjustment(doc, r.context, state) : null;
     } else if (r.source_type === 'sales_void') {
       const v = await loadVoid(c, r.source_id);
       const original = v ? sales.get(v.saleId) : undefined;

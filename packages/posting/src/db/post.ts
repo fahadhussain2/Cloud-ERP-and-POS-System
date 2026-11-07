@@ -6,6 +6,7 @@ import { postHandover } from '../handover';
 import { postOpening } from '../opening';
 import { postGoodsReceipt, postPurchaseReturn, postSupplierPayment } from '../purchasing';
 import { postSale } from '../sale';
+import { postStockAdjustment, postStockTransfer } from '../stock';
 import { postVoid } from '../void';
 import type { PostingContext, PostingException, PostingResult } from '../types';
 import {
@@ -22,6 +23,9 @@ import {
   loadSessionEvent,
   loadState,
   loadStateOf,
+  loadStockAdjustment,
+  loadStockTransfer,
+  loadStockTransferReceipt,
   loadSupplierPayment,
   loadVoid,
   withReturnCosts,
@@ -44,15 +48,19 @@ export type SourceType =
   | 'opening'
   | 'goods_receipt'
   | 'purchase_return'
-  | 'supplier_payment';
+  | 'supplier_payment'
+  | 'stock_transfer'
+  | 'stock_transfer_receipt'
+  | 'stock_adjustment';
 
 /**
  * Where each kind of document lives, which row holds it, and whom an exception on it belongs to. Constants, never
- * input. A session's open posts under the session's id and its close under the close document's id.
+ * input. A session's open posts under the session's id and its close under the close document's id; a sent transfer's
+ * receiving under its `receipt_id` (W1-18).
  */
 const SOURCES: Record<
   SourceType,
-  { table: string; documentType: string; userColumn: string; byClose?: true }
+  { table: string; documentType: string; userColumn: string; alsoBy?: 'close_document_id' | 'receipt_id' }
 > = {
   sale: { table: 'sales_documents', documentType: 'sales_document', userColumn: 'salesperson_user_id' },
   cash_handover: { table: 'cash_handovers', documentType: 'cash_handover', userColumn: 'cashier_user_id' },
@@ -62,7 +70,7 @@ const SOURCES: Record<
     table: 'cash_sessions',
     documentType: 'cash_session',
     userColumn: 'cashier_user_id',
-    byClose: true,
+    alsoBy: 'close_document_id',
   },
   sales_void: { table: 'sales_voids', documentType: 'sales_void', userColumn: 'voided_by_user_id' },
   // Posted by the importer, never by the catch-up (W1-14).
@@ -78,11 +86,27 @@ const SOURCES: Record<
     documentType: 'supplier_payment',
     userColumn: 'created_by_user_id',
   },
+  stock_transfer: {
+    table: 'stock_transfers',
+    documentType: 'stock_transfer',
+    userColumn: 'posted_by_user_id',
+  },
+  stock_transfer_receipt: {
+    table: 'stock_transfers',
+    documentType: 'stock_transfer',
+    userColumn: 'received_by_user_id',
+    alsoBy: 'receipt_id',
+  },
+  stock_adjustment: {
+    table: 'stock_adjustments',
+    documentType: 'stock_adjustment',
+    userColumn: 'posted_by_user_id',
+  },
 };
 
 /** The SQL that finds a source's row by the document id in `$n`. */
 const rowOf = (src: (typeof SOURCES)[SourceType], n: number, alias = '') =>
-  src.byClose ? `(${alias}id = $${n} OR ${alias}close_document_id = $${n})` : `${alias}id = $${n}`;
+  src.alsoBy ? `(${alias}id = $${n} OR ${alias}${src.alsoBy} = $${n})` : `${alias}id = $${n}`;
 
 export type PostOutcome =
   | { status: 'posted'; seq: number; journalNumber: string | null; exceptions: PostingException['kind'][] }
@@ -268,6 +292,29 @@ async function compute(
     if (!doc) throw missing();
     const context = await loadContext(c, null, doc.bankAccountId);
     return { context, result: postSupplierPayment(doc, context) };
+  }
+  if (type === 'stock_transfer' || type === 'stock_transfer_receipt') {
+    const doc =
+      type === 'stock_transfer' ? await loadStockTransfer(c, id) : await loadStockTransferReceipt(c, id);
+    if (!doc) throw missing();
+    const context = await loadContext(c, null);
+    const state = await loadStateOf(
+      c,
+      doc.lines.map((l) => l.itemId),
+      doc.lines.flatMap((l) => [l.fromLocationId, l.toLocationId]),
+    );
+    return { context, result: postStockTransfer(doc, context, state) };
+  }
+  if (type === 'stock_adjustment') {
+    const doc = await loadStockAdjustment(c, id);
+    if (!doc) throw missing();
+    const context = await loadContext(c, null);
+    const state = await loadStateOf(
+      c,
+      doc.lines.map((l) => l.itemId),
+      doc.lines.map((l) => l.locationId),
+    );
+    return { context, result: postStockAdjustment(doc, context, state) };
   }
   if (type === 'sales_void') {
     // A duplicate, or a void whose bill hasn't arrived, loads as null: it never posts (W1-12).

@@ -54,7 +54,7 @@ describe('setting up Delux', () => {
     ]);
   });
 
-  it('creates the branch with Shop, Godown and Damaged', async () => {
+  it('creates the branch with Shop, Godown and Damaged, and its In transit location (W1-18)', async () => {
     const rows = await q<{ code: string; kind: string; is_sellable: boolean }>(
       'SELECT code, kind, is_sellable FROM erp.locations WHERE tenant_id = :tenant ORDER BY code',
     );
@@ -62,6 +62,7 @@ describe('setting up Delux', () => {
       { code: 'DAMAGED', kind: 'damaged', is_sellable: false },
       { code: 'GODOWN', kind: 'storage', is_sellable: false },
       { code: 'SHOP', kind: 'shop', is_sellable: true },
+      { code: 'TRANSIT', kind: 'transit', is_sellable: false },
     ]);
   });
 

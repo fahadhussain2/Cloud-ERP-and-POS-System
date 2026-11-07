@@ -26,7 +26,11 @@ export const PERMISSIONS = [
   'cat.price.edit',
   'cat.label.print',
   'inv.adjust',
+  // Approves an adjustment whose losses are above the shop's limit (owner answer 3 to W1-18): the owner's only.
+  'inv.adjust.approve',
+  // Types a transfer; posting (or sending, or receiving) it needs inv.transfer.post (owner answer 2 to W1-18).
   'inv.transfer',
+  'inv.transfer.post',
   'inv.count',
   // Purchasing
   'pur.order.create',
@@ -95,6 +99,7 @@ export const ROLE_TEMPLATES: Readonly<Record<RoleTemplateKey, RoleTemplate>> = {
       'cat.label.print',
       'inv.adjust',
       'inv.transfer',
+      'inv.transfer.post',
       'inv.count',
       'pur.order.create',
       'pur.receive',

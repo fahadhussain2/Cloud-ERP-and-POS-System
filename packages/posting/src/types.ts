@@ -96,6 +96,27 @@ export interface PostingSupplierPayment {
   bankAccountId: string;
 }
 
+/**
+ * One step of a stock transfer as posting needs it (posting rules §5.4, W1-18): moving at once (from → to), sending
+ * (from → In transit) or receiving (In transit → to, what arrived). The receiving step posts under its own id.
+ */
+export interface PostingStockTransfer {
+  id: string;
+  number: string;
+  branchId: string;
+  businessDate: string;
+  lines: { id: string; itemId: string; fromLocationId: string; toLocationId: string; qty: Qty }[];
+}
+
+/** A posted stock adjustment (posting rules §5.3, W1-18): qty above 0 found, below 0 gone. */
+export interface PostingStockAdjustment {
+  id: string;
+  number: string;
+  branchId: string;
+  businessDate: string;
+  lines: { id: string; itemId: string; locationId: string; qty: Qty }[];
+}
+
 export interface PostingCashMovement {
   id: string;
   number: string;
