@@ -117,6 +117,67 @@ export interface PostingStockAdjustment {
   lines: { id: string; itemId: string; locationId: string; qty: Qty }[];
 }
 
+/** A customer's payment by bank from the back office (posting rules §6, W1-19). */
+export interface PostingCustomerReceipt {
+  id: string;
+  number: string;
+  branchId: string;
+  businessDate: string;
+  customerId: string;
+  amount: Money;
+  /** Its account is in `PostingContext.accounts.targets`. */
+  bankAccountId: string;
+}
+
+/** An expense from the back office (posting rules §6, W1-19). */
+export interface PostingExpense {
+  id: string;
+  number: string;
+  branchId: string;
+  businessDate: string;
+  /** Its account is in `PostingContext.accounts.targets`. */
+  categoryId: string;
+  /** The bank account it was paid from; null = the safe (CASH_SAFE). */
+  paidFrom: string | null;
+  amount: Money;
+}
+
+/** Money between banks, wallets, card settlement and the safe (posting rules §6, owner answer 6 to W1-19). */
+export interface PostingFundTransfer {
+  id: string;
+  number: string;
+  branchId: string;
+  businessDate: string;
+  /** Bank accounts; null = the safe. */
+  from: string | null;
+  to: string | null;
+  /** Out of `from`; `to` gets amount − charges. */
+  amount: Money;
+  /** 0 or more, below the amount, to the category's account. */
+  charges: Money;
+  chargesCategoryId: string | null;
+}
+
+/** A journal voucher as entered (ACC-05, W1-19); checked by `checkJournalVoucher` before it is posted. */
+export interface PostingJournalVoucher {
+  id: string;
+  number: string;
+  branchId: string;
+  businessDate: string;
+  narration: string;
+  lines: { accountId: string; partyId: string | null; debit: Money; credit: Money }[];
+}
+
+/** A journal voucher that reverses a posted back-office document (rule 3, D-108, W1-19). */
+export interface PostingReversal {
+  id: string;
+  number: string;
+  branchId: string;
+  businessDate: string;
+  /** The reversed document's number, for the memo. */
+  originalNumber: string;
+}
+
 export interface PostingCashMovement {
   id: string;
   number: string;

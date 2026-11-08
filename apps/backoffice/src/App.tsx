@@ -3,6 +3,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from './api';
+import { AccountsScreen, ExpenseCategoriesScreen, LedgerScreen } from './accounting/AccountsScreens';
+import { DocumentScreen, MoneyScreen } from './accounting/MoneyScreen';
+import { PeriodsScreen } from './accounting/PeriodsScreen';
+import { VoucherScreen } from './accounting/VoucherScreen';
 import { CategoriesScreen } from './catalog/CategoriesScreen';
 import { ItemScreen } from './catalog/ItemScreen';
 import { ItemsScreen } from './catalog/ItemsScreen';
@@ -129,6 +133,20 @@ export function App({ api }: { api: Api }) {
         <TransferNeededScreen api={api} />
       ) : shown.screen === 'stockSettings' ? (
         <StockSettingsScreen api={api} />
+      ) : shown.screen === 'money' ? (
+        <MoneyScreen api={api} />
+      ) : shown.screen === 'accountingDocument' ? (
+        <DocumentScreen key={`${shown.type}/${shown.id}`} api={api} type={shown.type} id={shown.id} />
+      ) : shown.screen === 'voucher' ? (
+        <VoucherScreen key={shown.id} api={api} id={shown.id} />
+      ) : shown.screen === 'periods' ? (
+        <PeriodsScreen api={api} />
+      ) : shown.screen === 'accounts' ? (
+        <AccountsScreen api={api} />
+      ) : shown.screen === 'ledger' ? (
+        <LedgerScreen key={shown.id} api={api} id={shown.id} />
+      ) : shown.screen === 'expenseCategories' ? (
+        <ExpenseCategoriesScreen api={api} />
       ) : (
         <StaffScreen api={api} permissions={me.permissions} />
       )}

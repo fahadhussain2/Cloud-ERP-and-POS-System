@@ -162,6 +162,26 @@
       "expected": true
     },
     {
+      "name": "Only the owner reopens a period (owner answer 5 to W1-19)",
+      "input": { "roles": ["accountant"], "permission": "acc.period.reopen" },
+      "expected": false
+    },
+    {
+      "name": "The owner reopens a period",
+      "input": { "roles": ["owner"], "permission": "acc.period.reopen" },
+      "expected": true
+    },
+    {
+      "name": "Accountant adds accounts and expense categories (owner answer 4 to W1-19)",
+      "input": { "roles": ["accountant"], "permission": "acc.chart.edit" },
+      "expected": true
+    },
+    {
+      "name": "Manager has no accounting (owner answer 1 to W1-19)",
+      "input": { "roles": ["manager"], "permission": "acc.chart.edit" },
+      "expected": false
+    },
+    {
       "name": "Accountant doesn't sell",
       "input": { "roles": ["accountant"], "permission": "pos.sale.create" },
       "expected": false

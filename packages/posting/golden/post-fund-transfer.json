@@ -1,0 +1,131 @@
+{
+  "description": "Posting a transfer between banks, wallets, card settlement and the safe (posting rules §6, ACC-04, owner answer 6 to W1-19): Dr the destination with the amount less the charges, Dr the charges' category account with the charges (when above 0) / Cr the source with the amount. A bank account or category without an account is target_unmapped; the safe (null) is CASH_SAFE. No stock, no party.",
+  "cases": [
+    {
+      "name": "the safe's Rs 500,000 deposited at Soneri",
+      "input": {
+        "transfer": {
+          "id": "ft-1",
+          "number": "FT000001",
+          "branchId": "br-main",
+          "businessDate": "2027-01-10",
+          "from": null,
+          "to": "bank-soneri",
+          "amount": 50000000,
+          "charges": 0,
+          "chargesCategoryId": null
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-10",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "FT000001",
+            "lines": [
+              { "accountId": "1150", "partyId": null, "debit": 50000000, "credit": 0 },
+              { "accountId": "1130", "partyId": null, "debit": 0, "credit": 50000000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "card settlement: Rs 10,000 out of clearing, Rs 9,750 into HBL, Rs 250 bank charges",
+      "input": {
+        "transfer": {
+          "id": "ft-2",
+          "number": "FT000002",
+          "branchId": "br-main",
+          "businessDate": "2027-01-10",
+          "from": "bank-card",
+          "to": "bank-hbl",
+          "amount": 1000000,
+          "charges": 25000,
+          "chargesCategoryId": "cat-bank-charges"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-10",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "FT000002",
+            "lines": [
+              { "accountId": "1160", "partyId": null, "debit": 975000, "credit": 0 },
+              { "accountId": "6310", "partyId": null, "debit": 25000, "credit": 0 },
+              { "accountId": "1180", "partyId": null, "debit": 0, "credit": 1000000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "cash drawn from HBL into the safe, dated in a locked month: on the day after the lock date",
+      "input": {
+        "transfer": {
+          "id": "ft-3",
+          "number": "FT000003",
+          "branchId": "br-main",
+          "businessDate": "2026-12-31",
+          "from": "bank-hbl",
+          "to": null,
+          "amount": 2000000,
+          "charges": 0,
+          "chargesCategoryId": null
+        },
+        "lockDate": "2026-12-31"
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "FT000003",
+            "lines": [
+              { "accountId": "1130", "partyId": null, "debit": 2000000, "credit": 0 },
+              { "accountId": "1160", "partyId": null, "debit": 0, "credit": 2000000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [
+            {
+              "kind": "posted_after_lock",
+              "details": { "businessDate": "2026-12-31", "lockDate": "2026-12-31" }
+            }
+          ],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "a charges category with no account is refused",
+      "input": {
+        "transfer": {
+          "id": "ft-4",
+          "number": "FT000004",
+          "branchId": "br-main",
+          "businessDate": "2027-01-10",
+          "from": "bank-card",
+          "to": "bank-hbl",
+          "amount": 1000000,
+          "charges": 100,
+          "chargesCategoryId": "cat-unknown"
+        }
+      },
+      "expected": { "ok": false, "error": { "code": "target_unmapped", "targetId": "cat-unknown" } }
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#64](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/64) |
 | **Module** | accounting (back-office screens and API; `packages/posting`: new posting sources), with cash desk (expense categories already reach the desks) and inventory (the lock date also closes stock documents) |
-| **Status** | Accepted (2026-11-08) with the owner's answers 1–6 (below) |
+| **Status** | Accepted (2026-11-08) with the owner's answers 1–6 (below). Built (2026-11-08) on `w1-19-accounting` |
 | **Refs** | ACC-04, ACC-05, ACC-06, ACC-01 (tenant-specific accounts), ACC-07 (in part, owner answer 3); PRD §4 (Accountant role), Q15 (drawings by journal voucher); posting rules §1.5, §1.6, §6, §9.3; data model §6, §9; architecture §7 (an audited unlock); CLAUDE.md rules 1, 3, 4, 5; D-035, D-057, D-095, D-101, D-105; D-108 (new, below) |
 | **Depends on** | W1-08 (posting engine, journals, party ledgers, the rebuild), W1-11 (the safe, expense categories at the desk), W1-16 (supplier payments by bank, document numbering) |
 | **Size** | about 4¼ days: migration, domain and posting golden files ¾; API with integration tests 1; screens 1¼ (receipts, expenses, transfers, journal vouchers with reversal, periods); account balances and the account ledger ½ (owner answer 3); new accounts and expense heads ¼ (owner answer 4); e2e and docs ½ |
@@ -140,6 +140,26 @@ New decision **D-108** records the answers: who keeps the books, no approval for
   - a transfer from card clearing with charges;
   - a voucher, then its reversal;
   - a month locked as the accountant, a back-dated entry refused, the month reopened as the owner.
+
+## Changes during the build
+
+| Change | Why |
+|---|---|
+| A reversal is a posted journal voucher with no lines of its own: its posting swaps the original's stored journal (in a rebuild, the original's replayed posting) | One mechanism for every kind; the rebuild check stays exact |
+| A voucher's memo in the journal is `<number> <narration>`; a reversal's `<number> <original number>` | The account ledger shows what each line was |
+| Back-office stock and purchasing documents dated on or before the lock date are refused when they post (`date_locked`), whoever posts them, including the owner approving an adjustment | One rule at the one place every back-office posting passes (`lockedOn`, `apps/api/src/lock.ts`) |
+| The lock checklist also counts sent transfers not yet received and adjustments waiting for approval | They are stock not yet where the books say |
+| `expense_categories` gained a `(tenant_id, id)` key | The new tables name their category by tenant, as every tenant foreign key does |
+| Customers and suppliers are found by `/api/accounting/parties` (code, name or phone) | The back office had no customer search |
+| The account ledger shows up to 1,000 lines per date range and says when there are more | A shop's month fits; a longer range is narrowed |
+| A new voucher's Post saves it and posts it in one go (the first e2e run found it only saved the draft) | One click, as on the other documents |
+| The e2e flow runs as the owner | The e2e shop has no Accountant login; the accountant's permissions are covered by the integration tests |
+
+## Checks (2026-11-08)
+
+- `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 2,065 tests.
+- `pnpm test:integration`: 387 passed (37 files), including the accounting API (17) and the rebuild check with reversals.
+- `pnpm e2e` (Edge): 51 passed; the new ledger flow covers a bank receipt, an expense, a voucher for drawings, a reversal, and last month locked with a receipt dated in it refused.
 
 ## Order
 

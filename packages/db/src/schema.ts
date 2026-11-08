@@ -1190,3 +1190,87 @@ export const cashMovements = erp.table('cash_movements', {
   ...syncColumns,
   ...auditColumns,
 });
+
+/** A customer's payment into a bank account (ACC-04, W1-19): posted when saved, then never changed. */
+export const customerReceipts = erp.table('customer_receipts', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  customerPartyId: uuid('customer_party_id').notNull(),
+  bankAccountId: uuid('bank_account_id').notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  businessDate: date('business_date').notNull(),
+  reference: text('reference'),
+  note: text('note'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  ...auditColumns,
+});
+
+/** An expense paid from a bank account or the safe (ACC-04, W1-19); no bank account = the safe. */
+export const expenses = erp.table('expenses', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  expenseCategoryId: uuid('expense_category_id').notNull(),
+  paidFromBankAccountId: uuid('paid_from_bank_account_id'),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  businessDate: date('business_date').notNull(),
+  reference: text('reference'),
+  note: text('note'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  ...auditColumns,
+});
+
+/** Money between banks, wallets, card settlement and the safe, with its charges (ACC-04, W1-19, owner answer 6). */
+export const fundTransfers = erp.table('fund_transfers', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  fromBankAccountId: uuid('from_bank_account_id'),
+  toBankAccountId: uuid('to_bank_account_id'),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  charges: bigint('charges', { mode: 'number' }).notNull(),
+  chargesCategoryId: uuid('charges_category_id'),
+  businessDate: date('business_date').notNull(),
+  reference: text('reference'),
+  note: text('note'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  ...auditColumns,
+});
+
+/** A journal voucher (ACC-05, W1-19): a draft, then posted once; a reversal names what it reverses. */
+export const journalVouchers = erp.table('journal_vouchers', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number'),
+  branchId: uuid('branch_id').notNull(),
+  businessDate: date('business_date').notNull(),
+  narration: text('narration'),
+  status: text('status', { enum: ['draft', 'posted'] }).notNull(),
+  reversesType: text('reverses_type'),
+  reversesId: uuid('reverses_id'),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  postedByUserId: uuid('posted_by_user_id'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  rowVersion: bigint('row_version', { mode: 'bigint' }).notNull(),
+  ...auditColumns,
+});
+
+export const journalVoucherLines = erp.table('journal_voucher_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  voucherId: uuid('voucher_id').notNull(),
+  lineNo: integer('line_no').notNull(),
+  accountId: uuid('account_id'),
+  partyId: uuid('party_id'),
+  debit: bigint('debit', { mode: 'number' }).notNull(),
+  credit: bigint('credit', { mode: 'number' }).notNull(),
+  memo: text('memo'),
+});

@@ -1,6 +1,13 @@
 import { withTenant } from '@erp/db';
 import type pg from 'pg';
 
+import {
+  postCustomerReceipt,
+  postExpense,
+  postFundTransfer,
+  postJournalVoucher,
+  postReversal,
+} from '../accounting';
 import { postCashMovement, postCollection, postSession } from '../cash';
 import { postHandover } from '../handover';
 import { postOpening } from '../opening';
@@ -13,6 +20,11 @@ import {
   loadCashMovement,
   loadCollection,
   loadContext,
+  loadCustomerReceipt,
+  loadExpense,
+  loadFundTransfer,
+  loadJournalVoucher,
+  loadMoneyPosting,
   loadGoodsReceipt,
   loadHandover,
   loadLineCosts,
@@ -51,7 +63,11 @@ export type SourceType =
   | 'supplier_payment'
   | 'stock_transfer'
   | 'stock_transfer_receipt'
-  | 'stock_adjustment';
+  | 'stock_adjustment'
+  | 'customer_receipt'
+  | 'expense'
+  | 'fund_transfer'
+  | 'journal_voucher';
 
 /**
  * Where each kind of document lives, which row holds it, and whom an exception on it belongs to. Constants, never
@@ -100,6 +116,19 @@ const SOURCES: Record<
   stock_adjustment: {
     table: 'stock_adjustments',
     documentType: 'stock_adjustment',
+    userColumn: 'posted_by_user_id',
+  },
+  // Back-office accounting (W1-19): posted in the transaction that saves (or posts) them.
+  customer_receipt: {
+    table: 'customer_receipts',
+    documentType: 'customer_receipt',
+    userColumn: 'created_by_user_id',
+  },
+  expense: { table: 'expenses', documentType: 'expense', userColumn: 'created_by_user_id' },
+  fund_transfer: { table: 'fund_transfers', documentType: 'fund_transfer', userColumn: 'created_by_user_id' },
+  journal_voucher: {
+    table: 'journal_vouchers',
+    documentType: 'journal_voucher',
     userColumn: 'posted_by_user_id',
   },
 };
@@ -315,6 +344,35 @@ async function compute(
       doc.lines.map((l) => l.locationId),
     );
     return { context, result: postStockAdjustment(doc, context, state) };
+  }
+  if (type === 'customer_receipt') {
+    const doc = await loadCustomerReceipt(c, id);
+    if (!doc) throw missing();
+    const context = await loadContext(c, null, doc.bankAccountId);
+    return { context, result: postCustomerReceipt(doc, context) };
+  }
+  if (type === 'expense') {
+    const doc = await loadExpense(c, id);
+    if (!doc) throw missing();
+    const context = await loadContext(c, null, [doc.categoryId, doc.paidFrom]);
+    return { context, result: postExpense(doc, context) };
+  }
+  if (type === 'fund_transfer') {
+    const doc = await loadFundTransfer(c, id);
+    if (!doc) throw missing();
+    const context = await loadContext(c, null, [doc.from, doc.to, doc.chargesCategoryId]);
+    return { context, result: postFundTransfer(doc, context) };
+  }
+  if (type === 'journal_voucher') {
+    const doc = await loadJournalVoucher(c, id);
+    if (!doc) throw missing();
+    const context = await loadContext(c, null);
+    if ('voucher' in doc) return { context, result: postJournalVoucher(doc.voucher, context) };
+    // A reversal swaps its original's stored posting (D-108); the original is always posted first.
+    const original = await loadMoneyPosting(c, doc.reverses.type, doc.reverses.id);
+    if (original === null)
+      throw new Error(`no posting of ${doc.reverses.type} ${doc.reverses.id} to reverse`);
+    return { context, result: postReversal(doc.reversal, original, context) };
   }
   if (type === 'sales_void') {
     // A duplicate, or a void whose bill hasn't arrived, loads as null: it never posts (W1-12).

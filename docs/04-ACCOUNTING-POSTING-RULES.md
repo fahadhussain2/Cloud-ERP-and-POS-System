@@ -170,6 +170,12 @@ Stock ledger only (out of one location, into another, at the same cost). **No GL
 | Bank-to-bank / bank-to-safe transfer | `Dr <to> / Cr <from>` |
 | Journal voucher | As entered (must balance). The party is required on AR/AP lines. |
 
+**As built (W1-19, D-108):**
+- `postCustomerReceipt` (source `customer_receipt`, `CR`), `postExpense` (`expense`, `EX`: paid from a bank or the safe, `CASH_SAFE`) and `postFundTransfer` (`fund_transfer`, `FT`) post when saved. A transfer's **charges** (owner answer 6) debit their expense category's account in the same entry: the destination gets the amount less the charges and the source goes down by the whole amount. This replaces the card-settlement voucher of §9.3.
+- `postJournalVoucher` (`journal_voucher`, `JV`) posts the lines as entered; a line on AR or AP writes its party entry, due on the entry date. A voucher can't use `INVENTORY`, `CASH_DRAWER` or `CASH_IN_TRANSIT` (`checkJournalVoucher`): stock is corrected by an adjustment, the drawer at the desk.
+- **Reversal** (`postReversal`): a journal voucher that swaps every line of a posted back-office document's journal and reverses its party entries on their own due dates, once per document. Sales are corrected only by void and return.
+- **The lock date:** a back-office document dated on or before it is refused; a counter document still posts on the first open date (§1.6). Only the owner moves the lock date back, with a reason, audited.
+
 ## 7. Opening balances at cutover (Delux, 1 Jan 2027)
 A single opening entry dated **2027-01-01** with `source_type = 'opening'`, plus lock date **2026-12-31**:
 

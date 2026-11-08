@@ -1,0 +1,93 @@
+{
+  "description": "Posting a journal voucher (posting rules §6, ACC-05, W1-19): its lines as entered, in line order, memo `<number> <narration>`. A line on AR_CONTROL writes a customer ledger entry of debit − credit, a line on AP_CONTROL a supplier entry of credit − debit, each due on the entry date; a line on either without a party is party_missing. Every other check (balanced, postable, the accounts the system keeps) is the voucher's check before posting (`checkJournalVoucher`).",
+  "cases": [
+    {
+      "name": "suspense cleared into cash rounding",
+      "input": {
+        "voucher": {
+          "id": "jv-1",
+          "number": "JV000001",
+          "branchId": "br-main",
+          "businessDate": "2027-01-31",
+          "narration": "Clear suspense",
+          "lines": [
+            { "accountId": "4210", "partyId": null, "debit": 300, "credit": 0 },
+            { "accountId": "1190", "partyId": null, "debit": 0, "credit": 300 }
+          ]
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-31",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "JV000001 Clear suspense",
+            "lines": [
+              { "accountId": "4210", "partyId": null, "debit": 300, "credit": 0 },
+              { "accountId": "1190", "partyId": null, "debit": 0, "credit": 300 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "a customer's balance set against what we owe them as a supplier",
+      "input": {
+        "voucher": {
+          "id": "jv-2",
+          "number": "JV000002",
+          "branchId": "br-main",
+          "businessDate": "2027-01-31",
+          "narration": "Contra",
+          "lines": [
+            { "accountId": "2100", "partyId": "both-1", "debit": 70000, "credit": 0 },
+            { "accountId": "1200", "partyId": "both-1", "debit": 0, "credit": 70000 }
+          ]
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-31",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "JV000002 Contra",
+            "lines": [
+              { "accountId": "2100", "partyId": "both-1", "debit": 70000, "credit": 0 },
+              { "accountId": "1200", "partyId": "both-1", "debit": 0, "credit": 70000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [
+            { "partyId": "both-1", "role": "supplier", "amount": -70000, "dueDate": "2027-01-31" },
+            { "partyId": "both-1", "role": "customer", "amount": -70000, "dueDate": "2027-01-31" }
+          ],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "an AR line without its customer is refused",
+      "input": {
+        "voucher": {
+          "id": "jv-3",
+          "number": "JV000003",
+          "branchId": "br-main",
+          "businessDate": "2027-01-31",
+          "narration": "Write off",
+          "lines": [
+            { "accountId": "6300", "partyId": null, "debit": 100, "credit": 0 },
+            { "accountId": "1200", "partyId": null, "debit": 0, "credit": 100 }
+          ]
+        }
+      },
+      "expected": { "ok": false, "error": { "code": "party_missing" } }
+    }
+  ]
+}

@@ -18,6 +18,11 @@ import type {
   PostingStockAdjustment,
   PostingStockTransfer,
   PostingSupplierPayment,
+  PostingCustomerReceipt,
+  PostingExpense,
+  PostingFundTransfer,
+  PostingJournalVoucher,
+  PostingReversal,
 } from '../types';
 
 // Reading what a posting needs from the database (W1-08). Money comes back as bigint text and quantities as
@@ -306,8 +311,9 @@ export async function loadSessionEvent(c: pg.ClientBase, id: string): Promise<Po
 export async function loadContext(
   c: pg.ClientBase,
   customerId: string | null,
-  targetId: string | null = null,
+  target: string | null | readonly (string | null)[] = null,
 ): Promise<PostingContext> {
+  const targetIds = (Array.isArray(target) ? target : [target]).filter((t): t is string => t !== null);
   const roles = await c.query<{ system_role: PostingRole; id: string }>(
     'SELECT system_role, id FROM erp.accounts WHERE system_role IS NOT NULL ORDER BY system_role',
   );
@@ -325,11 +331,11 @@ export async function loadContext(
     customer = { paymentTermsDays: terms.rows[0]?.payment_terms_days ?? null };
   }
   let targets: Record<string, string> | undefined;
-  if (targetId !== null) {
+  if (targetIds.length > 0) {
     const t = await c.query<{ id: string; account: string }>(
-      `SELECT id, gl_account_id AS account FROM erp.expense_categories WHERE id = $1
-       UNION ALL SELECT id, gl_account_id FROM erp.bank_accounts WHERE id = $1`,
-      [targetId],
+      `SELECT id, gl_account_id AS account FROM erp.expense_categories WHERE id = ANY($1::uuid[])
+       UNION ALL SELECT id, gl_account_id FROM erp.bank_accounts WHERE id = ANY($1::uuid[]) ORDER BY id`,
+      [targetIds],
     );
     targets = Object.fromEntries(t.rows.map((r) => [r.id, r.account]));
   }
@@ -800,5 +806,228 @@ export async function loadStockAdjustment(
       locationId: h.location_id,
       qty: toQty(l.qty),
     })),
+  };
+}
+/** A customer receipt by bank as posting needs it (W1-19). */
+export async function loadCustomerReceipt(
+  c: pg.ClientBase,
+  id: string,
+): Promise<PostingCustomerReceipt | null> {
+  const { rows } = await c.query<{
+    number: string;
+    branch_id: string;
+    business_date: string;
+    customer_party_id: string;
+    amount: string;
+    bank_account_id: string;
+  }>(
+    `SELECT number, branch_id, business_date::text, customer_party_id, amount, bank_account_id
+     FROM erp.customer_receipts WHERE id = $1`,
+    [id],
+  );
+  const h = rows[0];
+  if (!h) return null;
+  return {
+    id,
+    number: h.number,
+    branchId: h.branch_id,
+    businessDate: h.business_date,
+    customerId: h.customer_party_id,
+    amount: toMoney(h.amount),
+    bankAccountId: h.bank_account_id,
+  };
+}
+
+/** An expense as posting needs it (W1-19); paid from null = the safe. */
+export async function loadExpense(c: pg.ClientBase, id: string): Promise<PostingExpense | null> {
+  const { rows } = await c.query<{
+    number: string;
+    branch_id: string;
+    business_date: string;
+    expense_category_id: string;
+    paid_from_bank_account_id: string | null;
+    amount: string;
+  }>(
+    `SELECT number, branch_id, business_date::text, expense_category_id, paid_from_bank_account_id, amount
+     FROM erp.expenses WHERE id = $1`,
+    [id],
+  );
+  const h = rows[0];
+  if (!h) return null;
+  return {
+    id,
+    number: h.number,
+    branchId: h.branch_id,
+    businessDate: h.business_date,
+    categoryId: h.expense_category_id,
+    paidFrom: h.paid_from_bank_account_id,
+    amount: toMoney(h.amount),
+  };
+}
+
+/** A transfer between banks and the safe as posting needs it (W1-19); null = the safe. */
+export async function loadFundTransfer(c: pg.ClientBase, id: string): Promise<PostingFundTransfer | null> {
+  const { rows } = await c.query<{
+    number: string;
+    branch_id: string;
+    business_date: string;
+    from_bank_account_id: string | null;
+    to_bank_account_id: string | null;
+    amount: string;
+    charges: string;
+    charges_category_id: string | null;
+  }>(
+    `SELECT number, branch_id, business_date::text, from_bank_account_id, to_bank_account_id, amount, charges,
+       charges_category_id FROM erp.fund_transfers WHERE id = $1`,
+    [id],
+  );
+  const h = rows[0];
+  if (!h) return null;
+  return {
+    id,
+    number: h.number,
+    branchId: h.branch_id,
+    businessDate: h.business_date,
+    from: h.from_bank_account_id,
+    to: h.to_bank_account_id,
+    amount: toMoney(h.amount),
+    charges: toMoney(h.charges),
+    chargesCategoryId: h.charges_category_id,
+  };
+}
+
+/** The documents a reversal may name, and where each lives (W1-19, D-108). */
+export const REVERSIBLE = {
+  customer_receipt: 'customer_receipts',
+  expense: 'expenses',
+  fund_transfer: 'fund_transfers',
+  supplier_payment: 'supplier_payments',
+  journal_voucher: 'journal_vouchers',
+} as const;
+export type ReversibleType = keyof typeof REVERSIBLE;
+
+/**
+ * A posted journal voucher as posting needs it (W1-19): its lines in line order, or, for a reversal, what it
+ * reverses and that document's number. Null for a draft or no such voucher.
+ */
+export async function loadJournalVoucher(
+  c: pg.ClientBase,
+  id: string,
+): Promise<
+  | { voucher: PostingJournalVoucher }
+  | {
+      reversal: PostingReversal;
+      reverses: { type: ReversibleType; id: string };
+    }
+  | null
+> {
+  const head = await c.query<{
+    number: string;
+    branch_id: string;
+    business_date: string;
+    narration: string | null;
+    reverses_type: ReversibleType | null;
+    reverses_id: string | null;
+  }>(
+    `SELECT number, branch_id, business_date::text, narration, reverses_type, reverses_id
+     FROM erp.journal_vouchers WHERE id = $1 AND status = 'posted'`,
+    [id],
+  );
+  const h = head.rows[0];
+  if (!h) return null;
+  const base = {
+    id,
+    number: h.number,
+    branchId: h.branch_id,
+    businessDate: h.business_date,
+  };
+  if (h.reverses_type !== null && h.reverses_id !== null) {
+    const original = await c.query<{ number: string }>(
+      `SELECT number FROM erp.${REVERSIBLE[h.reverses_type]} WHERE id = $1`,
+      [h.reverses_id],
+    );
+    return {
+      reversal: { ...base, originalNumber: original.rows[0]?.number ?? '' },
+      reverses: { type: h.reverses_type, id: h.reverses_id },
+    };
+  }
+  const lines = await c.query<{
+    account_id: string;
+    party_id: string | null;
+    debit: string;
+    credit: string;
+  }>(
+    `SELECT account_id, party_id, debit, credit FROM erp.journal_voucher_lines WHERE voucher_id = $1
+     ORDER BY line_no`,
+    [id],
+  );
+  return {
+    voucher: {
+      ...base,
+      narration: h.narration ?? '',
+      lines: lines.rows.map((l) => ({
+        accountId: l.account_id,
+        partyId: l.party_id,
+        debit: toMoney(l.debit),
+        credit: toMoney(l.credit),
+      })),
+    },
+  };
+}
+
+/** A back-office document's stored posting (journal and party entries; they move no stock), or null (W1-19). */
+export async function loadMoneyPosting(
+  c: pg.ClientBase,
+  type: ReversibleType,
+  id: string,
+): Promise<Posting | null> {
+  const posting = await c.query<{ seq: string; entry_date: string }>(
+    'SELECT seq, entry_date::text FROM erp.postings WHERE source_type = $1 AND source_id = $2',
+    [type, id],
+  );
+  const p = posting.rows[0];
+  if (!p) return null;
+  const lines = await c.query<{
+    account_id: string;
+    party_id: string | null;
+    branch_id: string;
+    memo: string | null;
+    debit: string;
+    credit: string;
+  }>(
+    `SELECT l.account_id, l.party_id, l.branch_id, e.memo, l.debit, l.credit FROM erp.journal_entries e
+     JOIN erp.journal_lines l ON l.entry_id = e.id WHERE e.posting_seq = $1 ORDER BY l.line_no`,
+    [p.seq],
+  );
+  const parties = await c.query<{
+    party_id: string;
+    role: 'customer' | 'supplier';
+    amount: string;
+    due_date: string;
+  }>(
+    `SELECT party_id, role, amount, due_date::text FROM erp.party_ledger_entries WHERE posting_seq = $1 ORDER BY id`,
+    [p.seq],
+  );
+  return {
+    entryDate: p.entry_date,
+    journal: {
+      branchId: lines.rows[0]?.branch_id ?? '',
+      memo: lines.rows[0]?.memo ?? '',
+      lines: lines.rows.map((l) => ({
+        accountId: l.account_id,
+        partyId: l.party_id,
+        debit: toMoney(l.debit),
+        credit: toMoney(l.credit),
+      })),
+    },
+    movements: [],
+    partyEntries: parties.rows.map((e) => ({
+      partyId: e.party_id,
+      role: e.role,
+      amount: toMoney(e.amount),
+      dueDate: e.due_date,
+    })),
+    exceptions: [],
+    state: { costs: {}, balances: {} },
   };
 }

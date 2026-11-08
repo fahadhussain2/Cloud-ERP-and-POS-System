@@ -1,0 +1,70 @@
+{
+  "description": "Posting a customer receipt by bank from the back office (posting rules §6, ACC-04, W1-19): Dr the bank's account / Cr AR_CONTROL (the customer); the customer owes less on the entry date. A bank without an account is target_unmapped, a chart without AR_CONTROL role_unmapped. No stock.",
+  "cases": [
+    {
+      "name": "Rs 25,000 from a customer into HBL",
+      "input": {
+        "receipt": {
+          "id": "cr-1",
+          "number": "CR000001",
+          "branchId": "br-main",
+          "businessDate": "2027-01-10",
+          "customerId": "cust-akbar",
+          "amount": 2500000,
+          "bankAccountId": "bank-hbl"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-10",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "CR000001",
+            "lines": [
+              { "accountId": "1160", "partyId": null, "debit": 2500000, "credit": 0 },
+              { "accountId": "1200", "partyId": "cust-akbar", "debit": 0, "credit": 2500000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [
+            { "partyId": "cust-akbar", "role": "customer", "amount": -2500000, "dueDate": "2027-01-10" }
+          ],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "a bank with no account is refused",
+      "input": {
+        "receipt": {
+          "id": "cr-2",
+          "number": "CR000002",
+          "branchId": "br-main",
+          "businessDate": "2027-01-10",
+          "customerId": "cust-akbar",
+          "amount": 100,
+          "bankAccountId": "bank-unknown"
+        }
+      },
+      "expected": { "ok": false, "error": { "code": "target_unmapped", "targetId": "bank-unknown" } }
+    },
+    {
+      "name": "a chart without AR_CONTROL is refused",
+      "input": {
+        "receipt": {
+          "id": "cr-3",
+          "number": "CR000003",
+          "branchId": "br-main",
+          "businessDate": "2027-01-10",
+          "customerId": "cust-akbar",
+          "amount": 100,
+          "bankAccountId": "bank-hbl"
+        },
+        "unmapped": "AR_CONTROL"
+      },
+      "expected": { "ok": false, "error": { "code": "role_unmapped", "role": "AR_CONTROL" } }
+    }
+  ]
+}
