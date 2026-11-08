@@ -1,5 +1,6 @@
 import { Input } from '@erp/ui';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
@@ -7,6 +8,8 @@ import type { PickedItem } from './data';
 
 // The item of a receipt, return, transfer or adjustment line: type a code, name words, a barcode or an OEM number and
 // pick from the list (W1-16, W1-18). Searches a moment after the last key, at `url` (purchasing's search by default).
+// The results are drawn over the page, under the field: a line sits in a table whose scrolling container would cut a
+// list inside it off (owner, staging 2026-11-08).
 
 interface Found {
   id: string;
@@ -36,6 +39,24 @@ export function ItemPicker<T extends Found = PickedItem>({
   const [open, setOpen] = useState(false);
   const [found, setFound] = useState<T[]>([]);
   const listId = useId();
+  const field = useRef<HTMLDivElement>(null);
+  const [place, setPlace] = useState<CSSProperties | null>(null);
+
+  // Under the field, kept there while the page scrolls or resizes.
+  useLayoutEffect(() => {
+    if (!open || found.length === 0) return;
+    const follow = () => {
+      const r = field.current?.getBoundingClientRect();
+      if (r) setPlace({ position: 'fixed', top: r.bottom, left: r.left, width: r.width });
+    };
+    follow();
+    window.addEventListener('scroll', follow, true);
+    window.addEventListener('resize', follow);
+    return () => {
+      window.removeEventListener('scroll', follow, true);
+      window.removeEventListener('resize', follow);
+    };
+  }, [open, found.length]);
 
   useEffect(() => {
     if (!open || text.trim() === '') return;
@@ -75,7 +96,7 @@ export function ItemPicker<T extends Found = PickedItem>({
       </button>
     );
   return (
-    <div className="relative">
+    <div className="relative" ref={field}>
       <Input
         autoFocus
         aria-label={label}
@@ -94,30 +115,33 @@ export function ItemPicker<T extends Found = PickedItem>({
         }}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
-      {found.length > 0 && (
-        <ul
-          id={listId}
-          role="listbox"
-          aria-label={t('purchasing.line.results')}
-          className="absolute inset-x-0 top-full z-10 m-0 max-h-64 list-none overflow-auto rounded-md border border-input bg-surface p-1 shadow-md"
-        >
-          {found.map((i) => (
-            <li key={i.id} role="option" aria-selected={false}>
-              <button
-                type="button"
-                className="w-full rounded px-2 py-1 text-start hover:bg-surface-2"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onPick(i);
-                  setOpen(false);
-                }}
-              >
-                <span className="font-mono font-semibold">{i.code}</span> {i.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {found.length > 0 &&
+        createPortal(
+          <ul
+            id={listId}
+            role="listbox"
+            aria-label={t('purchasing.line.results')}
+            style={place ?? { position: 'fixed', visibility: 'hidden' }}
+            className="z-50 m-0 max-h-64 list-none overflow-auto rounded-md border border-input bg-surface p-1 shadow-md"
+          >
+            {found.map((i) => (
+              <li key={i.id} role="option" aria-selected={false}>
+                <button
+                  type="button"
+                  className="w-full rounded px-2 py-1 text-start hover:bg-surface-2"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onPick(i);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="font-mono font-semibold">{i.code}</span> {i.name}
+                </button>
+              </li>
+            ))}
+          </ul>,
+          document.body,
+        )}
     </div>
   );
 }
