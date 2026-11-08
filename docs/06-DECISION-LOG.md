@@ -970,3 +970,19 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - Drafts can pile up unposted; the transfers list shows them first, and Transfer needed shows what that costs the Shop.
   - A route that needs receiving leaves stock invisible to both ends until it is received; the On the way list shows how long.
 - **Status:** Accepted (with the W1-18 plan, owner answers 1–4)
+
+### D-108 Back-office accounting: the accountant keeps the books, reversal is the only correction, one lock date that only the owner moves back (2026-11-08)
+- **Context:** W1-19 (ACC-04, ACC-05, ACC-06, part of ACC-07). The legacy app entered customer receipts as journal vouchers and had no period lock.
+- **Decision:**
+  - **Who:** an Accountant login plus the owner keep the books (customer receipts, expenses and transfers by bank or the safe, journal vouchers, locking months). The manager gets no accounting; until Delux has an accountant, the owner does it (owner answer 1).
+  - **Documents:** a customer receipt by bank (`CR`), an expense from a bank or the safe (`EX`) and a transfer between banks, wallets, card settlement and the safe (`FT`) post when saved. A journal voucher (`JV`) is a draft, then posted, with **no approval step** (owner answer 2).
+  - **A voucher can't touch the accounts the system keeps:** `INVENTORY`, `CASH_DRAWER`, `CASH_IN_TRANSIT`. The party is required on AR/AP lines and refused elsewhere.
+  - **Corrections are reversals only:** Reverse on any posted back-office money document or voucher (supplier payments by bank included) writes a journal voucher that swaps its journal and reverses its party entries, at most once.
+  - **Fees on transfers:** a transfer takes optional charges with an expense category, so a card settlement or a bank fee posts in one entry (owner answer 6; replaces D-057 point 3).
+  - **Periods** are computed from `fiscal_year_start_month`, not stored; `tenants.lock_date` is the only record. The accountant or the owner moves it forward to the end of a month that is over, after a checklist of what still looks open; **only the owner moves it back**, with a reason, audited (`acc.period.reopen`, owner answer 5). The first lock fixes the start month (D-035).
+  - **Back-office documents dated on or before the lock date are refused** (purchasing and stock included); counter documents still post on the first open date (posting rules §1.6).
+  - **Account balances and the account ledger** come now, for the owner and the accountant (owner answer 3); the other financial reports stay in Wave 2.
+  - **The accountant adds accounts and expense categories** (`acc.chart.edit`); banks and wallets stay a setup job (owner answer 4).
+- **Why:** each kind of money movement posts the same way every time; the books, the stock ledger and the drawer can't drift apart through a voucher; a closed month stays closed unless the owner says otherwise.
+- **Trade-off:** a typing mistake costs a reversal and a new entry instead of an edit; a voucher needs no second pair of eyes, so the owner relies on the list and the audit log.
+- **Status:** Accepted (with the W1-19 plan, owner answers 1–6)
