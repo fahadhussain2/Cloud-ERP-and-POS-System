@@ -1,6 +1,6 @@
 import { can } from '@erp/domain';
 import { AppFrame } from '@erp/ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Counter, CounterHealth, CounterStatus } from './counter';
@@ -79,9 +79,11 @@ export function App({ counter }: { counter: Counter }) {
   // On a cash desk (W1-10): the Cash desk screen, or selling (Alt+Q switches, D-001: the desk also sells).
   const [deskView, setDeskView] = useState(false);
 
-  // Who is selling, for the pull below (a callback can't read the current phase).
+  // Who is selling, for the pull below and Alt+S (a callback can't read the current phase). Set as the screen is
+  // committed, before a key can reach it: an effect after the paint missed an Alt+S pressed as the list appeared (CI
+  // 2026-11-08).
   const phaseRef = useRef<Phase>(phase);
-  useEffect(() => {
+  useLayoutEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
 

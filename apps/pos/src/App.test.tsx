@@ -1833,6 +1833,23 @@ describe('push, offline warnings and counter health (W1-07)', () => {
     expect(await screen.findByText(en.health.noAttention)).toBeDefined();
   });
 
+  // Bug (CI, 2026-11-08): Alt+S read the phase from a ref updated by an effect that runs after the paint, so a key
+  // pressed as the staff list appeared was ignored. Pressed the instant the list is in the page, it must still open.
+  it('Alt+S opens it the moment the staff list appears', async () => {
+    const pressed = new Promise<void>((resolve) => {
+      const watch = new MutationObserver(() => {
+        if (!screen.queryByRole('button', { name: /Asif Khan/ })) return;
+        watch.disconnect();
+        fireEvent.keyDown(window, { key: 's', altKey: true });
+        resolve();
+      });
+      watch.observe(document.body, { childList: true, subtree: true });
+    });
+    show(fakeCounter().counter);
+    await pressed;
+    expect(await screen.findByText(en.health.noAttention)).toBeDefined();
+  });
+
   it('Try again needs a manager’s own PIN with admin.devices; a wrong one counts against them', async () => {
     const f = fakeCounter({
       staff: () => Promise.resolve([staff(), boss]),
