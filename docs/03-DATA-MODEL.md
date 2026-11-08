@@ -291,6 +291,8 @@ System roles: `CASH_DRAWER, CASH_IN_TRANSIT, AR_CONTROL, AP_CONTROL, INVENTORY, 
 - A deferred constraint trigger asserts that the sum of debits equals the sum of credits per entry.
 
 Journal vouchers written by the accountant are stored as `journal_entries` with `source_type = 'manual'`.
+- **As built (W1-19, migration 0019, D-108):** vouchers are documents, `journal_vouchers` (`number` JV… at posting, `business_date`, `narration`, `status` draft|posted, `reverses_type` + `reverses_id` for a reversal, unique, `row_version`) and `journal_voucher_lines` (`line_no, account_id, party_id, debit, credit, memo`), posted as `source_type = 'journal_voucher'`. Beside them: `customer_receipts` (`CR…`: customer, bank account, amount, date, reference, note), `expenses` (`EX…`: category, `paid_from_bank_account_id`, null = the safe) and `fund_transfers` (`FT…`: from and to bank accounts, null = the safe; `charges` with `charges_category_id`), each posted when saved and never changed (a trigger). Not synced.
+- **Periods are computed, not stored** (owner answer 5 to W1-19): fiscal years and months come from `tenants.fiscal_year_start_month` (`fiscalYearOf`), and a month is locked when it ends on or before `tenants.lock_date`. Moving the lock date writes `period.lock` or `period.reopen` to the audit log with the reason; the first lock sets `fiscal_year_locked`.
 
 **Built in W1-08 (migration 0009):** `journal_entries` (with `posting_seq`; `number` J000001… per tenant) and `journal_lines` (with `line_no`); system role `SUSPENSE` (1190 *Posting suspense*, D-095), plus:
 

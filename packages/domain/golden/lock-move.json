@@ -1,0 +1,104 @@
+{
+  "description": "Moving the lock date (ACC-06, owner answer 5 to W1-19, D-108). The new date must be the last day of a month, and of a month that is over (before today). Forward (or the first lock) needs only acc.period.close; back is a reopening: only with acc.period.reopen (the owner) and a reason. The same date again is `unchanged`. `direction` is forward or back, null when unchanged.",
+  "cases": [
+    {
+      "name": "the accountant locks January",
+      "input": {
+        "current": "2026-12-31",
+        "proposed": "2027-01-31",
+        "today": "2027-02-05",
+        "canReopen": false,
+        "reason": null
+      },
+      "expected": { "problems": [], "direction": "forward" }
+    },
+    {
+      "name": "the first lock ever",
+      "input": {
+        "current": null,
+        "proposed": "2026-10-31",
+        "today": "2026-11-08",
+        "canReopen": false,
+        "reason": null
+      },
+      "expected": { "problems": [], "direction": "forward" }
+    },
+    {
+      "name": "not the end of a month",
+      "input": {
+        "current": "2026-12-31",
+        "proposed": "2027-01-15",
+        "today": "2027-02-05",
+        "canReopen": true,
+        "reason": null
+      },
+      "expected": { "problems": ["not_month_end"], "direction": "forward" }
+    },
+    {
+      "name": "a month that isn't over: locking February on its last day",
+      "input": {
+        "current": "2027-01-31",
+        "proposed": "2027-02-28",
+        "today": "2027-02-28",
+        "canReopen": true,
+        "reason": null
+      },
+      "expected": { "problems": ["month_not_over"], "direction": "forward" }
+    },
+    {
+      "name": "the accountant can't reopen",
+      "input": {
+        "current": "2027-02-28",
+        "proposed": "2027-01-31",
+        "today": "2027-03-10",
+        "canReopen": false,
+        "reason": "A missed bank receipt"
+      },
+      "expected": { "problems": ["reopen_not_allowed"], "direction": "back" }
+    },
+    {
+      "name": "the owner reopens February with a reason",
+      "input": {
+        "current": "2027-02-28",
+        "proposed": "2027-01-31",
+        "today": "2027-03-10",
+        "canReopen": true,
+        "reason": "A missed bank receipt"
+      },
+      "expected": { "problems": [], "direction": "back" }
+    },
+    {
+      "name": "the owner reopens without saying why",
+      "input": {
+        "current": "2027-02-28",
+        "proposed": "2027-01-31",
+        "today": "2027-03-10",
+        "canReopen": true,
+        "reason": "   "
+      },
+      "expected": { "problems": ["reason_required"], "direction": "back" }
+    },
+    {
+      "name": "the same date again",
+      "input": {
+        "current": "2027-01-31",
+        "proposed": "2027-01-31",
+        "today": "2027-03-10",
+        "canReopen": true,
+        "reason": null
+      },
+      "expected": { "problems": ["unchanged"], "direction": null }
+    },
+    {
+      "name": "not a date",
+      "input": {
+        "current": "2027-01-31",
+        "proposed": "2027-02-31",
+        "today": "2027-03-10",
+        "canReopen": true,
+        "reason": null
+      },
+      "expected": { "problems": ["not_month_end"], "direction": "forward" }
+    }
+  ]
+}

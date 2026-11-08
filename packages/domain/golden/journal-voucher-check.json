@@ -1,0 +1,166 @@
+{
+  "description": "A journal voucher before it is posted (ACC-05, W1-19, D-108). Header problems first (the date as for every back-office document; a narration; at least two lines; debits = credits, judged only when every line's amount is valid), then per line in line order: an account; postable; active; not one the system keeps (INVENTORY, CASH_DRAWER, CASH_IN_TRANSIT); a debit or a credit, a whole number of paisa above 0, never both; on AR_CONTROL a customer and on AP_CONTROL a supplier, and no party on any other account. The totals are Σ debits and Σ credits of the valid lines.",
+  "cases": [
+    {
+      "name": "clearing Rs 3 of posting suspense into cash rounding",
+      "input": {
+        "date": "2027-01-31",
+        "today": "2027-02-01",
+        "lockDate": "2026-12-31",
+        "narration": "Clear suspense from bills that didn't add up",
+        "lines": [
+          { "accountId": "acc-rounding", "partyId": null, "debit": 300, "credit": 0 },
+          { "accountId": "acc-suspense", "partyId": null, "debit": 0, "credit": 300 }
+        ],
+        "accounts": {
+          "acc-rounding": { "postable": true, "active": true, "role": "ROUNDING" },
+          "acc-suspense": { "postable": true, "active": true, "role": "SUSPENSE" }
+        },
+        "parties": {}
+      },
+      "expected": { "problems": [], "debit": 300, "credit": 300 }
+    },
+    {
+      "name": "a customer's bad debt written off, with the customer on the AR line",
+      "input": {
+        "date": "2027-01-31",
+        "today": "2027-01-31",
+        "lockDate": null,
+        "narration": "Write off",
+        "lines": [
+          { "accountId": "acc-general", "partyId": null, "debit": 150000, "credit": 0 },
+          { "accountId": "acc-ar", "partyId": "cust-1", "debit": 0, "credit": 150000 }
+        ],
+        "accounts": {
+          "acc-general": { "postable": true, "active": true, "role": null },
+          "acc-ar": { "postable": true, "active": true, "role": "AR_CONTROL" }
+        },
+        "parties": { "cust-1": { "customer": true, "supplier": false } }
+      },
+      "expected": { "problems": [], "debit": 150000, "credit": 150000 }
+    },
+    {
+      "name": "unbalanced, no narration, dated on the lock date",
+      "input": {
+        "date": "2026-12-31",
+        "today": "2027-01-10",
+        "lockDate": "2026-12-31",
+        "narration": "  ",
+        "lines": [
+          { "accountId": "acc-drawings", "partyId": null, "debit": 5000000, "credit": 0 },
+          { "accountId": "acc-hbl", "partyId": null, "debit": 0, "credit": 4000000 }
+        ],
+        "accounts": {
+          "acc-drawings": { "postable": true, "active": true, "role": null },
+          "acc-hbl": { "postable": true, "active": true, "role": null }
+        },
+        "parties": {}
+      },
+      "expected": {
+        "problems": [
+          { "problem": "date_locked", "row": null },
+          { "problem": "narration_required", "row": null },
+          { "problem": "unbalanced", "row": null }
+        ],
+        "debit": 5000000,
+        "credit": 4000000
+      }
+    },
+    {
+      "name": "one line only",
+      "input": {
+        "date": "2027-01-10",
+        "today": "2027-01-10",
+        "lockDate": null,
+        "narration": "Half a voucher",
+        "lines": [{ "accountId": "acc-hbl", "partyId": null, "debit": 100, "credit": 0 }],
+        "accounts": { "acc-hbl": { "postable": true, "active": true, "role": null } },
+        "parties": {}
+      },
+      "expected": {
+        "problems": [
+          { "problem": "lines_too_few", "row": null },
+          { "problem": "unbalanced", "row": null }
+        ],
+        "debit": 100,
+        "credit": 0
+      }
+    },
+    {
+      "name": "every line problem, each on its row",
+      "input": {
+        "date": "2027-01-10",
+        "today": "2027-01-10",
+        "lockDate": null,
+        "narration": "Everything wrong",
+        "lines": [
+          { "accountId": null, "partyId": null, "debit": 100, "credit": 0 },
+          { "accountId": "acc-heading", "partyId": null, "debit": 100, "credit": 0 },
+          { "accountId": "acc-old", "partyId": null, "debit": 100, "credit": 0 },
+          { "accountId": "acc-inventory", "partyId": null, "debit": 100, "credit": 0 },
+          { "accountId": "acc-drawer", "partyId": null, "debit": 100, "credit": 0 },
+          { "accountId": "acc-transit", "partyId": null, "debit": 100, "credit": 0 },
+          { "accountId": "acc-hbl", "partyId": null, "debit": 100, "credit": 100 },
+          { "accountId": "acc-hbl", "partyId": null, "debit": 0, "credit": 0 },
+          { "accountId": "acc-hbl", "partyId": null, "debit": 0, "credit": 0.5 },
+          { "accountId": "acc-ar", "partyId": null, "debit": 0, "credit": 100 },
+          { "accountId": "acc-ar", "partyId": "supp-1", "debit": 0, "credit": 100 },
+          { "accountId": "acc-ap", "partyId": "cust-1", "debit": 0, "credit": 100 },
+          { "accountId": "acc-hbl", "partyId": "cust-1", "debit": 0, "credit": 100 }
+        ],
+        "accounts": {
+          "acc-heading": { "postable": false, "active": true, "role": null },
+          "acc-old": { "postable": true, "active": false, "role": null },
+          "acc-inventory": { "postable": true, "active": true, "role": "INVENTORY" },
+          "acc-drawer": { "postable": true, "active": true, "role": "CASH_DRAWER" },
+          "acc-transit": { "postable": true, "active": true, "role": "CASH_IN_TRANSIT" },
+          "acc-hbl": { "postable": true, "active": true, "role": null },
+          "acc-ar": { "postable": true, "active": true, "role": "AR_CONTROL" },
+          "acc-ap": { "postable": true, "active": true, "role": "AP_CONTROL" }
+        },
+        "parties": {
+          "cust-1": { "customer": true, "supplier": false },
+          "supp-1": { "customer": false, "supplier": true }
+        }
+      },
+      "expected": {
+        "problems": [
+          { "problem": "account_required", "row": 0 },
+          { "problem": "account_not_postable", "row": 1 },
+          { "problem": "account_inactive", "row": 2 },
+          { "problem": "account_kept", "row": 3 },
+          { "problem": "account_kept", "row": 4 },
+          { "problem": "account_kept", "row": 5 },
+          { "problem": "amount_invalid", "row": 6 },
+          { "problem": "amount_invalid", "row": 7 },
+          { "problem": "amount_invalid", "row": 8 },
+          { "problem": "party_required", "row": 9 },
+          { "problem": "party_not_customer", "row": 10 },
+          { "problem": "party_not_supplier", "row": 11 },
+          { "problem": "party_not_allowed", "row": 12 }
+        ],
+        "debit": 600,
+        "credit": 400
+      }
+    },
+    {
+      "name": "a party that is both a customer and a supplier, on AR and on AP",
+      "input": {
+        "date": "2027-01-10",
+        "today": "2027-01-10",
+        "lockDate": null,
+        "narration": "Set the customer's balance against what we owe them",
+        "lines": [
+          { "accountId": "acc-ap", "partyId": "both-1", "debit": 70000, "credit": 0 },
+          { "accountId": "acc-ar", "partyId": "both-1", "debit": 0, "credit": 70000 }
+        ],
+        "accounts": {
+          "acc-ar": { "postable": true, "active": true, "role": "AR_CONTROL" },
+          "acc-ap": { "postable": true, "active": true, "role": "AP_CONTROL" }
+        },
+        "parties": { "both-1": { "customer": true, "supplier": true } }
+      },
+      "expected": { "problems": [], "debit": 70000, "credit": 70000 }
+    }
+  ]
+}

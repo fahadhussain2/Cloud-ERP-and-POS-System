@@ -83,7 +83,9 @@ export type DomainErrorCode =
   | 'return_approval_pending'
   | 'no_return'
   | 'return_customer_mismatch'
-  | 'refund_approval_pending';
+  | 'refund_approval_pending'
+  // Back-office accounting (W1-19)
+  | 'invalid_start_month';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

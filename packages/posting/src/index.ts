@@ -1,4 +1,11 @@
 // Posting engine: document -> stock, party and GL entries (server only, CLAUDE.md rule 4).
+export {
+  postCustomerReceipt,
+  postExpense,
+  postFundTransfer,
+  postJournalVoucher,
+  postReversal,
+} from './accounting';
 export { postCashMovement, postCollection, postSession } from './cash';
 export { averageAfterReceipt } from './cost';
 export {
@@ -9,6 +16,7 @@ export {
   type PostOutcome,
   type SourceType,
 } from './db/post';
+export { REVERSIBLE, type ReversibleType } from './db/load';
 export { writeFloors } from './db/write';
 export { applyRebuild, checkRebuild, RebuildRefused, type RebuildCheck } from './db/rebuild';
 export { KEPT_TABLES, markLive, WIPED_TABLES, WipeRefused, wipePilot, type WipeReport } from './db/wipe';
@@ -28,7 +36,12 @@ export type {
   PostingCashMovement,
   PostingCollection,
   PostingContext,
+  PostingCustomerReceipt,
   PostingError,
+  PostingExpense,
+  PostingFundTransfer,
+  PostingJournalVoucher,
+  PostingReversal,
   PostingException,
   PostingHandover,
   PostingOpening,

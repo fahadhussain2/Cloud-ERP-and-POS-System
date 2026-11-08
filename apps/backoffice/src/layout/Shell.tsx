@@ -24,7 +24,11 @@ export interface MenuItem {
     | 'adjustments'
     | 'stockCard'
     | 'transferNeeded'
-    | 'stockSettings';
+    | 'stockSettings'
+    | 'money'
+    | 'periods'
+    | 'accounts'
+    | 'expenseCategories';
   href: string;
   /** Any of these permissions opens the screen. */
   needs: readonly string[];
@@ -33,7 +37,7 @@ export interface MenuItem {
 }
 
 export const MENU: readonly {
-  group: 'people' | 'catalog' | 'purchasing' | 'stock' | 'shop' | 'reports';
+  group: 'people' | 'catalog' | 'purchasing' | 'stock' | 'accounting' | 'shop' | 'reports';
   items: readonly MenuItem[];
 }[] = [
   {
@@ -119,6 +123,38 @@ export const MENU: readonly {
         href: href.stockSettings,
         needs: ['admin.settings'],
         screens: ['stockSettings'],
+      },
+    ],
+  },
+  {
+    // Back-office accounting (W1-19, D-108): money in and out, journal vouchers, the lock date, the chart.
+    group: 'accounting',
+    items: [
+      {
+        key: 'money',
+        href: href.money,
+        needs: [
+          'acc.receipt.create',
+          'acc.payment.create',
+          'acc.expense.create',
+          'acc.journal.post',
+          'acc.period.close',
+          'reports.financial',
+        ],
+        screens: ['money', 'accountingDocument', 'voucher'],
+      },
+      {
+        key: 'periods',
+        href: href.periods,
+        needs: ['acc.period.close', 'acc.period.reopen', 'acc.journal.post'],
+        screens: ['periods'],
+      },
+      { key: 'accounts', href: href.accounts, needs: ['reports.financial'], screens: ['accounts', 'ledger'] },
+      {
+        key: 'expenseCategories',
+        href: href.expenseCategories,
+        needs: ['acc.chart.edit'],
+        screens: ['expenseCategories'],
       },
     ],
   },

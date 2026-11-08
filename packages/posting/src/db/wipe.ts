@@ -54,6 +54,12 @@ const DOCUMENT_TABLES = [
   'stock_adjustments',
   'stock_transfer_lines',
   'stock_transfers',
+  // Back-office accounting (W1-19): a voucher's lines before it.
+  'journal_voucher_lines',
+  'journal_vouchers',
+  'customer_receipts',
+  'expenses',
+  'fund_transfers',
   'document_counters',
   'postings',
   'posting_state',

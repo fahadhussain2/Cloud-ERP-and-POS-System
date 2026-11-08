@@ -43,6 +43,10 @@ export const PERMISSIONS = [
   'acc.expense.create',
   'acc.journal.post',
   'acc.period.close',
+  // Moves the lock date back, with a reason (owner answer 5 to W1-19): the owner's only.
+  'acc.period.reopen',
+  // Adds and renames accounts and expense categories (owner answer 4 to W1-19).
+  'acc.chart.edit',
   // Visibility and administration
   'cost.view',
   'reports.view',
@@ -144,6 +148,7 @@ export const ROLE_TEMPLATES: Readonly<Record<RoleTemplateKey, RoleTemplate>> = {
       'acc.expense.create',
       'acc.journal.post',
       'acc.period.close',
+      'acc.chart.edit',
       'cost.view',
       'reports.view',
       'reports.financial',

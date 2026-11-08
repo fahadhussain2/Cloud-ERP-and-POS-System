@@ -28,6 +28,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHook
 import type pg from 'pg';
 
 import { requireAnyPermission, requirePermission } from '../auth/routes';
+import { lockedOn } from '../lock';
 import { moneyOf } from '../reports/routes';
 
 // Purchasing in the back office (W1-16 plan; PUR-01, PUR-02, PUR-03, PUR-09; owner answers 1–4). Suppliers, goods
@@ -167,6 +168,9 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     type: 'goods_receipt' | 'purchase_return' | 'supplier_payment',
     id: string,
   ) => {
+    // Nothing posts into a locked month from the back office (D-108); pick a later date.
+    const locked = await lockedOn(c, type, id);
+    if (locked !== null) throw new Refusal(409, { error: 'date_locked', lockDate: locked });
     const outcome = await postDocument(c, { tenantId: req.auth!.tenantId, type, id, now: now() });
     if (outcome.status === 'failed') throw new Refusal(400, { error: 'posting_failed', code: outcome.code });
   };

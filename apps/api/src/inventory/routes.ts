@@ -34,6 +34,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHook
 import type pg from 'pg';
 
 import { requireAnyPermission, requirePermission } from '../auth/routes';
+import { lockedOn } from '../lock';
 import { moneyOf } from '../reports/routes';
 
 // Stock operations in the back office (W1-18 plan; INV-04, INV-05, INV-07; owner answers 1–4; D-107).
@@ -193,6 +194,9 @@ export function registerInventory(scope: FastifyInstance, { pool, now, requireAu
     type: 'stock_transfer' | 'stock_transfer_receipt' | 'stock_adjustment',
     id: string,
   ) => {
+    // Nothing posts into a locked month from the back office (D-108); pick a later date.
+    const locked = await lockedOn(c, type, id);
+    if (locked !== null) throw new Refusal(409, { error: 'date_locked', lockDate: locked });
     const outcome = await postDocument(c, { tenantId: req.auth!.tenantId, type, id, now: now() });
     if (outcome.status === 'failed') throw new Refusal(400, { error: 'posting_failed', code: outcome.code });
   };

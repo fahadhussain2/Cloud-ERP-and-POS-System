@@ -112,6 +112,10 @@ The importer writes the opening as a **draft** and posts it with `postDocument(t
 
 Three more sources, posted by the back office in the transaction that posts the document (a posting that fails refuses the post): `goods_receipt` (`postGoodsReceipt`: stock at each line's exact value, the average from that value, the last purchase, AP with the due date, paid by bank or not), `purchase_return` (`postPurchaseReturn`: out at the average, the difference to Purchase price variance) and `supplier_payment` (`postSupplierPayment`: by bank). The context records the bank's account, so the rebuild replays them as posted. The pilot wipe removes them and their counters (D-101).
 
+## 5g. Back-office accounting (posting rules §6, W1-19, D-108)
+
+Four more sources, posted by the back office in the transaction that saves or posts the document (a posting that fails, or a date on or before the lock date, refuses it): `customer_receipt`, `expense`, `fund_transfer` (each posted when saved) and `journal_voucher` (a draft, then posted). Their bank accounts and categories reach their accounts through `context.accounts.targets` (`loadContext` takes several); the safe is `CASH_SAFE`. A **reversal** is a `journal_voucher` row naming what it reverses (`reverses_type`, `reverses_id`, unique): `loadJournalVoucher` returns it as a reversal, `postReversal` swaps the original's posting as stored (`loadMoneyPosting`), and the rebuild swaps the original's replayed posting. The pilot wipe removes them and their counters (D-101).
+
 ## 6. Known limits
 
 - **Arrival order** sets the cost of a late offline sale (D-017): recorded and reproducible, not re-costed (re-costing is Phase 2).

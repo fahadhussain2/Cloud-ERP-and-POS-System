@@ -1,6 +1,13 @@
 import pg from 'pg';
 
 import { emptyState, withChanges } from '../replay';
+import {
+  postCustomerReceipt,
+  postExpense,
+  postFundTransfer,
+  postJournalVoucher,
+  postReversal,
+} from '../accounting';
 import { postCashMovement, postCollection, postSession } from '../cash';
 import { postHandover } from '../handover';
 import { postOpening } from '../opening';
@@ -12,6 +19,10 @@ import type { LedgerState, Posting, PostingContext, PostingResult } from '../typ
 import {
   loadCashMovement,
   loadCollection,
+  loadCustomerReceipt,
+  loadExpense,
+  loadFundTransfer,
+  loadJournalVoucher,
   loadGoodsReceipt,
   loadHandover,
   loadOpening,
@@ -71,6 +82,8 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
   const sales = new Map<string, Posting>();
   // How each sold line left the stock, for a return of it (W1-13).
   const lineCosts = new Map<string, LineCost>();
+  // Each back-office money document's replayed posting, for its reversal to swap (W1-19).
+  const money = new Map<string, Posting>();
   for (const r of rows.rows) {
     let result: PostingResult | null;
     if (r.source_type === 'cash_handover') {
@@ -106,6 +119,23 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
     } else if (r.source_type === 'stock_adjustment') {
       const doc = await loadStockAdjustment(c, r.source_id);
       result = doc ? postStockAdjustment(doc, r.context, state) : null;
+    } else if (r.source_type === 'customer_receipt') {
+      const doc = await loadCustomerReceipt(c, r.source_id);
+      result = doc ? postCustomerReceipt(doc, r.context) : null;
+    } else if (r.source_type === 'expense') {
+      const doc = await loadExpense(c, r.source_id);
+      result = doc ? postExpense(doc, r.context) : null;
+    } else if (r.source_type === 'fund_transfer') {
+      const doc = await loadFundTransfer(c, r.source_id);
+      result = doc ? postFundTransfer(doc, r.context) : null;
+    } else if (r.source_type === 'journal_voucher') {
+      const doc = await loadJournalVoucher(c, r.source_id);
+      if (!doc) result = null;
+      else if ('voucher' in doc) result = postJournalVoucher(doc.voucher, r.context);
+      else {
+        const original = money.get(`${doc.reverses.type} ${doc.reverses.id}`);
+        result = original ? postReversal(doc.reversal, original, r.context) : null;
+      }
     } else if (r.source_type === 'sales_void') {
       const v = await loadVoid(c, r.source_id);
       const original = v ? sales.get(v.saleId) : undefined;
@@ -123,6 +153,7 @@ async function replayTenant(c: pg.ClientBase): Promise<{ steps: Replayed[]; stat
         if (m.qtyDelta < 0)
           lineCosts.set(m.sourceLineId, { unitCost: m.unitCost, avgCostAfter: m.avgCostAfter });
     }
+    if (posting && posting.movements.length === 0) money.set(`${r.source_type} ${r.source_id}`, posting);
     if (posting) state = withChanges(state, posting.state);
     const journalNumber =
       posting && posting.journal.lines.length > 0 ? `J${String((journals += 1)).padStart(6, '0')}` : null;

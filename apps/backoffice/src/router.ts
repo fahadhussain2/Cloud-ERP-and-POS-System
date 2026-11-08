@@ -27,7 +27,14 @@ export type Route =
   | { screen: 'adjustment'; id: string }
   | { screen: 'stockCard'; itemId: string | null }
   | { screen: 'transferNeeded' }
-  | { screen: 'stockSettings' };
+  | { screen: 'stockSettings' }
+  | { screen: 'money' }
+  | { screen: 'accountingDocument'; type: string; id: string }
+  | { screen: 'voucher'; id: string }
+  | { screen: 'periods' }
+  | { screen: 'accounts' }
+  | { screen: 'ledger'; id: string }
+  | { screen: 'expenseCategories' };
 
 export const href = {
   staff: '#/staff',
@@ -62,6 +69,15 @@ export const href = {
   stockCard: (itemId: string) => `#/stock/card/${encodeURIComponent(itemId)}`,
   transferNeeded: '#/stock/needed',
   stockSettings: '#/stock/settings',
+  money: '#/accounting/money',
+  accountingDocument: (type: string, id: string) =>
+    `#/accounting/documents/${encodeURIComponent(type)}/${encodeURIComponent(id)}`,
+  /** `new` for a new voucher. */
+  voucher: (id: string) => `#/accounting/vouchers/${encodeURIComponent(id)}`,
+  periods: '#/accounting/periods',
+  accounts: '#/accounting/accounts',
+  ledger: (id: string) => `#/accounting/accounts/${encodeURIComponent(id)}`,
+  expenseCategories: '#/accounting/categories',
 } as const;
 
 export function parseHash(hash: string): Route {
@@ -105,6 +121,20 @@ export function parseHash(hash: string): Route {
     return { screen: 'stockCard', itemId: parts[2] ? decodeURIComponent(parts[2]) : null };
   if (parts[0] === 'stock' && parts[1] === 'needed') return { screen: 'transferNeeded' };
   if (parts[0] === 'stock' && parts[1] === 'settings') return { screen: 'stockSettings' };
+  if (parts[0] === 'accounting') {
+    if (parts[1] === 'documents' && parts[2] && parts[3])
+      return {
+        screen: 'accountingDocument',
+        type: decodeURIComponent(parts[2]),
+        id: decodeURIComponent(parts[3]),
+      };
+    if (parts[1] === 'vouchers' && parts[2]) return { screen: 'voucher', id: decodeURIComponent(parts[2]) };
+    if (parts[1] === 'periods') return { screen: 'periods' };
+    if (parts[1] === 'accounts' && parts[2]) return { screen: 'ledger', id: decodeURIComponent(parts[2]) };
+    if (parts[1] === 'accounts') return { screen: 'accounts' };
+    if (parts[1] === 'categories') return { screen: 'expenseCategories' };
+    return { screen: 'money' };
+  }
   return { screen: 'home' };
 }
 

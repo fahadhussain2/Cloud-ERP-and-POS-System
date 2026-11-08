@@ -24,6 +24,9 @@ Open items that must be settled before, or soon after, go-live. Each line names 
 - [ ] **Label print test on the Zebra** (W1-17): on the PC that prints labels, print a posted receipt's labels (print dialog: the Zebra, Margins: None, Scale: 100 %); scan three at a counter (the item comes up) and compare with a legacy label side by side.
 - [ ] **Stock settings on production** (W1-18, D-107): the owner opens Stock → Stock settings and checks that the approval limit is **Rs 10,000** and that **no route needs receiving** (the Godown is in the same building).
 - [ ] **Staff roles for stock** (W1-18): the storekeeper has the Purchaser role (drafts transfers); only the owner and the manager post transfers and adjustments.
+- [ ] **Who keeps the books** (W1-19, D-108): if Delux has an accountant, they get their own login with the Accountant role; otherwise the owner keeps the books. The manager has no accounting.
+- [ ] **Expense categories and bank charges** (W1-19): the accountant checks Accounting → Expense categories against the legacy expense heads, and adds a *Bank charges* category (on its own expense account) for card settlement and bank fees.
+- [ ] **The first lock** (W1-19): after go-live the books are locked up to 31 Dec 2026 (the go-live mark); Accounting → Periods shows it, and the first month to lock is January 2027, once it is checked.
 
 ## After go-live
 

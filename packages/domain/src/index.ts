@@ -56,6 +56,27 @@ export {
   type PendingApproval,
   type PriceCheck,
 } from './bill';
+export {
+  KEPT_ROLES,
+  checkDocumentDate,
+  checkJournalVoucher,
+  checkLockMove,
+  checkMoneyDocument,
+  fiscalYearOf,
+  moneyDocumentKey,
+  monthEnd,
+  type DateProblem,
+  type FiscalMonth,
+  type FiscalYear,
+  type LockMoveInput,
+  type LockProblem,
+  type MoneyDocumentInput,
+  type MoneyEnd,
+  type MoneyProblem,
+  type VoucherAccount,
+  type VoucherCheckInput,
+  type VoucherProblem,
+} from './accounting';
 export { businessDate } from './business-date';
 export { costFloor } from './floor';
 export {
