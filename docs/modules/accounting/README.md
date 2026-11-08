@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: the posting engine for sales built in W1-08 (in review); [spec](spec.md) v1 accepted |
+| **Status** | In progress: the posting engine built (W1-08 onwards); [spec](spec.md) v1 accepted; back-office accounting planned ([W1-19](plans/W1-19-back-office-accounting.md), accepted) |
 | **Requirements** | 9 (ACC-01…ACC-09) |
 | **Feature spec needed** | Yes: posting engine design and rebuild ([spec.md](spec.md)) |
 
