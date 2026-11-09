@@ -285,6 +285,29 @@ describe("a customer's page", () => {
       terms: { creditAllowed: true, creditLimit: null, noLimit: true },
     });
   });
+
+  it('keeps the limit when credit is turned off, so turning it back on finds it (review, D-109 answer 5)', async () => {
+    const f = fakeApi(lookups());
+    show(<CustomerScreen api={f.api} id="c1" />);
+    fireEvent.click(await screen.findByRole('button', { name: en.customers.edit }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByLabelText(en.customers.fields.creditAllowed));
+    fireEvent.click(within(dialog).getByRole('button', { name: en.customers.save }));
+    await waitFor(() => expect(f.calls.some((c) => c.method === 'PATCH')).toBe(true));
+    expect((f.calls.find((c) => c.method === 'PATCH')!.body as { terms: unknown }).terms).toMatchObject({
+      creditAllowed: false,
+      creditLimit: 10_000_000,
+      noLimit: false,
+    });
+  });
+
+  it('says only the owner changes the terms when editing, without the new-customer note', async () => {
+    show(<CustomerScreen api={fakeApi(lookups({ can: { edit: true, terms: false } })).api} id="c1" />);
+    fireEvent.click(await screen.findByRole('button', { name: en.customers.edit }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(en.customers.termsLockedEdit)).toBeDefined();
+    expect(within(dialog).queryByText(en.customers.termsLocked)).toBeNull();
+  });
 });
 
 describe('the phone to check for a duplicate', () => {

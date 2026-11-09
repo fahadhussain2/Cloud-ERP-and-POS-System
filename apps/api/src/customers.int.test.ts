@@ -551,4 +551,24 @@ describe('reaching the counters (the W1-09 pull)', () => {
     const after = await pullCustomers(before.cursor);
     expect(after.changes['customers']!.map((p) => p['id'])).toEqual([id]);
   });
+
+  it('brings back a deleted customer account with the new terms, and re-sends the party (review)', async () => {
+    const sup = await send('POST', '/api/purchasing/suppliers', 'maria', {
+      code: 'S0005',
+      name: 'Back Again',
+    });
+    const id = sup.json<{ id: string }>().id;
+    await create({ partyId: id }, 'maria');
+    expect((await send('DELETE', `/api/customers/${id}`, 'maria')).statusCode).toBe(200);
+    const gone = await pullCustomers();
+    expect((await list()).map((r) => r.id)).not.toContain(id);
+    const again = await create({ partyId: id, terms: terms({ tierId: tier['MECHANIC'] }) });
+    expect(again).toBe(id);
+    expect((await detail(id)).customer).toMatchObject({ tierId: tier['MECHANIC'], supplier: true });
+    const back = await pullCustomers(gone.cursor);
+    expect(back.changes['customers']!.map((p) => p['id'])).toEqual([id]);
+    expect(back.changes['customer_accounts']!.map((a) => [a['party_id'], a['deleted_at']])).toEqual([
+      [id, null],
+    ]);
+  });
 });

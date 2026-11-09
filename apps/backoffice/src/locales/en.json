@@ -490,6 +490,7 @@
     "added": "{{name}} added. The counters have them within seconds.",
     "phoneUsed": "This phone is already used by {{code}} {{name}}.",
     "termsLocked": "Only the owner sets the price tier and credit terms. A new customer starts on the default tier, without credit.",
+    "termsLockedEdit": "Only the owner changes the price tier and credit terms.",
     "source": {
       "label": "Add from",
       "new": "A new customer",
