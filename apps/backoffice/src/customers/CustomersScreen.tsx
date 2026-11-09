@@ -430,6 +430,10 @@ export function CustomerDialog({
       if (v === null) return t('customers.problems.limit');
       if (v === undefined || v < 0) return t('customers.problems.amount');
       limit = v;
+    } else if (!f.creditAllowed && !f.noLimit) {
+      // Credit off keeps the limit (owner answer 5: stopping a debtor), so turning it back on finds it.
+      const v = moneyValue(f.limit, minor);
+      limit = typeof v === 'number' && v >= 0 ? v : null;
     }
     return {
       tierId: f.tierId,
@@ -579,7 +583,9 @@ export function CustomerDialog({
       <fieldset className="m-0 grid gap-3.5 border-0 p-0 sm:grid-cols-2" disabled={!canTerms}>
         <legend className="mb-1 text-sm font-semibold">{t('customers.fields.credit')}</legend>
         {!canTerms && (
-          <p className="m-0 text-sm text-muted-foreground sm:col-span-2">{t('customers.termsLocked')}</p>
+          <p className="m-0 text-sm text-muted-foreground sm:col-span-2">
+            {t(customer ? 'customers.termsLockedEdit' : 'customers.termsLocked')}
+          </p>
         )}
         <div className="flex flex-col gap-1.5">
           <label htmlFor={tierId} className={LABEL_CLASS}>

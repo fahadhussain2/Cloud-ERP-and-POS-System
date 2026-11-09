@@ -106,10 +106,17 @@ The owner accepted every recommendation. Each question is kept below with the an
 
 - **Deactivating a party that is also a supplier** is refused while the shop owes it as a supplier (`supplier_balance_open`), since the party row is shared and deactivating it hides the supplier too.
 
+## Review fixes (2026-11-09)
+
+- **Credit off keeps the limit:** turning a customer's credit off (owner answer 5, to stop a debtor) used to send no limit, so turning it back on lost it. The limit now stays stored while credit is off.
+- **A restored customer account** (a supplier whose customer account was deleted, made a customer again) has an integration test: the account comes back with the new terms and the counters get the party again.
+- **The edit dialog** says "Only the owner changes the price tier and credit terms" instead of the new-customer note.
+- **Accepted, not changed:** after a rollback past migration 0020, the previous release can't give or take away the Manager or Accountant role (its `canGrantRole` refuses a permission it doesn't know) until the next deploy, as after 0019. A searched code like `C0043` also matches phones containing "0043".
+
 ## Checks (2026-11-09)
 
-- `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 117 files, 2,079 tests.
-- `pnpm test:integration`: 405 passed (39 files), including the customers API and the counter pull (17) and migration 0020's role grant.
+- `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 117 files, 2,081 tests (after the review fixes).
+- `pnpm test:integration`: 406 passed (39 files), including the customers API and the counter pull (19) and migration 0020's role grant.
 - `pnpm e2e` (Edge): 52 passed, including "a customer added in the back office buys on account at a counter; credit off stops it".
 - **Not done yet:** Verify 2 (a fresh shop on staging), and the review against `REVIEW.md` by someone other than the author.
 
