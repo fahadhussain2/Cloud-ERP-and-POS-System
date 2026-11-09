@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Issue** | none yet: to be opened with the acceptance (the task list gets the row in this PR) |
+| **Issue** | none yet (the task list has the row) |
 | **Module** | pos (the customers the counter sells to), with platform (two new permissions) and accounting (the customer's ledger, read only) |
-| **Status** | Proposed (2026-11-09): waiting for the owner's answers 1–9 (below) |
-| **Refs** | POS-05, POS-07, CAT-04 (a customer's default tier), PUR-01 (a party can be customer and supplier), ACC-03 (customer sub-ledger), SYN-01 (customers), PLT-08 (audit); data model §3; sync spec §3; CLAUDE.md rules 1, 5, 8, 10; D-013, D-085, D-096 (owner answer 5 of W1-09: "until a back-office customer screen exists"), D-101 (the pilot wipe keeps parties), D-104 (legacy stays the master until go-live), D-105 (the suppliers screen); D-109 (new, written when this plan is accepted) |
+| **Status** | Accepted (2026-11-09) with the owner's answers 1–9, all as recommended (below) |
+| **Refs** | POS-05, POS-07, CAT-04 (a customer's default tier), PUR-01 (a party can be customer and supplier), ACC-03 (customer sub-ledger), SYN-01 (customers), PLT-08 (audit); data model §3; sync spec §3; CLAUDE.md rules 1, 5, 8, 10; D-013, D-085, D-096 (owner answer 5 of W1-09: "until a back-office customer screen exists"), D-101 (the pilot wipe keeps parties), D-104 (legacy stays the master until go-live), D-105 (the suppliers screen); D-109 (new) |
 | **Depends on** | W1-09 (the customer pull, the touch trigger, `normalizePhone`), W1-16 (the suppliers screen and API this mirrors), W1-19 (customer receipts by bank, which this screen's ledger shows) |
 | **Size** | about 2¼ days: migration and permissions ¼; API with integration tests ¾; screens (list, add and edit dialogs, ledger) ¾; e2e and docs ½ |
 | **Test-first** | Yes for RLS and sync: the customers API under RLS and permissions, and a customer added or changed in the back office reaching the next counter pull (integration), written before the routes |
@@ -18,7 +18,9 @@ A new shop has **no way to get customers**. The counter only picks customers it 
 
 **The owner or a manager adds a customer in the back office, and seconds later every counter can find them with `F4`, at their tier's prices and, if the owner allows it, on account up to their limit.** The same screen lists and searches customers with their balances, edits their details and credit terms, stops credit or deactivates a customer, and shows each customer's ledger (every sale on account, return, collection, bank receipt and voucher, with the running balance).
 
-## Open questions for the owner (with the recommended answer)
+## Owner answers (2026-11-09)
+
+The owner accepted every recommendation. Each question is kept below with the answer chosen.
 
 1. **Who adds and edits customers?**
    **Recommended:** owner, manager and accountant, with a new permission **`cust.edit`** (add, edit details, deactivate or reactivate, delete one added by mistake). Salesmen and cashiers can't; they see customers only on the counter.

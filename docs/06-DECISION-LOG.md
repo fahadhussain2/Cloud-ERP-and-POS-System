@@ -986,3 +986,18 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** each kind of money movement posts the same way every time; the books, the stock ledger and the drawer can't drift apart through a voucher; a closed month stays closed unless the owner says otherwise.
 - **Trade-off:** a typing mistake costs a reversal and a new entry instead of an edit; a voucher needs no second pair of eyes, so the owner relies on the list and the audit log.
 - **Status:** Accepted (with the W1-19 plan, owner answers 1–6)
+
+### D-109 Customers in the back office: managers add them, only the owner sets tier and credit, codes `C0001`, deactivate only at zero (2026-11-09)
+- **Context:** W1-22 (POS-05, POS-07, CAT-04, PUR-01, ACC-03). A new shop had no way to get customers: only the legacy import and the e2e seed created them. W1-09 left them to the mapping file "until a back-office customer screen exists" (D-096).
+- **Decision:**
+  - **A back-office Customers screen** on the existing `parties` + `customer_accounts`: list and search with balances, add, edit, deactivate, delete one never used, and the customer's ledger, read only (owner answer 7; ageing stays in W1-20). No new table and no change to the pull: the W1-09 datasets and nudge carry every change to the counters.
+  - **Who** (owner answers 1, 2): **`cust.edit`** (owner, manager, accountant) adds and edits customers; **`cust.terms.edit`** (owner only) sets the price tier and credit terms, as only the owner changes prices (D-104). Migration 0020 grants `cust.edit` to the Manager and Accountant roles made from the templates.
+  - **A new customer** (owner answer 3) starts on the default tier with credit off; credit on needs a limit or *No limit* ticked on purpose; the offline cap starts at Rs 25,000 (PRD Q6), one constant in `packages/domain`. Phones are stored normalized (`normalizePhone`).
+  - **Codes** (owner answer 4): suggested `C0001`, `C0002`…, editable, unique across parties ignoring case, never changed after saving; legacy codes are numeric, so they never collide.
+  - **Deactivate only at a zero balance**; a customer who owes has their credit turned off instead. **Delete** only a customer never used anywhere, marked deleted; a party that is also a supplier loses only its customer account (owner answer 5).
+  - **Before go-live** (owner answer 6), imported customers show a notice that the next import overwrites changes made here; new customers are never touched by an import.
+  - **A supplier can be made a customer** too, on the same party (owner answer 8, PUR-01).
+  - **No customer creation at the counter** for now (owner answer 9): the walk-in phone covers it until a later task.
+- **Why:** a shop must be able to start selling on account without the importer; the money-at-risk fields stay with the owner; an open balance stays collectable at the desk.
+- **Trade-off:** a manager's new customer can't buy on account until the owner sets their terms; until go-live, imported customers are still changed in the legacy app or the mapping file.
+- **Status:** Accepted (with the W1-22 plan, owner answers 1–9). Amends D-096: the back office now sets credit terms; until go-live, imported customers' terms still come from the mapping file.
