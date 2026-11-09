@@ -109,6 +109,17 @@ describe('role templates', () => {
     );
   });
 
+  it('let the owner, a manager and an accountant edit customers, and only the owner set their terms (D-109)', () => {
+    const edit = (Object.keys(ROLE_TEMPLATES) as RoleTemplateKey[]).filter((k) =>
+      can([grant(k)], 'cust.edit', 'b1'),
+    );
+    const terms = (Object.keys(ROLE_TEMPLATES) as RoleTemplateKey[]).filter((k) =>
+      can([grant(k)], 'cust.terms.edit', 'b1'),
+    );
+    expect(edit).toEqual(['owner', 'manager', 'accountant']);
+    expect(terms).toEqual(['owner']);
+  });
+
   it('expand * to the whole catalog for display', () => {
     expect(expandPermissions([grant('owner')], 'b1')).toEqual([...PERMISSIONS]);
     expect(expandPermissions([grant('salesman', 'b2')], 'b1')).toEqual([]);

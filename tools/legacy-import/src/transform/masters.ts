@@ -1,4 +1,4 @@
-import { parseQty, QTY_SCALE } from '@erp/domain';
+import { DEFAULT_OFFLINE_DAILY_CAP, parseQty, QTY_SCALE } from '@erp/domain';
 
 import { key, type Mapping } from './mapping';
 import {
@@ -76,9 +76,6 @@ export interface CustomerTerms {
   creditLimit: number | null;
   offlineDailyCap: number;
 }
-
-/** Rs 25,000 a day while offline (PRD Q6, D-013). */
-const OFFLINE_DAILY_CAP = 2_500_000;
 
 export interface PartyCandidate {
   code: string;
@@ -319,7 +316,7 @@ export function buildMasters(s: Staged, m: Mapping): Masters {
             tier: m.partyTiers.get(code) ?? 'RETAIL',
             creditAllowed: m.partyCredit.get(code)?.creditAllowed ?? true,
             creditLimit: m.partyCredit.get(code)?.creditLimit ?? null,
-            offlineDailyCap: m.partyCredit.get(code)?.offlineDailyCap ?? OFFLINE_DAILY_CAP,
+            offlineDailyCap: m.partyCredit.get(code)?.offlineDailyCap ?? DEFAULT_OFFLINE_DAILY_CAP,
           }
         : null,
       supplier: role.supplier,

@@ -828,3 +828,87 @@ test('the owner changes a price and adds an item in the back office; the counter
   await page.getByRole('combobox').fill('enol001');
   await expect(results.getByRole('option').first()).toContainText(/Rs\s?7,200/);
 });
+
+// W1-22 plan (D-109): the owner adds a customer in the back office on the Mechanic tier with a Rs 10,000 limit; a
+// counter finds them by phone after its next pull, at Mechanic prices, and sells on account within the limit without
+// a PIN; the customer's ledger shows the bill; deactivating them is refused while they owe; with their credit turned
+// off, the counter no longer offers On account. Test Motors is used by no other flow.
+test('a customer added in the back office buys on account at a counter; credit off stops it', async ({
+  page,
+  browser,
+}) => {
+  const c = bo.customers;
+  const office = await browser.newContext();
+  const bop = await office.newPage();
+  await signIn(bop, OWNER.username, OWNER_PASSWORD);
+  await bop
+    .getByRole('navigation', { name: bo.nav.menu })
+    .getByRole('link', { name: bo.nav.customers })
+    .click();
+  await bop.getByRole('button', { name: c.add }).click();
+  let form = bop.getByRole('dialog');
+  await expect(form.getByLabel(c.fields.code)).toHaveValue(/^C\d{4}$/);
+  await form.getByLabel(c.fields.name).fill('Test Motors');
+  await form.getByLabel(c.fields.phones).fill('0333-5550101');
+  await form.getByLabel(c.fields.tier).selectOption({ label: 'Mechanic' });
+  await form.getByLabel(c.fields.creditAllowed).check();
+  await form.getByLabel(c.fields.limit).fill('10,000');
+  await form.getByRole('button', { name: new RegExp(`^${c.create}`) }).click();
+  await expect(bop.getByRole('heading', { name: 'Test Motors' })).toBeVisible();
+
+  // The counter has them after its next pull (the nudge makes it seconds).
+  await page.goto(POS);
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await addToBill(page, 'brpd001');
+  const find = async () => {
+    await page.keyboard.press('F4');
+    const dialog = page.getByRole('dialog', { name: pos.customer.title });
+    await dialog.getByLabel(pos.customer.search).fill('5550101');
+    try {
+      await expect(dialog.getByRole('option').nth(1)).toContainText('Test Motors', { timeout: 1000 });
+    } catch (err) {
+      await page.keyboard.press('Escape');
+      throw err;
+    }
+    await dialog.getByLabel(pos.customer.search).press('ArrowDown');
+    await dialog.getByLabel(pos.customer.search).press('Enter');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  };
+  await expect(find).toPass({ timeout: 15_000 });
+  await expect(billPanel(page)).toContainText('Mechanic prices');
+  await expect(total(page)).toHaveText(/Rs\s4,275/);
+  await onAccount(page).click();
+  await payDialog(page)
+    .getByRole('button', { name: new RegExp(`^${pos.pay.finalize}`) })
+    .click();
+  await expect(notice(page)).toHaveText(/printed · paid by On account$/);
+  await expect(page.getByText('0 bills waiting to sync')).toBeVisible({ timeout: 5000 });
+
+  // The bill is on their ledger, and they can't be deactivated while they owe.
+  await expect(async () => {
+    await bop.reload();
+    await expect(bop.getByRole('table', { name: c.ledger.title })).toContainText(/Rs\s?4,275/, {
+      timeout: 1000,
+    });
+  }).toPass({ timeout: 15_000 });
+  await bop.getByRole('link', { name: `← ${c.title}` }).click();
+  await bop.getByRole('button', { name: `${c.deactivate} Test Motors` }).click();
+  form = bop.getByRole('dialog');
+  await form.getByRole('button', { name: c.deactivate }).click();
+  await expect(form.getByRole('alert')).toHaveText(/balance is Rs\s?4,275/);
+  await form.getByRole('button', { name: c.cancel }).click();
+
+  // Credit off: the counter stops offering On account after its next pull.
+  await bop.getByRole('button', { name: `${c.edit} Test Motors` }).click();
+  form = bop.getByRole('dialog');
+  await form.getByLabel(c.fields.creditAllowed).uncheck();
+  await form.getByRole('button', { name: c.save }).click();
+  await expect(bop.getByRole('status')).toHaveText(c.saved.replace('{{name}}', 'Test Motors'));
+  await office.close();
+
+  await addToBill(page, 'brpd001');
+  await expect(async () => {
+    await find();
+    await expect(onAccount(page)).toBeDisabled({ timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
+});

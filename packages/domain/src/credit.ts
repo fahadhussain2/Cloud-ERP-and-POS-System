@@ -9,6 +9,12 @@ import type { SaleDocument } from './sale-document';
 // re-checks every on-account sale with what it knows from all counters (`reviewCredit`), flagging, never refusing
 // (D-011).
 
+/**
+ * A new customer's offline daily cap, in paisa: Rs 25,000 (PRD Q6). The importer and the back office's new
+ * customers start from it (owner answer 3 to W1-22, D-109).
+ */
+export const DEFAULT_OFFLINE_DAILY_CAP = 2_500_000;
+
 /** A customer's credit terms as pulled (sync spec §3). */
 export interface CreditAccount {
   creditAllowed: boolean;

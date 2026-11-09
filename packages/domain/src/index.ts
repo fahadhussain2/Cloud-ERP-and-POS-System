@@ -194,6 +194,7 @@ export {
 export {
   checkCredit,
   CREDIT_REASONS,
+  DEFAULT_OFFLINE_DAILY_CAP,
   onAccountAmount,
   reviewCredit,
   type CreditAccount,

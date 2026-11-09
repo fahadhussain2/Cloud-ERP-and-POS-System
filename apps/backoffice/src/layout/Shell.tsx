@@ -17,6 +17,7 @@ export interface MenuItem {
     | 'items'
     | 'categories'
     | 'labels'
+    | 'customers'
     | 'suppliers'
     | 'receipts'
     | 'purchaseReturns'
@@ -37,7 +38,7 @@ export interface MenuItem {
 }
 
 export const MENU: readonly {
-  group: 'people' | 'catalog' | 'purchasing' | 'stock' | 'accounting' | 'shop' | 'reports';
+  group: 'people' | 'sales' | 'catalog' | 'purchasing' | 'stock' | 'accounting' | 'shop' | 'reports';
   items: readonly MenuItem[];
 }[] = [
   {
@@ -48,6 +49,18 @@ export const MENU: readonly {
         href: href.staff,
         needs: ['admin.users', 'admin.devices'],
         screens: ['staff', 'person'],
+      },
+    ],
+  },
+  {
+    // Customers (W1-22, D-109): who buys on account, at which tier, and what they owe.
+    group: 'sales',
+    items: [
+      {
+        key: 'customers',
+        href: href.customers,
+        needs: ['cust.edit', 'cust.terms.edit'],
+        screens: ['customers', 'customer'],
       },
     ],
   },

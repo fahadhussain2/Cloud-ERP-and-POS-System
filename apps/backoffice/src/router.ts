@@ -15,6 +15,8 @@ export type Route =
   | { screen: 'newItem' }
   | { screen: 'categories' }
   | { screen: 'labels'; source: { receipt: string } | { items: string[] } | null }
+  | { screen: 'customers' }
+  | { screen: 'customer'; id: string }
   | { screen: 'suppliers' }
   | { screen: 'supplier'; id: string }
   | { screen: 'receipts' }
@@ -51,6 +53,8 @@ export const href = {
   receiptLabels: (ref: string) => `#/catalog/labels/receipt/${encodeURIComponent(ref)}`,
   /** A relabel of the items picked on the items screen. */
   itemLabels: (ids: readonly string[]) => `#/catalog/labels/items/${ids.map(encodeURIComponent).join(',')}`,
+  customers: '#/sales/customers',
+  customer: (id: string) => `#/sales/customers/${encodeURIComponent(id)}`,
   suppliers: '#/purchasing/suppliers',
   supplier: (id: string) => `#/purchasing/suppliers/${encodeURIComponent(id)}`,
   receipts: '#/purchasing/receipts',
@@ -102,6 +106,9 @@ export function parseHash(hash: string): Route {
     return { screen: 'labels', source: null };
   }
   if (parts[0] === 'catalog') return { screen: 'items' };
+  if (parts[0] === 'sales' && parts[1] === 'customers' && parts[2])
+    return { screen: 'customer', id: decodeURIComponent(parts[2]) };
+  if (parts[0] === 'sales' && parts[1] === 'customers') return { screen: 'customers' };
   if (parts[0] === 'purchasing' && parts[1] === 'suppliers' && parts[2])
     return { screen: 'supplier', id: decodeURIComponent(parts[2]) };
   if (parts[0] === 'purchasing' && parts[1] === 'suppliers') return { screen: 'suppliers' };

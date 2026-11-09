@@ -18,6 +18,7 @@ import { TransferScreen, TransfersScreen } from './inventory/TransferScreen';
 import { ReceiptScreen, ReceiptsScreen } from './purchasing/ReceiptScreen';
 import { ReturnScreen, ReturnsScreen } from './purchasing/ReturnScreen';
 import { SupplierScreen, SuppliersScreen } from './purchasing/SuppliersScreen';
+import { CustomerScreen, CustomersScreen } from './customers/CustomersScreen';
 import { allowed, MENU, Shell } from './layout/Shell';
 import { useRoute, type Route } from './router';
 import { CountersScreen } from './screens/CountersScreen';
@@ -107,6 +108,10 @@ export function App({ api }: { api: Api }) {
           source={shown.source}
           permissions={me.permissions}
         />
+      ) : shown.screen === 'customers' ? (
+        <CustomersScreen api={api} />
+      ) : shown.screen === 'customer' ? (
+        <CustomerScreen key={shown.id} api={api} id={shown.id} />
       ) : shown.screen === 'suppliers' ? (
         <SuppliersScreen api={api} />
       ) : shown.screen === 'supplier' ? (

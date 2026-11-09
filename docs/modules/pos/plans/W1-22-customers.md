@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | none yet (the task list has the row) |
 | **Module** | pos (the customers the counter sells to), with platform (two new permissions) and accounting (the customer's ledger, read only) |
-| **Status** | Accepted (2026-11-09) with the owner's answers 1–9, all as recommended (below) |
+| **Status** | Accepted (2026-11-09) with the owner's answers 1–9, all as recommended (below). Built (2026-11-09) on `w1-22-customers` |
 | **Refs** | POS-05, POS-07, CAT-04 (a customer's default tier), PUR-01 (a party can be customer and supplier), ACC-03 (customer sub-ledger), SYN-01 (customers), PLT-08 (audit); data model §3; sync spec §3; CLAUDE.md rules 1, 5, 8, 10; D-013, D-085, D-096 (owner answer 5 of W1-09: "until a back-office customer screen exists"), D-101 (the pilot wipe keeps parties), D-104 (legacy stays the master until go-live), D-105 (the suppliers screen); D-109 (new) |
 | **Depends on** | W1-09 (the customer pull, the touch trigger, `normalizePhone`), W1-16 (the suppliers screen and API this mirrors), W1-19 (customer receipts by bank, which this screen's ledger shows) |
 | **Size** | about 2¼ days: migration and permissions ¼; API with integration tests ¾; screens (list, add and edit dialogs, ledger) ¾; e2e and docs ½ |
@@ -94,6 +94,31 @@ The owner accepted every recommendation. Each question is kept below with the an
 
 1. `pnpm check`, `pnpm test:integration` and `pnpm e2e`, output shown.
 2. **On staging, on a fresh shop:** add two customers (one with credit), see them on a staging counter within seconds, sell on account to one, record a bank receipt for them (W1-19), and check the ledger. Results go into this plan.
+
+## Build notes (2026-11-09)
+
+- **No customers module README:** the screen lives in the back office (`apps/backoffice/src/customers/`) and the API in `apps/api/src/customers/`; the plan stays with the POS module, as W1-09.
+- **Two "used" checks instead of one** (`apps/api/src/parties.ts`): `USED_AS_CUSTOMER` and `USED_AS_SUPPLIER`. A customer account can go when the party was never used *as a customer*, even if it has supplier documents (only the account goes then); a supplier delete keeps its old rule (used nowhere, and no live customer account), now also counting bank receipts and journal voucher lines.
+- **Credit limits as typed:** the form takes rupees and sends paisa; credit on without a limit is refused on the form and by the API (`limit_required`) unless *No limit* is ticked.
+- **The duplicate-phone hint** searches the last 7 digits of the last phone typed, so `+92 300…` and `0300…` find each other.
+- **The e2e flow** is the last test of `e2e/counter.spec.ts`, to share its counter helpers. It doesn't record a bank receipt: that would take `CR000001` before `ledger.spec` expects it. The integration test covers the receipt on the ledger.
+- **Tests first:** the integration tests were written before the routes, but they could only run once the local database was up (Docker Desktop had to be restarted), so they weren't committed failing first.
+
+- **Deactivating a party that is also a supplier** is refused while the shop owes it as a supplier (`supplier_balance_open`), since the party row is shared and deactivating it hides the supplier too.
+
+## Review fixes (2026-11-09)
+
+- **Credit off keeps the limit:** turning a customer's credit off (owner answer 5, to stop a debtor) used to send no limit, so turning it back on lost it. The limit now stays stored while credit is off.
+- **A restored customer account** (a supplier whose customer account was deleted, made a customer again) has an integration test: the account comes back with the new terms and the counters get the party again.
+- **The edit dialog** says "Only the owner changes the price tier and credit terms" instead of the new-customer note.
+- **Accepted, not changed:** after a rollback past migration 0020, the previous release can't give or take away the Manager or Accountant role (its `canGrantRole` refuses a permission it doesn't know) until the next deploy, as after 0019. A searched code like `C0043` also matches phones containing "0043".
+
+## Checks (2026-11-09)
+
+- `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 117 files, 2,081 tests (after the review fixes).
+- `pnpm test:integration`: 406 passed (39 files), including the customers API and the counter pull (19) and migration 0020's role grant.
+- `pnpm e2e` (Edge): 52 passed, including "a customer added in the back office buys on account at a counter; credit off stops it".
+- **Not done yet:** Verify 2 (a fresh shop on staging), and the review against `REVIEW.md` by someone other than the author.
 
 ## Order
 

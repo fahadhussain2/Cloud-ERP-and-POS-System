@@ -51,7 +51,7 @@
 7. **`tools/legacy-import`** (owner answer 5): the mapping file gains `partyCredit` by party code (`creditAllowed`, `creditLimit` in rupees, `offlineDailyCap` in rupees, each optional; the defaults stay: credit allowed, no limit, Rs 25,000), validated like `partyTiers`, and the load writes them to `customer_accounts`. The review report shows each credit customer's terms. A re-run with a changed entry updates the account; without an entry it keeps the defaults.
 8. **Docs:** POS spec §10 (customer and tier), §11 (`F4`), new §15 *Customers and credit*; sync spec §3 (the datasets), §6.1 (customer, walk-in phone, credit block, credit overrides), §6.2 (the credit exceptions); data model §12 (schema 7); POS README; decision entry **D-096**.
 
-**Out of scope:** editing customers, limits, tiers and caps in the back office (no Wave 1 task has it; the mapping file sets them for the pilot, owner answer 5); customer collections and receipts (W1-11, CSH-05); opening balances (W1-14); finding a bill by the walk-in phone (W1-13); the outstanding and ageing report and the exceptions screen (W1-20); stock on the counter; adding a new customer at the counter.
+**Out of scope:** editing customers, limits, tiers and caps in the back office (no Wave 1 task had it; the mapping file sets them for the pilot, owner answer 5; added later by W1-22, D-109); customer collections and receipts (W1-11, CSH-05); opening balances (W1-14); finding a bill by the walk-in phone (W1-13); the outstanding and ageing report and the exceptions screen (W1-20); stock on the counter; adding a new customer at the counter.
 
 ## Tests written first
 
