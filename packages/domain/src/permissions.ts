@@ -21,6 +21,10 @@ export const PERMISSIONS = [
   'cash.movement.create',
   'cash.session.close',
   'cash.variance.approve',
+  // Customers (W1-22, D-109): add and edit customers (owner, manager, accountant)…
+  'cust.edit',
+  // …and set a customer's price tier and credit terms: the owner's only (owner answer 2), as for prices (D-104).
+  'cust.terms.edit',
   // Catalog and stock
   'cat.item.edit',
   'cat.price.edit',
@@ -98,6 +102,7 @@ export const ROLE_TEMPLATES: Readonly<Record<RoleTemplateKey, RoleTemplate>> = {
       'pos.return.outside_policy',
       'pos.override.approve',
       'cash.variance.approve',
+      'cust.edit',
       'cat.item.edit',
       // Not cat.price.edit: only the owner changes prices (owner answer 3 to W1-15).
       'cat.label.print',
@@ -149,6 +154,7 @@ export const ROLE_TEMPLATES: Readonly<Record<RoleTemplateKey, RoleTemplate>> = {
       'acc.journal.post',
       'acc.period.close',
       'acc.chart.edit',
+      'cust.edit',
       'cost.view',
       'reports.view',
       'reports.financial',

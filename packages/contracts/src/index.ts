@@ -136,6 +136,15 @@ export {
   type SupplierDetail,
   type SupplierRow,
 } from './purchasing';
+export {
+  CreateCustomerRequest,
+  CustomerTerms,
+  UpdateCustomerRequest,
+  type CustomerDetail,
+  type CustomerLedgerLine,
+  type CustomerLookups,
+  type CustomerRow,
+} from './customers';
 export { LabelItemsRequest, LabelTemplateRequest, type LabelLineView, type LabelsView } from './labels';
 export {
   AdjustmentDraft,

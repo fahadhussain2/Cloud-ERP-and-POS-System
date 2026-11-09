@@ -10,6 +10,7 @@ import { registerLabels } from './catalog/labels';
 import { registerCatalog } from './catalog/routes';
 import { registerAccounting } from './accounting/routes';
 import { registerInventory } from './inventory/routes';
+import { registerCustomers } from './customers/routes';
 import { registerPurchasing } from './purchasing/routes';
 import { registerDevices } from './devices/routes';
 import { registerEvents } from './sync/events';
@@ -93,6 +94,7 @@ export function buildApp({
         registerCatalog(api, { pool, now, requireAuth });
         registerLabels(api, { pool, requireAuth });
         registerPurchasing(api, { pool, now, requireAuth });
+        registerCustomers(api, { pool, requireAuth });
         registerInventory(api, { pool, now, requireAuth });
         registerAccounting(api, { pool, now, requireAuth });
       },

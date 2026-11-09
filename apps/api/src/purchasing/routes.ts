@@ -29,6 +29,7 @@ import type pg from 'pg';
 
 import { requireAnyPermission, requirePermission } from '../auth/routes';
 import { lockedOn } from '../lock';
+import { SUPPLIER_DELETABLE } from '../parties';
 import { moneyOf } from '../reports/routes';
 
 // Purchasing in the back office (W1-16 plan; PUR-01, PUR-02, PUR-03, PUR-09; owner answers 1–4). Suppliers, goods
@@ -247,18 +248,8 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     balance: Number(r['balance'] ?? 0),
     deletable: r['deletable'] === true,
   });
-  /** SQL: the party `p` appears nowhere a deleted supplier would leave something pointing at nothing. */
-  const UNUSED = `NOT EXISTS (SELECT 1 FROM erp.party_ledger_entries x WHERE x.party_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM erp.goods_receipts x WHERE x.supplier_party_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM erp.purchase_returns x WHERE x.supplier_party_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM erp.supplier_payments x WHERE x.supplier_party_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM erp.cash_movements x WHERE x.party_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM erp.payments x WHERE x.party_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM erp.sales_documents x WHERE x.customer_party_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM erp.opening_balance_lines x WHERE x.party_id = p.id OR x.last_supplier_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM erp.items x WHERE x.default_supplier_id = p.id AND x.deleted_at IS NULL)
-      AND NOT EXISTS (SELECT 1 FROM erp.item_costs x WHERE x.last_supplier_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM erp.customer_accounts x WHERE x.party_id = p.id AND x.deleted_at IS NULL)`;
+  // Deletable = used nowhere and not a customer too (the shared check, W1-22).
+  const UNUSED = SUPPLIER_DELETABLE;
   const SUPPLIERS = `SELECT p.*, s.payment_terms_days, p.row_version::text AS rv, (${UNUSED}) AS deletable,
       coalesce((SELECT sum(e.amount) FROM erp.party_ledger_entries e
                 WHERE e.party_id = p.id AND e.role = 'supplier'), 0) AS balance
