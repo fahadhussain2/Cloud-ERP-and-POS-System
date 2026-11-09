@@ -333,17 +333,16 @@ export function registerCustomers(scope: FastifyInstance, { pool, requireAuth }:
       if (b.terms && cur['av'] !== b.accountVersion)
         throw new Refusal(409, { error: 'stale', by: cur['aby'] ?? null });
       // A customer who owes (or has paid in advance) stays active, so the desk can still collect (owner answer 5).
+      // The party is one row for both roles, so a supplier the shop still owes keeps it active too (D-105).
       if (b.status === 'inactive' && cur['status'] !== 'inactive') {
-        const balance = Number(
-          (
-            await c.query<{ b: string }>(
-              `SELECT coalesce(sum(amount), 0)::text AS b FROM erp.party_ledger_entries
-               WHERE party_id = $1 AND role = 'customer'`,
-              [id],
-            )
-          ).rows[0]!.b,
+        const open = await c.query<{ role: string; b: string }>(
+          `SELECT role, sum(amount)::text AS b FROM erp.party_ledger_entries WHERE party_id = $1 GROUP BY role`,
+          [id],
         );
-        if (balance !== 0) throw new Refusal(409, { error: 'balance_open', balance });
+        const of = (role: string) => Number(open.rows.find((r) => r.role === role)?.b ?? 0);
+        if (of('customer') !== 0) throw new Refusal(409, { error: 'balance_open', balance: of('customer') });
+        if (of('supplier') !== 0)
+          throw new Refusal(409, { error: 'supplier_balance_open', balance: of('supplier') });
       }
       const phones = phonesOf(b.phones);
       const pick = (v: unknown, col: string) => (v !== undefined ? v : cur[col]);

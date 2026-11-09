@@ -561,6 +561,7 @@
       "balance_open": "This customer's balance is {{amount}}. Only a customer who owes nothing can be deactivated; turn their credit off instead.",
       "stale": "{{by}} changed this customer in the meantime. Close and open it again.",
       "someone": "Someone",
+      "supplier_balance_open": "The shop still owes this party {{amount}} as a supplier, so it stays active.",
       "in_use": "This customer has been used, so it can't be deleted. Deactivate it instead.",
       "already_customer": "This supplier is already a customer.",
       "forbidden": "Only the owner sets the price tier and credit terms.",

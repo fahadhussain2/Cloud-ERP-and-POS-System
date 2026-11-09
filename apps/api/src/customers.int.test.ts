@@ -394,6 +394,40 @@ describe('editing, searching, deactivating and deleting', () => {
     expect(sup.statusCode, sup.body).toBe(200);
   });
 
+  it('keeps a party active while the shop owes it as a supplier', async () => {
+    const sup = await send('POST', '/api/purchasing/suppliers', 'maria', {
+      code: 'S0004',
+      name: 'Owed Supplier',
+    });
+    const id = sup.json<{ id: string }>().id;
+    await create({ partyId: id }, 'maria');
+    const draft = await send('POST', '/api/accounting/vouchers', 'owner', {
+      date: '2026-11-09',
+      narration: 'Owed to supplier',
+      lines: [
+        { accountId: account['3300'], partyId: null, debit: 20_000, credit: 0, memo: null },
+        { accountId: account['2100'], partyId: id, debit: 0, credit: 20_000, memo: null },
+      ],
+    });
+    const v = (
+      await send('GET', `/api/accounting/vouchers/${draft.json<{ id: string }>().id}`, 'owner')
+    ).json<{
+      id: string;
+      rowVersion: string;
+    }>();
+    await send('POST', `/api/accounting/vouchers/${draft.json<{ id: string }>().id}/post`, 'owner', {
+      rowVersion: v.rowVersion,
+    });
+    const c = (await detail(id)).customer;
+    const refused = await send('PATCH', `/api/customers/${id}`, 'maria', {
+      rowVersion: c.rowVersion,
+      status: 'inactive',
+    });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json()).toMatchObject({ error: 'supplier_balance_open' });
+    expect(Math.abs(refused.json<{ balance: number }>().balance)).toBe(20_000);
+  });
+
   it('keeps the supplier delete refusing a party that still has a customer account', async () => {
     const sup = await send('POST', '/api/purchasing/suppliers', 'maria', {
       code: 'S0002',

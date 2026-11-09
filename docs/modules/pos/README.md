@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W1-02 (POS shell), W1-03 (catalog and search), W1-05 (bill building) and W1-06 (finalize and print) and W1-09 (customers and credit) merged; W1-12 (hold, void and reissue) merged (D-099); W1-13 (return and exchange) built, in review (D-100) |
+| **Status** | In progress: W1-02 (POS shell), W1-03 (catalog and search), W1-05 (bill building) and W1-06 (finalize and print) and W1-09 (customers and credit) merged; W1-12 (hold, void and reissue) merged (D-099); W1-13 (return and exchange) built, in review (D-100); W1-22 (customers in the back office) built on `w1-22-customers` (D-109) |
 | **Requirements** | 17 (POS-01…POS-17) |
 | **Feature spec needed** | Yes: checkout screen and keyboard map; local DB and storage guardrails |
 

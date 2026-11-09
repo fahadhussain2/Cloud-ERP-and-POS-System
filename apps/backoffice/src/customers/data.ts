@@ -29,6 +29,8 @@ export function customerRefusal(t: TFunction, body: unknown, money?: CustomerLoo
   if (b?.error === 'stale') return t('customers.errors.stale', { by: b.by ?? t('customers.errors.someone') });
   if (b?.error === 'balance_open' && b.balance !== undefined && money)
     return t('customers.errors.balance_open', { amount: formatMoney(b.balance, money) });
+  if (b?.error === 'supplier_balance_open' && b.balance !== undefined && money)
+    return t('customers.errors.supplier_balance_open', { amount: formatMoney(b.balance, money) });
   if (b?.error && exists(`customers.errors.${b.error}`)) return t(`customers.errors.${b.error}`);
   return t('app.error');
 }
