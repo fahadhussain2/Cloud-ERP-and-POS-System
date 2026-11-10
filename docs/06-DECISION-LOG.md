@@ -1001,3 +1001,18 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** a shop must be able to start selling on account without the importer; the money-at-risk fields stay with the owner; an open balance stays collectable at the desk.
 - **Trade-off:** a manager's new customer can't buy on account until the owner sets their terms; until go-live, imported customers are still changed in the legacy app or the mapping file.
 - **Status:** Accepted (with the W1-22 plan, owner answers 1–9). Amends D-096: the back office now sets credit terms; until go-live, imported customers' terms still come from the mapping file.
+
+### D-110 Reports read the ledgers on request; exceptions are reviewed, never changed; Trace a bill and Send diagnostics for support (2026-11-10)
+- **Context:** W1-20 (RPT-01, RPT-03, RPT-04, RPT-05, RPT-06, RPT-10, PLT-12). The facts are already on the server: sales, payments, overrides, voids, returns, exceptions, stock and cost, party ledgers, handovers, sync attempts and device health. Only the counter's diagnostic log never leaves it.
+- **Decision:**
+  - **Reports are read only and computed on request** from those tables, inside `withTenant`; nothing is stored. The register's totals and the ageing buckets are pure functions in `packages/domain`, golden-tested.
+  - **Who** (owner answer 1): every report needs `reports.view` (owner, manager, purchaser, accountant); cost and value also need `cost.view`, left out by the API, not only the screen. **Trace a bill** needs `support.trace` (new: owner). Cashiers and salesmen see no reports.
+  - **Dates** (owner answer 2): today by default, one branch, a range of up to 92 days, Download CSV on every report, no PDF.
+  - **The sales register** (owner answer 3): every finalized bill, returns and exchanges netted; voided bills listed struck through and left out of the totals; totals by salesman, counter and tender.
+  - **Ageing** (owner answer 4): by due date in five buckets (not yet due, 1–30, 31–60, 61–90, over 90 days overdue), credits applied to the oldest debit first; the totals equal Accounts receivable and Accounts payable.
+  - **Exceptions** (owner answer 5): the owner or manager marks one reviewed or dismissed, with a note (`exceptions.review`, new), audited; the exception itself never changes. The open high-severity count shows on the home screen.
+  - **Send diagnostics** (owner answer 6): a manager, after a PIN, sends the counter's last 5,000 log events and its health snapshot, device-signed; kept 30 days in `device_diagnostics` (new, forced RLS, not synced), shown on the device's page and in Trace a bill.
+  - **Stock** (owner answer 7): on hand now, valued at average cost (an item without a cost counts 0, as posting does); stock at a past date waits for Wave 2.
+- **Why:** one source of truth (rule 4), so a report can't disagree with the books; support can follow a bill from the counter to the books without asking the shop what happened.
+- **Trade-off:** no stock at a past date, no PDF and no financial statements (trial balance, profit and loss, balance sheet, cash book: ACC-07, Wave 2) before go-live; reports on a long range are slower than stored summaries would be, hence the 92-day cap.
+- **Status:** Accepted (with the W1-20 plan, owner answers 1–7).
