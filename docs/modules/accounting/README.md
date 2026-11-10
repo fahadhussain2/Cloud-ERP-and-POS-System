@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: the posting engine built (W1-08 onwards); [spec](spec.md) v1 accepted; back-office accounting built ([W1-19](plans/W1-19-back-office-accounting.md): receipts, expenses, transfers, journal vouchers with reversal, periods and the lock date, account balances and ledgers) |
+| **Status** | In progress: the posting engine built (W1-08 onwards); [spec](spec.md) v1 accepted; back-office accounting done and verified on staging ([W1-19](plans/W1-19-back-office-accounting.md): receipts, expenses, transfers, journal vouchers with reversal, periods and the lock date, account balances and ledgers) |
 | **Requirements** | 9 (ACC-01…ACC-09) |
 | **Feature spec needed** | Yes: posting engine design and rebuild ([spec.md](spec.md)) |
 
