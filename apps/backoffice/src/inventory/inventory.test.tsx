@@ -247,6 +247,21 @@ describe('an adjustment', () => {
     expect(screen.queryByText(/will wait/)).toBeNull();
   });
 
+  // Owner's staging test of W1-19: a stock document dated in a locked month said "Something went wrong".
+  it('says the books are locked when Post is refused for the date', async () => {
+    const f = fakeApi(lookups({ can: { ...CAN, approve: true } }), {
+      'POST /api/inventory/adjustments/a1/post': {
+        status: 409,
+        body: { error: 'date_locked', lockDate: '2026-10-31' },
+      },
+    });
+    show(<AdjustmentScreen api={f.api} id="a1" />);
+    fireEvent.click(await screen.findByRole('button', { name: en.inventory.post }));
+    expect(
+      await screen.findByText('The books are locked up to 2026-10-31. Pick a later date.'),
+    ).toBeDefined();
+  });
+
   it('the owner approves one awaiting approval, or sends it back with a note', async () => {
     const waiting = {
       ...ADJUSTMENT,
