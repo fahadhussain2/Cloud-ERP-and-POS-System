@@ -5,7 +5,7 @@ import type {
   TransferNeededRow,
   TransferView,
 } from '@erp/contracts';
-import { checkTransfer, isDateLocked } from '@erp/domain';
+import { checkTransfer, isDateLocked, isEmptyDraft } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -297,6 +297,11 @@ function TransferForm({
     lines: used.map((l) => ({ itemId: l.item.id, qty: qtyValue(l.qty) ?? 0 })),
   });
   const save = async (): Promise<{ id: string; rowVersion: string } | null> => {
+    // Nothing on any line is nothing to keep (owner's review of W1-19); the server refuses it too.
+    if (isEmptyDraft(body().lines)) {
+      setMessage({ text: t('inventory.errors.empty_draft'), error: true });
+      return null;
+    }
     const res = x
       ? await api('PUT', `/api/inventory/transfers/${encodeURIComponent(x.id)}`, {
           ...body(),

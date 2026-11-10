@@ -226,6 +226,15 @@ describe('lookups and settings', () => {
 describe('a transfer that moves at once (INV-04, owner answer 2)', () => {
   let made: Made;
 
+  it('an empty transfer or adjustment draft is refused (owner review of W1-19)', async () => {
+    const transfer = await send('POST', '/api/inventory/transfers', 'pete', transferDraft([]));
+    expect(transfer.statusCode).toBe(400);
+    expect(transfer.json()).toEqual({ error: 'empty_draft' });
+    const adjustment = await send('POST', '/api/inventory/adjustments', 'maria', adjustmentDraft('lost', []));
+    expect(adjustment.statusCode).toBe(400);
+    expect(adjustment.json()).toEqual({ error: 'empty_draft' });
+  });
+
   it('the purchaser types it, but only the manager or the owner posts it', async () => {
     const res = await send(
       'POST',

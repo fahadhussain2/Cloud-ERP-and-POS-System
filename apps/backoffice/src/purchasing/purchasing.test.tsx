@@ -189,6 +189,15 @@ describe('a goods receipt', () => {
     expect(screen.getByText(en.purchasing.notLive.title)).toBeDefined();
   });
 
+  // Owner's review of W1-19: a receipt with nothing on its lines isn't saved.
+  it('refuses to save a new receipt with no item on any line', async () => {
+    const f = fakeApi(lookups());
+    show(<ReceiptScreen api={f.api} id="new" />);
+    fireEvent.click(await screen.findByRole('button', { name: en.purchasing.saveDraft }));
+    expect(await screen.findByText(en.purchasing.errors.empty_draft)).toBeDefined();
+    expect(f.calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
   // Owner's review of W1-19: a receipt received in a locked month is greyed out before Post, so Post can't leave a
   // surprise draft. Save draft still keeps what was typed.
   it('greys out Post and says why when Received on is on or before the lock date', async () => {

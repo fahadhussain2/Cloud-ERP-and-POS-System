@@ -1,4 +1,5 @@
 import type { AccountingLookups, VoucherView } from '@erp/contracts';
+import { isEmptyDraft } from '@erp/domain';
 import {
   Button,
   formatMoney,
@@ -24,6 +25,7 @@ import {
   accountingRefusal,
   AccountSelect,
   ErrorText,
+  LineEffectHint,
   PartyPicker,
   problemText,
   useAccountingLookups,
@@ -117,6 +119,11 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
       setError(t('accounting.problems.amount_invalid'));
       return null;
     }
+    // Nothing on any line is nothing to keep (owner's review of W1-19); the server refuses it too.
+    if (isEmptyDraft(draft().lines)) {
+      setError(t('accounting.errors.empty_draft'));
+      return null;
+    }
     setBusy(true);
     const r =
       view === null
@@ -159,7 +166,7 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
     setError(accountingRefusal(t, r.body));
   };
   const remove = async () => {
-    if (!view) return navigate(href.money);
+    if (!view) return;
     setBusy(true);
     const r = await api(
       'DELETE',
@@ -191,9 +198,11 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
               <Button disabled={busy || debit !== credit || debit === 0} onClick={() => void post()}>
                 {t('accounting.voucher.post')}
               </Button>
-              <Button variant="ghost" disabled={busy} onClick={() => void remove()}>
-                {t('accounting.voucher.delete')}
-              </Button>
+              {view && (
+                <Button variant="ghost" disabled={busy} onClick={() => void remove()}>
+                  {t('accounting.voucher.delete')}
+                </Button>
+              )}
             </div>
           )
         }
@@ -237,6 +246,13 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
                       accounts={accounts}
                       value={l.accountId}
                       onChange={(accountId) => set(i, { accountId, party: null })}
+                    />
+                    <LineEffectHint
+                      lookups={lookups}
+                      accountId={l.accountId}
+                      partyName={l.party?.name ?? null}
+                      debit={amounts[i]!.debit ?? 0}
+                      credit={amounts[i]!.credit ?? 0}
                     />
                   </TableCell>
                   <TableCell>

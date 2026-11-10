@@ -1,0 +1,281 @@
+{
+  "description": "What a journal voucher line does to its account, shown under the account as you type (owner's review of W1-19, D-108). Debits raise assets and expenses and lower liabilities, equity and income; credits do the opposite. A customer line (AR_CONTROL) says the customer owes you more or less, a supplier line (AP_CONTROL) that you owe them more or less. The amount is the line's debit less credit, either way round; no hint while it is 0 or not a whole number of paisa.",
+  "cases": [
+    {
+      "name": "Bank charges debited 2,000: an expense goes up",
+      "input": {
+        "account": {
+          "type": "expense",
+          "role": null
+        },
+        "debit": 200000,
+        "credit": 0
+      },
+      "expected": {
+        "kind": "account",
+        "direction": "up",
+        "amount": 200000
+      }
+    },
+    {
+      "name": "Utilities credited 2,000: an expense goes down",
+      "input": {
+        "account": {
+          "type": "expense",
+          "role": null
+        },
+        "debit": 0,
+        "credit": 200000
+      },
+      "expected": {
+        "kind": "account",
+        "direction": "down",
+        "amount": 200000
+      }
+    },
+    {
+      "name": "HBL debited: a bank goes up",
+      "input": {
+        "account": {
+          "type": "asset",
+          "role": "BANK"
+        },
+        "debit": 500000,
+        "credit": 0
+      },
+      "expected": {
+        "kind": "account",
+        "direction": "up",
+        "amount": 500000
+      }
+    },
+    {
+      "name": "the safe credited: it goes down",
+      "input": {
+        "account": {
+          "type": "asset",
+          "role": "CASH_SAFE"
+        },
+        "debit": 0,
+        "credit": 120000
+      },
+      "expected": {
+        "kind": "account",
+        "direction": "down",
+        "amount": 120000
+      }
+    },
+    {
+      "name": "a loan credited: what the shop owes goes up",
+      "input": {
+        "account": {
+          "type": "liability",
+          "role": null
+        },
+        "debit": 0,
+        "credit": 1000000
+      },
+      "expected": {
+        "kind": "account",
+        "direction": "up",
+        "amount": 1000000
+      }
+    },
+    {
+      "name": "a loan debited: it goes down",
+      "input": {
+        "account": {
+          "type": "liability",
+          "role": null
+        },
+        "debit": 1000000,
+        "credit": 0
+      },
+      "expected": {
+        "kind": "account",
+        "direction": "down",
+        "amount": 1000000
+      }
+    },
+    {
+      "name": "partners' drawings debited: equity goes down",
+      "input": {
+        "account": {
+          "type": "equity",
+          "role": null
+        },
+        "debit": 500000,
+        "credit": 0
+      },
+      "expected": {
+        "kind": "account",
+        "direction": "down",
+        "amount": 500000
+      }
+    },
+    {
+      "name": "capital credited: equity goes up",
+      "input": {
+        "account": {
+          "type": "equity",
+          "role": null
+        },
+        "debit": 0,
+        "credit": 500000
+      },
+      "expected": {
+        "kind": "account",
+        "direction": "up",
+        "amount": 500000
+      }
+    },
+    {
+      "name": "other income credited: it goes up",
+      "input": {
+        "account": {
+          "type": "income",
+          "role": null
+        },
+        "debit": 0,
+        "credit": 30000
+      },
+      "expected": {
+        "kind": "account",
+        "direction": "up",
+        "amount": 30000
+      }
+    },
+    {
+      "name": "sales debited: they go down",
+      "input": {
+        "account": {
+          "type": "income",
+          "role": "SALES"
+        },
+        "debit": 30000,
+        "credit": 0
+      },
+      "expected": {
+        "kind": "account",
+        "direction": "down",
+        "amount": 30000
+      }
+    },
+    {
+      "name": "a customer debited: they owe you more",
+      "input": {
+        "account": {
+          "type": "asset",
+          "role": "AR_CONTROL"
+        },
+        "debit": 100000,
+        "credit": 0
+      },
+      "expected": {
+        "kind": "owes_you",
+        "direction": "up",
+        "amount": 100000
+      }
+    },
+    {
+      "name": "a customer credited: they owe you less",
+      "input": {
+        "account": {
+          "type": "asset",
+          "role": "AR_CONTROL"
+        },
+        "debit": 0,
+        "credit": 100000
+      },
+      "expected": {
+        "kind": "owes_you",
+        "direction": "down",
+        "amount": 100000
+      }
+    },
+    {
+      "name": "a supplier credited: you owe them more",
+      "input": {
+        "account": {
+          "type": "liability",
+          "role": "AP_CONTROL"
+        },
+        "debit": 0,
+        "credit": 50000
+      },
+      "expected": {
+        "kind": "you_owe",
+        "direction": "up",
+        "amount": 50000
+      }
+    },
+    {
+      "name": "a supplier debited: you owe them less",
+      "input": {
+        "account": {
+          "type": "liability",
+          "role": "AP_CONTROL"
+        },
+        "debit": 50000,
+        "credit": 0
+      },
+      "expected": {
+        "kind": "you_owe",
+        "direction": "down",
+        "amount": 50000
+      }
+    },
+    {
+      "name": "both sides on one line: the difference counts",
+      "input": {
+        "account": {
+          "type": "expense",
+          "role": null
+        },
+        "debit": 300000,
+        "credit": 100000
+      },
+      "expected": {
+        "kind": "account",
+        "direction": "up",
+        "amount": 200000
+      }
+    },
+    {
+      "name": "nothing typed yet: no hint",
+      "input": {
+        "account": {
+          "type": "expense",
+          "role": null
+        },
+        "debit": 0,
+        "credit": 0
+      },
+      "expected": null
+    },
+    {
+      "name": "the same on both sides: no hint",
+      "input": {
+        "account": {
+          "type": "asset",
+          "role": "BANK"
+        },
+        "debit": 100000,
+        "credit": 100000
+      },
+      "expected": null
+    },
+    {
+      "name": "an amount that isn't a whole number of paisa: no hint",
+      "input": {
+        "account": {
+          "type": "expense",
+          "role": null
+        },
+        "debit": 100.5,
+        "credit": 0
+      },
+      "expected": null
+    }
+  ]
+}

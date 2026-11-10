@@ -38,12 +38,12 @@ export function monthEnd(date: string): string {
 
 export type DateProblem = 'date_required' | 'date_in_future' | 'date_locked';
 
-/** A back-office document's date: given, not after today, after the lock date (D-108). */
 /** Whether a back-office document dated `date` is on or before the lock date, so it can't post (D-108). */
 export function isDateLocked(date: string, lockDate: string | null): boolean {
   return date !== '' && lockDate !== null && date <= lockDate;
 }
 
+/** A back-office document's date: given, not after today, after the lock date (D-108). */
 export function checkDocumentDate(
   date: string | null,
   today: string,
@@ -205,6 +205,33 @@ export function checkJournalVoucher(input: VoucherCheckInput): {
   });
   if (amountsValid && debit !== credit) header.push({ problem: 'unbalanced', row: null });
   return { problems: [...header, ...rows], debit, credit };
+}
+
+export interface LineEffectInput {
+  account: { type: 'asset' | 'liability' | 'equity' | 'income' | 'expense'; role: string | null };
+  debit: number;
+  credit: number;
+}
+
+/** What a voucher line does to its account: up or down by how much; a customer or supplier line in their words. */
+export type LineEffect = {
+  kind: 'account' | 'owes_you' | 'you_owe';
+  direction: 'up' | 'down';
+  amount: number;
+} | null;
+
+/**
+ * The hint under a voucher line (owner's review of W1-19): debits raise assets and expenses and lower liabilities,
+ * equity and income, credits the opposite. Null while the line nets to 0 or an amount isn't whole paisa (rule 1).
+ */
+export function lineEffect(account: LineEffectInput['account'], debit: number, credit: number): LineEffect {
+  if (!Number.isSafeInteger(debit) || !Number.isSafeInteger(credit)) return null;
+  const net = debit - credit;
+  if (net === 0) return null;
+  const debitRaises = account.type === 'asset' || account.type === 'expense';
+  const kind =
+    account.role === 'AR_CONTROL' ? 'owes_you' : account.role === 'AP_CONTROL' ? 'you_owe' : 'account';
+  return { kind, direction: net > 0 === debitRaises ? 'up' : 'down', amount: Math.abs(net) };
 }
 
 export interface FiscalMonth {

@@ -206,6 +206,22 @@ describe('a goods receipt (PUR-02)', () => {
     ...over,
   });
 
+  it('an empty receipt or return draft is refused (owner review of W1-19)', async () => {
+    const receipt = await send('POST', '/api/purchasing/receipts', 'maria', draft({ lines: [] }));
+    expect(receipt.statusCode).toBe(400);
+    expect(receipt.json()).toEqual({ error: 'empty_draft' });
+    const back = await send('POST', '/api/purchasing/returns', 'maria', {
+      supplierId: naveed,
+      locationId: shopLocation,
+      returnedOn: '2026-11-06',
+      reason: null,
+      note: null,
+      lines: [],
+    });
+    expect(back.statusCode).toBe(400);
+    expect(back.json()).toEqual({ error: 'empty_draft' });
+  });
+
   it('is saved as a draft without a number, and shows the difference from the bill', async () => {
     const res = await send('POST', '/api/purchasing/receipts', 'maria', draft());
     expect(res.statusCode).toBe(201);

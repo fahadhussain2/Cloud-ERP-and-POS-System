@@ -288,6 +288,17 @@ describe('back-office accounting', () => {
     expect(same.json()).toMatchObject({ problems: ['same_account'] });
   });
 
+  it('an empty voucher draft is refused: nothing typed on any line (owner review of W1-19)', async () => {
+    const blank = { accountId: null, partyId: null, debit: 0, credit: 0, memo: null };
+    const res = await send('POST', '/api/accounting/vouchers', 'alia', {
+      date: '2026-11-08',
+      narration: '',
+      lines: [blank, blank],
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'empty_draft' });
+  });
+
   it('a journal voucher: a draft, refused while unbalanced, then posted as JV000001 with the supplier entry', async () => {
     const draft = await send('POST', '/api/accounting/vouchers', 'alia', {
       date: '2026-11-08',

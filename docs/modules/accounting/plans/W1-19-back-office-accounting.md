@@ -163,12 +163,14 @@ New decision **D-108** records the answers: who keeps the books, no approval for
 
 ## Owner's test on staging (2026-11-10)
 
-Tests 1–4 (bank receipt, expenses, transfer with charges, voucher and reversal) passed. Test 5 found one bug, fixed with its failing tests first:
+All five tests passed (bank receipt, expenses, transfer with charges, voucher and reversal, the month lock). What the owner found on the way, and what changed:
 
 | Found | Fix |
 |---|---|
 | A goods receipt received in a locked month: Post saved it as a draft with no message; posting the draft said "Something went wrong". The server refused it correctly (`date_locked`), but the purchasing and stock screens had no words for it, and a new draft opening at its own address dropped the message | The purchasing and stock screens say "The books are locked up to …"; a refusal after the draft is saved is kept for the draft when it opens again (`carry` in `router.ts`). An existing draft now reloads after a refused Post, so the next Post is not refused as changed by someone else. The ledger e2e flow posts a goods receipt dated in the locked month, twice |
 | Then: Post on a new receipt in a locked month still saved a draft before it was refused, which looked like it had worked | The purchasing and stock lookups carry the lock date, and the screens check it as you type (`isDateLocked`, `packages/domain`): a date on or before it says "The books are locked up to …" under the date and greys out Post (also Send for approval, Approve, Receive and Pay). Save draft still keeps what was typed: a draft isn't in the books, and drafts already saved in a month that gets locked are listed by the lock checklist. The server still refuses as before |
+| Debit and credit were hard to read: was a line the right way round? | A hint under each voucher line's account, and on every posted journal: "↑ Bank charges goes up Rs 2,000", "↓ The customer owes you less: …", "↑ You owe the supplier more: …" (`lineEffect`, `packages/domain`, golden-tested for every account type; the arrow says it as well as the colour) |
+| A journal voucher could be saved with nothing in it, and showed in the list as a draft; a new one offered Delete draft | Saving a draft with no line holding an item, an account or an amount is refused, on every back-office document (receipts, returns, transfers, adjustments, vouchers), by the screen and the API (`empty_draft`, `isEmptyDraft`). On an edit, posted or changed-by-someone-else is said first. Delete draft shows only on a saved draft |
 
 ## Order
 
