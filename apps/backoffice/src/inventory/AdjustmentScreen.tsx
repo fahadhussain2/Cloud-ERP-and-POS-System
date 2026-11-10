@@ -1,5 +1,5 @@
 import type { AdjustmentView, InventoryItem, InventoryLookups, StockDocumentRow } from '@erp/contracts';
-import { adjustmentApproval, checkAdjustment } from '@erp/domain';
+import { adjustmentApproval, checkAdjustment, isDateLocked } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -209,6 +209,15 @@ function AdjustmentForm({
     setLines((ls) => ls.map((l, i) => (i === n ? { ...l, ...patch } : l)));
   const nan = (v: number | null | undefined) => (v === undefined ? Number.NaN : (v ?? 0));
   const used = lines.filter((l) => l.item.id !== null || l.qty.trim() !== '');
+  // The owner can't approve one dated on or before the lock date either.
+  const approveLocked =
+    a && isDateLocked(a.adjustedOn, lookups.lockDate)
+      ? t('inventory.errors.date_locked', { date: lookups.lockDate })
+      : null;
+  // A date on or before the lock date can't post (D-108): Post waits, and the date says why. Save draft still works.
+  const locked = isDateLocked(h.adjustedOn, lookups.lockDate)
+    ? t('inventory.errors.date_locked', { date: lookups.lockDate })
+    : null;
   const check = checkAdjustment({
     locationId: h.locationId || null,
     locationKind: fixedAt ? 'transit' : (lookups.locations.find((l) => l.id === h.locationId)?.kind ?? null),
@@ -337,6 +346,7 @@ function AdjustmentForm({
           <TextField
             label={t('inventory.fields.adjustedOn')}
             type="date"
+            error={locked}
             value={h.adjustedOn}
             onChange={(e) => set('adjustedOn', e.target.value)}
           />
@@ -464,14 +474,17 @@ function AdjustmentForm({
           >
             {t('inventory.saveDraft')}
           </Button>
-          <Button onClick={() => void postIt()} disabled={check.problems.length > 0}>
+          <Button onClick={() => void postIt()} disabled={check.problems.length > 0 || locked !== null}>
             {waits ? t('inventory.adjustments.sendForApproval') : t('inventory.post')}
           </Button>
         </div>
       )}
       {a?.status === 'awaiting_approval' && lookups.can.approve && (
         <Panel className="flex flex-wrap items-end gap-3 p-3.5">
-          <Button onClick={() => void decide('approve')}>{t('inventory.adjustments.approve')}</Button>
+          <Button onClick={() => void decide('approve')} disabled={approveLocked !== null}>
+            {t('inventory.adjustments.approve')}
+          </Button>
+          {approveLocked && <span className="text-sm text-destructive">{approveLocked}</span>}
           <TextField
             label={t('inventory.adjustments.rejectNote')}
             value={rejectNote}

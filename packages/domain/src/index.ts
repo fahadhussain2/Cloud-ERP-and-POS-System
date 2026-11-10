@@ -63,6 +63,7 @@ export {
   checkLockMove,
   checkMoneyDocument,
   fiscalYearOf,
+  isDateLocked,
   moneyDocumentKey,
   monthEnd,
   type DateProblem,

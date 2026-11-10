@@ -185,6 +185,8 @@ describe('lookups and settings', () => {
     expect(body.adjustmentApprovalLimit).toBe(1000000);
     expect(body.reasons).toContain('write_off');
     expect(body.routes).toEqual([]);
+    // The lock date, for the screens to grey out Post on a locked date (D-108); none set in this shop.
+    expect(res.json<{ lockDate: string | null }>().lockDate).toBeNull();
     expect(body.can).toEqual({
       transfer: true,
       postTransfer: false,

@@ -11,6 +11,7 @@ import {
   checkLockMove,
   checkMoneyDocument,
   fiscalYearOf,
+  isDateLocked,
   monthEnd,
   type LockMoveInput,
   type MoneyDocumentInput,
@@ -32,6 +33,17 @@ runGolden(lockCases as unknown as GoldenFile<LockMoveInput>, checkLockMove);
 const day = fc
   .date({ min: new Date('2000-01-01T00:00:00Z'), max: new Date('2099-12-31T00:00:00Z'), noInvalidDate: true })
   .map((d) => d.toISOString().slice(0, 10));
+
+describe('the lock date', () => {
+  // A back-office document dated on or before it can't post (D-108); the screens grey out Post with it.
+  it('locks a date on or before it, and nothing when there is none', () => {
+    expect(isDateLocked('2026-10-31', '2026-10-31')).toBe(true);
+    expect(isDateLocked('2026-06-15', '2026-10-31')).toBe(true);
+    expect(isDateLocked('2026-11-01', '2026-10-31')).toBe(false);
+    expect(isDateLocked('2026-06-15', null)).toBe(false);
+    expect(isDateLocked('', '2026-10-31')).toBe(false);
+  });
+});
 
 describe('accounting properties', () => {
   it('a month end needs a real date', () => {

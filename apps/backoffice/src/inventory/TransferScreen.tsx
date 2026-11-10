@@ -5,7 +5,7 @@ import type {
   TransferNeededRow,
   TransferView,
 } from '@erp/contracts';
-import { checkTransfer } from '@erp/domain';
+import { checkTransfer, isDateLocked } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -264,6 +264,13 @@ function TransferForm({
   const nan = (v: number | null | undefined) => (v === undefined ? Number.NaN : (v ?? 0));
   const kind = (id: string) => lookups.locations.find((l) => l.id === id)?.kind ?? null;
   const used = lines.filter((l) => l.item.id !== null || l.qty.trim() !== '');
+  const receiveLocked = isDateLocked(receivedOn, lookups.lockDate)
+    ? t('inventory.errors.date_locked', { date: lookups.lockDate })
+    : null;
+  // A date on or before the lock date can't post (D-108): Post waits, and the date says why. Save draft still works.
+  const locked = isDateLocked(h.movedOn, lookups.lockDate)
+    ? t('inventory.errors.date_locked', { date: lookups.lockDate })
+    : null;
   const check = checkTransfer({
     fromLocationId: h.fromLocationId || null,
     toLocationId: h.toLocationId || null,
@@ -382,6 +389,7 @@ function TransferForm({
           <TextField
             label={t('inventory.fields.movedOn')}
             type="date"
+            error={locked}
             value={h.movedOn}
             onChange={(e) => set('movedOn', e.target.value)}
           />
@@ -504,7 +512,7 @@ function TransferForm({
             {t('inventory.saveDraft')}
           </Button>
           {lookups.can.postTransfer && (
-            <Button onClick={() => void postIt()} disabled={check.problems.length > 0}>
+            <Button onClick={() => void postIt()} disabled={check.problems.length > 0 || locked !== null}>
               {needsReceiving ? t('inventory.transfers.send') : t('inventory.post')}
             </Button>
           )}
@@ -515,10 +523,13 @@ function TransferForm({
           <TextField
             label={t('inventory.fields.receivedOn')}
             type="date"
+            error={receiveLocked}
             value={receivedOn}
             onChange={(e) => setReceivedOn(e.target.value)}
           />
-          <Button onClick={() => void receiveIt()}>{t('inventory.transfers.receive')}</Button>
+          <Button onClick={() => void receiveIt()} disabled={receiveLocked !== null}>
+            {t('inventory.transfers.receive')}
+          </Button>
           <span className="text-sm text-muted-foreground">{t('inventory.transfers.receiveHint')}</span>
         </Panel>
       )}

@@ -1,5 +1,5 @@
 import type { DocumentRow, PurchasingLookups, ReceiptView, ReturnView } from '@erp/contracts';
-import { checkReturn, money, mulQty, PURCHASE_RETURN_REASONS, qty as qtyOf } from '@erp/domain';
+import { checkReturn, isDateLocked, money, mulQty, PURCHASE_RETURN_REASONS, qty as qtyOf } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -201,6 +201,10 @@ function ReturnForm({
       ? l.qty.trim() !== ''
       : l.item.id !== null || l.qty.trim() !== '' || l.unitCost.trim() !== '',
   );
+  // A date on or before the lock date can't post (D-108): Post waits, and the date says why. Save draft still works.
+  const locked = isDateLocked(h.returnedOn, lookups.lockDate)
+    ? t('purchasing.errors.date_locked', { date: lookups.lockDate })
+    : null;
   const check = checkReturn({
     supplierId: h.supplierId || null,
     locationId: h.locationId || null,
@@ -320,6 +324,7 @@ function ReturnForm({
           <TextField
             label={t('purchasing.fields.returnedOn')}
             type="date"
+            error={locked}
             value={h.returnedOn}
             onChange={(e) => set('returnedOn', e.target.value)}
           />
@@ -470,7 +475,7 @@ function ReturnForm({
           >
             {t('purchasing.saveDraft')}
           </Button>
-          <Button onClick={() => void postIt()} disabled={check.problems.length > 0}>
+          <Button onClick={() => void postIt()} disabled={check.problems.length > 0 || locked !== null}>
             {t('purchasing.post')}
           </Button>
         </div>

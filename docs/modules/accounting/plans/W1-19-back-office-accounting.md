@@ -168,6 +168,7 @@ Tests 1–4 (bank receipt, expenses, transfer with charges, voucher and reversal
 | Found | Fix |
 |---|---|
 | A goods receipt received in a locked month: Post saved it as a draft with no message; posting the draft said "Something went wrong". The server refused it correctly (`date_locked`), but the purchasing and stock screens had no words for it, and a new draft opening at its own address dropped the message | The purchasing and stock screens say "The books are locked up to …"; a refusal after the draft is saved is kept for the draft when it opens again (`carry` in `router.ts`). An existing draft now reloads after a refused Post, so the next Post is not refused as changed by someone else. The ledger e2e flow posts a goods receipt dated in the locked month, twice |
+| Then: Post on a new receipt in a locked month still saved a draft before it was refused, which looked like it had worked | The purchasing and stock lookups carry the lock date, and the screens check it as you type (`isDateLocked`, `packages/domain`): a date on or before it says "The books are locked up to …" under the date and greys out Post (also Send for approval, Approve, Receive and Pay). Save draft still keeps what was typed: a draft isn't in the books, and drafts already saved in a month that gets locked are listed by the lock checklist. The server still refuses as before |
 
 ## Order
 

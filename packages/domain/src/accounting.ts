@@ -39,6 +39,11 @@ export function monthEnd(date: string): string {
 export type DateProblem = 'date_required' | 'date_in_future' | 'date_locked';
 
 /** A back-office document's date: given, not after today, after the lock date (D-108). */
+/** Whether a back-office document dated `date` is on or before the lock date, so it can't post (D-108). */
+export function isDateLocked(date: string, lockDate: string | null): boolean {
+  return date !== '' && lockDate !== null && date <= lockDate;
+}
+
 export function checkDocumentDate(
   date: string | null,
   today: string,
@@ -46,7 +51,7 @@ export function checkDocumentDate(
 ): DateProblem | null {
   if (!date || !parts(date)) return 'date_required';
   if (date > today) return 'date_in_future';
-  if (lockDate !== null && date <= lockDate) return 'date_locked';
+  if (isDateLocked(date, lockDate)) return 'date_locked';
   return null;
 }
 

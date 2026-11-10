@@ -215,4 +215,6 @@ export interface PurchasingLookups {
   live: boolean;
   money: { locale: string; currency: string; minorUnits: number };
   can: { receive: boolean; payByBank: boolean };
+  /** The shop's lock date (D-108): a document dated on or before it can't post; null = none. */
+  lockDate: string | null;
 }

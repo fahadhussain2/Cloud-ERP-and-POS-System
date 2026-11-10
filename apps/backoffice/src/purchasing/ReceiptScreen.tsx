@@ -1,5 +1,5 @@
 import type { DocumentRow, PurchasingLookups, ReceiptView } from '@erp/contracts';
-import { checkReceipt, receiptTotals } from '@erp/domain';
+import { checkReceipt, isDateLocked, receiptTotals } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -277,6 +277,10 @@ function ReceiptForm({
       retail: l.item.retail,
     }));
   const billTotal = moneyValue(h.billTotal, m.minorUnits);
+  // A date on or before the lock date can't post (D-108): Post waits, and the date says why. Save draft still works.
+  const locked = isDateLocked(h.receivedOn, lookups.lockDate)
+    ? t('purchasing.errors.date_locked', { date: lookups.lockDate })
+    : null;
   const check = checkReceipt({
     supplierId: h.supplierId || null,
     billNo: h.billNo,
@@ -441,6 +445,7 @@ function ReceiptForm({
           <TextField
             label={t('purchasing.fields.receivedOn')}
             type="date"
+            error={locked}
             value={h.receivedOn}
             onChange={(e) => set('receivedOn', e.target.value)}
           />
@@ -658,7 +663,7 @@ function ReceiptForm({
           <Button onClick={() => void saveDraft()} variant="outline">
             {t('purchasing.saveDraft')}
           </Button>
-          <Button onClick={() => void postIt()} disabled={check.problems.length > 0}>
+          <Button onClick={() => void postIt()} disabled={check.problems.length > 0 || locked !== null}>
             {t('purchasing.post')}
           </Button>
           {r && (

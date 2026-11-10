@@ -1,4 +1,5 @@
 import type { PurchasingLookups, SupplierDetail, SupplierRow } from '@erp/contracts';
+import { isDateLocked } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -611,7 +612,12 @@ function PayDialog({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const bankId = useId();
+  // A payment dated on or before the lock date can't post (D-108): the date says why before it is sent.
+  const locked = isDateLocked(paidOn, lookups.lockDate)
+    ? t('purchasing.errors.date_locked', { date: lookups.lockDate })
+    : null;
   const submit = async () => {
+    if (locked) return setError(locked);
     const value = moneyValue(amount, lookups.money.minorUnits);
     if (typeof value !== 'number' || value <= 0) return setError(t('purchasing.problems.amount'));
     setBusy(true);
@@ -671,6 +677,7 @@ function PayDialog({
         <TextField
           label={t('purchasing.pay.date')}
           type="date"
+          error={locked}
           value={paidOn}
           onChange={(e) => setPaidOn(e.target.value)}
         />
