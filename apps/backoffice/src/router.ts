@@ -156,7 +156,26 @@ export function useRoute(): Route {
   return parseHash(hash);
 }
 
-/** Goes to another screen (the address changes, the route follows). */
-export function navigate(to: string): void {
+/** Goes to another screen (the address changes, the route follows), with a refusal for it to show when it opens. */
+export function navigate(to: string, refusal?: string): void {
+  carried = refusal === undefined ? null : { to, text: refusal };
   window.location.hash = to;
+}
+
+// A document screen opens afresh after a save: a new draft at its own address, an existing one when it reloads.
+// A refusal shown just before would be lost, so it is kept here for the screen at that address, read once.
+// Going anywhere else drops it.
+let carried: { to: string; text: string } | null = null;
+
+/** Keeps a refusal for the screen at `to`, which shows it when it next opens. */
+export function carry(to: string, text: string): void {
+  carried = { to, text };
+}
+
+/** The refusal kept for the screen at `to`, once; null when there is none. */
+export function takeCarried(to: string): string | null {
+  if (carried?.to !== to) return null;
+  const { text } = carried;
+  carried = null;
+  return text;
 }

@@ -7,7 +7,7 @@ import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
 
 // W1-19 plan (D-108): the owner keeps the books in the back office. A Rs 25,000 bank receipt from Rehman Autos lowers
 // what they owe; an electricity bill paid from a bank; a journal voucher for partners' drawings; the bill reversed,
-// once; last month locked after its checklist, and a receipt dated in it refused. Back office only; after counter.spec,
+// once; last month locked after its checklist, and a receipt and a goods receipt dated in it refused. Back office only; after counter.spec,
 // which gives the owner their own password. Rehman Autos is used by no other flow.
 
 const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
@@ -124,5 +124,40 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   await dialog.getByLabel(a.fields.date).fill(lockDate);
   await dialog.getByRole('button', { name: a.new.save }).click();
   await expect(dialog.getByRole('alert')).toHaveText(a.problems.date_locked);
+  await dialog.getByRole('button', { name: a.cancel }).click();
+
+  // Goods received in the locked month: Post saves the draft, is refused, and the draft says why (owner's staging
+  // test of W1-19). Its own supplier, so the purchasing flow's numbers are untouched.
+  await menu(page, bo.nav.suppliers);
+  await page.getByRole('button', { name: bo.purchasing.suppliers.add }).click();
+  const form = page.getByRole('dialog');
+  await form.getByLabel(bo.purchasing.fields.code).fill('S900');
+  await form.getByLabel(bo.purchasing.fields.name).fill('Late Bill Traders');
+  await form.getByRole('button', { name: new RegExp(`^${bo.purchasing.suppliers.create}`) }).click();
+  await expect(page.getByRole('heading', { name: 'Late Bill Traders' })).toBeVisible();
+  await menu(page, bo.nav.receipts);
+  await page.getByRole('link', { name: bo.purchasing.receipts.add }).click();
+  await page
+    .getByLabel(bo.purchasing.fields.supplier, { exact: true })
+    .selectOption({ label: 'Late Bill Traders (S900)' });
+  await page.getByLabel(bo.purchasing.fields.billNo).fill('LATE-1');
+  await page.getByLabel(bo.purchasing.fields.receivedOn).fill(lockDate);
+  await page.getByRole('button', { name: 'Item of line 1' }).click();
+  await page.getByRole('textbox', { name: 'Item of line 1' }).fill('enol001');
+  await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('ENOL001');
+  await page.getByRole('textbox', { name: 'Item of line 1' }).press('Enter');
+  await page.getByLabel('Quantity of line 1').fill('1');
+  await page.getByLabel('Unit cost of line 1').fill('100');
+  await page.getByLabel(bo.purchasing.fields.billTotal).fill('100');
+  await page.getByRole('button', { name: bo.purchasing.post }).click();
+  await expect(page).toHaveURL(/#\/purchasing\/receipts\/[0-9a-f-]{36}$/);
+  await expect(page.getByText(bo.purchasing.errors.date_locked.replace('{{date}}', lockDate))).toBeVisible();
+  // Post again: refused the same way, never "Something went wrong".
+  await page.getByRole('button', { name: bo.purchasing.post }).click();
+  await expect(page.getByText(bo.purchasing.errors.date_locked.replace('{{date}}', lockDate))).toBeVisible();
+  await expect(page.getByText(bo.app.error)).toHaveCount(0);
+  expect(
+    await sql(`SELECT 1 FROM erp.goods_receipts WHERE supplier_bill_no = 'LATE-1' AND status = 'draft'`),
+  ).toHaveLength(1);
   await office.close();
 });

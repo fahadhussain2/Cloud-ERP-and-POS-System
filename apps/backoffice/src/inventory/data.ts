@@ -45,11 +45,13 @@ export function inventoryRefusal(t: TFunction, exists: (key: string) => boolean,
     problems?: { problem: string; row: number | null }[];
     by?: string | null;
     code?: string;
+    lockDate?: string;
   } | null;
   if (b?.error === 'invalid' && b.problems?.length)
     return b.problems.map((p) => problemText(t, exists, p.problem, p.row)).join(' ');
   if (b?.error === 'stale') return t('inventory.errors.stale', { by: b.by ?? t('inventory.errors.someone') });
   if (b?.error === 'posting_failed') return t('inventory.errors.posting_failed', { code: b.code ?? '' });
+  if (b?.error === 'date_locked') return t('inventory.errors.date_locked', { date: b.lockDate ?? '' });
   if (b?.error && exists(`inventory.errors.${b.error}`)) return t(`inventory.errors.${b.error}`);
   return t('app.error');
 }

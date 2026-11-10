@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { Api } from '../api';
 import { i18n } from '../i18n';
 import en from '../locales/en.json';
+import { href, navigate } from '../router';
 import { ReceiptScreen } from './ReceiptScreen';
 import { SupplierScreen, SuppliersScreen } from './SuppliersScreen';
 
@@ -185,6 +186,33 @@ describe('a goods receipt', () => {
     show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
     expect(await screen.findByText(en.purchasing.receipts.cashHint)).toBeDefined();
     expect(screen.getByText(en.purchasing.notLive.title)).toBeDefined();
+  });
+
+  // Owner's staging test of W1-19: a receipt received in a locked month said "Something went wrong".
+  it('says the books are locked when Post is refused for the date', async () => {
+    const f = fakeApi(lookups(), {
+      'POST /api/purchasing/receipts/r1/post': {
+        status: 409,
+        body: { error: 'date_locked', lockDate: '2026-10-31' },
+      },
+    });
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    fireEvent.change(await screen.findByLabelText(en.purchasing.fields.billTotal), {
+      target: { value: '13401' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.post }));
+    expect(
+      await screen.findByText('The books are locked up to 2026-10-31. Pick a later date.'),
+    ).toBeDefined();
+  });
+
+  // A new receipt is saved, refused, then opened at its own address: the refusal must still show there.
+  it('keeps the refusal when a new receipt opens at its own address', async () => {
+    navigate(href.receipt('r1'), 'The books are locked up to 2026-10-31. Pick a later date.');
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    expect(
+      await screen.findByText('The books are locked up to 2026-10-31. Pick a later date.'),
+    ).toBeDefined();
   });
 });
 

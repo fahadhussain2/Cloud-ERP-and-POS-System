@@ -31,7 +31,7 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../api';
 import { qtyText, qtyValue } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
-import { href, navigate } from '../router';
+import { carry, href, navigate, takeCarried } from '../router';
 import { inventoryRefusal, locationName, problemText, today, useInventoryLookups } from './data';
 
 // Stock transfers (W1-18, INV-04; owner answers 2 and 4): the storekeeper types one, the owner or the manager posts
@@ -251,7 +251,11 @@ function TransferForm({
   );
   const [received, setReceived] = useState<string[]>(view ? view.lines.map((l) => qtyText(l.qty)) : []);
   const [receivedOn, setReceivedOn] = useState(today());
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  // A refusal from just before this form opened (a new draft at its own address, or a reload): see `carry`.
+  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(() => {
+    const text = takeCarried(href.transfer(x?.id ?? 'new'));
+    return text === null ? null : { text, error: true };
+  });
   const ids = { from: useId(), to: useId() };
   const exists = (k: string) => t(k) !== k;
   const set = (k: keyof typeof h, v: string) => setH((s) => ({ ...s, [k]: v }));
@@ -307,7 +311,12 @@ function TransferForm({
     const res = await api('POST', `/api/inventory/transfers/${encodeURIComponent(s.id)}/post`, {
       rowVersion: s.rowVersion,
     });
-    if (res.status !== 200) setMessage({ text: inventoryRefusal(t, exists, res.body), error: true });
+    // The draft was saved before Post was refused: it opens again, as saved, with the refusal (`carry`).
+    if (res.status !== 200) {
+      const text = inventoryRefusal(t, exists, res.body);
+      setMessage({ text, error: true });
+      carry(href.transfer(s.id), text);
+    }
     after(s.id);
   };
   const receiveIt = async () => {
