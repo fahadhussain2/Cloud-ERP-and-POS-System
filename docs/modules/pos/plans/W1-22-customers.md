@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Issue** | none yet (the task list has the row) |
+| **Issue** | none (it couldn't be created; the task list has the row) |
 | **Module** | pos (the customers the counter sells to), with platform (two new permissions) and accounting (the customer's ledger, read only) |
-| **Status** | Accepted (2026-11-09) with the owner's answers 1–9, all as recommended (below). Built (2026-11-09) on `w1-22-customers` |
+| **Status** | Done (2026-11-10): planned in PR #129, accepted in PR #130 (owner answers 1–9, D-109), built and fixed after the review in PR #131, all merged to staging; the owner verified it on staging (below) |
 | **Refs** | POS-05, POS-07, CAT-04 (a customer's default tier), PUR-01 (a party can be customer and supplier), ACC-03 (customer sub-ledger), SYN-01 (customers), PLT-08 (audit); data model §3; sync spec §3; CLAUDE.md rules 1, 5, 8, 10; D-013, D-085, D-096 (owner answer 5 of W1-09: "until a back-office customer screen exists"), D-101 (the pilot wipe keeps parties), D-104 (legacy stays the master until go-live), D-105 (the suppliers screen); D-109 (new) |
 | **Depends on** | W1-09 (the customer pull, the touch trigger, `normalizePhone`), W1-16 (the suppliers screen and API this mirrors), W1-19 (customer receipts by bank, which this screen's ledger shows) |
 | **Size** | about 2¼ days: migration and permissions ¼; API with integration tests ¾; screens (list, add and edit dialogs, ledger) ¾; e2e and docs ½ |
@@ -118,7 +118,11 @@ The owner accepted every recommendation. Each question is kept below with the an
 - `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 117 files, 2,081 tests (after the review fixes).
 - `pnpm test:integration`: 406 passed (39 files), including the customers API and the counter pull (19) and migration 0020's role grant.
 - `pnpm e2e` (Edge): 52 passed, including "a customer added in the back office buys on account at a counter; credit off stops it".
-- **Not done yet:** Verify 2 (a fresh shop on staging), and the review against `REVIEW.md` by someone other than the author.
+- **Review:** against `REVIEW.md` before the merge, by the session that wrote the code (no blockers or majors; the fixes are above). The owner approved the merge.
+
+## Owner review on staging (2026-11-10)
+
+**Working as expected.** The owner tested the Customers screen on staging (Verify 2) and found nothing to change: "I have also tested customer screen and it works correctly as well".
 
 ## Order
 

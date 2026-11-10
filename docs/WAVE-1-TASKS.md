@@ -32,7 +32,7 @@ Sizes are rough working days for one developer. **P** = in the pilot from 1 Dec;
 | [W1-18](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/63) | Stock operations: transfers, adjustments, item stock card *(built)* | INV-04, INV-05, INV-07 | W1-08 | 2 | G |
 | [W1-19](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/64) | Back-office accounting: bank receipts and payments, expenses, transfers, journal vouchers, periods and lock date | ACC-04, ACC-05, ACC-06 | W1-08 | 3 | G |
 | [W1-20](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/65) | Reports and support: sales register, overrides, voids/returns, stock and valuation, outstanding and ageing, exceptions, "Trace a bill" | RPT-01, RPT-03, RPT-04, RPT-05, RPT-06, RPT-10, PLT-12 | W1-11, W1-13 | 3 | G |
-| W1-22 | Customers in the back office: list and search, add, edit details and credit terms, deactivate, the customer ledger; new customers reach the counters through the W1-09 pull ([plan](modules/pos/plans/W1-22-customers.md), accepted, D-109). Found on staging: a new shop had no way to get customers | POS-05, POS-07, CAT-04, PUR-01, ACC-03 | W1-09, W1-16, W1-19 | 2¼ | G |
+| W1-22 | Customers in the back office: list and search, add, edit details and credit terms, deactivate, the customer ledger; new customers reach the counters through the W1-09 pull ([plan](modules/pos/plans/W1-22-customers.md), D-109). Found on staging: a new shop had no way to get customers *(built)* | POS-05, POS-07, CAT-04, PUR-01, ACC-03 | W1-09, W1-16, W1-19 | 2¼ | G |
 
 **Total ≈ 56 days** (W1-02 done). P tasks ≈ 34 days.
 
