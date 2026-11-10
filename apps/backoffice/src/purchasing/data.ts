@@ -47,6 +47,7 @@ export function purchasingRefusal(
     problems?: { problem: string; row: number | null }[];
     by?: string | null;
     code?: string;
+    lockDate?: string;
     balance?: number;
   } | null;
   if (b?.error === 'invalid' && b.problems?.length)
@@ -56,6 +57,7 @@ export function purchasingRefusal(
   if (b?.error === 'balance_open' && b.balance !== undefined && money)
     return t('purchasing.errors.balance_open', { amount: formatMoney(b.balance, money) });
   if (b?.error === 'posting_failed') return t('purchasing.errors.posting_failed', { code: b.code ?? '' });
+  if (b?.error === 'date_locked') return t('purchasing.errors.date_locked', { date: b.lockDate ?? '' });
   if (b?.error && exists(`purchasing.errors.${b.error}`)) return t(`purchasing.errors.${b.error}`);
   return t('app.error');
 }

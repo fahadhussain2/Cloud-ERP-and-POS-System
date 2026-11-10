@@ -161,6 +161,14 @@ New decision **D-108** records the answers: who keeps the books, no approval for
 - `pnpm test:integration`: 387 passed (37 files), including the accounting API (17) and the rebuild check with reversals.
 - `pnpm e2e` (Edge): 51 passed; the new ledger flow covers a bank receipt, an expense, a voucher for drawings, a reversal, and last month locked with a receipt dated in it refused.
 
+## Owner's test on staging (2026-11-10)
+
+Tests 1–4 (bank receipt, expenses, transfer with charges, voucher and reversal) passed. Test 5 found one bug, fixed with its failing tests first:
+
+| Found | Fix |
+|---|---|
+| A goods receipt received in a locked month: Post saved it as a draft with no message; posting the draft said "Something went wrong". The server refused it correctly (`date_locked`), but the purchasing and stock screens had no words for it, and a new draft opening at its own address dropped the message | The purchasing and stock screens say "The books are locked up to …"; a refusal after the draft is saved is kept for the draft when it opens again (`carry` in `router.ts`). An existing draft now reloads after a refused Post, so the next Post is not refused as changed by someone else. The ledger e2e flow posts a goods receipt dated in the locked month, twice |
+
 ## Order
 
 1. Migration and schema.

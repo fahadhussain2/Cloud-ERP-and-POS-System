@@ -24,7 +24,7 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../api';
 import { qtyText, qtyValue } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
-import { href, navigate } from '../router';
+import { carry, href, navigate, takeCarried } from '../router';
 import { inventoryRefusal, locationName, problemText, today, useInventoryLookups } from './data';
 import { StatusOf, StockNotice } from './TransferScreen';
 
@@ -197,7 +197,11 @@ function AdjustmentForm({
       : [blank()],
   );
   const [rejectNote, setRejectNote] = useState('');
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  // A refusal from just before this form opened (a new draft at its own address, or a reload): see `carry`.
+  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(() => {
+    const text = takeCarried(href.adjustment(a?.id ?? 'new'));
+    return text === null ? null : { text, error: true };
+  });
   const ids = { location: useId(), reason: useId() };
   const exists = (k: string) => t(k) !== k;
   const set = (k: keyof typeof h, v: string) => setH((s) => ({ ...s, [k]: v }));
@@ -257,7 +261,12 @@ function AdjustmentForm({
     const res = await api('POST', `/api/inventory/adjustments/${encodeURIComponent(s.id)}/post`, {
       rowVersion: s.rowVersion,
     });
-    if (res.status !== 200) setMessage({ text: inventoryRefusal(t, exists, res.body), error: true });
+    // The draft was saved before Post was refused: it opens again, as saved, with the refusal (`carry`).
+    if (res.status !== 200) {
+      const text = inventoryRefusal(t, exists, res.body);
+      setMessage({ text, error: true });
+      carry(href.adjustment(s.id), text);
+    }
     after(s.id);
   };
   const decide = async (what: 'approve' | 'reject') => {

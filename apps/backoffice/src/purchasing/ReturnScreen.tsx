@@ -23,7 +23,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { moneyText, moneyValue, qtyText, qtyValue } from '../catalog/data';
-import { href, navigate } from '../router';
+import { carry, href, navigate, takeCarried } from '../router';
 import { ItemPicker } from './ItemPicker';
 import { PurchasingNotice } from './PurchasingNotice';
 import { DocumentList } from './ReceiptScreen';
@@ -183,7 +183,11 @@ function ReturnForm({
             },
           ],
   );
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  // A refusal from just before this form opened (a new draft at its own address, or a reload): see `carry`.
+  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(() => {
+    const text = takeCarried(href.purchaseReturn(r?.id ?? 'new'));
+    return text === null ? null : { text, error: true };
+  });
   const set = (k: keyof typeof h, v: string) => setH((x) => ({ ...x, [k]: v }));
   const put = (n: number, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l, i) => (i === n ? { ...l, ...patch } : l)));
@@ -247,7 +251,12 @@ function ReturnForm({
     const res = await api('POST', `/api/purchasing/returns/${encodeURIComponent(s.id)}/post`, {
       rowVersion: s.rowVersion,
     });
-    if (res.status !== 200) setMessage({ text: purchasingRefusal(t, exists, res.body), error: true });
+    // The draft was saved before Post was refused: it opens again, as saved, with the refusal (`carry`).
+    if (res.status !== 200) {
+      const text = purchasingRefusal(t, exists, res.body);
+      setMessage({ text, error: true });
+      carry(href.purchaseReturn(s.id), text);
+    }
     after(s.id);
   };
 
