@@ -767,7 +767,8 @@
       "forbidden": "You can't do this.",
       "posting_failed": "It couldn't be posted ({{code}}). Nothing was changed.",
       "date_locked": "The books are locked up to {{date}}. Pick a later date.",
-      "balance_open": "The shop still owes this supplier {{amount}}. Settle it first, then deactivate."
+      "balance_open": "The shop still owes this supplier {{amount}}. Settle it first, then deactivate.",
+      "empty_draft": "Add at least one item before saving."
     }
   },
   "labels": {
@@ -917,7 +918,8 @@
       "invalid_request": "That can't be saved.",
       "forbidden": "You can't do this.",
       "posting_failed": "It couldn't be posted ({{code}}). Nothing was changed.",
-      "date_locked": "The books are locked up to {{date}}. Pick a later date."
+      "date_locked": "The books are locked up to {{date}}. Pick a later date.",
+      "empty_draft": "Add at least one item before saving."
     },
     "transfers": {
       "title": "Transfers",
@@ -1217,7 +1219,18 @@
       "posted": "It is posted already.",
       "not_found": "Not found.",
       "forbidden": "You can't do this.",
-      "invalid_request": "Something is missing or wrong."
+      "invalid_request": "Something is missing or wrong.",
+      "empty_draft": "Enter at least one line before saving."
+    },
+    "effect": {
+      "up": "↑ {{name}} goes up {{amount}}",
+      "down": "↓ {{name}} goes down {{amount}}",
+      "owesYouMore": "↑ {{name}} owes you more: {{amount}}",
+      "owesYouLess": "↓ {{name}} owes you less: {{amount}}",
+      "youOweMore": "↑ You owe {{name}} more: {{amount}}",
+      "youOweLess": "↓ You owe {{name}} less: {{amount}}",
+      "customer": "The customer",
+      "supplier": "the supplier"
     }
   }
 }

@@ -1,5 +1,6 @@
 import type { AccountingLookups, AccountRow, PartyHit } from '@erp/contracts';
-import { Alert, AlertDescription, AlertTitle, Input } from '@erp/ui';
+import { lineEffect } from '@erp/domain';
+import { Alert, AlertDescription, AlertTitle, formatMoney, Input } from '@erp/ui';
 import type { TFunction } from 'i18next';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -196,4 +197,44 @@ export function AccountSelect({
       ))}
     </select>
   );
+}
+
+/**
+ * What a voucher or journal line does to its account, under the account (owner's review of W1-19): "↑ Bank charges
+ * goes up Rs 2,000", or in a customer's or supplier's words. Nothing while the account or the amount isn't there yet.
+ * The arrow says it as well as the colour.
+ */
+export function LineEffectHint({
+  lookups,
+  accountId,
+  partyName,
+  debit,
+  credit,
+}: {
+  lookups: AccountingLookups;
+  accountId: string | null;
+  partyName: string | null;
+  debit: number | undefined;
+  credit: number | undefined;
+}) {
+  const { t } = useTranslation();
+  const account = lookups.accounts.find((a) => a.id === accountId);
+  if (!account || debit === undefined || credit === undefined) return null;
+  const effect = lineEffect(account, debit, credit);
+  if (!effect) return null;
+  const amount = formatMoney(effect.amount, lookups.money);
+  const up = effect.direction === 'up';
+  const text =
+    effect.kind === 'owes_you'
+      ? t(up ? 'accounting.effect.owesYouMore' : 'accounting.effect.owesYouLess', {
+          name: partyName ?? t('accounting.effect.customer'),
+          amount,
+        })
+      : effect.kind === 'you_owe'
+        ? t(up ? 'accounting.effect.youOweMore' : 'accounting.effect.youOweLess', {
+            name: partyName ?? t('accounting.effect.supplier'),
+            amount,
+          })
+        : t(up ? 'accounting.effect.up' : 'accounting.effect.down', { name: account.name, amount });
+  return <p className={`m-0 mt-1 text-xs font-medium ${up ? 'text-ok' : 'text-warn'}`}>{text}</p>;
 }

@@ -81,13 +81,22 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
 
   // Partners' drawings by journal voucher: Dr 3110 / Cr HBL Rs 5,000.
   await page.getByRole('button', { name: a.money.newVoucher }).click();
+  // Nothing typed is nothing to save, and a new voucher has no draft to delete (owner's review of W1-19).
+  await expect(page.getByRole('button', { name: a.voucher.delete })).toHaveCount(0);
+  await page.getByRole('button', { name: a.voucher.save }).click();
+  await expect(page.getByText(a.errors.empty_draft)).toBeVisible();
   await page.getByLabel(a.voucher.narration).fill("Partner's drawings, November");
   await page.getByRole('combobox', { name: 'Account, line 1' }).selectOption(await accountId('3110'));
   await page.getByLabel('Debit, line 1').fill('5,000');
   await page.getByRole('combobox', { name: 'Account, line 2' }).selectOption(await accountId('1160'));
   await page.getByLabel('Credit, line 2').fill('5,000');
+  // Each line says what it does: drawings lower equity, and the bank goes down (owner's review of W1-19).
+  await expect(page.getByText(/^↓ Partners' drawings goes down Rs\s5,000$/)).toBeVisible();
+  await expect(page.getByText(/^↓ Bank: HBL goes down Rs\s5,000$/)).toBeVisible();
   await page.getByRole('button', { name: a.voucher.post }).click();
   await expect(page.getByRole('heading', { name: `${a.types.journal_voucher} JV000001` })).toBeVisible();
+  // The posted journal says it too.
+  await expect(page.getByText(/^↓ Partners' drawings goes down Rs\s5,000$/)).toBeVisible();
   await expect(page.getByRole('table')).toContainText('3110');
 
   // The bill was typed on the wrong account: reversed, once.

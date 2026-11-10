@@ -196,6 +196,21 @@ describe('a transfer', () => {
     );
   });
 
+  // Owner's review of W1-19: a transfer or an adjustment with no item isn't saved.
+  it('refuses to save a new transfer or adjustment with no item', async () => {
+    for (const screenOf of [
+      (api: Api) => <TransferScreen api={api} id="new" />,
+      (api: Api) => <AdjustmentScreen api={api} id="new" />,
+    ]) {
+      const f = fakeApi(lookups());
+      show(screenOf(f.api));
+      fireEvent.click(await screen.findByRole('button', { name: en.inventory.saveDraft }));
+      expect(await screen.findByText(en.inventory.errors.empty_draft)).toBeDefined();
+      expect(f.calls.some((c) => c.method === 'POST')).toBe(false);
+      cleanup();
+    }
+  });
+
   it('says Send on a route that needs receiving, and saves before it sends', async () => {
     const f = fakeApi(
       lookups({ routes: [{ fromLocationId: 'godown', toLocationId: 'shop', needsReceiving: true }] }),

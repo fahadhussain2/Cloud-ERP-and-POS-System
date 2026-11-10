@@ -19,6 +19,7 @@ import {
   can,
   checkReceipt,
   checkReturn,
+  isEmptyDraft,
   normalizeIdentifier,
   receiptTotals,
   type Permission,
@@ -560,6 +561,8 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
   scope.post('/purchasing/receipts', { preHandler: receive }, async (req, reply) => {
     const parsed = ReceiptDraft.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+    // Nothing typed on any line is nothing to keep (owner's review of W1-19).
+    if (isEmptyDraft(parsed.data.lines)) return reply.code(400).send({ error: 'empty_draft' });
     const b = parsed.data;
     return run(req, reply, async (c) => {
       const branch = await branchOf(c, b.locationId);
@@ -581,6 +584,8 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     const b = parsed.data;
     return run(req, reply, async (c) => {
       await checkVersion(c, 'goods_receipts', id, b.rowVersion);
+      // Nothing typed on any line is nothing to keep (owner's review of W1-19); posted or stale is said first.
+      if (isEmptyDraft(b.lines)) throw new Refusal(400, { error: 'empty_draft' });
       const branch = await branchOf(c, b.locationId);
       const { rows } = await c.query<{ rv: string }>(
         `UPDATE erp.goods_receipts SET branch_id = $2, supplier_party_id = $3, supplier_bill_no = $4,
@@ -814,6 +819,8 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
   scope.post('/purchasing/returns', { preHandler: receive }, async (req, reply) => {
     const parsed = ReturnDraft.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+    // Nothing typed on any line is nothing to keep (owner's review of W1-19).
+    if (isEmptyDraft(parsed.data.lines)) return reply.code(400).send({ error: 'empty_draft' });
     return run(
       req,
       reply,
@@ -827,6 +834,8 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
     return run(req, reply, async (c) => {
       await checkVersion(c, 'purchase_returns', id, parsed.data.rowVersion);
+      // Nothing typed on any line is nothing to keep (owner's review of W1-19); posted or stale is said first.
+      if (isEmptyDraft(parsed.data.lines)) throw new Refusal(400, { error: 'empty_draft' });
       const { rowVersion } = await writeReturn(c, req.auth!.tenantId, id, parsed.data);
       return { rowVersion };
     });

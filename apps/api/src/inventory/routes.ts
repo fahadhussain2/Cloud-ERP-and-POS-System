@@ -26,6 +26,7 @@ import {
   checkAdjustment,
   checkTransfer,
   checkTransferReceipt,
+  isEmptyDraft,
   normalizeIdentifier,
   type Permission,
 } from '@erp/domain';
@@ -468,6 +469,8 @@ export function registerInventory(scope: FastifyInstance, { pool, now, requireAu
   scope.post('/inventory/transfers', { preHandler: draftTransfer }, async (req, reply) => {
     const parsed = TransferDraft.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+    // Nothing typed on any line is nothing to keep (owner's review of W1-19).
+    if (isEmptyDraft(parsed.data.lines)) return reply.code(400).send({ error: 'empty_draft' });
     return run(
       req,
       reply,
@@ -481,6 +484,8 @@ export function registerInventory(scope: FastifyInstance, { pool, now, requireAu
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
     return run(req, reply, async (c) => {
       await checkVersion(c, 'stock_transfers', id, parsed.data.rowVersion, ['draft']);
+      // Nothing typed on any line is nothing to keep (owner's review of W1-19); posted or stale is said first.
+      if (isEmptyDraft(parsed.data.lines)) throw new Refusal(400, { error: 'empty_draft' });
       const { rowVersion } = await writeTransfer(c, req.auth!.tenantId, id, parsed.data);
       return { rowVersion };
     });
@@ -801,6 +806,8 @@ export function registerInventory(scope: FastifyInstance, { pool, now, requireAu
   scope.post('/inventory/adjustments', { preHandler: adjust }, async (req, reply) => {
     const parsed = AdjustmentDraft.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+    // Nothing typed on any line is nothing to keep (owner's review of W1-19).
+    if (isEmptyDraft(parsed.data.lines)) return reply.code(400).send({ error: 'empty_draft' });
     return run(
       req,
       reply,
@@ -814,6 +821,8 @@ export function registerInventory(scope: FastifyInstance, { pool, now, requireAu
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
     return run(req, reply, async (c) => {
       await checkVersion(c, 'stock_adjustments', id, parsed.data.rowVersion, ['draft']);
+      // Nothing typed on any line is nothing to keep (owner's review of W1-19); posted or stale is said first.
+      if (isEmptyDraft(parsed.data.lines)) throw new Refusal(400, { error: 'empty_draft' });
       const { rowVersion } = await writeAdjustment(c, req.auth!.tenantId, id, parsed.data);
       return { rowVersion };
     });

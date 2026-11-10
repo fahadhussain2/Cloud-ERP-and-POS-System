@@ -31,6 +31,7 @@ import {
   AccountingNotice,
   accountingRefusal,
   ErrorText,
+  LineEffectHint,
   PartyPicker,
   placeName,
   useAccountingLookups,
@@ -499,6 +500,13 @@ export function DocumentScreen({ api, type, id }: { api: Api; type: string; id: 
                   <a href={href.ledger(l.accountId)} className="underline-offset-4 hover:underline">
                     <span className="font-mono">{l.accountCode}</span> {l.accountName}
                   </a>
+                  <LineEffectHint
+                    lookups={lookups}
+                    accountId={l.accountId}
+                    partyName={l.partyName}
+                    debit={l.debit}
+                    credit={l.credit}
+                  />
                 </TableCell>
                 <TableCell>{l.partyName ?? ''}</TableCell>
                 <TableCell className="text-end tabular-nums">

@@ -1,5 +1,5 @@
 import type { DocumentRow, PurchasingLookups, ReceiptView } from '@erp/contracts';
-import { checkReceipt, isDateLocked, receiptTotals } from '@erp/domain';
+import { checkReceipt, isDateLocked, isEmptyDraft, receiptTotals } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -324,6 +324,11 @@ function ReceiptForm({
 
   /** Saves the draft; returns its id and row version, or null after showing why not. */
   const save = async (): Promise<{ id: string; rowVersion: string } | null> => {
+    // Nothing on any line is nothing to keep (owner's review of W1-19); the server refuses it too.
+    if (isEmptyDraft(body().lines)) {
+      setMessage({ text: t('purchasing.errors.empty_draft'), error: true });
+      return null;
+    }
     const res = r
       ? await api('PUT', `/api/purchasing/receipts/${encodeURIComponent(r.id)}`, {
           ...body(),

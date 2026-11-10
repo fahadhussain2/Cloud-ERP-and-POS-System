@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import fiscalYearCases from '../golden/fiscal-year.json';
 import voucherCases from '../golden/journal-voucher-check.json';
+import effectCases from '../golden/voucher-line-effect.json';
 import lockCases from '../golden/lock-move.json';
 import moneyCases from '../golden/money-document-check.json';
 import {
@@ -12,7 +13,9 @@ import {
   checkMoneyDocument,
   fiscalYearOf,
   isDateLocked,
+  lineEffect,
   monthEnd,
+  type LineEffectInput,
   type LockMoveInput,
   type MoneyDocumentInput,
   type VoucherCheckInput,
@@ -29,6 +32,9 @@ runGolden(fiscalYearCases as unknown as GoldenFile<{ date: string; startMonth: n
   fiscalYearOf(i.date, i.startMonth),
 );
 runGolden(lockCases as unknown as GoldenFile<LockMoveInput>, checkLockMove);
+runGolden(effectCases as unknown as GoldenFile<LineEffectInput>, (i) =>
+  lineEffect(i.account, i.debit, i.credit),
+);
 
 const day = fc
   .date({ min: new Date('2000-01-01T00:00:00Z'), max: new Date('2099-12-31T00:00:00Z'), noInvalidDate: true })

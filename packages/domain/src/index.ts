@@ -64,10 +64,13 @@ export {
   checkMoneyDocument,
   fiscalYearOf,
   isDateLocked,
+  lineEffect,
   moneyDocumentKey,
   monthEnd,
   type DateProblem,
   type FiscalMonth,
+  type LineEffect,
+  type LineEffectInput,
   type FiscalYear,
   type LockMoveInput,
   type LockProblem,
@@ -79,6 +82,7 @@ export {
   type VoucherProblem,
 } from './accounting';
 export { businessDate } from './business-date';
+export { isEmptyDraft, type DraftLine } from './drafts';
 export { costFloor } from './floor';
 export {
   checkReceipt,

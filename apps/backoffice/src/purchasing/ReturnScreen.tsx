@@ -1,5 +1,13 @@
 import type { DocumentRow, PurchasingLookups, ReceiptView, ReturnView } from '@erp/contracts';
-import { checkReturn, isDateLocked, money, mulQty, PURCHASE_RETURN_REASONS, qty as qtyOf } from '@erp/domain';
+import {
+  checkReturn,
+  isDateLocked,
+  isEmptyDraft,
+  money,
+  mulQty,
+  PURCHASE_RETURN_REASONS,
+  qty as qtyOf,
+} from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -234,6 +242,11 @@ function ReturnForm({
     })),
   });
   const save = async (): Promise<{ id: string; rowVersion: string } | null> => {
+    // Nothing on any line is nothing to keep (owner's review of W1-19); the server refuses it too.
+    if (isEmptyDraft(body().lines)) {
+      setMessage({ text: t('purchasing.errors.empty_draft'), error: true });
+      return null;
+    }
     const res = r
       ? await api('PUT', `/api/purchasing/returns/${encodeURIComponent(r.id)}`, {
           ...body(),

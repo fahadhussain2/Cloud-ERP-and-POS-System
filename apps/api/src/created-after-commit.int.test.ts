@@ -28,6 +28,8 @@ let cookie = '';
 let shopLocation = '';
 let category = '';
 let unit = '';
+/** A seeded item: a draft needs a line (owner review of W1-19). */
+let bearing = '';
 const app = () => buildApp({ pool, now: () => new Date('2026-11-06T06:00:00.000Z') });
 
 const send = (method: 'POST', url: string, payload: unknown) =>
@@ -83,6 +85,7 @@ beforeAll(async () => {
     category = (await c.query<{ id: string }>("SELECT id FROM erp.categories WHERE code = 'ABEA'")).rows[0]!
       .id;
     unit = (await c.query<{ id: string }>("SELECT id FROM erp.units WHERE code = 'PCS'")).rows[0]!.id;
+    bearing = (await c.query<{ id: string }>("SELECT id FROM erp.items WHERE code = 'ABEA001'")).rows[0]!.id;
   });
   const login = await app().inject({
     method: 'POST',
@@ -115,7 +118,7 @@ it('a supplier, a receipt draft, a return draft and a new item exist by the time
     billDiscount: 0,
     billTotal: null,
     notes: null,
-    lines: [],
+    lines: [{ itemId: bearing, qty: 1000, unitCost: 100, lineDiscount: 0 }],
   });
   expect(receipt.statusCode).toBe(201);
   expect(await exists('goods_receipts', receipt.json<{ id: string }>().id)).toBe(true);
@@ -126,7 +129,7 @@ it('a supplier, a receipt draft, a return draft and a new item exist by the time
     returnedOn: '2026-11-06',
     reason: null,
     note: null,
-    lines: [],
+    lines: [{ itemId: bearing, receiptLineId: null, qty: 1000, unitCost: 100 }],
   });
   expect(back.statusCode).toBe(201);
   expect(await exists('purchase_returns', back.json<{ id: string }>().id)).toBe(true);

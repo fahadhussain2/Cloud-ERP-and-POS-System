@@ -38,6 +38,7 @@ import {
   type Permission,
   type SystemRole,
   type VoucherAccount,
+  isEmptyDraft,
 } from '@erp/domain';
 import { postDocument } from '@erp/posting';
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
@@ -709,6 +710,8 @@ export function registerAccounting(scope: FastifyInstance, { pool, now, requireA
   scope.post('/accounting/vouchers', { preHandler: journal }, async (req, reply) => {
     const parsed = VoucherDraft.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+    // Nothing typed on any line is nothing to keep (owner's review of W1-19).
+    if (isEmptyDraft(parsed.data.lines)) return reply.code(400).send({ error: 'empty_draft' });
     const b = parsed.data;
     return run(req, reply, async (c) => {
       const { rows } = await c.query<{ id: string }>(
@@ -736,6 +739,8 @@ export function registerAccounting(scope: FastifyInstance, { pool, now, requireA
     const id = (req.params as { id: string }).id;
     return run(req, reply, async (c) => {
       await draftAt(c, id, b.rowVersion);
+      // Nothing typed on any line is nothing to keep (owner's review of W1-19); posted or stale is said first.
+      if (isEmptyDraft(b.lines)) throw new Refusal(400, { error: 'empty_draft' });
       await c.query(
         `UPDATE erp.journal_vouchers SET business_date = $2, narration = $3, row_version = row_version + 1
          WHERE id = $1`,

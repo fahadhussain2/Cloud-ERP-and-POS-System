@@ -5,6 +5,7 @@ import type {
   LockChecklist,
   PeriodsView,
 } from '@erp/contracts';
+import { formatMoney } from '@erp/ui';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
@@ -213,6 +214,39 @@ describe('a journal voucher', () => {
     expect((post as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText('Credit, line 2'), { target: { value: '1,500' } });
     await waitFor(() => expect((post as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  // Owner's review of W1-19: nothing typed is nothing to save, and a new voucher has no draft to delete.
+  it('refuses to save an empty voucher, and offers Delete draft only on a saved one', async () => {
+    const { api, calls } = fakeApi(lookups());
+    show(<VoucherScreen api={api} id="new" />);
+    fireEvent.click(await screen.findByRole('button', { name: a.voucher.save }));
+    expect(await screen.findByText(a.errors.empty_draft)).toBeTruthy();
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+    expect(screen.queryByRole('button', { name: a.voucher.delete })).toBeNull();
+  });
+
+  // Owner's review of W1-19: each line says what it does to its account, so a wrong-way line shows before posting.
+  it('says under each account what the line does to it', async () => {
+    const { api } = fakeApi(lookups());
+    show(<VoucherScreen api={api} id="new" />);
+    await screen.findByRole('button', { name: a.voucher.post });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Account, line 1' }), {
+      target: { value: 'a6300' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Account, line 2' }), {
+      target: { value: 'a1130' },
+    });
+    fireEvent.change(screen.getByLabelText('Debit, line 1'), { target: { value: '1,500' } });
+    fireEvent.change(screen.getByLabelText('Credit, line 2'), { target: { value: '1,500' } });
+    // The page's text is matched with its spaces made plain; money has a non-breaking one.
+    const amount = formatMoney(150000, MONEY).replace(/\s/g, ' ');
+    expect(screen.getByText(`↑ General expenses goes up ${amount}`)).toBeTruthy();
+    expect(screen.getByText(`↓ Cash in safe goes down ${amount}`)).toBeTruthy();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Account, line 2' }), {
+      target: { value: 'a1200' },
+    });
+    expect(screen.getByText(`↓ The customer owes you less: ${amount}`)).toBeTruthy();
   });
 
   it('a new voucher posts in one go: saved as a draft, then posted, then shown as posted', async () => {
