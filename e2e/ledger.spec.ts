@@ -126,8 +126,8 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   await expect(dialog.getByRole('alert')).toHaveText(a.problems.date_locked);
   await dialog.getByRole('button', { name: a.cancel }).click();
 
-  // Goods received in the locked month: Post saves the draft, is refused, and the draft says why (owner's staging
-  // test of W1-19). Its own supplier, so the purchasing flow's numbers are untouched.
+  // Goods received in the locked month: Post waits and the date says why; the draft can be saved (owner's staging
+  // test and review of W1-19). Its own supplier, and never posted, so the purchasing flow's numbers are untouched.
   await menu(page, bo.nav.suppliers);
   await page.getByRole('button', { name: bo.purchasing.suppliers.add }).click();
   const form = page.getByRole('dialog');
@@ -149,15 +149,21 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   await page.getByLabel('Quantity of line 1').fill('1');
   await page.getByLabel('Unit cost of line 1').fill('100');
   await page.getByLabel(bo.purchasing.fields.billTotal).fill('100');
-  await page.getByRole('button', { name: bo.purchasing.post }).click();
+  // Post waits, and Received on says why; Save draft keeps what was typed (owner's review of W1-19).
+  const locked = bo.purchasing.errors.date_locked.replace('{{date}}', lockDate);
+  await expect(page.getByText(locked)).toBeVisible();
+  await expect(page.getByRole('button', { name: bo.purchasing.post })).toBeDisabled();
+  await page.getByRole('button', { name: bo.purchasing.saveDraft }).click();
   await expect(page).toHaveURL(/#\/purchasing\/receipts\/[0-9a-f-]{36}$/);
-  await expect(page.getByText(bo.purchasing.errors.date_locked.replace('{{date}}', lockDate))).toBeVisible();
-  // Post again: refused the same way, never "Something went wrong".
-  await page.getByRole('button', { name: bo.purchasing.post }).click();
-  await expect(page.getByText(bo.purchasing.errors.date_locked.replace('{{date}}', lockDate))).toBeVisible();
+  await expect(page.getByText(locked)).toBeVisible();
+  await expect(page.getByRole('button', { name: bo.purchasing.post })).toBeDisabled();
   await expect(page.getByText(bo.app.error)).toHaveCount(0);
   expect(
     await sql(`SELECT 1 FROM erp.goods_receipts WHERE supplier_bill_no = 'LATE-1' AND status = 'draft'`),
   ).toHaveLength(1);
+  // A later date opens Post again (not posted here: the purchasing flow numbers the first receipt).
+  await page.getByLabel(bo.purchasing.fields.receivedOn).fill(new Date().toISOString().slice(0, 10));
+  await expect(page.getByText(locked)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: bo.purchasing.post })).toBeEnabled();
   await office.close();
 });

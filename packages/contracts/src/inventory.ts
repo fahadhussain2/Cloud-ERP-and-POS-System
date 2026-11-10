@@ -81,6 +81,8 @@ export interface InventoryLookups {
     viewCost: boolean;
     settings: boolean;
   };
+  /** The shop's lock date (D-108): a document dated on or before it can't post; null = none. */
+  lockDate: string | null;
 }
 
 /** An item found for a line: what the checks need, its stock per location, and its average with cost.view. */

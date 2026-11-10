@@ -203,8 +203,11 @@ export function registerInventory(scope: FastifyInstance, { pool, now, requireAu
 
   scope.get('/inventory/lookups', { preHandler: lookups }, async (req, reply) =>
     run(req, reply, async (c) => {
-      const t = (await c.query<{ live: boolean }>('SELECT go_live_at IS NOT NULL AS live FROM erp.tenants'))
-        .rows[0];
+      const t = (
+        await c.query<{ live: boolean; lock_date: string | null }>(
+          'SELECT go_live_at IS NOT NULL AS live, lock_date::text AS lock_date FROM erp.tenants',
+        )
+      ).rows[0];
       const out: InventoryLookups = {
         locations: (
           await c.query<{ id: string; code: string; name: string; kind: LocationKindName }>(
@@ -231,6 +234,7 @@ export function registerInventory(scope: FastifyInstance, { pool, now, requireAu
           viewCost: allowed(req, 'cost.view'),
           settings: allowed(req, 'admin.settings'),
         },
+        lockDate: t?.lock_date ?? null,
       };
       return out;
     }),

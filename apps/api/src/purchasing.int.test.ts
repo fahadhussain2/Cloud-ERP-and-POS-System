@@ -503,4 +503,16 @@ describe('the books', () => {
     expect(l.bankAccounts.map((b) => b.id)).toContain(hbl);
     expect(l.can).toEqual({ receive: true, payByBank: false });
   });
+
+  it('the lookups carry the lock date, so the screen greys out Post for a locked date (D-108)', async () => {
+    const lockDate = async () =>
+      (await send('GET', '/api/purchasing/lookups', 'maria')).json<{ lockDate: string | null }>().lockDate;
+    expect(await lockDate()).toBeNull();
+    await q('UPDATE erp.tenants SET lock_date = $2 WHERE id = $1', [tenant, '2026-10-31']);
+    try {
+      expect(await lockDate()).toBe('2026-10-31');
+    } finally {
+      await q('UPDATE erp.tenants SET lock_date = NULL WHERE id = $1', [tenant]);
+    }
+  });
 });

@@ -26,6 +26,7 @@ const lookups = (over: Partial<PurchasingLookups> = {}): PurchasingLookups => ({
   live: false,
   money: MONEY,
   can: { receive: true, payByBank: false },
+  lockDate: null,
   ...over,
 });
 const DRAFT: ReceiptView = {
@@ -186,6 +187,26 @@ describe('a goods receipt', () => {
     show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
     expect(await screen.findByText(en.purchasing.receipts.cashHint)).toBeDefined();
     expect(screen.getByText(en.purchasing.notLive.title)).toBeDefined();
+  });
+
+  // Owner's review of W1-19: a receipt received in a locked month is greyed out before Post, so Post can't leave a
+  // surprise draft. Save draft still keeps what was typed.
+  it('greys out Post and says why when Received on is on or before the lock date', async () => {
+    const f = fakeApi(lookups({ lockDate: '2026-11-06' }));
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    fireEvent.change(await screen.findByLabelText(en.purchasing.fields.billTotal), {
+      target: { value: '13401' },
+    });
+    expect(screen.getByText('The books are locked up to 2026-11-06. Pick a later date.')).toBeDefined();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post }).disabled).toBe(true);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.saveDraft }).disabled).toBe(
+      false,
+    );
+    fireEvent.change(screen.getByLabelText(en.purchasing.fields.receivedOn), {
+      target: { value: '2026-11-07' },
+    });
+    expect(screen.queryByText('The books are locked up to 2026-11-06. Pick a later date.')).toBeNull();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post }).disabled).toBe(false);
   });
 
   // Owner's staging test of W1-19: a receipt received in a locked month said "Something went wrong".

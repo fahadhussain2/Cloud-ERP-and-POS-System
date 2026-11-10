@@ -178,12 +178,13 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
 
   scope.get('/purchasing/lookups', { preHandler: read }, async (req, reply) =>
     run(req, reply, async (c) => {
-      const live = (
-        await c.query<{ live: boolean }>(
-          'SELECT go_live_at IS NOT NULL AS live FROM erp.tenants WHERE id = $1',
+      const shop = (
+        await c.query<{ live: boolean; lock_date: string | null }>(
+          'SELECT go_live_at IS NOT NULL AS live, lock_date::text AS lock_date FROM erp.tenants WHERE id = $1',
           [req.auth!.tenantId],
         )
-      ).rows[0]?.live;
+      ).rows[0];
+      const live = shop?.live;
       const out: PurchasingLookups = {
         locations: (
           await c.query<{ id: string; code: string; name: string }>(
@@ -205,6 +206,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
         live: live === true,
         money: await moneyOf(c),
         can: { receive: allowed(req, 'pur.receive'), payByBank: allowed(req, 'acc.payment.create') },
+        lockDate: shop?.lock_date ?? null,
       };
       return out;
     }),

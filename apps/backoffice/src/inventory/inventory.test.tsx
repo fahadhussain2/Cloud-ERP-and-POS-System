@@ -37,6 +37,7 @@ const lookups = (over: Partial<InventoryLookups> = {}): InventoryLookups => ({
   live: false,
   money: MONEY,
   can: CAN,
+  lockDate: null,
   ...over,
 });
 
@@ -184,6 +185,17 @@ describe('a transfer', () => {
     expect(screen.queryByRole('button', { name: en.inventory.post })).toBeNull();
   });
 
+  it('greys out Post and says why when its date is on or before the lock date (D-108)', async () => {
+    show(<TransferScreen api={fakeApi(lookups({ lockDate: '2026-11-08' })).api} id="t1" />);
+    expect(
+      await screen.findByText('The books are locked up to 2026-11-08. Pick a later date.'),
+    ).toBeDefined();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.inventory.post }).disabled).toBe(true);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.inventory.saveDraft }).disabled).toBe(
+      false,
+    );
+  });
+
   it('says Send on a route that needs receiving, and saves before it sends', async () => {
     const f = fakeApi(
       lookups({ routes: [{ fromLocationId: 'godown', toLocationId: 'shop', needsReceiving: true }] }),
@@ -245,6 +257,19 @@ describe('an adjustment', () => {
     show(<AdjustmentScreen api={fakeApi(lookups({ can: { ...CAN, approve: true } })).api} id="a1" />);
     expect(await screen.findByRole('button', { name: en.inventory.post })).toBeDefined();
     expect(screen.queryByText(/will wait/)).toBeNull();
+  });
+
+  it('greys out Post and says why when its date is on or before the lock date (D-108)', async () => {
+    show(
+      <AdjustmentScreen
+        api={fakeApi(lookups({ can: { ...CAN, approve: true }, lockDate: '2026-11-08' })).api}
+        id="a1"
+      />,
+    );
+    expect(
+      await screen.findByText('The books are locked up to 2026-11-08. Pick a later date.'),
+    ).toBeDefined();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.inventory.post }).disabled).toBe(true);
   });
 
   // Owner's staging test of W1-19: a stock document dated in a locked month said "Something went wrong".
