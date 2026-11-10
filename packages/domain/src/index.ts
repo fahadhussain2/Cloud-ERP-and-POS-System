@@ -83,6 +83,16 @@ export {
 } from './accounting';
 export { businessDate } from './business-date';
 export { isEmptyDraft, type DraftLine } from './drafts';
+export {
+  ageBalances,
+  registerTotals,
+  type AgeingBuckets,
+  type AgeingEntry,
+  type AgeingInput,
+  type AgeingRow,
+  type RegisterBill,
+  type RegisterTotals,
+} from './reports';
 export { costFloor } from './floor';
 export {
   checkReceipt,

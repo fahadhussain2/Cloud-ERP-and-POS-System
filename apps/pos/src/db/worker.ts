@@ -150,6 +150,7 @@ const ops = {
   recordPinEvent: (e: Omit<repo.PinEvent, 'id' | 'pushedAt'>) => repo.recordPinEvent(open(), e),
   outboxStats: () => repo.outboxStats(open()),
   log: (kind: string, detail: Record<string, unknown>) => repo.log(open(), kind, detail),
+  diagnosticLog: () => repo.diagnosticLog(open()),
   /** PBKDF2 with 600k iterations (W0-10): run here, so the UI stays responsive. */
   verifyPin: (verifier: string, pin: string) => verifyPin(verifier, pin),
 };

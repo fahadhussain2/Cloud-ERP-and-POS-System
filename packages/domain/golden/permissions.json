@@ -182,6 +182,31 @@
       "expected": false
     },
     {
+      "name": "Manager reviews exceptions (owner answer 5 to W1-20)",
+      "input": { "roles": ["manager"], "permission": "exceptions.review" },
+      "expected": true
+    },
+    {
+      "name": "Accountant sees exceptions but doesn't review them",
+      "input": { "roles": ["accountant"], "permission": "exceptions.review" },
+      "expected": false
+    },
+    {
+      "name": "Owner traces a bill (PLT-12, owner answer 1 to W1-20)",
+      "input": { "roles": ["owner"], "permission": "support.trace" },
+      "expected": true
+    },
+    {
+      "name": "Manager doesn't trace bills: the owner's only",
+      "input": { "roles": ["manager"], "permission": "support.trace" },
+      "expected": false
+    },
+    {
+      "name": "Cashier sees no reports",
+      "input": { "roles": ["cashier"], "permission": "reports.view" },
+      "expected": false
+    },
+    {
       "name": "Accountant doesn't sell",
       "input": { "roles": ["accountant"], "permission": "pos.sale.create" },
       "expected": false

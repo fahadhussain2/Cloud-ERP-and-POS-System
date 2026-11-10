@@ -10,6 +10,8 @@ describe('job registry', () => {
     const names = jobsFor({ pool: {} as pg.Pool, log }).map((job) => job.name);
     expect(new Set(names).size).toBe(names.length);
     expect(names).toContain('posting-catch-up');
+    // A counter's diagnostics are removed after 30 days (owner answer 6 to W1-20).
+    expect(names).toContain('diagnostics-prune');
   });
 
   it('has no database jobs without a database', () => {

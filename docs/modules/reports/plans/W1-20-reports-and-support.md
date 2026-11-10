@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#65](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/65) |
 | **Module** | reports (back-office screens and API, read only), with platform (PLT-12: "Trace a bill", "Send diagnostics" on the counter) |
-| **Status** | Accepted (2026-11-10) with the owner's answers 1–7 (below) |
+| **Status** | Accepted (2026-11-10) with the owner's answers 1–7 (below). Built (2026-11-10) on `w1-20-reports` |
 | **Refs** | RPT-01, RPT-03, RPT-04, RPT-05, RPT-06, RPT-10, PLT-12; PLT-09 (device health); PRD §6.8; architecture §11.3 (the counter's diagnostic log); CLAUDE.md rules 1, 5, 7, 10; D-059 (handover exceptions), D-090 (pilot order), D-100 (no legacy bills), D-101 (pilot wipe); D-110 (new, below) |
 | **Depends on** | W1-11 (cash desk, handovers, day reconciliation and its CSV), W1-13 (returns), W1-08 (stock, cost and party ledgers), W1-16 (supplier ledger), W1-22 (customers) |
 | **Size** | about 3½ days: report queries and API with integration tests 1¼; screens and CSV 1¼; "Trace a bill" ½; "Send diagnostics" ¼ (question 6); e2e and docs ¼ |
@@ -152,6 +152,26 @@ The owner accepted every recommendation in the questions below (1–7). The tria
   - an exception reviewed;
   - one bill traced end to end;
   - diagnostics sent from a counter.
+
+## Changes during the build
+
+| Change | Why |
+|---|---|
+| The open high-severity count is a badge beside **Exceptions** in the menu, not on a home screen | The back office has no home page: it opens the first screen a person may use. The menu is on every screen |
+| `exceptions.review_note` (new column) holds the reviewer's note; the status, who and when were there since 0008 | What the server recorded (kind, severity, details) never changes; only its review does |
+| `device_diagnostics` is not audited row by row; each upload writes one `diagnostics.sent` audit row | A row is a log of up to 5,000 events; copying it into the audit log would double it for nothing |
+| No new indexes: the reports use `sales_documents_day_idx`, `exceptions_open_idx` and `party_ledger_entries_party_idx` | They already cover the date and party lookups |
+| The trace's *attempts* counts a refused document sent again; a bill already accepted and pushed again is answered as a duplicate and not counted | Sync stays idempotent (rule 7): a duplicate writes nothing |
+| Send diagnostics while offline isn't queued: the counter says it is offline and to try again | A queued log would be stale by the time it went; support asks for it when it is needed |
+| The counter drops any log key naming a phone, PIN, password, token, secret or signature before sending (`scrub`, tested) | Nothing personal or secret leaves the counter (the plan's risk table) |
+| The stock report sends at most 2,000 lines and says so; its totals count every line | Delux has about 20,000 items; the search narrows it |
+| Trace a bill also shows a logged reprint and a failed print, from the diagnostics, as their own steps | The counter's log is the only place a print is recorded |
+
+## Checks (2026-11-10)
+
+- `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 2,142 tests.
+- `pnpm test:integration`: 429 passed (41 files), including the reports and support API (18) and migration 0021's role update.
+- `pnpm e2e` (Edge): 54 passed; the new reports flow covers Send diagnostics on the counter, the register, a trace, an exception reviewed and the counter's diagnostics page.
 
 ## Order
 

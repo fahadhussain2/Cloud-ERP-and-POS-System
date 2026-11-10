@@ -418,6 +418,14 @@ export const clearOpenBill = (db: SqlDb, userId: string): void =>
 
 const LOG_KEEP = 5000;
 
+/** The whole diagnostic log, oldest first, for Send diagnostics (PLT-12, W1-20). */
+export const diagnosticLog = (db: SqlDb): { at: string; kind: string; detail: string }[] =>
+  db.selectObjects('SELECT at, kind, detail FROM diagnostic_log ORDER BY id') as {
+    at: string;
+    kind: string;
+    detail: string;
+  }[];
+
 /** One diagnostic event (architecture §11.3); keeps the last 5,000. */
 export function log(db: SqlDb, kind: string, detail: Record<string, unknown>): void {
   db.exec('INSERT INTO diagnostic_log (at, kind, detail) VALUES (?, ?, ?)', [

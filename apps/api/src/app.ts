@@ -15,8 +15,10 @@ import { registerPurchasing } from './purchasing/routes';
 import { registerDevices } from './devices/routes';
 import { registerEvents } from './sync/events';
 import { registerReports } from './reports/routes';
+import { registerReportViews } from './reports/views';
 import { registerPush } from './sync/push';
 import { registerSync } from './sync/routes';
+import { registerSupport } from './support/routes';
 
 export interface AppOptions extends FastifyServerOptions {
   // The image tag of this release (D-075); the deploy checks it after starting.
@@ -91,6 +93,8 @@ export function buildApp({
         registerAdmin(api, { pool, requireAuth });
         registerUsers(api, { pool, now, requireAuth });
         registerReports(api, { pool, now, requireAuth });
+        registerReportViews(api, { pool, now, requireAuth });
+        registerSupport(api, { pool, now, requireAuth, requireDevice });
         registerCatalog(api, { pool, now, requireAuth });
         registerLabels(api, { pool, requireAuth });
         registerPurchasing(api, { pool, now, requireAuth });

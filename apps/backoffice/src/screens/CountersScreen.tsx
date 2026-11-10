@@ -24,6 +24,8 @@ import {
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { DiagnosticsRow } from '@erp/contracts';
+
 import type { Api } from '../api';
 import { ConfirmDialog } from '../staff/dialogs';
 
@@ -87,6 +89,7 @@ export function CountersScreen({ api }: { api: Api }) {
   const [code, setCode] = useState<{ code: string; expiresAt: string } | null>(null);
   const [revoking, setRevoking] = useState<Device | null>(null);
   const [reenabling, setReenabling] = useState<Device | null>(null);
+  const [looking, setLooking] = useState<Device | null>(null);
   const [loadedAt, setLoadedAt] = useState(0);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const branchLabel = useId();
@@ -227,7 +230,14 @@ export function CountersScreen({ api }: { api: Api }) {
                       </StatusChip>
                     </TableCell>
                     <HealthCells health={d.health ?? null} time={time} nowMs={loadedAt} />
-                    <TableCell className="text-end">
+                    <TableCell className="flex justify-end gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setLooking(looking?.id === d.id ? null : d)}
+                      >
+                        {t('counters.diagnostics.show')}
+                      </Button>
                       {d.status === 'active' ? (
                         <Button size="sm" variant="outline" onClick={() => setRevoking(d)}>
                           {t('counters.revoke')}
@@ -245,6 +255,7 @@ export function CountersScreen({ api }: { api: Api }) {
           </div>
         )}
       </Panel>
+      {looking && <DiagnosticsPanel key={looking.id} api={api} device={looking} time={time} />}
       {revoking && (
         <ConfirmDialog
           api={api}
@@ -278,6 +289,74 @@ export function CountersScreen({ api }: { api: Api }) {
         />
       )}
     </>
+  );
+}
+
+/**
+ * What a manager sent from this counter with Send diagnostics (PLT-12, owner answer 6 to W1-20): kept 30 days; each one
+ * downloads as JSON for support.
+ */
+function DiagnosticsPanel({
+  api,
+  device,
+  time,
+}: {
+  api: Api;
+  device: Device;
+  time: (iso: string) => string;
+}) {
+  const { t } = useTranslation();
+  const [rows, setRows] = useState<DiagnosticsRow[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    void api('GET', `/api/devices/${encodeURIComponent(device.id)}/diagnostics`).then((r) => {
+      if (live) setRows(r.status === 200 ? (r.body as { diagnostics: DiagnosticsRow[] }).diagnostics : []);
+    });
+    return () => {
+      live = false;
+    };
+  }, [api, device.id]);
+  const download = async (row: DiagnosticsRow) => {
+    const r = await api(
+      'GET',
+      `/api/devices/${encodeURIComponent(device.id)}/diagnostics/${encodeURIComponent(row.id)}`,
+    );
+    if (r.status !== 200) return;
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(r.body, null, 2)], { type: 'application/json' }),
+    );
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `diagnostics-${device.code}-${row.receivedAt.slice(0, 19).replace(/[:T]/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <Panel title={`${t('counters.diagnostics.title')} · ${device.code}`} className="pb-2">
+      <p className="m-0 px-3.5 text-sm text-muted-foreground">{t('counters.diagnostics.help')}</p>
+      {rows === null ? null : rows.length === 0 ? (
+        <p className="m-0 px-3.5 pt-2 text-muted-foreground">{t('counters.diagnostics.none')}</p>
+      ) : (
+        <Table aria-label={t('counters.diagnostics.title')}>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell>{time(row.receivedAt)}</TableCell>
+                <TableCell>
+                  {t('counters.diagnostics.sentBy')} {row.sentByName}
+                </TableCell>
+                <TableCell>{t('counters.diagnostics.events', { count: row.eventCount })}</TableCell>
+                <TableCell className="text-end">
+                  <Button size="sm" variant="outline" onClick={() => void download(row)}>
+                    {t('counters.diagnostics.download')}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </Panel>
   );
 }
 

@@ -37,7 +37,7 @@ interface Branch {
 }
 
 /** A date as YYYY-MM-DD in this browser's time zone, `days` from today. */
-const dayOf = (days: number) => {
+export const dayOf = (days: number) => {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -54,7 +54,7 @@ const ACK_TONE: Record<AcknowledgementStatus, ChipTone> = {
 const varianceTone = (v: number | null): string =>
   v === null || v === 0 ? '' : v < 0 ? 'text-bad' : 'text-warn';
 
-function DateField({
+export function DateField({
   label,
   value,
   onChange,

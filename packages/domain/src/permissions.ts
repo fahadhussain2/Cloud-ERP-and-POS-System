@@ -55,6 +55,10 @@ export const PERMISSIONS = [
   'cost.view',
   'reports.view',
   'reports.financial',
+  // Marks an exception reviewed or dismissed, with a note (owner answer 5 to W1-20): owner and manager.
+  'exceptions.review',
+  // Trace a bill (PLT-12, owner answer 1 to W1-20): the owner's only.
+  'support.trace',
   'admin.users',
   'admin.roles',
   'admin.settings',
@@ -115,6 +119,7 @@ export const ROLE_TEMPLATES: Readonly<Record<RoleTemplateKey, RoleTemplate>> = {
       'pur.reprice.approve',
       'cost.view',
       'reports.view',
+      'exceptions.review',
       'admin.devices',
     ],
     limits: { maxDiscountBp: 10_000, voidWindow: 'same_day_before_handover' },

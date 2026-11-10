@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Planned: [W1-20](plans/W1-20-reports-and-support.md) accepted (sales register, overrides, voids and returns, stock and valuation, ageing, exceptions, Trace a bill); RPT-02 built in W1-11 |
+| **Status** | Built: [W1-20](plans/W1-20-reports-and-support.md) (sales register, overrides, voids and returns, stock and valuation, ageing, exceptions, Trace a bill); RPT-02 built in W1-11 |
 | **Requirements** | 10 (RPT-01…RPT-10) |
 | **Feature spec needed** | No |
 
