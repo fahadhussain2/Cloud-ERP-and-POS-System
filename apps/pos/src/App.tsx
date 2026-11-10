@@ -10,7 +10,7 @@ import { CardScreen } from './screens/Card';
 import { CashDeskScreen } from './screens/CashDeskScreen';
 import { ChoosePinScreen } from './screens/ChoosePinScreen';
 import { CounterScreen } from './screens/CounterScreen';
-import { HealthDialog, type RetryAttempt } from './screens/HealthDialog';
+import { HealthDialog, type RetryAttempt, type SendAttempt } from './screens/HealthDialog';
 import { RevokedScreen } from './screens/RevokedScreen';
 import { SetupScreen } from './screens/SetupScreen';
 import { StatusBar, type Connection } from './screens/StatusBar';
@@ -392,6 +392,24 @@ export function App({ counter }: { counter: Counter }) {
     return { result: r.result, failures: r.approverState.failures };
   };
 
+  /** *Send diagnostics*: the same manager check as *Try again* (admin.devices), then the log goes (PLT-12, W1-20). */
+  const sendLog: SendAttempt = async (manager, pin) => {
+    const [state, grants] = await Promise.all([counter.getPinState(manager.id), counter.grants(manager.id)]);
+    const r = await checkManager({
+      approver: manager,
+      approverState: state,
+      approverGrants: grants,
+      branchId: device?.branchId ?? null,
+      pin,
+      verify: (v, p) => counter.verifyPin(v, p),
+    });
+    await counter.setPinState(manager.id, r.approverState);
+    await recordLock(manager.id, state, r.approverState);
+    const sent = r.result === 'approved' ? await counter.sendDiagnostics(manager.id) : null;
+    await counter.log('diagnostics.send', { managerId: manager.id, result: r.result, sent });
+    return { result: r.result, failures: r.approverState.failures, sent };
+  };
+
   const offline = {
     level: offlineLevel(status.lastContactAt, now, {
       warningHours: settings?.offlineWarningHours ?? DEFAULT_THRESHOLDS.warningHours,
@@ -505,6 +523,7 @@ export function App({ counter }: { counter: Counter }) {
           locale={settings?.locale ?? i18n.language}
           timeZone={settings?.timeZone ?? 'Asia/Karachi'}
           onRetry={retry}
+          onSend={sendLog}
           onClose={() => setHealth(null)}
         />
       )}

@@ -24,6 +24,15 @@ import { useRoute, type Route } from './router';
 import { CountersScreen } from './screens/CountersScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { PasswordScreen } from './screens/PasswordScreen';
+import {
+  AgeingScreen,
+  ExceptionsScreen,
+  OverridesScreen,
+  SalesRegisterScreen,
+  StockReportScreen,
+  TraceScreen,
+  VoidsReturnsScreen,
+} from './reports/ReportViews';
 import { CashVarianceScreen, DayReconciliationScreen } from './screens/ReportsScreens';
 import { PersonScreen } from './staff/PersonScreen';
 import { StaffScreen } from './staff/StaffScreen';
@@ -66,6 +75,20 @@ export function App({ api }: { api: Api }) {
     };
   }, [fetchMe]);
 
+  // The open high-severity exceptions of the last week, beside Exceptions in the menu (owner answer 5 to W1-20).
+  const [openHigh, setOpenHigh] = useState(0);
+  const seesReports = me?.permissions.includes('reports.view') ?? false;
+  useEffect(() => {
+    if (!seesReports) return;
+    let live = true;
+    void api('GET', '/api/reports/exceptions/open-count').then((r) => {
+      if (live && r.status === 200) setOpenHigh((r.body as { high: number }).high);
+    });
+    return () => {
+      live = false;
+    };
+  }, [api, seesReports, route]);
+
   if (me === undefined) return <p className="p-6 text-muted-foreground">{t('app.loading')}</p>;
   if (me === null) return <LoginScreen api={api} onSignedIn={setMe} />;
   if (me.mustChangePassword) return <PasswordScreen api={api} onChanged={() => void loadMe()} />;
@@ -82,6 +105,7 @@ export function App({ api }: { api: Api }) {
       permissions={me.permissions}
       route={shown ?? route}
       onSignOut={() => void signOut()}
+      badges={{ exceptions: seesReports ? openHigh : 0 }}
     >
       {shown === null ? (
         <PageHeader title={t('app.title')} help={t('home.nothing')} />
@@ -93,6 +117,20 @@ export function App({ api }: { api: Api }) {
         <DayReconciliationScreen api={api} permissions={me.permissions} />
       ) : shown.screen === 'cashVariance' ? (
         <CashVarianceScreen api={api} />
+      ) : shown.screen === 'salesRegister' ? (
+        <SalesRegisterScreen api={api} />
+      ) : shown.screen === 'overridesReport' ? (
+        <OverridesScreen api={api} />
+      ) : shown.screen === 'voidsReturns' ? (
+        <VoidsReturnsScreen api={api} />
+      ) : shown.screen === 'stockReport' ? (
+        <StockReportScreen api={api} />
+      ) : shown.screen === 'ageing' ? (
+        <AgeingScreen api={api} />
+      ) : shown.screen === 'exceptions' ? (
+        <ExceptionsScreen api={api} permissions={me.permissions} />
+      ) : shown.screen === 'trace' ? (
+        <TraceScreen key={shown.number ?? ''} api={api} number={shown.number} />
       ) : shown.screen === 'items' ? (
         <ItemsScreen api={api} />
       ) : shown.screen === 'item' ? (

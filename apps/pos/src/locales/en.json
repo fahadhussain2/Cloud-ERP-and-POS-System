@@ -473,7 +473,16 @@
     "locked": "This manager is locked on this counter.",
     "notAllowed": "Only a manager who gives PINs (admin.devices) can do this.",
     "retried": "Bill {{number}} will be sent again.",
-    "close": "Close"
+    "close": "Close",
+    "diagnostics": {
+      "title": "Send diagnostics",
+      "help": "Sends this counter's recent log and health to support, after a manager's PIN. Nothing personal is sent.",
+      "send": "Send diagnostics",
+      "sent": "Sent to support.",
+      "offline": "Not sent: the counter is offline. Try again when it is back online.",
+      "not_permitted": "Not sent: the server says this manager may not manage counters.",
+      "failed": "Not sent. Try again; if it stays, tell support."
+    }
   },
   "revoked": {
     "title": "This counter was removed",

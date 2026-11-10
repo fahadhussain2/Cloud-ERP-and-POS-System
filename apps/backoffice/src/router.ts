@@ -10,6 +10,13 @@ export type Route =
   | { screen: 'counters' }
   | { screen: 'dayReconciliation' }
   | { screen: 'cashVariance' }
+  | { screen: 'salesRegister' }
+  | { screen: 'overridesReport' }
+  | { screen: 'voidsReturns' }
+  | { screen: 'stockReport' }
+  | { screen: 'ageing' }
+  | { screen: 'exceptions' }
+  | { screen: 'trace'; number: string | null }
   | { screen: 'items' }
   | { screen: 'item'; id: string }
   | { screen: 'newItem' }
@@ -44,6 +51,14 @@ export const href = {
   counters: '#/counters',
   dayReconciliation: '#/reports/day',
   cashVariance: '#/reports/variance',
+  // The W1-20 reports and support (D-110).
+  salesRegister: '#/reports/sales',
+  overridesReport: '#/reports/overrides',
+  voidsReturns: '#/reports/voids',
+  stockReport: '#/reports/stock',
+  ageing: '#/reports/ageing',
+  exceptions: '#/reports/exceptions',
+  trace: (number?: string) => (number ? `#/support/trace/${encodeURIComponent(number)}` : '#/support/trace'),
   items: '#/catalog',
   item: (id: string) => `#/catalog/items/${encodeURIComponent(id)}`,
   newItem: '#/catalog/new',
@@ -91,6 +106,14 @@ export function parseHash(hash: string): Route {
   if (parts[0] === 'counters') return { screen: 'counters' };
   if (parts[0] === 'reports' && parts[1] === 'day') return { screen: 'dayReconciliation' };
   if (parts[0] === 'reports' && parts[1] === 'variance') return { screen: 'cashVariance' };
+  if (parts[0] === 'reports' && parts[1] === 'sales') return { screen: 'salesRegister' };
+  if (parts[0] === 'reports' && parts[1] === 'overrides') return { screen: 'overridesReport' };
+  if (parts[0] === 'reports' && parts[1] === 'voids') return { screen: 'voidsReturns' };
+  if (parts[0] === 'reports' && parts[1] === 'stock') return { screen: 'stockReport' };
+  if (parts[0] === 'reports' && parts[1] === 'ageing') return { screen: 'ageing' };
+  if (parts[0] === 'reports' && parts[1] === 'exceptions') return { screen: 'exceptions' };
+  if (parts[0] === 'support' && parts[1] === 'trace')
+    return { screen: 'trace', number: parts[2] ? decodeURIComponent(parts[2]) : null };
   if (parts[0] === 'catalog' && parts[1] === 'items' && parts[2])
     return { screen: 'item', id: decodeURIComponent(parts[2]) };
   if (parts[0] === 'catalog' && parts[1] === 'new') return { screen: 'newItem' };

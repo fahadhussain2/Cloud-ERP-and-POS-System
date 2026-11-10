@@ -37,6 +37,8 @@ const DOCUMENT_TABLES = [
   'sequence_gaps',
   'device_series',
   'device_status',
+  // Reports and support (W1-20): a counter's diagnostics, sent by a manager.
+  'device_diagnostics',
   'journal_lines',
   'journal_entries',
   'stock_movements',

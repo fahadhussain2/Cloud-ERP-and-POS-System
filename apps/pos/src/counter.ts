@@ -29,6 +29,7 @@ import type { HeldBill } from './db/held';
 import type { FoundBill, ReturnableBill } from './db/returns';
 import type { LocalHealth, QuarantinedRow } from './db/outbox';
 import type { VoidListBill, VoidRequest } from './db/void';
+import type { DiagnosticsResult } from './sync/diagnostics';
 import type { DeviceInfo, PinEvent, TenantSettings } from './db/repo';
 import type { EnrollResult } from './device/session';
 import type { DeskPrintJob } from './print/DeskSlipPrint';
@@ -95,6 +96,8 @@ export interface Counter {
   /** Drops this counter's documents older than 30 days, never one still to sync (rule 9). */
   prune(): Promise<number>;
   log(kind: string, detail: Record<string, unknown>): Promise<void>;
+  /** Sends this counter's log and health to support, as the manager who unlocked it (PLT-12, W1-20). */
+  sendDiagnostics(sentByUserId: string): Promise<DiagnosticsResult>;
   /** Omni-search over the local catalog (POS spec §9). */
   search(text: string, opts?: SearchOptions): Promise<SearchResult[]>;
   /** How much of the catalog is on this counter, and whether its first load has finished. */

@@ -27,15 +27,15 @@ const toMoney = (v: string | number) => money(String(v));
 const iso = (t: Date | null) => t?.toISOString() ?? null;
 
 /** RFC 4180: quote a field that holds a comma, quote or line break. */
-type Cell = string | number | null;
+export type Cell = string | number | null;
 const csvField = (v: Cell) => {
   const s = v === null ? '' : String(v);
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
-const csv = (header: string[], rows: Cell[][]) =>
+export const csv = (header: string[], rows: Cell[][]) =>
   [header, ...rows].map((r) => r.map(csvField).join(',')).join('\r\n') + '\r\n';
 
-function sendCsv(reply: FastifyReply, name: string, body: string) {
+export function sendCsv(reply: FastifyReply, name: string, body: string) {
   return reply
     .header('content-type', 'text/csv; charset=utf-8')
     .header('content-disposition', `attachment; filename="${name}"`)

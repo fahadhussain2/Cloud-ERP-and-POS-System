@@ -14,6 +14,13 @@ export interface MenuItem {
     | 'counters'
     | 'dayReconciliation'
     | 'cashVariance'
+    | 'salesRegister'
+    | 'overridesReport'
+    | 'voidsReturns'
+    | 'stockReport'
+    | 'ageing'
+    | 'exceptions'
+    | 'trace'
     | 'items'
     | 'categories'
     | 'labels'
@@ -186,6 +193,19 @@ export const MENU: readonly {
         screens: ['dayReconciliation'],
       },
       { key: 'cashVariance', href: href.cashVariance, needs: ['reports.view'], screens: ['cashVariance'] },
+      // The W1-20 reports and support (D-110).
+      { key: 'salesRegister', href: href.salesRegister, needs: ['reports.view'], screens: ['salesRegister'] },
+      {
+        key: 'overridesReport',
+        href: href.overridesReport,
+        needs: ['reports.view'],
+        screens: ['overridesReport'],
+      },
+      { key: 'voidsReturns', href: href.voidsReturns, needs: ['reports.view'], screens: ['voidsReturns'] },
+      { key: 'stockReport', href: href.stockReport, needs: ['reports.view'], screens: ['stockReport'] },
+      { key: 'ageing', href: href.ageing, needs: ['reports.view'], screens: ['ageing'] },
+      { key: 'exceptions', href: href.exceptions, needs: ['reports.view'], screens: ['exceptions'] },
+      { key: 'trace', href: href.trace(), needs: ['support.trace'], screens: ['trace'] },
     ],
   },
 ];
@@ -198,12 +218,15 @@ export function Shell({
   permissions,
   route,
   onSignOut,
+  badges = {},
   children,
 }: {
   fullName: string;
   permissions: readonly string[];
   route: Route;
   onSignOut: () => void;
+  /** A count beside a menu entry, e.g. the open high-severity exceptions (owner answer 5 to W1-20). */
+  badges?: Partial<Record<MenuItem['key'], number>>;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -256,6 +279,14 @@ export function Shell({
                       )}
                     >
                       {t(`nav.${item.key}`)}
+                      {(badges[item.key] ?? 0) > 0 && (
+                        <span
+                          className="ms-1.5 rounded-full bg-bad px-1.5 text-xs font-semibold text-white tabular-nums"
+                          aria-label={t('nav.badge', { count: badges[item.key] })}
+                        >
+                          {badges[item.key]}
+                        </span>
+                      )}
                     </a>
                   );
                 })}

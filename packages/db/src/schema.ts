@@ -671,6 +671,7 @@ export const exceptions = erp.table('exceptions', {
   status: text('status', { enum: ['open', 'reviewed', 'dismissed'] }).notNull(),
   reviewedByUserId: uuid('reviewed_by_user_id'),
   reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  reviewNote: text('review_note'),
   ...auditColumns,
 });
 
@@ -711,6 +712,19 @@ export const deviceStatus = erp.table('device_status', {
   storageUsage: bigint('storage_usage', { mode: 'number' }),
   storageQuota: bigint('storage_quota', { mode: 'number' }),
   clockSkewMs: integer('clock_skew_ms'),
+});
+
+/** A counter's diagnostic log and health, sent by a manager (PLT-12, migration 0021, W1-20); kept 30 days. */
+export const deviceDiagnostics = erp.table('device_diagnostics', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  sentByUserId: uuid('sent_by_user_id').notNull(),
+  atDevice: timestamp('at_device', { withTimezone: true }).notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  health: jsonb('health').notNull(),
+  events: jsonb('events').notNull(),
+  eventCount: integer('event_count').notNull(),
 });
 
 // Ledgers (migration 0009, W1-08): written only by packages/posting (rule 4).

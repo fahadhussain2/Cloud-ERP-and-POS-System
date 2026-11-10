@@ -1,0 +1,227 @@
+{
+  "description": "The sales register's totals (RPT-01, owner answer 3 to W1-20, D-110): every finalized bill counts, returns and exchanges with their signed totals (net); a voided bill is counted apart and left out of every total. Totals by salesman, by counter and by tender, each sorted by name or code so the order is fixed. Amounts are paisa.",
+  "cases": [
+    {
+      "name": "a day of cash, card, a split bill, a void, a return, an exchange and a credit sale",
+      "input": {
+        "bills": [
+          {
+            "number": "S-C1-000001",
+            "status": "finalized",
+            "kind": "sale",
+            "salespersonId": "u-ali",
+            "salespersonName": "Ali",
+            "deviceCode": "C1",
+            "total": 450000,
+            "payments": [
+              {
+                "methodCode": "cash",
+                "methodName": "Cash",
+                "amount": 450000
+              }
+            ]
+          },
+          {
+            "number": "S-C1-000002",
+            "status": "finalized",
+            "kind": "sale",
+            "salespersonId": "u-sara",
+            "salespersonName": "Sara",
+            "deviceCode": "C1",
+            "total": 1200000,
+            "payments": [
+              {
+                "methodCode": "card",
+                "methodName": "Card",
+                "amount": 1200000
+              }
+            ]
+          },
+          {
+            "number": "S-C2-000001",
+            "status": "finalized",
+            "kind": "sale",
+            "salespersonId": "u-ali",
+            "salespersonName": "Ali",
+            "deviceCode": "C2",
+            "total": 300000,
+            "payments": [
+              {
+                "methodCode": "cash",
+                "methodName": "Cash",
+                "amount": 100000
+              },
+              {
+                "methodCode": "raast",
+                "methodName": "Raast",
+                "amount": 200000
+              }
+            ]
+          },
+          {
+            "number": "S-C2-000002",
+            "status": "voided",
+            "kind": "sale",
+            "salespersonId": "u-sara",
+            "salespersonName": "Sara",
+            "deviceCode": "C2",
+            "total": 999900,
+            "payments": [
+              {
+                "methodCode": "cash",
+                "methodName": "Cash",
+                "amount": 999900
+              }
+            ]
+          },
+          {
+            "number": "R-C1-000001",
+            "status": "finalized",
+            "kind": "return",
+            "salespersonId": "u-ali",
+            "salespersonName": "Ali",
+            "deviceCode": "C1",
+            "total": -50000,
+            "payments": [
+              {
+                "methodCode": "cash",
+                "methodName": "Cash",
+                "amount": -50000
+              }
+            ]
+          },
+          {
+            "number": "S-C1-000003",
+            "status": "finalized",
+            "kind": "exchange",
+            "salespersonId": "u-sara",
+            "salespersonName": "Sara",
+            "deviceCode": "C1",
+            "total": 25000,
+            "payments": [
+              {
+                "methodCode": "cash",
+                "methodName": "Cash",
+                "amount": 25000
+              }
+            ]
+          },
+          {
+            "number": "S-C2-000003",
+            "status": "finalized",
+            "kind": "sale",
+            "salespersonId": "u-sara",
+            "salespersonName": "Sara",
+            "deviceCode": "C2",
+            "total": 800000,
+            "payments": [
+              {
+                "methodCode": "account",
+                "methodName": "On account",
+                "amount": 800000
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "bills": 6,
+        "voided": 1,
+        "total": 2725000,
+        "bySalesperson": [
+          {
+            "id": "u-ali",
+            "name": "Ali",
+            "bills": 3,
+            "total": 700000
+          },
+          {
+            "id": "u-sara",
+            "name": "Sara",
+            "bills": 3,
+            "total": 2025000
+          }
+        ],
+        "byCounter": [
+          {
+            "code": "C1",
+            "bills": 4,
+            "total": 1625000
+          },
+          {
+            "code": "C2",
+            "bills": 2,
+            "total": 1100000
+          }
+        ],
+        "byTender": [
+          {
+            "code": "account",
+            "name": "On account",
+            "amount": 800000
+          },
+          {
+            "code": "card",
+            "name": "Card",
+            "amount": 1200000
+          },
+          {
+            "code": "cash",
+            "name": "Cash",
+            "amount": 525000
+          },
+          {
+            "code": "raast",
+            "name": "Raast",
+            "amount": 200000
+          }
+        ]
+      }
+    },
+    {
+      "name": "a day with no bills",
+      "input": {
+        "bills": []
+      },
+      "expected": {
+        "bills": 0,
+        "voided": 0,
+        "total": 0,
+        "bySalesperson": [],
+        "byCounter": [],
+        "byTender": []
+      }
+    },
+    {
+      "name": "only a voided bill: counted as voided, nothing in the totals",
+      "input": {
+        "bills": [
+          {
+            "number": "S-C1-000009",
+            "status": "voided",
+            "kind": "sale",
+            "salespersonId": "u-ali",
+            "salespersonName": "Ali",
+            "deviceCode": "C1",
+            "total": 100000,
+            "payments": [
+              {
+                "methodCode": "cash",
+                "methodName": "Cash",
+                "amount": 100000
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "bills": 0,
+        "voided": 1,
+        "total": 0,
+        "bySalesperson": [],
+        "byCounter": [],
+        "byTender": []
+      }
+    }
+  ]
+}

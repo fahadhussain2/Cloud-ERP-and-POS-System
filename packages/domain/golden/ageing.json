@@ -1,0 +1,250 @@
+{
+  "description": "Ageing by due date (RPT-06, owner answer 4 to W1-20, D-110). A party's ledger entries are signed: positive raises what is owed (a customer's credit sale, a supplier's bill), negative lowers it (a payment, a return). Credits are applied to the oldest debit first (by due date, then entry date). What is left of each debit goes to its bucket by how many days past its due date it is at `asOf`: not yet due (0 or fewer), 1\u201330, 31\u201360, 61\u201390, over 90. A credit left over (a party owing less than nothing) goes to not yet due, so the buckets always add up to the balance. Parties with a zero balance are left out; the rows are sorted by party id and the totals add the rows.",
+  "cases": [
+    {
+      "name": "one customer with a bill on every bucket edge: 0, 1, 30, 31, 60, 61, 90 and 91 days past due",
+      "input": {
+        "asOf": "2027-03-31",
+        "entries": [
+          {
+            "partyId": "c1",
+            "entryDate": "2027-03-01",
+            "dueDate": "2027-03-31",
+            "amount": 10000
+          },
+          {
+            "partyId": "c1",
+            "entryDate": "2027-02-01",
+            "dueDate": "2027-03-30",
+            "amount": 20000
+          },
+          {
+            "partyId": "c1",
+            "entryDate": "2027-01-01",
+            "dueDate": "2027-03-01",
+            "amount": 30000
+          },
+          {
+            "partyId": "c1",
+            "entryDate": "2027-01-01",
+            "dueDate": "2027-02-28",
+            "amount": 40000
+          },
+          {
+            "partyId": "c1",
+            "entryDate": "2026-12-01",
+            "dueDate": "2027-01-30",
+            "amount": 50000
+          },
+          {
+            "partyId": "c1",
+            "entryDate": "2026-12-01",
+            "dueDate": "2027-01-29",
+            "amount": 60000
+          },
+          {
+            "partyId": "c1",
+            "entryDate": "2026-12-01",
+            "dueDate": "2026-12-31",
+            "amount": 70000
+          },
+          {
+            "partyId": "c1",
+            "entryDate": "2026-11-01",
+            "dueDate": "2026-12-30",
+            "amount": 80000
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "partyId": "c1",
+            "balance": 360000,
+            "notDue": 10000,
+            "days1to30": 50000,
+            "days31to60": 90000,
+            "days61to90": 130000,
+            "over90": 80000
+          }
+        ],
+        "totals": {
+          "balance": 360000,
+          "notDue": 10000,
+          "days1to30": 50000,
+          "days31to60": 90000,
+          "days61to90": 130000,
+          "over90": 80000
+        }
+      }
+    },
+    {
+      "name": "a payment clears the oldest bill first, then part of the next",
+      "input": {
+        "asOf": "2027-03-31",
+        "entries": [
+          {
+            "partyId": "c1",
+            "entryDate": "2027-01-01",
+            "dueDate": "2027-01-15",
+            "amount": 100000
+          },
+          {
+            "partyId": "c1",
+            "entryDate": "2027-03-01",
+            "dueDate": "2027-03-15",
+            "amount": 100000
+          },
+          {
+            "partyId": "c1",
+            "entryDate": "2027-03-20",
+            "dueDate": "2027-03-20",
+            "amount": -150000
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "partyId": "c1",
+            "balance": 50000,
+            "notDue": 0,
+            "days1to30": 50000,
+            "days31to60": 0,
+            "days61to90": 0,
+            "over90": 0
+          }
+        ],
+        "totals": {
+          "balance": 50000,
+          "notDue": 0,
+          "days1to30": 50000,
+          "days31to60": 0,
+          "days61to90": 0,
+          "over90": 0
+        }
+      }
+    },
+    {
+      "name": "a customer who paid more than they owed: a credit balance under not yet due",
+      "input": {
+        "asOf": "2027-03-31",
+        "entries": [
+          {
+            "partyId": "c1",
+            "entryDate": "2027-01-01",
+            "dueDate": "2027-01-31",
+            "amount": 30000
+          },
+          {
+            "partyId": "c1",
+            "entryDate": "2027-02-01",
+            "dueDate": "2027-02-01",
+            "amount": -50000
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "partyId": "c1",
+            "balance": -20000,
+            "notDue": -20000,
+            "days1to30": 0,
+            "days31to60": 0,
+            "days61to90": 0,
+            "over90": 0
+          }
+        ],
+        "totals": {
+          "balance": -20000,
+          "notDue": -20000,
+          "days1to30": 0,
+          "days31to60": 0,
+          "days61to90": 0,
+          "over90": 0
+        }
+      }
+    },
+    {
+      "name": "two parties, one settled (left out), sorted by id, with totals",
+      "input": {
+        "asOf": "2027-03-31",
+        "entries": [
+          {
+            "partyId": "s2",
+            "entryDate": "2027-03-10",
+            "dueDate": "2027-04-09",
+            "amount": 500000
+          },
+          {
+            "partyId": "s1",
+            "entryDate": "2027-01-05",
+            "dueDate": "2027-02-04",
+            "amount": 200000
+          },
+          {
+            "partyId": "s3",
+            "entryDate": "2027-01-05",
+            "dueDate": "2027-02-04",
+            "amount": 70000
+          },
+          {
+            "partyId": "s3",
+            "entryDate": "2027-02-10",
+            "dueDate": "2027-02-10",
+            "amount": -70000
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "partyId": "s1",
+            "balance": 200000,
+            "notDue": 0,
+            "days1to30": 0,
+            "days31to60": 200000,
+            "days61to90": 0,
+            "over90": 0
+          },
+          {
+            "partyId": "s2",
+            "balance": 500000,
+            "notDue": 500000,
+            "days1to30": 0,
+            "days31to60": 0,
+            "days61to90": 0,
+            "over90": 0
+          }
+        ],
+        "totals": {
+          "balance": 700000,
+          "notDue": 500000,
+          "days1to30": 0,
+          "days31to60": 200000,
+          "days61to90": 0,
+          "over90": 0
+        }
+      }
+    },
+    {
+      "name": "nothing owed: no rows",
+      "input": {
+        "asOf": "2027-03-31",
+        "entries": []
+      },
+      "expected": {
+        "rows": [],
+        "totals": {
+          "balance": 0,
+          "notDue": 0,
+          "days1to30": 0,
+          "days31to60": 0,
+          "days61to90": 0,
+          "over90": 0
+        }
+      }
+    }
+  ]
+}

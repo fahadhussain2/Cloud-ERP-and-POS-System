@@ -11,6 +11,7 @@ import { printBill } from './print/print-bill';
 import { checkDesk } from './sync/bills';
 import { browserStorage, runStorageChecks } from './storage/checks';
 import { openEventStream } from './sync/events';
+import { sendDiagnostics } from './sync/diagnostics';
 import { changePin } from './sync/pin';
 import { datasetsFor, pullAll, type PullResult } from './sync/pull';
 import { pushAll, type PushOutcome } from './sync/push';
@@ -122,6 +123,20 @@ export function browserCounter(): Counter {
     await db.log('sync.push', { ...r, ms: Date.now() - started });
     return r;
   };
+  const health = async () => {
+    const [local, storage, offset] = await Promise.all([
+      db.localHealth(),
+      storageFigures(),
+      db.getSync('server_clock_offset_ms'),
+    ]);
+    return {
+      ...local,
+      ...storage,
+      appVersion: CLIENT_VERSION,
+      schemaVersion: LATEST_VERSION,
+      serverOffsetMs: offset === null ? null : Number(offset),
+    };
+  };
   return {
     checkStorage: () => runStorageChecks({ ...browserStorage(), openDatabase: () => db.open() }),
     device: () => db.getDevice(),
@@ -146,20 +161,7 @@ export function browserCounter(): Counter {
       });
       return () => stream.close();
     },
-    health: async () => {
-      const [local, storage, offset] = await Promise.all([
-        db.localHealth(),
-        storageFigures(),
-        db.getSync('server_clock_offset_ms'),
-      ]);
-      return {
-        ...local,
-        ...storage,
-        appVersion: CLIENT_VERSION,
-        schemaVersion: LATEST_VERSION,
-        serverOffsetMs: offset === null ? null : Number(offset),
-      };
-    },
+    health,
     needsAttention: () => db.quarantinedRows(),
     retryBill: (id) => db.retryQuarantined(id),
     prune: () => db.pruneDocuments(),
@@ -181,6 +183,8 @@ export function browserCounter(): Counter {
       };
     },
     log: (kind, detail) => db.log(kind, detail),
+    sendDiagnostics: (sentByUserId) =>
+      sendDiagnostics({ api, tokens, log: () => db.diagnosticLog(), health }, sentByUserId),
     search: (text, opts) => db.search(text, opts),
     catalog: () => db.catalogStatus(),
     tiers: () => db.tiers(),

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { CounterHealth } from '../counter';
+import type { DiagnosticsResult } from '../sync/diagnostics';
 import type { QuarantinedRow } from '../db/outbox';
 import type { ApproverResult } from '../unlock/approve';
 import type { StaffUser } from '../unlock/unlock';
@@ -22,6 +23,12 @@ export type RetryAttempt = (
   pin: string,
 ) => Promise<{ result: ApproverResult; failures: number }>;
 
+/** *Send diagnostics* (PLT-12, owner answer 6 to W1-20): a manager's own PIN, then the log goes to support. */
+export type SendAttempt = (
+  manager: StaffUser,
+  pin: string,
+) => Promise<{ result: ApproverResult; failures: number; sent: DiagnosticsResult | null }>;
+
 export function HealthDialog({
   health,
   attention,
@@ -30,6 +37,7 @@ export function HealthDialog({
   locale,
   timeZone,
   onRetry,
+  onSend,
   onClose,
 }: {
   health: CounterHealth | null;
@@ -40,10 +48,12 @@ export function HealthDialog({
   locale: string;
   timeZone: string;
   onRetry: RetryAttempt;
+  onSend: SendAttempt;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const [retrying, setRetrying] = useState<QuarantinedRow | null>(null);
+  const [sending, setSending] = useState(false);
   const [manager, setManager] = useState<StaffUser | null>(null);
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
@@ -63,19 +73,26 @@ export function HealthDialog({
 
   const back = () => {
     setRetrying(null);
+    setSending(false);
     setManager(null);
     setPin('');
   };
 
   const submit = async () => {
-    if (retrying === null) return onClose();
+    if (retrying === null && !sending) return onClose();
     if (manager === null || pin === '') return;
     setBusy(true);
-    const r = await onRetry(retrying, manager, pin);
+    const r = retrying !== null ? await onRetry(retrying, manager, pin) : await onSend(manager, pin);
     setBusy(false);
     setPin('');
     if (r.result === 'approved') {
-      setMessage({ ok: true, text: t('health.retried', { number: retrying.number }) });
+      const sent: DiagnosticsResult | null = 'sent' in r ? (r.sent as DiagnosticsResult | null) : null;
+      if (retrying !== null) setMessage({ ok: true, text: t('health.retried', { number: retrying.number }) });
+      else if (sent === 'sent') setMessage({ ok: true, text: t('health.diagnostics.sent') });
+      else {
+        setMessage({ ok: false, text: t(`health.diagnostics.${sent ?? 'failed'}`) });
+        return;
+      }
       return back();
     }
     setMessage({
@@ -89,12 +106,12 @@ export function HealthDialog({
     });
   };
 
-  if (retrying !== null)
+  if (retrying !== null || sending)
     return (
       <FormDialog
-        title={t('health.tryAgain')}
-        description={retrying.number}
-        actionLabel={t('health.tryAgain')}
+        title={retrying !== null ? t('health.tryAgain') : t('health.diagnostics.title')}
+        description={retrying !== null ? retrying.number : t('health.diagnostics.help')}
+        actionLabel={retrying !== null ? t('health.tryAgain') : t('health.diagnostics.send')}
         busy={busy || manager === null}
         onClose={back}
         onSubmit={() => void submit()}
@@ -228,6 +245,22 @@ export function HealthDialog({
             <AlertDescription>{message.text}</AlertDescription>
           </Alert>
         )}
+      </section>
+      <section aria-labelledby="health-support" className="flex flex-col gap-2">
+        <h3 id="health-support" className="m-0 font-display text-lg">
+          {t('health.diagnostics.title')}
+        </h3>
+        <p className="m-0 text-muted-foreground">{t('health.diagnostics.help')}</p>
+        <button
+          type="button"
+          className="cursor-pointer self-start rounded-md border border-current bg-transparent px-2.5 py-1 text-sm font-semibold"
+          onClick={() => {
+            setMessage(null);
+            setSending(true);
+          }}
+        >
+          {t('health.diagnostics.send')}
+        </button>
       </section>
     </FormDialog>
   );

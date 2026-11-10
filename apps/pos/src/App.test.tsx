@@ -128,6 +128,10 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
     listen: () => () => undefined,
     health: () => Promise.resolve(HEALTH),
     needsAttention: () => Promise.resolve([]),
+    sendDiagnostics: (userId) => {
+      calls.push(`diagnostics ${userId}`);
+      return Promise.resolve('sent');
+    },
     retryBill: (id) => {
       calls.push(`retry ${id}`);
       return Promise.resolve(true);
@@ -1874,6 +1878,23 @@ describe('push, offline warnings and counter health (W1-07)', () => {
     fireEvent.click(screen.getByRole('button', { name: en.health.tryAgain }));
     expect(await screen.findByText(i18n.t('health.retried', { number: 'C01-S000007' }))).toBeDefined();
     expect(f.calls).toContain('retry doc-7');
+  });
+
+  // PLT-12, owner answer 6 to W1-20: the log goes to support only after a manager's own PIN.
+  it('Send diagnostics needs a manager’s PIN, then sends as them', async () => {
+    const f = fakeCounter({
+      staff: () => Promise.resolve([staff(), boss]),
+      grants: (id) => Promise.resolve(id === 'm1' ? [MANAGER] : []),
+    });
+    show(f.counter);
+    await screen.findByRole('button', { name: /Asif Khan/ });
+    fireEvent.click(screen.getByRole('button', { name: en.status.openHealth }));
+    fireEvent.click(await screen.findByRole('button', { name: en.health.diagnostics.send }));
+    fireEvent.click(await screen.findByRole('button', { name: /Boss Man/ }));
+    fireEvent.change(screen.getByLabelText(en.health.pin), { target: { value: '2468' } });
+    fireEvent.click(screen.getByRole('button', { name: en.health.diagnostics.send }));
+    expect(await screen.findByText(en.health.diagnostics.sent)).toBeDefined();
+    expect(f.calls).toContain('diagnostics m1');
   });
 
   it('a revoked counter stops selling and says how many bills it still holds', async () => {

@@ -1,3 +1,4 @@
+import { pruneDiagnostics } from '@erp/db';
 import { postPending } from '@erp/posting';
 import type pg from 'pg';
 
@@ -35,9 +36,26 @@ export function postingCatchUp(pool: pg.Pool, log: JobLog, now: () => Date = () 
   };
 }
 
+/** A counter's diagnostics are kept 30 days (owner answer 6 to W1-20, D-110): removed shop by shop, every 6 hours. */
+export function diagnosticsPrune(pool: pg.Pool, log: JobLog, now: () => Date = () => new Date()): Job {
+  return {
+    name: 'diagnostics-prune',
+    everyMs: 6 * 60 * 60_000,
+    run: async () => {
+      const shops = await pool.query<{ code: string; tenant_id: string }>(
+        'SELECT code, tenant_id FROM erp.tenant_directory ORDER BY code',
+      );
+      for (const shop of shops.rows) {
+        const removed = await pruneDiagnostics(pool, shop.tenant_id, now());
+        if (removed > 0) log.info({ shop: shop.code, removed }, 'diagnostics.pruned');
+      }
+    },
+  };
+}
+
 /** Background jobs (reconciliation, reports, reorder list, notifications) are registered here. */
 export function jobsFor(deps: { pool: pg.Pool | undefined; log: JobLog }): Job[] {
-  return deps.pool ? [postingCatchUp(deps.pool, deps.log)] : [];
+  return deps.pool ? [postingCatchUp(deps.pool, deps.log), diagnosticsPrune(deps.pool, deps.log)] : [];
 }
 
 /** Runs the jobs until stopped. A failing run is reported and the job carries on at its next turn. */

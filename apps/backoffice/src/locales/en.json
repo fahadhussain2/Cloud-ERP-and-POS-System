@@ -63,7 +63,15 @@
     "money": "Money",
     "periods": "Periods",
     "accounts": "Accounts",
-    "expenseCategories": "Expense categories"
+    "expenseCategories": "Expense categories",
+    "salesRegister": "Sales register",
+    "overridesReport": "Overrides",
+    "voidsReturns": "Voids and returns",
+    "stockReport": "Stock and value",
+    "ageing": "Outstanding and ageing",
+    "exceptions": "Exceptions",
+    "trace": "Trace a bill",
+    "badge": "{{count}} open, high"
   },
   "home": {
     "nothing": "There is nothing here for your role yet."
@@ -205,7 +213,17 @@
     "gapsOpen_one": "{{count}} gap",
     "gapsOpen_other": "{{count}} gaps",
     "attention_one": "{{count}} refused",
-    "attention_other": "{{count}} refused"
+    "attention_other": "{{count}} refused",
+    "diagnostics": {
+      "title": "Diagnostics sent",
+      "none": "None in the last 30 days.",
+      "show": "Diagnostics",
+      "sentBy": "Sent by",
+      "events_one": "{{count}} event",
+      "events_other": "{{count}} events",
+      "download": "Download",
+      "help": "A manager sends them from the counter (Alt+S, Send diagnostics). Kept 30 days."
+    }
   },
   "reports": {
     "branch": "Branch",
@@ -252,7 +270,19 @@
       "expected": "Expected",
       "counted": "Counted",
       "variance": "Variance",
-      "acknowledgement": "Acknowledged"
+      "acknowledgement": "Acknowledged",
+      "number": "Number",
+      "time": "Time",
+      "counter": "Counter",
+      "salesman": "Salesman",
+      "customer": "Customer",
+      "tenders": "Paid by",
+      "total": "Total",
+      "kind": "What",
+      "item": "Item",
+      "reason": "Reason",
+      "qty": "Qty",
+      "amount": "Amount"
     },
     "reason": {
       "change_error": "Wrong change given",
@@ -291,6 +321,172 @@
       "sessions_one": "{{count}} session",
       "sessions_other": "{{count}} sessions",
       "sessionsTitle": "Sessions"
+    },
+    "none": "Nothing in these dates.",
+    "range": {
+      "from": "From",
+      "to": "To",
+      "tooLong": "Pick at most 92 days (a quarter)."
+    },
+    "kind": {
+      "sale": "Sale",
+      "return": "Return",
+      "exchange": "Exchange"
+    },
+    "register": {
+      "title": "Sales register",
+      "help": "Every bill in the dates, returns and exchanges netted. A voided bill is listed struck through and left out of the totals.",
+      "bills": "Bills",
+      "total": "Net sales",
+      "voided": "Voided",
+      "bySalesman": "By salesman",
+      "byCounter": "By counter",
+      "byTender": "By how it was paid",
+      "list": "Bills",
+      "voidedAs": "Voided {{number}}"
+    },
+    "ovr": {
+      "title": "Overrides",
+      "help": "Every approval given at the counter: below list or floor, credit, returns, voids and reprints. The floor shows only with cost.",
+      "byRequester": "Asked by",
+      "byApprover": "Approved by",
+      "byKind": "By kind",
+      "list": "Approvals",
+      "askedBy": "Asked by",
+      "approvedBy": "Approved by",
+      "list_": "List",
+      "price": "Price",
+      "floor": "Floor",
+      "kinds": {
+        "below_list": "Below list",
+        "below_floor": "Below floor",
+        "credit_limit": "Over the credit limit",
+        "offline_cap": "Over the day's offline cap",
+        "no_receipt_return": "Return without a receipt",
+        "return_permission": "Return",
+        "return_outside_policy": "Return outside policy",
+        "void": "Void",
+        "reprint": "Reprint",
+        "refund_transfer": "Refund by transfer"
+      }
+    },
+    "vr": {
+      "title": "Voids and returns",
+      "help": "Voids with their reasons and the bill issued in their place; returned lines by reason and condition.",
+      "voidsByReason": "Voids by reason",
+      "returnsByReason": "Returns by reason",
+      "returnsByCondition": "Returns by condition",
+      "voids": "Voids",
+      "returns": "Returned lines",
+      "bill": "Bill",
+      "voidedBy": "Voided by",
+      "reissue": "Reissued as",
+      "conditionTitle": "Condition",
+      "original": "Original bill",
+      "noReceipt": "No receipt",
+      "condition": {
+        "resellable": "Back on the shelf",
+        "defective": "Defective"
+      }
+    },
+    "stock": {
+      "title": "Stock and value",
+      "help": "What is on hand now at each location, valued at average cost. Values show only with cost.",
+      "search": "Item code or name",
+      "below": "Only below zero",
+      "onHand": "On hand",
+      "value": "Value",
+      "avgCost": "Average cost",
+      "category": "Category",
+      "location": "Location",
+      "byLocation": "By location",
+      "byCategory": "By category",
+      "list": "Items",
+      "noCostShort": "No cost",
+      "noCost_one": "{{count}} item has no cost yet and counts 0.",
+      "noCost_other": "{{count}} items have no cost yet and count 0.",
+      "truncated": "Only the first 2,000 lines are shown; the totals count them all. Narrow the search."
+    },
+    "ageing": {
+      "title": "Outstanding and ageing",
+      "help": "Who owes the shop and whom the shop owes, by how long past the due date. Payments settle the oldest bills first.",
+      "side": "Whose balances",
+      "customers": "Customers",
+      "suppliers": "Suppliers",
+      "asOf": "At",
+      "party": "Name",
+      "terms": "Terms",
+      "balance": "Balance",
+      "total": "Total",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "buckets": {
+        "notDue": "Not yet due",
+        "days1to30": "1–30 days",
+        "days31to60": "31–60 days",
+        "days61to90": "61–90 days",
+        "over90": "Over 90 days"
+      },
+      "control": {
+        "customers": "Accounts receivable",
+        "suppliers": "Accounts payable"
+      },
+      "matches": "Equals {{account}}: {{amount}}.",
+      "differs": "{{account}} is {{amount}}: the books and the ledgers differ. Tell support."
+    },
+    "exc": {
+      "title": "Exceptions",
+      "help": "What the server flagged while accepting counter documents. A bill is never refused for it; review each one.",
+      "showReviewed": "Show reviewed and dismissed",
+      "list": "Exceptions",
+      "kind": "What",
+      "severity": "Severity",
+      "document": "Document",
+      "status": "Status",
+      "review": "Review",
+      "reviewTitle": "Review the exception",
+      "note": "Note (optional)",
+      "save": "Save",
+      "cancel": "Cancel",
+      "none": "No exceptions in these dates.",
+      "severities": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      },
+      "statuses": {
+        "open": "Open",
+        "reviewed": "Reviewed",
+        "dismissed": "Dismissed"
+      },
+      "kinds": {
+        "below_floor_no_override": "Below the floor without an approval",
+        "discount_over_limit": "Discount over the seller's limit",
+        "document_inconsistent": "A document's figures don't add up",
+        "credit_limit_exceeded": "Over the credit limit",
+        "offline_cap_exceeded": "Over the day's offline cap",
+        "negative_stock": "Stock below zero",
+        "missing_handover": "Cash bill not handed over",
+        "handover_amount_mismatch": "Cash at the desk doesn't match the bill",
+        "cash_received_for_void": "Cash taken for a voided bill",
+        "seq_gap": "Missing document numbers",
+        "clock_skew": "The counter's clock is off",
+        "revoked_device_doc": "From a revoked counter",
+        "bad_signature": "Signature not valid",
+        "no_cost": "Sold with no cost yet",
+        "posting_failed": "Couldn't be posted",
+        "posted_after_lock": "Posted after the lock date",
+        "duplicate_handover": "Handed over twice",
+        "handover_not_permitted": "Handover by someone not allowed",
+        "cash_not_permitted": "Cash taken by someone not allowed",
+        "float_mismatch": "Float doesn't match",
+        "void_not_permitted": "Void by someone not allowed",
+        "duplicate_void": "Voided twice",
+        "return_over_quantity": "More returned than was sold",
+        "return_original_invalid": "Return of a bill that is not here",
+        "return_price_mismatch": "Return price doesn't match the sale",
+        "return_not_permitted": "Return by someone not allowed"
+      }
     }
   },
   "catalog": {
@@ -1231,6 +1427,41 @@
       "youOweLess": "↓ You owe {{name}} less: {{amount}}",
       "customer": "The customer",
       "supplier": "the supplier"
+    }
+  },
+  "support": {
+    "trace": {
+      "title": "Trace a bill",
+      "help": "One bill from the counter to the desk and the books: every step, when it happened and where it was recorded.",
+      "number": "Bill number",
+      "find": "Trace",
+      "notFound": "No bill {{number}} in this shop.",
+      "voided": "Voided",
+      "timeline": "What happened",
+      "sources": {
+        "counter": "Counter",
+        "sync": "Sync",
+        "server": "Server",
+        "desk": "Cash desk",
+        "books": "Books",
+        "diagnostics": "Counter's log"
+      },
+      "steps": {
+        "created": "Made on {{device}} by {{salesman}}: {{total}}",
+        "accepted": "Reached the server: {{status}} (tries: {{attempts}})",
+        "override": "Approval: {{kind}} by {{approvedBy}} ({{reason}})",
+        "reprinted": "Reprinted, approved by {{approvedBy}}",
+        "exception": "Flagged: {{kind}} ({{severity}}, {{status}})",
+        "posted": "Posted to the books: {{journal}}",
+        "posting_reversed": "Posting reversed: {{journal}}",
+        "handed_over": "Cash handed over at the desk: {{amount}} to {{cashier}} ({{number}})",
+        "paid_out": "Refund paid at the desk: {{amount}} by {{cashier}} ({{number}})",
+        "voided": "Voided {{number}} ({{reason}}), approved by {{approvedBy}}",
+        "reissued": "Reissued as {{number}}",
+        "returned": "Returned on {{number}}",
+        "print_failed": "Printing failed on the counter",
+        "reprinted_log": "Reprinted on the counter"
+      }
     }
   }
 }
