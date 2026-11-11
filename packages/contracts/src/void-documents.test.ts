@@ -1,18 +1,65 @@
 import { describe, expect, it } from 'vitest';
 
 import voidDocuments from '../../domain/golden/void-document.json';
-import { SaleDocumentV1, SaleVoidV1 } from './documents';
+import { SaleDocumentV1, SaleVoidV1, SaleVoidV2 } from './documents';
 
 // The void's wire schema (family V, POS spec §18, W1-12) and the reissue's link on a sale: every void the domain builds
 // passes, a malformed one doesn't.
 
 const built = voidDocuments.cases.flatMap((c) => ('expected' in c ? [c.expected] : []));
 const voided = () => ({ ...built[0]! }) as Record<string, unknown>;
+/** A W1-12 void: version 1, without the payment checks. */
+const v1 = (d: Record<string, unknown>) => {
+  const copy: Record<string, unknown> = { ...d, version: 1 };
+  delete copy['paymentChecks'];
+  return copy;
+};
+
+describe('SaleVoidV2', () => {
+  it('takes every void the domain builds (W1-23)', () => {
+    expect(built.length).toBeGreaterThan(3);
+    for (const d of built) expect(SaleVoidV2.safeParse(d).success, String(d.number)).toBe(true);
+  });
+
+  it.each([
+    ['no payment checks', { paymentChecks: undefined }],
+    [
+      'a check for on account',
+      { paymentChecks: [{ method: 'on_account', amount: 100, known: 'asked', answer: 'not_arrived' }] },
+    ],
+    [
+      'a method twice',
+      {
+        paymentChecks: [
+          { method: 'cash', amount: 100, known: 'checked', answer: 'not_arrived' },
+          { method: 'cash', amount: 200, known: 'asked', answer: 'not_arrived' },
+        ],
+      },
+    ],
+    [
+      'an unknown answer',
+      { paymentChecks: [{ method: 'cash', amount: 100, known: 'asked', answer: 'maybe' }] },
+    ],
+    [
+      'a zero amount',
+      { paymentChecks: [{ method: 'jazzcash', amount: 0, known: 'asked', answer: 'not_arrived' }] },
+    ],
+    ['version 1 with checks', { version: 1 }],
+    ['"other" without a note', { reason: 'other', note: null }],
+    ['a bill with cash said to need nothing from the desk', { handoverSeen: 'not_applicable' }],
+  ])('refuses %s', (_name, change) => {
+    expect(SaleVoidV2.safeParse({ ...voided(), ...change }).success).toBe(false);
+  });
+});
 
 describe('SaleVoidV1', () => {
-  it('takes every void the domain builds', () => {
-    expect(built.length).toBeGreaterThan(3);
-    for (const d of built) expect(SaleVoidV1.safeParse(d).success, String(d.number)).toBe(true);
+  it('still takes a W1-12 void', () => {
+    for (const d of built)
+      expect(SaleVoidV1.safeParse(v1(d as Record<string, unknown>)).success, String(d.number)).toBe(true);
+  });
+
+  it('refuses a V2 void', () => {
+    expect(SaleVoidV1.safeParse(voided()).success).toBe(false);
   });
 
   it.each([
@@ -29,7 +76,7 @@ describe('SaleVoidV1', () => {
     ['an unknown field', { extra: 1 }],
     ['money with paisa as a fraction', { saleTotal: 4320.5 }],
   ])('refuses %s', (_name, change) => {
-    expect(SaleVoidV1.safeParse({ ...voided(), ...change }).success).toBe(false);
+    expect(SaleVoidV1.safeParse({ ...v1(voided()), ...change }).success).toBe(false);
   });
 });
 

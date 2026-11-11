@@ -16,11 +16,14 @@ import {
   buildHandoverDocument,
   buildSaleDocument,
   buildSessionDocument,
+  buildVoidCashDocument,
   buildVoidDocument,
   money,
+  reconcileDay,
   ROLE_TEMPLATES,
   type Bill,
   type CashHandoverDocument,
+  type CashMovementDocument,
   type CashSessionDocument,
   type DeskSession,
   type PaymentMethodInfo,
@@ -35,6 +38,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import deluxSpec from '../../../infra/db/tenants/delux.json';
 import { buildApp } from './app';
+import { dayInput } from './reports/routes';
 import { hashPassword } from './auth/password';
 
 // Voids on the server (W1-12, sync spec §6.2, posting rules §4.4): a counter's void of its own bill is stored, the bill
@@ -225,7 +229,10 @@ const voidOf = (bill: SaleDocument, deskStatus: 'pending' | 'unknown' | 'not_app
       total: bill.amounts.total,
       cashDue: bill.cashDue,
       status: 'finalized',
+      payments: bill.payments,
     },
+    // W1-23: whatever the counter must ask, answered not arrived (the desk's own answer wins for cash).
+    answers: Object.fromEntries(bill.payments.map((p) => [p.method, 'not_arrived' as const])),
     deviceId: counter.deviceId,
     branchId: shop.branchId,
     deskStatus: bill.cashDue === 0 ? 'not_applicable' : deskStatus,
@@ -272,7 +279,21 @@ const scan = (bill: SaleDocument, atMs: number): CashHandoverDocument =>
     context: context(desk, 'H', atMs),
   });
 
-type AnyDocument = SaleDocument | SaleVoidDocument | CashHandoverDocument | CashSessionDocument;
+type AnyDocument =
+  SaleDocument | SaleVoidDocument | CashHandoverDocument | CashSessionDocument | CashMovementDocument;
+
+/** The desk gives back the cash it took for a voided bill, with the manager's PIN (W1-23, D-111). */
+const giveBack = (bill: SaleDocument): CashMovementDocument =>
+  buildVoidCashDocument({
+    session,
+    cashierId: shop.cashier,
+    grants: CASHIER_GRANTS,
+    branchId: shop.branchId,
+    bill: { number: bill.number, status: 'voided', cashTaken: money(bill.cashDue), givenBack: false },
+    approverId: shop.manager,
+    approverGrants: MANAGER_GRANTS,
+    context: context(desk, 'M'),
+  });
 
 async function push(device: Device, docs: AnyDocument[]): Promise<PushResponse> {
   const documents: PushDocument[] = await Promise.all(
@@ -535,6 +556,142 @@ describe('cash at the desk for a voided bill (D-059)', () => {
     });
     expect(await posted('cash_handover', h.id)).toBe(true);
     expect((await checkRebuild(pool, shop.tenantId)).differences).toEqual([]);
+  });
+});
+
+describe('cash taken for a voided bill, given back at the desk (W1-23, D-111)', () => {
+  const pullQueue = async () =>
+    (
+      await app().inject({
+        method: 'GET',
+        url: '/api/sync/pull?datasets=cash_queue&limit=1000',
+        headers: { authorization: `Device ${desk.token}` },
+      })
+    ).json<{ changes: { cash_queue?: Record<string, unknown>[] } }>().changes.cash_queue ?? [];
+  const clashOf = async (billNumber: string) =>
+    q<{ status: string; review_note: string | null; reviewed_by_user_id: string | null }>(
+      `SELECT status, review_note, reviewed_by_user_id FROM erp.exceptions
+       WHERE kind = 'cash_received_for_void' AND details ->> 'billNumber' = $1`,
+      [billNumber],
+    );
+
+  it.each([
+    ['the scan first (the void after it)', 'scan_first'],
+    ['the void first (the scan after it)', 'void_first'],
+  ])(
+    'with %s: posts, brings cash in transit back, settles the exception, and leaves the queue',
+    async (_name, order) => {
+      const transit = await balanceOf('1120');
+      const drawer = await balanceOf('1110');
+      const s = sale(1);
+      await push(counter, [s]);
+      const v = voidOf(s, 'unknown');
+      const h = scan(s, Date.now() - 90_000);
+      if (order === 'scan_first') {
+        await push(desk, [h]);
+        await push(counter, [v]);
+      } else {
+        await push(counter, [v]);
+        await push(desk, [h]);
+      }
+      expect(await clashOf(s.number)).toMatchObject([{ status: 'open' }]);
+      // Until it is given back, the voided bill stays in the queue with its void.
+      expect((await pullQueue()).find((r) => r['number'] === s.number)).toMatchObject({
+        status: 'voided',
+        handover_status: 'received',
+        void_number: v.number,
+        cash_given_back_number: null,
+      });
+
+      const m = giveBack(s);
+      expect(results(await push(desk, [m]))).toEqual([['accepted', null, []]]);
+      expect(await posted('cash_movement', m.id)).toBe(true);
+      expect(await journalOf('cash_movement', m.id)).toEqual([
+        { code: '1120', debit: 120000, credit: 0 },
+        { code: '1110', debit: 0, credit: 120000 },
+      ]);
+      // The sale, its void, the handover and the give-back: both accounts where they began.
+      expect(await balanceOf('1120')).toBe(transit);
+      expect(await balanceOf('1110')).toBe(drawer);
+      expect(await clashOf(s.number)).toEqual([
+        {
+          status: 'reviewed',
+          review_note: `Given back on ${m.number}, approved by tariq`,
+          reviewed_by_user_id: shop.manager,
+        },
+      ]);
+      expect((await pullQueue()).find((r) => r['number'] === s.number)).toMatchObject({
+        cash_given_back_number: m.number,
+      });
+      // The void records what the counter knew: the paid question, answered not paid yet.
+      const checks = await q<{ payment_checks: unknown }>(
+        'SELECT payment_checks FROM erp.sales_voids WHERE id = $1',
+        [v.id],
+      );
+      expect(checks[0]).toEqual({
+        payment_checks: [{ method: 'cash', amount: 120000, known: 'asked', answer: 'not_arrived' }],
+      });
+
+      const day = await withTenant(pool, { tenantId: shop.tenantId }, (_db, c) =>
+        dayInput(c, shop.branchId, s.businessDate, new Date()),
+      );
+      expect(reconcileDay(day!).voidCash.find((x) => x.billNumber === s.number)).toEqual({
+        billNumber: s.number,
+        voidNumber: v.number,
+        amount: 120000,
+        givenBack: { number: m.number, businessDate: m.businessDate },
+      });
+      expect((await checkRebuild(pool, shop.tenantId)).differences).toEqual([]);
+    },
+  );
+
+  it('a second give-back of the bill is kept, flagged and never posted', async () => {
+    const s = sale(1);
+    await push(counter, [s]);
+    await push(desk, [scan(s, Date.now() - 90_000)]);
+    await push(counter, [voidOf(s, 'unknown')]);
+    const first = giveBack(s);
+    await push(desk, [first]);
+    const second = giveBack(s);
+    expect(results(await push(desk, [second]))).toEqual([['accepted', null, ['void_cash_duplicate']]]);
+    expect(await posted('cash_movement', second.id)).toBe(false);
+    const stored = await q<{ duplicate_of_id: string }>(
+      'SELECT duplicate_of_id FROM erp.cash_movements WHERE id = $1',
+      [second.id],
+    );
+    expect(stored[0]).toEqual({ duplicate_of_id: first.id });
+  });
+
+  it('for a bill not voided and whose cash the desk never took is flagged and still stored (rule 7)', async () => {
+    const s = sale(1);
+    await push(counter, [s]);
+    expect(results(await push(desk, [giveBack(s)]))).toEqual([
+      ['accepted', null, ['void_cash_not_voided', 'void_cash_without_handover']],
+    ]);
+  });
+
+  it('flags a void whose checks say the money had arrived (a counter with the wrong rule)', async () => {
+    const s = sale(1);
+    await push(counter, [s]);
+    const v: SaleVoidDocument = {
+      ...voidOf(s, 'unknown'),
+      paymentChecks: [{ method: 'cash', amount: money(120000), known: 'asked', answer: 'arrived' }],
+    };
+    expect(results(await push(counter, [v]))).toEqual([['accepted', null, ['void_not_permitted']]]);
+    expect((await exceptionsOf(v.id))[0]).toMatchObject({ details: { cause: 'money_arrived' } });
+  });
+
+  it('still takes a W1-12 (V1) void', async () => {
+    const s = sale(1);
+    await push(counter, [s]);
+    const v1: SaleVoidDocument = { ...voidOf(s), version: 1 };
+    delete v1.paymentChecks;
+    expect(results(await push(counter, [v1]))).toEqual([['accepted', null, []]]);
+    const stored = await q<{ payment_checks: unknown }>(
+      'SELECT payment_checks FROM erp.sales_voids WHERE id = $1',
+      [v1.id],
+    );
+    expect(stored[0]).toEqual({ payment_checks: null });
   });
 });
 

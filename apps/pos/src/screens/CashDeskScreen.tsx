@@ -24,11 +24,11 @@ import { useTranslation } from 'react-i18next';
 
 import type { Counter } from '../counter';
 import type { CounterCustomer } from '../db/customers';
-import type { DeskLookups, DeskState } from '../db/desk';
+import type { DeskLookups, DeskState, VoidCashRow } from '../db/desk';
 import type { DeskSlip } from '../print/DeskSlipPrint';
-import { checkVarianceApprover } from '../unlock/approve';
+import { checkVarianceApprover, checkVoidCashApprover } from '../unlock/approve';
 import type { StaffUser } from '../unlock/unlock';
-import { ConfirmDialog, EntryDialog } from './BillDialogs';
+import { ApprovalDialog, ConfirmDialog, EntryDialog, type ApprovalAttempt } from './BillDialogs';
 import {
   CashOutDialog,
   CollectionDialog,
@@ -58,6 +58,7 @@ export type CashDeskCounter = Pick<
   | 'deskCustomer'
   | 'receiveCollection'
   | 'recordCashMovement'
+  | 'giveBackVoidCash'
   | 'printDesk'
   | 'customers'
   | 'checkout'
@@ -73,7 +74,9 @@ type Dialog =
   | { kind: 'collect'; customers: CounterCustomer[]; lookups: DeskLookups }
   | { kind: 'cashOut'; lookups: DeskLookups }
   | { kind: 'correct'; bill: QueueBill }
-  | { kind: 'unknown'; number: string; cashDue: Money };
+  | { kind: 'unknown'; number: string; cashDue: Money }
+  /** Giving back the cash taken for a voided bill, after a manager's PIN (W1-23, D-111). */
+  | { kind: 'giveBack'; row: VoidCashRow };
 
 interface Message {
   tone: 'ok' | 'bad';
@@ -374,6 +377,54 @@ export function CashDeskScreen({
     return { result: r.result, failures: r.approverState.failures };
   };
 
+  /**
+   * The manager's PIN for cash given back (W1-23, owner answer 1): someone who may void, never the session's cashier;
+   * then the movement in one local transaction, and its slip.
+   */
+  const giveBack =
+    (row: VoidCashRow): ApprovalAttempt =>
+    async (approver, pin) => {
+      const [before, grants] = await Promise.all([
+        counter.getPinState(approver.id),
+        counter.grants(approver.id),
+      ]);
+      const r = await checkVoidCashApprover({
+        approver,
+        approverState: before,
+        approverGrants: grants,
+        branchId,
+        sessionCashierId: open?.cashierId ?? user.id,
+        pin,
+        verify: (v, x) => counter.verifyPin(v, x),
+      });
+      await counter.setPinState(approver.id, r.approverState);
+      if (!before.locked && r.approverState.locked)
+        await counter.recordPinEvent({
+          kind: 'locked',
+          userId: approver.id,
+          byUserId: null,
+          at: new Date().toISOString(),
+        });
+      await counter.log(`approval.void_cash.${r.result}`, { bill: row.number, approverId: approver.id });
+      if (r.result === 'approved') {
+        try {
+          const doc = await counter.giveBackVoidCash({
+            userId: user.id,
+            billNumber: row.number,
+            approverId: approver.id,
+          });
+          await written(
+            t('desk.voidCash.done', { amount: rs(doc.amount), bill: row.number, number: doc.number }),
+          );
+          await printSlip({ kind: 'cash_out', doc });
+        } catch (err) {
+          setDialog(null);
+          setMessage({ tone: 'bad', text: t(problemOf('voidCash', err)) });
+        }
+      }
+      return { result: r.result, failures: r.approverState.failures };
+    };
+
   const closeSession = async (input: CloseInputUi): Promise<string | null> => {
     try {
       const doc = await counter.closeSession({ userId: user.id, ...input });
@@ -499,6 +550,33 @@ export function CashDeskScreen({
           </p>
         )}
       </div>
+
+      {(desk?.voidCash.length ?? 0) > 0 && (
+        <Panel title={t('desk.voidCash.title')} aria-label={t('desk.voidCash.title')} className="pb-2">
+          <p className="m-0 px-3.5 pb-1 text-sm text-muted-foreground">{t('desk.voidCash.help')}</p>
+          <ul className="m-0 flex list-none flex-col gap-1.5 px-3.5 py-1">
+            {desk!.voidCash.map((row) => (
+              <li key={row.number} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="font-mono font-semibold">{row.number}</span>
+                <span className="text-sm text-muted-foreground">
+                  {row.voidNumber === null
+                    ? t('desk.voidCash.voided')
+                    : t('desk.voidCash.voidedOn', { number: row.voidNumber })}
+                </span>
+                <span className="font-semibold tabular-nums">{rs(row.amount)}</span>
+                <button
+                  type="button"
+                  className="ms-auto cursor-pointer rounded-md border border-border bg-transparent px-2.5 py-1 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={open === null}
+                  onClick={() => setDialog({ kind: 'giveBack', row })}
+                >
+                  {t('desk.voidCash.giveBack', { amount: rs(row.amount) })}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
 
       <Panel
         ref={queuePanel}
@@ -658,6 +736,23 @@ export function CashDeskScreen({
             });
             return null;
           }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'giveBack' && (
+        <ApprovalDialog
+          description={t('desk.voidCash.approve', {
+            amount: rs(dialog.row.amount),
+            number: dialog.row.number,
+          })}
+          facts={[
+            [t('desk.col.bill'), dialog.row.number],
+            [t('desk.voidCash.void'), dialog.row.voidNumber ?? '—'],
+            [t('desk.voidCash.amount'), rs(dialog.row.amount)],
+          ]}
+          staff={staff.filter((s) => s.id !== (open?.cashierId ?? user.id))}
+          reasons={[]}
+          onApprove={giveBack(dialog.row)}
           onClose={() => setDialog(null)}
         />
       )}

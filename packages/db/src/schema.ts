@@ -527,6 +527,9 @@ export const salesDocuments = erp.table('sales_documents', {
   returnOfNumber: text('return_of_number'),
   noReceipt: boolean('no_receipt').notNull(),
   noReceiptRef: text('no_receipt_ref'),
+  // The void's number, and the movement that gave back the cash the desk took for a voided bill (W1-23).
+  voidNumber: text('void_number'),
+  cashGivenBackNumber: text('cash_given_back_number'),
   ...syncColumns,
   ...auditColumns,
 });
@@ -556,6 +559,8 @@ export const salesVoids = erp.table('sales_voids', {
   }).notNull(),
   note: text('note'),
   handoverSeen: text('handover_seen', { enum: ['pending', 'not_applicable', 'unknown'] }).notNull(),
+  // What the counter knew of each payment part (W1-23, SaleVoidV2); null for a V1 void.
+  paymentChecks: jsonb('payment_checks'),
   atDevice: timestamp('at_device', { withTimezone: true }).notNull(),
   businessDate: date('business_date').notNull(),
   receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
@@ -1183,7 +1188,7 @@ export const cashMovements = erp.table('cash_movements', {
   number: text('number').notNull(),
   seq: integer('seq').notNull(),
   kind: text('kind', {
-    enum: ['expense', 'supplier_payment', 'bank_deposit', 'to_safe', 'from_safe'],
+    enum: ['expense', 'supplier_payment', 'bank_deposit', 'to_safe', 'from_safe', 'void_cash'],
   }).notNull(),
   amount: bigint('amount', { mode: 'number' }).notNull(),
   expenseCategoryId: uuid('expense_category_id'),
@@ -1191,6 +1196,10 @@ export const cashMovements = erp.table('cash_movements', {
   bankAccountId: uuid('bank_account_id'),
   note: text('note'),
   reference: text('reference'),
+  // Cash given back for a voided bill (W1-23): its bill, the approver, and the give-back it repeats.
+  billNumber: text('bill_number'),
+  approvedByUserId: uuid('approved_by_user_id'),
+  duplicateOfId: uuid('duplicate_of_id'),
   sessionId: uuid('session_id').notNull(),
   cashierUserId: uuid('cashier_user_id').notNull(),
   atDevice: timestamp('at_device', { withTimezone: true }).notNull(),

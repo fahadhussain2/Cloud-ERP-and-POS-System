@@ -230,7 +230,9 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
                       s.cashOuts.expense +
                       s.cashOuts.supplier_payment +
                       s.cashOuts.bank_deposit +
-                      s.cashOuts.to_safe;
+                      s.cashOuts.to_safe +
+                      // Cash given back for a voided bill (W1-23).
+                      s.cashOuts.void_cash;
                     return (
                       <TableRow key={s.id}>
                         <TableCell className="font-mono">{s.number}</TableCell>
@@ -317,6 +319,30 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
                   </div>
                 ))
               )}
+            </Panel>
+          )}
+
+          {report.voidCash.length > 0 && (
+            <Panel title={t('reports.day.voidCash')} className="pb-3">
+              <ul className="m-0 ps-8">
+                {report.voidCash.map((v) => (
+                  <li key={v.billNumber}>
+                    {v.givenBack === null
+                      ? t('reports.day.voidCashOpen', {
+                          bill: v.billNumber,
+                          void: v.voidNumber,
+                          amount: m(v.amount, report.money),
+                        })
+                      : t('reports.day.voidCashGivenBack', {
+                          bill: v.billNumber,
+                          void: v.voidNumber,
+                          amount: m(v.amount, report.money),
+                          number: v.givenBack.number,
+                          date: v.givenBack.businessDate,
+                        })}
+                  </li>
+                ))}
+              </ul>
             </Panel>
           )}
 

@@ -95,7 +95,10 @@ export function postCollection(doc: PostingCollection, context: PostingContext):
   });
 }
 
-/** Out of the drawer to the category, supplier, bank or safe; `from_safe` the other way. */
+/**
+ * Out of the drawer to the category, supplier, bank or safe; `from_safe` the other way; `void_cash` back to cash in
+ * transit (posting rules §4.5).
+ */
 export function postCashMovement(doc: PostingCashMovement, context: PostingContext): PostingResult {
   return posted(doc, context, (entryDate) => {
     const target = (): Leg => {
@@ -122,6 +125,9 @@ export function postCashMovement(doc: PostingCashMovement, context: PostingConte
         return { lines: move(role(context, 'CASH_SAFE'), drawer, doc.amount), partyEntries: [] };
       case 'from_safe':
         return { lines: move(drawer, role(context, 'CASH_SAFE'), doc.amount), partyEntries: [] };
+      // Cash taken for a voided bill, given back (W1-23, D-111): undoes the handover's Dr drawer / Cr in transit.
+      case 'void_cash':
+        return { lines: move(role(context, 'CASH_IN_TRANSIT'), drawer, doc.amount), partyEntries: [] };
     }
   });
 }

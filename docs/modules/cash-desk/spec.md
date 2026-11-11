@@ -108,7 +108,13 @@ Each is written with its outbox row in **one local transaction** (rule 6), signe
 
 **Collection** (family `R`, `D01-R000001`, `CustomerCollectionV1`): `partyId`, `customerCode`, `customerName` (for a reprint), `methodId`, `methodCode`, `amount`, `reference`, `note`, `balanceBefore` (printed, never posted), with the session, cashier, identity, time and version fields.
 
-**Cash movement** (family `M`, `D01-M000001`, `CashMovementV1`): `kind`, `amount`, exactly one of `expenseCategoryId`, `partyId` (the supplier) and `bankAccountId` (none for the safe), `targetName` (for a reprint), `note`, `reference`, and the same fields.
+**Cash movement** (family `M`, `D01-M000001`, `CashMovementV1`): `kind`, `amount`, exactly one of `expenseCategoryId`, `partyId` (the supplier) and `bankAccountId` (none for the safe), `targetName` (for a reprint), `note`, `reference`, and the same fields. **`CashMovementV2`** (W1-23) adds the kind `void_cash`, with `billNumber` and `approvedByUserId` on it and only on it; the desk writes every movement as V2 from then on, and push still takes V1.
+
+## 12a. Cash taken for a voided bill (W1-23, D-111)
+
+When a counter voids a bill offline and the desk takes its cash meanwhile, the server flags `cash_received_for_void` (§13). A section **Cash taken for voided bills** above the queue lists each voided bill whose cash this desk, or another (as the queue says), took and that isn't given back yet: the bill, its void and the amount, with **Give back Rs 1,000**. It needs the PIN of someone holding `pos.void` who is **never the session's cashier** (owner answer 1), and gives back **the full amount taken** (owner answer 2), at any desk of the branch, on any later day, in an open session (owner answer 4). It is a cash movement of kind `void_cash`, written with its outbox row in one transaction, printed as a voucher and in the session's expected cash. A reissued bill is collected from the queue as usual.
+
+**A refund waits for its bill (guard 2):** the desk won't pay out a return's refund while its original bill's cash is still pending in its queue: *This refund's bill hasn't been paid yet: collect the bill first, then pay out the refund.* A refund slip scanned offline carries only the return's own number, so it can't be linked and is paid out; the server flags `refund_before_payment` (§13).
 
 ## 13. On the server
 
@@ -119,7 +125,8 @@ Push (sync spec §6.2) takes `H` and `Z` only from a cash desk. A handover is **
 | `handover_amount_mismatch` | medium | the amount (or its direction) differs from the bill's cash due, once both are there (D-059) |
 | `duplicate_handover` | medium | the bill already has a handover of that kind: kept with `duplicate_of_id`, **never posted** |
 | `handover_not_permitted` | low | the server says the cashier lacks the permission |
-| `cash_received_for_void` | high | the bill was voided (W1-12, D-059): before the handover was made, or after it while the counter was offline. The handover still posts, so cash in transit shows it until explained |
+| `cash_received_for_void` | high | the bill was voided (W1-12, D-059): before the handover was made, or after it while the counter was offline. The handover still posts, so cash in transit shows it until the cash is given back (§12a), which marks it reviewed by itself (`exception.settled`, owner answer 3); `cashKnown` says whether the counter's void was checked with the desk or answered by a person (W1-23) |
+| `refund_before_payment` | high | a return's refund was paid out while its original bill's cash was still pending (W1-23, guard 2): judged once both are in, in any push order; marked reviewed by the server when the original's handover arrives |
 
 Each handover posts `Dr CASH_DRAWER / Cr CASH_IN_TRANSIT` (a payout the reverse) for its own amount (posting rules §4.5), so its order against the bill doesn't matter. Cash received, corrections and change never post.
 
@@ -131,6 +138,16 @@ Each handover posts `Dr CASH_DRAWER / Cr CASH_IN_TRANSIT` (a payout the reverse)
 | `float_mismatch` | medium | an open's float differs from what stayed at the desk's last close |
 
 A collection for a customer, or a cash-out naming a category, supplier or bank the server doesn't have, is stored and fails to post (`posting_failed`, D-095) until it can.
+
+**Cash given back for a voided bill** (W1-23) posts `Dr CASH_IN_TRANSIT / Cr CASH_DRAWER` and sets the bill's `cash_given_back_number`, so the bill leaves every desk's section. Findings, never refusals:
+
+| Exception | Severity | When |
+|---|---|---|
+| `void_cash_duplicate` | high | the bill's cash was already given back: kept with `duplicate_of_id`, **never posted** |
+| `void_cash_without_handover` | high | no handover in for the bill |
+| `void_cash_not_voided` | medium | the bill isn't voided |
+| `void_cash_amount_mismatch` | medium | another amount than the handover took |
+| `cash_not_permitted` | low | the cashier lacks `cash.refund.pay`, or the approver lacks `pos.void` or is the session's cashier (`ownVariance`) |
 
 ## 14. Not built yet
 

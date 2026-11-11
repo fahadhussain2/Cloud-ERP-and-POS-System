@@ -240,6 +240,7 @@ export function browserCounter(): Counter {
     deskCustomer: (partyId) => db.deskCustomer(partyId),
     receiveCollection: async (req) => signStored(await db.receiveCollection({ ...req, ...made() })),
     recordCashMovement: async (req) => signStored(await db.recordCashMovement({ ...req, ...made() })),
+    giveBackVoidCash: async (req) => signStored(await db.giveBackVoidCash({ ...req, ...made() })),
     printDesk: (job) => printDeskSlip(job),
   };
 }

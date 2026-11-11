@@ -410,7 +410,8 @@
       "acknowledged": "Acknowledged by",
       "toAcknowledge": "to acknowledge",
       "receiverSigns": "Received by (signature)",
-      "cashierSigns": "Cashier and manager (signatures)"
+      "cashierSigns": "Cashier and manager (signatures)",
+      "bill": "Bill"
     },
     "void": "VOID {{number}} · {{at}} · by {{by}}, approved by {{approvedBy}} · {{reason}}",
     "reissueOf": "Reissue of {{number}}",
@@ -611,7 +612,8 @@
         "supplier_payment": "Supplier payment",
         "bank_deposit": "Bank deposit",
         "to_safe": "To the safe",
-        "from_safe": "From the safe"
+        "from_safe": "From the safe",
+        "void_cash": "Cash given back for a voided bill"
       },
       "target": {
         "expense": "Expense category",
@@ -655,6 +657,17 @@
       "acknowledgedBy": "Acknowledged by {{name}}",
       "left": "Stays in the drawer for the next session (the rest goes to the safe)",
       "action": "Close & print"
+    },
+    "voidCash": {
+      "title": "Cash taken for voided bills",
+      "help": "The counter voided these bills, but this desk had taken their cash. Give it back to the customer: a manager enters their PIN. A reissued bill is collected from the queue as usual.",
+      "voided": "voided",
+      "voidedOn": "voided on {{number}}",
+      "giveBack": "Give back {{amount}}",
+      "approve": "Give back {{amount}} taken for the voided bill {{number}}. Someone who may void, not the cashier, enters their own PIN.",
+      "void": "Void",
+      "amount": "Cash taken",
+      "done": "{{amount}} given back for {{bill}} ({{number}})"
     }
   },
   "handover": {
@@ -668,7 +681,8 @@
     "received_short": "That’s less than the amount due. The bill can’t be handed over short.",
     "session_open": "A session is already open on this desk.",
     "invalid_float": "Type the float in whole rupees, 0 or more.",
-    "failed": "The handover was not saved: {{message}}"
+    "failed": "The handover was not saved: {{message}}",
+    "original_unpaid": "This refund's bill hasn't been paid yet: collect the bill first, then pay out the refund."
   },
   "collection": {
     "no_session": "Open a session first (Alt+O).",
@@ -747,7 +761,7 @@
     "none": "No bill of today on this counter has that number.",
     "empty": "No bills of today on this counter to void.",
     "approve": "Void {{number}}: it keeps its number and prints as VOID. Someone who may void enters their own PIN, with the reason.",
-    "approveUnknown": "Offline: the cash desk can't be asked whether it has taken this bill's cash. Check with the cashier before voiding.",
+    "approveAsked": "Offline: the cash desk couldn't be asked, and you answered that the customer hasn't paid {{number}} yet. Void it: it keeps its number and prints as VOID. Someone who may void enters their own PIN, with the reason.",
     "bill": "Bill",
     "total": "Total",
     "desk": "Cash desk",
@@ -758,6 +772,26 @@
       "received": "Handed over",
       "paid_out": "Paid out"
     },
+    "answered": "{{method}}",
+    "answer": {
+      "arrived": "Reached the shop",
+      "not_arrived": "Not reached the shop"
+    },
+    "ask": {
+      "cashTitle": "Has the customer paid?",
+      "cash": "Has the customer already paid for {{number}} at the cash desk?",
+      "cashHelp": "The cash desk can't be asked right now. Check with the customer or the cashier: once paid, it is a return, not a void.",
+      "cashDue": "Cash due",
+      "cashYes": "Yes, they've paid",
+      "cashNo": "No, not yet",
+      "accountTitle": "Has the money arrived?",
+      "account": "Has the shop's {{method}} account received {{amount}} for {{number}}?",
+      "accountHelp": "Check the account's app or the payment SMS: once it has arrived, it is a return, so the refund is recorded.",
+      "accountYes": "Yes, received",
+      "accountNo": "No, not received"
+    },
+    "moneyArrived": "The money for {{number}} has reached the shop: return what comes back, so the refund is recorded.",
+    "paymentMissing": "{{amount}} by {{method}} hasn't reached the shop. Ask the customer to complete it, then return the bill.",
     "handedOver": "{{number}} was handed over at {{at}} by {{by}}: it can't be voided. Use a return.",
     "handedOverHere": "{{number}} was handed over at this desk: it can't be voided. Use a return.",
     "done": "{{number}} voided ({{void}}) and printed as VOID",
@@ -776,7 +810,10 @@
       "window_none": "That person's role doesn't allow voids.",
       "reason_required": "Choose a reason.",
       "note_required": "Write a note for “Other”.",
-      "note_too_long": "The note can be at most 200 characters."
+      "note_too_long": "The note can be at most 200 characters.",
+      "payment_unanswered": "Answer the payment question first.",
+      "money_arrived": "The money has reached the shop: use a return.",
+      "payment_missing": "A payment hasn't reached the shop yet: ask the customer to complete it, then return the bill."
     }
   },
   "return": {
@@ -830,7 +867,10 @@
     "doneEven": "Exchange {{number}} printed · nothing to pay",
     "doneRefund": "Return {{number}} printed · refund {{cash}} at the cash desk",
     "doneAccount": "Return {{number}} printed · {{amount}} credited to the account",
-    "doneTransfer": "Return {{number}} printed · refunded by {{method}}"
+    "doneTransfer": "Return {{number}} printed · refunded by {{method}}",
+    "unpaidTitle": "Void {{number}} instead?",
+    "unpaid": "{{number}} hasn't been paid at the cash desk yet. Void it and reissue it without what comes back: a return would pay out money the shop never received.",
+    "voidInstead": "Void and reissue"
   },
   "refund": {
     "even": "Finalize even exchange",
@@ -850,5 +890,16 @@
     "needsCustomer": "Only a customer with an account",
     "evenTitle": "Even exchange",
     "evenBody": "What comes back pays for what goes out exactly: nothing to pay or refund."
+  },
+  "voidCash": {
+    "not_voided": "That bill isn't voided.",
+    "no_cash_taken": "No cash was taken for that bill.",
+    "already_given_back": "The cash for that bill has already been given back.",
+    "no_session": "Open the session first.",
+    "not_session_cashier": "Only the session's cashier can give cash back.",
+    "not_permitted": "That person can't pay out cash.",
+    "approver_required": "A manager enters their PIN first.",
+    "approver_is_cashier": "The cashier can't approve their own give-back.",
+    "approver_not_permitted": "That person can't approve it: someone who may void enters their PIN."
   }
 }

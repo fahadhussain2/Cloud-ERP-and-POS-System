@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { SaleDocumentV1, SaleVoidV1 } from '@erp/contracts';
+import { SaleDocumentV1, SaleVoidV2 } from '@erp/contracts';
 import { DomainError, money, type Tender } from '@erp/domain';
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -147,6 +147,7 @@ const request = (saleId: string, over: Partial<VoidRequest> = {}): VoidRequest =
   reason: 'wrong_price',
   note: null,
   deskStatus: 'pending',
+  answers: {},
   ...over,
 });
 
@@ -196,7 +197,7 @@ describe('a void', () => {
     const sale = sell();
     const before = db.selectValue('SELECT payload FROM local_documents WHERE id = ?', [sale.id]);
     const { void: v } = voidBill(db, request(sale.id));
-    expect(SaleVoidV1.safeParse(v).success).toBe(true);
+    expect(SaleVoidV2.safeParse(v).success).toBe(true);
     expect(v).toMatchObject({
       number: 'C03-V000001',
       saleId: sale.id,
@@ -215,7 +216,29 @@ describe('a void', () => {
 
   it('offline records that the desk could not be asked', () => {
     const sale = sell();
-    expect(voidBill(db, request(sale.id, { deskStatus: 'unknown' })).void.handoverSeen).toBe('unknown');
+    const offline = voidBill(
+      db,
+      request(sale.id, { deskStatus: 'unknown', answers: { cash: 'not_arrived' } }),
+    );
+    expect(offline.void.handoverSeen).toBe('unknown');
+    // W1-23: the paid question's answer is on the void.
+    expect(offline.void.paymentChecks).toEqual([
+      { method: 'cash', amount: sale.cashDue, known: 'asked', answer: 'not_arrived' },
+    ]);
+  });
+
+  it('is refused once the money has arrived, or before the paid question is answered (W1-23), writing nothing', () => {
+    const sale = sell();
+    const offline = (answers: VoidRequest['answers']) =>
+      refused(() => voidBill(db, request(sale.id, { deskStatus: 'unknown', answers })));
+    expect(offline({ cash: 'arrived' })).toBe('money_arrived');
+    expect(offline({})).toBe('payment_unanswered');
+    expect(count("SELECT count(*) FROM outbox WHERE family = 'V'")).toBe(0);
+  });
+
+  it('asks nothing about a bill on account, and records no checks for it (W1-23)', () => {
+    const sale = sell('on_account');
+    expect(voidBill(db, request(sale.id, { deskStatus: 'not_applicable' })).void.paymentChecks).toEqual([]);
   });
 
   it('is refused twice, without pos.void, for a handed-over bill, or yesterday’s, writing nothing', () => {

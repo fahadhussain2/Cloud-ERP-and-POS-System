@@ -5,6 +5,9 @@ import {
   type CashDeskStatus,
   type Money,
   type AnySaleDocument,
+  type BillPayment,
+  type PaymentAnswer,
+  type PaymentMethodCode,
   type SaleVoidDocument,
   type VoidReason,
 } from '@erp/domain';
@@ -26,6 +29,8 @@ export interface VoidListBill {
   customerId: string | null;
   total: Money;
   cashDue: Money;
+  /** Its payments (W1-23): where the money is decides between a void and a return. */
+  payments: BillPayment[];
 }
 
 export interface VoidRequest {
@@ -42,6 +47,8 @@ export interface VoidRequest {
   note: string | null;
   /** What the live check said; this device's own knowledge (a desk's handovers and queue) wins when it knows more. */
   deskStatus: CashDeskStatus;
+  /** The person's answers for the payment parts the desk's status doesn't settle (W1-23), by method. */
+  answers: Partial<Record<PaymentMethodCode, PaymentAnswer>>;
 }
 
 const voidedSql = `EXISTS (SELECT 1 FROM local_documents v WHERE v.family = 'V'
@@ -56,7 +63,7 @@ export function voidableBills(db: SqlDb, nowMs: number, filter = ''): VoidListBi
     .selectObjects(
       `SELECT d.id, d.number, d.created_at, json_extract(d.payload, '$.sellerId') AS seller,
          json_extract(d.payload, '$.customerId') AS customer, json_extract(d.payload, '$.amounts.total') AS total,
-         json_extract(d.payload, '$.cashDue') AS cash_due
+         json_extract(d.payload, '$.cashDue') AS cash_due, json_extract(d.payload, '$.payments') AS payments
        FROM local_documents d
        WHERE d.family = 'S' AND d.business_date = ? AND instr(d.number, ?) > 0 AND NOT ${voidedSql}
        ORDER BY d.created_at DESC, d.seq DESC LIMIT 500`,
@@ -70,6 +77,12 @@ export function voidableBills(db: SqlDb, nowMs: number, filter = ''): VoidListBi
       customerId: typeof r['customer'] === 'string' ? r['customer'] : null,
       total: money(Number(r['total'])),
       cashDue: money(Number(r['cash_due'])),
+      payments: (
+        JSON.parse(typeof r['payments'] === 'string' ? r['payments'] : '[]') as {
+          method: PaymentMethodCode;
+          amount: number;
+        }[]
+      ).map((p) => ({ method: p.method, amount: money(p.amount) })),
     }));
 }
 
@@ -141,7 +154,9 @@ export function voidBill(db: SqlDb, req: VoidRequest): { void: SaleVoidDocument;
         total: sale.amounts.total,
         cashDue: sale.cashDue,
         status: voidOf(db, sale.id) === null ? 'finalized' : 'voided',
+        payments: sale.payments,
       },
+      answers: req.answers,
       deviceId: device.deviceId,
       branchId: device.branchId,
       deskStatus,
@@ -173,7 +188,12 @@ export function voidBill(db: SqlDb, req: VoidRequest): { void: SaleVoidDocument;
        VALUES (?, 'V', ?, ?, 'pending', 0, ?)`,
       [doc.id, doc.seq, payload, doc.createdAt],
     );
-    log(db, 'bill.voided', { number: sale.number, void: doc.number, approvedBy: doc.approvedBy });
+    log(db, 'bill.voided', {
+      number: sale.number,
+      void: doc.number,
+      approvedBy: doc.approvedBy,
+      checks: doc.paymentChecks ?? [],
+    });
     return { void: doc, sale };
   });
 }

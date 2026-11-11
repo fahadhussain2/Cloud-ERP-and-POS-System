@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#140](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/140) |
 | **Module** | cash desk (the desk's screen, its payouts and cash movements) and the counter's void and return, with POS sync, posting and reports |
-| **Status** | Accepted (2026-11-11) with the owner's answers 1–4 (below), the payment questions and both return guards |
+| **Status** | Accepted (2026-11-11) with the owner's answers 1–4 (below), the payment questions and both return guards. Built (2026-11-11) on `w1-23-build` |
 | **Refs** | CSH-02, CSH-03, CSH-04 (refund payout), CSH-07 (expected cash), CSH-08 (day reconciliation), RPT-10, POS-11 (void and reissue), POS-12 (returns); POS spec §18 (the cash desk check), §19 (return and refund by transfer); posting rules §4.4 (void), §4.5 (cash in transit); cash desk spec §13; CLAUDE.md rules 2, 3, 4, 6, 7; D-024 (cash in transit), D-059 (`cash_received_for_void`), D-099 (void), D-108 (vouchers can't touch cash in transit); **D-111** (new) |
 | **Found** | The owner's staging checks of W1-12 (2026-11-11): the offline clash raised `cash_received_for_void` correctly, but nothing in the system could settle it; and a bill paid by JazzCash was voided like an unpaid one, with no word about a return; and a bill not yet paid at the desk could be returned, its refund payable before the bill |
 | **Depends on** | W1-10 and W1-11 (handovers, cash movements, the close), W1-12 (void and reissue), W1-13 (returns, refund by transfer), W1-20 (exceptions review) |
@@ -118,6 +118,30 @@ If the bill was reissued, the reissue is a bill like any other: it waits in the 
   - an offline void of a paid cash bill, answered **Yes, they've paid**: the counter opens the return, and the desk pays out its refund by scanning it;
   - an offline clash, settled by **Give back**: the exception reviewed, *Cash in transit* back to 0, the drawer's expected cash down by the amount;
   - another offline clash with a reissue at a different price: the cash given back, the reissue collected from the queue, the close balances.
+
+## Changes during the build
+
+| Change | Why |
+|---|---|
+| The give-back carries `billNumber` and `approvedByUserId`, not the void's number; the queue carries the void's number (`void_number`) for the screen, and the server finds the void by the bill | One bill has one void (D-099); the document names only what the desk decides |
+| Guard 1 applies to this counter's own bills of today; a return of another counter's unpaid bill goes on, and guard 2 keeps its refund at the desk | Only the counter that made a bill may void it (D-099, owner answer 2 to W1-12), and the live check answers only for a device's own bills |
+| Guard 1 asks only about the desk's cash; a bank, wallet or card part on the bill is taken as arrived and the return goes on | It was paid at the counter; the void's questions (§18) are where a person checks the account |
+| A void of a return (a refund) asks no payment question | Nothing on it brings money in; W1-12's rule (before its payout) stays |
+| `voidOrReturn` also gives the void check's problems `payment_unanswered`, `money_arrived` and `payment_missing`, after `handed_over` | The same rule refuses the document the counter would never write |
+| A fourth give-back finding, `void_cash_amount_mismatch` (medium): another amount than the handover took | The desk always gives back the full amount (owner answer 2); a different figure means something is wrong |
+| Two desks' give-backs of one bill are judged one after the other by the bill's lock, not a row lock | The app role may only insert and read cash movements (rule 4) |
+| A second give-back is kept (`duplicate_of_id`) and left out of the session's movements on the server, like a duplicate handover | Posted once only, so the books don't count it twice; the drawer that paid twice shows it as a variance |
+| The server's notes on a settled exception are *Given back on D01-M000012, approved by …* and *Bill paid on D01-H000031*; both audited as `exception.settled` | What settled it, and who approved it, is on the exception |
+| The queue keeps a voided bill whose cash was taken until it is given back, past its 7 days, and sends it once more when it is | Owner answer 4: any later day |
+| Local schema 13 adds the queue's three columns and keeps the pull cursor; a row already on a desk gets them when it next changes | Starting the pull over would re-send the whole catalog; a pending bill changes anyway when it is handed over |
+| The give-back's approval asks no reason, and the payment question's Enter answers *yes* | The void already had its reason; *yes* (the money arrived) leads to the return, the safer side |
+| Trace a bill shows the void's checks (*What the counter knew when voiding*) and *Cash given back* as their own steps | The owner sees why the counter voided and how the cash came back |
+
+## Checks (2026-11-11)
+
+- `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 2,248 tests.
+- `pnpm test:integration`: 436 passed (41 files), including the give-back in both push orders, a duplicate give-back, a V1 void, a void whose checks say the money had arrived, and a refund paid before its bill (flagged, then settled).
+- `pnpm e2e` (Edge): 57 passed; new or changed flows: the offline clash given back at the desk, a JazzCash void answered *received* that opens its return, guard 1 on an unpaid bill, guard 2 on a split bill, and the exchange and offline return on bills paid at the desk.
 
 ## Order
 

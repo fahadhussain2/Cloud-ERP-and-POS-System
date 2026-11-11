@@ -171,7 +171,7 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
     print: () => {},
     customers: () => Promise.resolve([]),
     creditFigures: () => Promise.reject(new Error('no customer')),
-    deskState: () => Promise.resolve({ session: null, queue: [], local: [] }),
+    deskState: () => Promise.resolve({ session: null, queue: [], local: [], voidCash: [] }),
     openSession: () => Promise.reject(new Error('not a cash desk')),
     closeSession: () => Promise.reject(new Error('not a cash desk')),
     confirmHandover: () => Promise.reject(new Error('not a cash desk')),
@@ -179,6 +179,7 @@ const fakeCounter = (over: Partial<Counter> = {}) => {
     deskCustomer: () => Promise.resolve(null),
     receiveCollection: () => Promise.reject(new Error('not a cash desk')),
     recordCashMovement: () => Promise.reject(new Error('not a cash desk')),
+    giveBackVoidCash: () => Promise.reject(new Error('not a cash desk')),
     printDesk: () => {},
     ...over,
   };
@@ -1239,6 +1240,7 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
               customerId: d.customerId,
               total: d.amounts.total,
               cashDue: d.cashDue,
+              payments: d.payments.map((p) => ({ method: p.method, amount: p.amount })),
             })),
         );
       f.counter.deskCheck = () => Promise.resolve(desk);
@@ -1650,7 +1652,7 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
         expect(f.voids).toEqual([]);
       });
 
-      it('offline warns that the desk could not be asked; a salesman cannot approve', async () => {
+      it('offline asks whether the customer has paid at the desk; a salesman cannot approve (W1-23)', async () => {
         const f = payCounter();
         const box = await sold(f.counter);
         await payCash(f, 1);
@@ -1660,11 +1662,56 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
         const list = within(await screen.findByRole('dialog'));
         await list.findByRole('option', { name: /C01-S000001/ });
         enter(list.getByLabelText(en.void.search));
-        expect(await screen.findByText(en.void.approveUnknown)).toBeDefined();
+        expect(await screen.findByText(en.void.ask.cash.replace('{{number}}', 'C01-S000001'))).toBeDefined();
+        fireEvent.click(screen.getByRole('button', { name: en.void.ask.cashNo }));
+        expect(
+          await screen.findByText(en.void.approveAsked.replace('{{number}}', 'C01-S000001')),
+        ).toBeDefined();
         fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Asif Khan/ }));
         fireEvent.change(screen.getByLabelText(en.approval.pin), { target: { value: '4831' } });
         fireEvent.submit(screen.getByLabelText(en.approval.pin).closest('form')!);
         expect(await screen.findByText(en.approval.notAllowed)).toBeDefined();
+        expect(f.voids).toEqual([]);
+      });
+
+      it("a bill paid by Raast always asks whether the shop's account received it, online too (W1-23)", async () => {
+        const f = payCounter();
+        const box = await sold(f.counter);
+        const pad = within(screen.getByRole('group', { name: en.pay.pad }));
+        fireEvent.click(pad.getByRole('button', { name: 'Raast' }));
+        const reference = await within(await screen.findByRole('dialog')).findByLabelText(
+          en.pay.reference.raast,
+        );
+        fireEvent.change(reference, { target: { value: 'RST-5512' } });
+        enter(reference);
+        await waitFor(() => expect(f.docs).toHaveLength(1));
+        await waitFor(() => expect(document.activeElement).toBe(box));
+        fireEvent.keyDown(window, { key: 'v', altKey: true });
+        const list = within(await screen.findByRole('dialog'));
+        await list.findByRole('option', { name: /C01-S000001/ });
+        enter(list.getByLabelText(en.void.search));
+        expect(
+          await screen.findByText(/Has the shop’?'?s Raast account received .*4,500 for C01-S000001\?/),
+        ).toBeDefined();
+        // Not received: the void goes on, and the approver sees the answer.
+        fireEvent.click(screen.getByRole('button', { name: en.void.ask.accountNo }));
+        expect(await screen.findByText(en.void.approve.replace('{{number}}', 'C01-S000001'))).toBeDefined();
+        expect(screen.getByText(en.void.answer.not_arrived)).toBeDefined();
+      });
+
+      it('offline, answered they have paid: no void, the return opens on that bill (W1-23)', async () => {
+        const f = payCounter();
+        const box = await sold(f.counter);
+        await payCash(f, 1);
+        f.setDesk({ status: 'unknown', at: null, cashierName: null });
+        await waitFor(() => expect(document.activeElement).toBe(box));
+        fireEvent.keyDown(window, { key: 'v', altKey: true });
+        const list = within(await screen.findByRole('dialog'));
+        await list.findByRole('option', { name: /C01-S000001/ });
+        enter(list.getByLabelText(en.void.search));
+        fireEvent.click(await screen.findByRole('button', { name: en.void.ask.cashYes }));
+        // The return opens on that bill, its lines ready to mark; nothing was voided.
+        expect(await screen.findByRole('dialog', { name: /Return from C01-S000001/ })).toBeDefined();
         expect(f.voids).toEqual([]);
       });
     });
@@ -1681,6 +1728,8 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
         const f = payCounter();
         const box = await sold(f.counter);
         await payCash(f, 1);
+        // Paid at the desk: a return (guard 1 sends an unpaid bill of today to the void, W1-23).
+        f.setDesk({ status: 'received', at: '2026-11-03T09:10:00.000Z', cashierName: 'Ali' });
         await waitFor(() => expect(document.activeElement).toBe(box));
         fireEvent.keyDown(window, { key: 'F3' });
         const find = within(await screen.findByRole('dialog'));
@@ -1710,6 +1759,24 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
         });
         expect(f.printed.at(-1)!.document).toEqual(r);
         await waitFor(() => expect(notice()).toContain('refund Rs 4,500 at the cash desk'));
+      });
+
+      it('F3 on a bill of today not yet paid at the desk offers the void and reissue instead (W1-23, guard 1)', async () => {
+        const f = payCounter();
+        const box = await sold(f.counter);
+        await payCash(f, 1);
+        await waitFor(() => expect(document.activeElement).toBe(box));
+        fireEvent.keyDown(window, { key: 'F3' });
+        const find = within(await screen.findByRole('dialog'));
+        fireEvent.change(find.getByLabelText(en.return.search), { target: { value: 'C01-S000001' } });
+        await find.findByRole('option', { name: /C01-S000001/ });
+        enter(find.getByLabelText(en.return.search));
+        expect(
+          await screen.findByText(en.return.unpaid.replace(/\{\{number\}\}/g, 'C01-S000001')),
+        ).toBeDefined();
+        fireEvent.click(screen.getByRole('button', { name: en.return.voidInstead }));
+        // The void's approval, on the same bill, with nothing asked: the desk said it isn't paid.
+        expect(await screen.findByText(en.void.approve.replace('{{number}}', 'C01-S000001'))).toBeDefined();
       });
 
       it("a return without a receipt waits for the manager's PIN, at the price on screen", async () => {

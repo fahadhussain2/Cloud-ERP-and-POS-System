@@ -85,7 +85,18 @@ export type DomainErrorCode =
   | 'return_customer_mismatch'
   | 'refund_approval_pending'
   // Back-office accounting (W1-19)
-  | 'invalid_start_month';
+  | 'invalid_start_month'
+  // Voids and returns by payment, cash given back for a voided bill (W1-23, D-111)
+  | 'payment_unanswered'
+  | 'money_arrived'
+  | 'payment_missing'
+  | 'original_unpaid'
+  | 'not_voided'
+  | 'no_cash_taken'
+  | 'already_given_back'
+  | 'approver_required'
+  | 'approver_is_cashier'
+  | 'approver_not_permitted';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

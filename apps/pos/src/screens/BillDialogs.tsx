@@ -241,7 +241,7 @@ export function ApprovalDialog<R extends string>({
   description: string;
   facts: readonly (readonly [string, ReactNode])[];
   staff: StaffUser[];
-  /** The reasons to choose from, shown as `override.reason.<r>`; the first is preselected. */
+  /** The reasons to choose from, shown as `override.reason.<r>`; the first is preselected. None: no reason asked. */
   reasons?: readonly R[];
   onApprove: ApprovalAttempt<R>;
   onClose: () => void;
@@ -249,7 +249,7 @@ export function ApprovalDialog<R extends string>({
   const { t } = useTranslation();
   const [approver, setApprover] = useState<StaffUser | null>(null);
   const [pin, setPin] = useState('');
-  const [reason, setReason] = useState<R>(reasons[0]!);
+  const [reason, setReason] = useState<R>(reasons[0] ?? ('' as R));
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -316,30 +316,34 @@ export function ApprovalDialog<R extends string>({
             value={pin}
             onChange={(e) => setPin(e.target.value)}
           />
-          <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
-            <legend className={`${LABEL_CLASS} mb-1`}>{t('approval.reason')}</legend>
-            {reasons.map((r) => (
-              <label key={r} className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="radio"
-                  name="reason"
-                  value={r}
-                  checked={reason === r}
-                  onChange={() => setReason(r)}
-                />
-                {t(`override.reason.${r}`)}
-              </label>
-            ))}
-          </fieldset>
-          <TextField
-            label={t('approval.note')}
-            autoComplete="off"
-            value={note}
-            onChange={(e) => {
-              setNote(e.target.value);
-              setError(null);
-            }}
-          />
+          {reasons.length > 0 && (
+            <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
+              <legend className={`${LABEL_CLASS} mb-1`}>{t('approval.reason')}</legend>
+              {reasons.map((r) => (
+                <label key={r} className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="radio"
+                    name="reason"
+                    value={r}
+                    checked={reason === r}
+                    onChange={() => setReason(r)}
+                  />
+                  {t(`override.reason.${r}`)}
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {reasons.length > 0 && (
+            <TextField
+              label={t('approval.note')}
+              autoComplete="off"
+              value={note}
+              onChange={(e) => {
+                setNote(e.target.value);
+                setError(null);
+              }}
+            />
+          )}
         </>
       )}
       {error && (

@@ -123,14 +123,45 @@ async function traceOf(c: pg.ClientBase, number: string): Promise<BillTraceView 
     });
 
   for (const v of (
-    await c.query<{ at: Date; number: string; reason: string; approved_by: string }>(
-      `SELECT sv.at_device AS at, sv.number, sv.reason_code AS reason, u.full_name AS approved_by
+    await c.query<{
+      at: Date;
+      number: string;
+      reason: string;
+      approved_by: string;
+      checks: { method: string; known: string; answer: string }[] | null;
+    }>(
+      `SELECT sv.at_device AS at, sv.number, sv.reason_code AS reason, u.full_name AS approved_by,
+         sv.payment_checks AS checks
        FROM erp.sales_voids sv JOIN erp.users u ON u.id = sv.approved_by_user_id
        WHERE (sv.sale_document_id = $1 OR sv.sale_number = $2) AND sv.duplicate_of_id IS NULL`,
       [bill.id, bill.number],
     )
-  ).rows)
+  ).rows) {
     add(v.at, 'voided', 'counter', { number: v.number, reason: v.reason, approvedBy: v.approved_by });
+    // What the counter knew of each payment part when it voided (W1-23): the desk's status, or a person's answer.
+    if (v.checks !== null && v.checks.length > 0)
+      add(v.at, 'void_checked', 'counter', {
+        number: v.number,
+        checks: v.checks.map((x) => `${x.method}: ${x.answer} (${x.known})`).join('; '),
+      });
+  }
+
+  // Cash the desk took for the voided bill, given back (W1-23, D-111).
+  for (const m of (
+    await c.query<{ at: Date; number: string; amount: string; cashier: string; approved_by: string }>(
+      `SELECT m.at_device AS at, m.number, m.amount, u.full_name AS cashier, a.full_name AS approved_by
+       FROM erp.cash_movements m JOIN erp.users u ON u.id = m.cashier_user_id
+       JOIN erp.users a ON a.id = m.approved_by_user_id
+       WHERE m.kind = 'void_cash' AND m.bill_number = $1 AND m.duplicate_of_id IS NULL`,
+      [bill.number],
+    )
+  ).rows)
+    add(m.at, 'cash_given_back', 'desk', {
+      number: m.number,
+      amount: Number(m.amount),
+      cashier: m.cashier,
+      approvedBy: m.approved_by,
+    });
 
   for (const r of (
     await c.query<{ at: Date; number: string }>(

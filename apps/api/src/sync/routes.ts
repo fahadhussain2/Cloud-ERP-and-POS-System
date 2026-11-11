@@ -128,13 +128,17 @@ function datasetSource(dataset: PullDataset, branchId: string, deviceId: string)
     };
   switch (dataset) {
     // The cash desk's queue (W1-10): the branch's bills with cash to move, pending or of the last 7 days, so a received
-    // bill comes once more with its new status and the first pull stays small.
+    // bill comes once more with its new status and the first pull stays small. A voided bill the desk took cash for
+    // stays until the cash is given back, and comes once more when it is (W1-23).
     case 'cash_queue':
       return {
         table: 'sales_documents',
         columns: [...Object.keys(CASH_DESK_COLUMNS.cash_queue), 'row_version', 'deleted_at'],
         where: `branch_id = $4 AND cash_due <> 0
-                AND (handover_status = 'pending' OR received_at > now() - interval '${CASH_QUEUE_DAYS} days')`,
+                AND (handover_status = 'pending' OR received_at > now() - interval '${CASH_QUEUE_DAYS} days'
+                     OR (status = 'voided' AND handover_status = 'received'
+                         AND (cash_given_back_number IS NULL
+                              OR updated_at > now() - interval '${CASH_QUEUE_DAYS} days')))`,
         params: [branchId],
       };
     case 'tenant':

@@ -270,11 +270,10 @@ describe('migrations', () => {
     ]);
     const columns = (table: string) =>
       db.selectObjects(`PRAGMA table_info(${table})`).map((r) => String(r['name']));
-    expect(columns('cash_queue')).toEqual([
-      ...Object.keys(CASH_DESK_COLUMNS.cash_queue),
-      'row_version',
-      'deleted_at',
-    ]);
+    // Exactly the pulled columns; schema 13 (W1-23) adds three at the end.
+    expect(columns('cash_queue').sort()).toEqual(
+      [...Object.keys(CASH_DESK_COLUMNS.cash_queue), 'row_version', 'deleted_at'].sort(),
+    );
     expect(db.selectValue('SELECT count(*) FROM cash_sessions')).toBe(0);
   });
 

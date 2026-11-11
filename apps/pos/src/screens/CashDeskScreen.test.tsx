@@ -103,6 +103,7 @@ function fakeDesk(state: Partial<DeskState> = {}) {
       bill('C03-S000415', 'imran', -45000, { cashReceived: null }),
     ],
     local: [],
+    voidCash: [],
     ...state,
   };
   const counter: CashDeskCounter = {
@@ -161,6 +162,16 @@ function fakeDesk(state: Partial<DeskState> = {}) {
         number: 'D01-M000001',
         kind: req.kind,
         amount: req.amount,
+      } as CashMovementDocument);
+    },
+    giveBackVoidCash: (req) => {
+      deskCalls.push(`give back ${req.billNumber} approved by ${req.approverId}`);
+      desk = { ...desk, voidCash: desk.voidCash.filter((v) => v.number !== req.billNumber) };
+      return Promise.resolve({
+        number: 'D01-M000012',
+        kind: 'void_cash',
+        amount: money(100000),
+        billNumber: req.billNumber,
       } as CashMovementDocument);
     },
     printDesk: (job) => prints.push(`${job.slip.kind} ${job.slip.doc.number}`),
@@ -479,6 +490,38 @@ describe('collections, cash-out and the count (W1-11)', { timeout: 15_000 }, () 
     fireEvent.click(screen.getByRole('button', { name: 'Close & print' }));
     await screen.findByText(/Session D01-Z000003 closed/);
     expect(f.sessions).toEqual(['close {"500000":1} - - 500000']);
+  });
+
+  it("gives back the cash taken for a voided bill after a manager's PIN, never the cashier's (W1-23)", async () => {
+    const f = fakeDesk({
+      voidCash: [
+        {
+          number: 'C03-S000051',
+          voidNumber: 'C03-V000004',
+          amount: money(100000),
+          createdAt: '2026-11-02T10:10:00.000Z',
+        },
+      ],
+    });
+    const MANAGER: RoleGrant[] = [{ ...CASHIER[0]!, permissions: ['pos.void'] }];
+    f.counter.grants = (id) => Promise.resolve(id === 'imran' ? MANAGER : CASHIER);
+    f.counter.verifyPin = () => Promise.resolve(true);
+    show(f.counter);
+    const section = within(await screen.findByRole('region', { name: 'Cash taken for voided bills' }));
+    expect(section.getByText('C03-S000051')).toBeTruthy();
+    expect(section.getByText('voided on C03-V000004')).toBeTruthy();
+    await screen.findAllByText('Receive payment');
+    fireEvent.click(section.getByRole('button', { name: /Give back .*1,000/ }));
+    const approval = within(await screen.findByRole('dialog'));
+    // The session's cashier isn't offered as the approver.
+    expect(approval.queryByRole('button', { name: /^Ali/ })).toBeNull();
+    fireEvent.click(approval.getByRole('button', { name: /Imran/ }));
+    fireEvent.change(approval.getByLabelText(/PIN/), { target: { value: '1234' } });
+    fireEvent.submit(approval.getByLabelText(/PIN/).closest('form')!);
+    await screen.findByText(/given back for C03-S000051 \(D01-M000012\)/);
+    expect(f.desk()).toEqual(['give back C03-S000051 approved by imran']);
+    expect(f.printed()).toEqual(['cash_out D01-M000012']);
+    expect(screen.queryByRole('region', { name: 'Cash taken for voided bills' })).toBeNull();
   });
 
   it('a short count needs its reason, then Acknowledge later closes it', async () => {

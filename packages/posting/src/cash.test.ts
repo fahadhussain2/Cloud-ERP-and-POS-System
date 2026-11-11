@@ -176,3 +176,45 @@ describe('a desk day in the books, in any order', () => {
     }
   });
 });
+
+// W1-23 (D-111): a cash sale (Dr cash in transit), its void (the reversal, Cr cash in transit), the desk's handover of
+// the voided bill's cash (Dr drawer / Cr cash in transit) and the cash given back leave both accounts where they began.
+describe('cash taken for a voided bill, given back', () => {
+  const ctx = contextOf();
+  const common = { branchId: 'br-main', businessDate: '2026-11-02' };
+  const effect = (r: PostingResult, account: string) => {
+    if (!r.ok) throw new Error(`not posted: ${r.error.code}`);
+    return r.posting.journal.lines
+      .filter((l) => l.accountId === account)
+      .reduce((a, l) => a + l.debit - l.credit, 0);
+  };
+  const handover = postHandover(
+    {
+      ...common,
+      id: 'h-9',
+      number: 'D01-H000009',
+      billNumber: 'C03-S000051',
+      kind: 'in',
+      amount: money(100000),
+    },
+    ctx,
+  );
+  const giveBack = postCashMovement(
+    {
+      ...common,
+      id: 'm-9',
+      number: 'D01-M000012',
+      kind: 'void_cash',
+      amount: money(100000),
+      partyId: null,
+      targetId: null,
+    },
+    ctx,
+  );
+
+  it('brings cash in transit back to 0 and takes the cash out of the drawer', () => {
+    // The sale and its void: +1,000 then −1,000 on cash in transit (post-void.json).
+    expect(effect(handover, '1120') + effect(giveBack, '1120')).toBe(0);
+    expect(effect(handover, '1110') + effect(giveBack, '1110')).toBe(0);
+  });
+});

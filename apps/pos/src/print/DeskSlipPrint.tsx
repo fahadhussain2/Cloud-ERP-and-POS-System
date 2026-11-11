@@ -102,6 +102,7 @@ function SlipPage({ job }: { job: DeskPrintJob }) {
           <>
             <Row label={t('print.desk.kind')} value={t(`desk.cashOut.kind.${s.doc.kind}`)} />
             {s.doc.targetName && <Row label={t('print.desk.to')} value={s.doc.targetName} />}
+            {s.doc.billNumber && <Row label={t('print.desk.bill')} value={s.doc.billNumber} />}
             <div className="bill-total">
               <dt>{t('print.desk.paid')}</dt>
               <dd>{m(s.doc.amount)}</dd>

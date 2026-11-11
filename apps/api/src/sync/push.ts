@@ -4,6 +4,7 @@ import {
   canonicalJson,
   CashHandoverV1,
   CashMovementV1,
+  CashMovementV2,
   CashSessionV1,
   CashSessionV2,
   CustomerCollectionV1,
@@ -12,6 +13,7 @@ import {
   SaleDocumentV1,
   SaleDocumentV2,
   SaleVoidV1,
+  SaleVoidV2,
   toBase64Url,
   verifyCanonical,
   type ExceptionKind,
@@ -26,6 +28,7 @@ import {
 import { withTenant } from '@erp/db';
 import {
   businessDate,
+  cashKnownOf,
   money,
   onAccountAmount,
   qty,
@@ -36,6 +39,7 @@ import {
   reviewSale,
   reviewSession,
   reviewVoid,
+  reviewVoidCash,
   type CashFinding,
   type CashHandoverDocument,
   type CashMovementDocument,
@@ -56,6 +60,7 @@ import {
   type SaleDocument,
   type SaleFinding,
   type SaleVoidDocument,
+  type VoidCashFinding,
   type VoidFinding,
 } from '@erp/domain';
 import {
@@ -148,6 +153,12 @@ const SEVERITY: Partial<Record<ExceptionKind, 'low' | 'medium' | 'high'>> = {
   return_original_invalid: 'medium',
   return_price_mismatch: 'medium',
   return_not_permitted: 'medium',
+  // W1-23 (D-111): a refund paid before its bill's cash came in, and cash given back for a voided bill that looks wrong.
+  refund_before_payment: 'high',
+  void_cash_duplicate: 'high',
+  void_cash_without_handover: 'high',
+  void_cash_not_voided: 'medium',
+  void_cash_amount_mismatch: 'medium',
 };
 
 const sha256 = (value: unknown) => createHash('sha256').update(canonicalJson(value)).digest();
@@ -342,8 +353,10 @@ async function pushOne(
       result = await acceptCollection(c, device, t.doc, doc, received);
       post = 'payment';
     } else if (t.family === 'M') {
-      result = await acceptMovement(c, device, t.doc, doc, received);
-      post = 'cash_movement';
+      const stored = await acceptMovement(c, device, t.doc, doc, received);
+      result = stored.result;
+      // A second give-back of a bill is kept for review and never posted (W1-23).
+      if (!stored.duplicate) post = 'cash_movement';
     } else {
       result = await acceptSession(c, device, t.doc, doc);
       // The open posts a float other than what stayed; the close its variance and what went to the safe.
@@ -523,14 +536,23 @@ async function trustedCollection(c: pg.ClientBase, device: Device, s: Setting, d
   return r;
 }
 
-/** A cash movement (W1-11): the cashier must be this tenant's; its category, supplier or bank is checked by posting. */
+/**
+ * A cash movement (W1-11; V2, W1-23: cash given back for a voided bill): the cashier, and a give-back's approver, must
+ * be this tenant's; its category, supplier or bank is checked by posting.
+ */
 async function trustedMovement(c: pg.ClientBase, device: Device, doc: PushDocument) {
-  const parsed = CashMovementV1.safeParse(doc.payload);
+  const version = (doc.payload as { version?: unknown }).version;
+  const parsed = (version === 2 ? CashMovementV2 : CashMovementV1).safeParse(doc.payload);
   if (!parsed.success) throw new Rejected('bad_schema');
   const m = parsed.data as unknown as CashMovementDocument;
   sameRow(m, doc, device);
-  const known = await c.query('SELECT 1 FROM erp.users WHERE id = $1', [m.cashierId]);
-  if (known.rowCount !== 1) throw new Rejected('unknown_reference');
+  const users = [
+    ...new Set([m.cashierId, ...(m.approvedByUserId === undefined ? [] : [m.approvedByUserId])]),
+  ];
+  const known = await c.query<{ n: number }>('SELECT count(*)::int AS n FROM erp.users WHERE id = ANY($1)', [
+    users,
+  ]);
+  if (known.rows[0]!.n !== users.length) throw new Rejected('unknown_reference');
   await seqTaken(c, device, doc);
   return m;
 }
@@ -541,7 +563,9 @@ async function trustedMovement(c: pg.ClientBase, device: Device, doc: PushDocume
  * approver must be this tenant's.
  */
 async function trustedVoid(c: pg.ClientBase, device: Device, doc: PushDocument) {
-  const parsed = SaleVoidV1.safeParse(doc.payload);
+  // V2 (W1-23) adds the payment checks; a W1-12 counter still sends V1.
+  const version = (doc.payload as { version?: unknown }).version;
+  const parsed = (version === 2 ? SaleVoidV2 : SaleVoidV1).safeParse(doc.payload);
   if (!parsed.success) throw new Rejected('bad_schema');
   const v = parsed.data as unknown as SaleVoidDocument;
   if (v.id !== doc.id || v.seq !== doc.seq) throw new Rejected('bad_schema');
@@ -885,9 +909,9 @@ async function linkWaitingVoids(
 async function markVoided(c: pg.ClientBase, device: Device, billId: string, v: SaleVoidDocument) {
   await c.query(
     `UPDATE erp.sales_documents SET status = 'voided', void_document_id = $2, void_reason_code = $3, voided_at = $4,
-       voided_by_user_id = $5, void_approved_by_user_id = $6
+       voided_by_user_id = $5, void_approved_by_user_id = $6, void_number = $7
      WHERE id = $1 AND status = 'finalized'`,
-    [billId, v.id, v.reason, v.createdAt, v.userId, v.approvedBy],
+    [billId, v.id, v.reason, v.createdAt, v.userId, v.approvedBy, v.number],
   );
   await c.query(
     `INSERT INTO erp.overrides (tenant_id, document_id, line_id, kind, requested_by_user_id, approved_by_user_id,
@@ -972,8 +996,9 @@ async function acceptVoid(
   await c.query(
     `INSERT INTO erp.sales_voids (id, tenant_id, branch_id, device_id, number, seq, sale_document_id, sale_number,
        voided_by_user_id, approved_by_user_id, reason_code, note, handover_seen, at_device, business_date, received_at,
-       duplicate_of_id, payload, payload_hash, signature, client_version, exception_count)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
+       duplicate_of_id, payload, payload_hash, signature, client_version, exception_count, payment_checks)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
+       $23)`,
     [
       v.id,
       device.tenantId,
@@ -997,6 +1022,7 @@ async function acceptVoid(
       Buffer.from(fromBase64Url(doc.signature!)),
       v.clientVersion,
       findings.length,
+      v.paymentChecks === undefined ? null : JSON.stringify(v.paymentChecks),
     ],
   );
   const duplicate = existing !== undefined;
@@ -1069,13 +1095,28 @@ async function linkWaitingHandovers(c: pg.ClientBase, tenantId: string, bill: Sa
         `UPDATE erp.sales_documents SET handover_status = $2 WHERE id = $1 AND handover_status = 'pending'`,
         [bill.id, status],
       );
-    // Only the amount is new now: the permission was judged when the handover itself arrived.
+    // Only the amount and a return's original are new now: the permission was judged when the handover arrived.
+    const returnOf = bill.version === 2 ? (bill.returnOf ?? null) : null;
+    const originalPending =
+      returnOf === null
+        ? false
+        : (
+            await c.query<{ pending: boolean }>(
+              `SELECT cash_due > 0 AND handover_status = 'pending' AND status = 'finalized' AS pending
+               FROM erp.sales_documents WHERE number = $1 ORDER BY received_at, id LIMIT 1`,
+              [returnOf.number],
+            )
+          ).rows[0]?.pending === true;
     const mismatch = reviewHandover(h.payload, {
-      bill: { id: bill.id, cashDue: money(bill.cashDue) },
+      bill: {
+        id: bill.id,
+        cashDue: money(bill.cashDue),
+        returnOf: returnOf === null ? null : { number: returnOf.number, pending: originalPending },
+      },
       existing: null,
       grants: [],
       branchId: bill.branchId,
-    }).filter((f) => f.kind === 'handover_amount_mismatch');
+    }).filter((f) => f.kind === 'handover_amount_mismatch' || f.kind === 'refund_before_payment');
     for (const f of mismatch)
       await addHandoverException(c, { tenantId, deviceId: h.device_id }, h.payload, f);
   }
@@ -1100,8 +1141,15 @@ async function acceptHandover(
       void_id: string | null;
       void_number: string | null;
       voided_at: Date | null;
+      void_payload: SaleVoidDocument | null;
+      return_of_number: string | null;
+      original_pending: boolean | null;
     }>(
-      `SELECT d.id, d.cash_due, v.id AS void_id, v.number AS void_number, d.voided_at
+      `SELECT d.id, d.cash_due, v.id AS void_id, v.number AS void_number, d.voided_at, v.payload AS void_payload,
+         d.return_of_number,
+         (SELECT o.cash_due > 0 AND o.handover_status = 'pending' AND o.status = 'finalized'
+          FROM erp.sales_documents o WHERE o.number = d.return_of_number
+          ORDER BY o.received_at, o.id LIMIT 1) AS original_pending
        FROM erp.sales_documents d LEFT JOIN erp.sales_voids v ON v.id = d.void_document_id
        WHERE d.number = $1 ORDER BY d.received_at, d.id LIMIT 1`,
       [h.billNumber],
@@ -1121,11 +1169,21 @@ async function acceptHandover(
       ? {
           id: bill.id,
           cashDue: money(bill.cash_due),
-          // A voided bill (W1-12): cash for it is a finding (D-059).
+          // A voided bill (W1-12): cash for it is a finding (D-059), with how the counter knew (W1-23).
           voided:
             bill.void_id === null
               ? null
-              : { id: bill.void_id, number: bill.void_number!, at: bill.voided_at!.toISOString() },
+              : {
+                  id: bill.void_id,
+                  number: bill.void_number!,
+                  at: bill.voided_at!.toISOString(),
+                  cashKnown: bill.void_payload === null ? null : cashKnownOf(bill.void_payload),
+                },
+          // A return's refund before its bill's cash came in (W1-23, guard 2).
+          returnOf:
+            bill.return_of_number === null
+              ? null
+              : { number: bill.return_of_number, pending: bill.original_pending === true },
         }
       : null,
     existing: existing ?? null,
@@ -1176,6 +1234,16 @@ async function acceptHandover(
       );
   }
   for (const f of findings) await addHandoverException(c, device, h, f);
+  // The bill's cash came in: a refund of a return of it paid out earlier is settled (W1-23, guard 2).
+  if (h.kind === 'in' && !duplicate)
+    await settleExceptions(c, device, {
+      kind: 'refund_before_payment',
+      key: 'originalNumber',
+      value: h.billNumber,
+      note: `Bill paid on ${h.number}`,
+      userId: h.cashierId,
+      at: received,
+    });
   return {
     result: {
       id: h.id,
@@ -1372,15 +1440,19 @@ async function acceptMovement(
   m: CashMovementDocument,
   doc: PushDocument,
   received: Date,
-): Promise<PushResult> {
+): Promise<{ result: PushResult; duplicate: boolean }> {
+  const giveBack = m.kind === 'void_cash' ? await voidCashReview(c, m) : null;
   const grants = await grantsOf(c, [m.cashierId]);
-  const findings = reviewDeskDocument(m, { grants: grants[m.cashierId] ?? [], branchId: m.branchId });
+  const findings: (CashFinding | VoidCashFinding)[] =
+    giveBack?.findings ?? reviewDeskDocument(m, { grants: grants[m.cashierId] ?? [], branchId: m.branchId });
+  const duplicateOf = giveBack?.existing?.id ?? null;
   await c.query(
     `INSERT INTO erp.cash_movements (id, tenant_id, branch_id, device_id, number, seq, kind, amount,
        expense_category_id, party_id, bank_account_id, note, reference, session_id, cashier_user_id, at_device,
-       business_date, received_at, payload, payload_hash, signature, client_version, exception_count)
+       business_date, received_at, payload, payload_hash, signature, client_version, exception_count, bill_number,
+       approved_by_user_id, duplicate_of_id)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
-       $23)`,
+       $23, $24, $25, $26)`,
     [
       m.id,
       device.tenantId,
@@ -1405,6 +1477,9 @@ async function acceptMovement(
       Buffer.from(fromBase64Url(doc.signature!)),
       m.clientVersion,
       findings.length,
+      m.billNumber ?? null,
+      m.approvedByUserId ?? null,
+      duplicateOf,
     ],
   );
   for (const f of findings)
@@ -1418,9 +1493,120 @@ async function acceptMovement(
         userId: m.cashierId,
         businessDate: m.businessDate,
       },
-      f,
+      // A give-back's findings name its bill, so the exceptions report can show it.
+      giveBack === null
+        ? f
+        : ({ ...f, billNumber: m.billNumber! } as VoidCashFinding & { billNumber: string }),
     );
-  return { id: m.id, status: 'accepted', exceptions: [...new Set(findings.map((f) => f.kind))], error: null };
+  const duplicate = duplicateOf !== null;
+  if (giveBack !== null && !duplicate) {
+    // The queue drops the bill (its row comes again), and the cash-for-void exception is settled (owner answer 3).
+    if (giveBack.billId !== null)
+      await c.query(
+        `UPDATE erp.sales_documents SET cash_given_back_number = $2
+         WHERE id = $1 AND cash_given_back_number IS NULL`,
+        [giveBack.billId, m.number],
+      );
+    await settleExceptions(c, device, {
+      kind: 'cash_received_for_void',
+      key: 'billNumber',
+      value: m.billNumber!,
+      note: `Given back on ${m.number}, approved by ${await userName(c, m.approvedByUserId!)}`,
+      userId: m.approvedByUserId!,
+      at: received,
+    });
+  }
+  return {
+    result: {
+      id: m.id,
+      status: 'accepted',
+      exceptions: [...new Set(findings.map((f) => f.kind))],
+      error: null,
+    },
+    duplicate,
+  };
+}
+
+/**
+ * What the server holds for a pushed give-back (W1-23): its bill by number, the bill's first handover in, an earlier
+ * give-back of the bill, and the session's cashier. The bill's lock (`holdBill`) makes two desks' give-backs of one
+ * bill wait for each other, so only the first is not a duplicate.
+ */
+async function voidCashReview(c: pg.ClientBase, m: CashMovementDocument) {
+  const billNumber = m.billNumber!;
+  await holdBill(c, billNumber);
+  const bill = (
+    await c.query<{ id: string; status: 'finalized' | 'voided' }>(
+      'SELECT id, status FROM erp.sales_documents WHERE number = $1 ORDER BY received_at, id LIMIT 1',
+      [billNumber],
+    )
+  ).rows[0];
+  const handover = (
+    await c.query<{ amount: string }>(
+      `SELECT amount FROM erp.cash_handovers
+       WHERE bill_number = $1 AND kind = 'in' AND duplicate_of_id IS NULL ORDER BY at_device LIMIT 1`,
+      [billNumber],
+    )
+  ).rows[0];
+  const existing = (
+    await c.query<{ id: string; number: string }>(
+      `SELECT id, number FROM erp.cash_movements
+       WHERE kind = 'void_cash' AND bill_number = $1 AND duplicate_of_id IS NULL AND id <> $2`,
+      [billNumber, m.id],
+    )
+  ).rows[0];
+  const session = (
+    await c.query<{ cashier_user_id: string }>(
+      'SELECT cashier_user_id FROM erp.cash_sessions WHERE id = $1',
+      [m.sessionId],
+    )
+  ).rows[0];
+  const users = [m.cashierId, ...(m.approvedByUserId === undefined ? [] : [m.approvedByUserId])];
+  const grants = await grantsOf(c, users);
+  const findings = reviewVoidCash(m, {
+    bill: bill ? { status: bill.status } : null,
+    handover: handover ? { amount: money(handover.amount) } : null,
+    existing: existing ?? null,
+    grantsOf: (id) => grants[id] ?? [],
+    sessionCashierId: session?.cashier_user_id ?? null,
+    branchId: m.branchId,
+  });
+  return { findings, existing: existing ?? null, billId: bill?.id ?? null };
+}
+
+async function userName(c: pg.ClientBase, id: string): Promise<string> {
+  const r = await c.query<{ full_name: string }>('SELECT full_name FROM erp.users WHERE id = $1', [id]);
+  return r.rows[0]?.full_name ?? id;
+}
+
+/**
+ * Marks the open exceptions of `kind` whose details name `value` reviewed, by the server, with a note (W1-23): what
+ * they flagged has been put right. Audited as `exception.settled`; a manager can still reopen one (W1-20).
+ */
+async function settleExceptions(
+  c: pg.ClientBase,
+  device: Pick<Device, 'tenantId'>,
+  e: { kind: ExceptionKind; key: string; value: string; note: string; userId: string; at: Date },
+) {
+  const { rows } = await c.query<{ id: string }>(
+    `UPDATE erp.exceptions SET status = 'reviewed', review_note = $3, reviewed_by_user_id = $4, reviewed_at = $5
+     WHERE kind = $1 AND status = 'open' AND details ->> '${e.key}' = $2
+     RETURNING id`,
+    [e.kind, e.value, e.note, e.userId, e.at],
+  );
+  for (const r of rows)
+    await c.query(
+      `INSERT INTO erp.audit_log (tenant_id, at, user_id, action, entity, entity_id, before, after)
+       VALUES ($1, $2, $3, 'exception.settled', 'exceptions', $4, $5, $6)`,
+      [
+        device.tenantId,
+        e.at,
+        e.userId,
+        r.id,
+        JSON.stringify({ status: 'open' }),
+        JSON.stringify({ status: 'reviewed', note: e.note }),
+      ],
+    );
 }
 
 /** One exception on a collection, cash movement or session document, with its figures (sync spec §6.2). */
@@ -1434,7 +1620,7 @@ async function addCashException(
     userId: string;
     businessDate: string;
   },
-  f: CashFinding,
+  f: CashFinding | (VoidCashFinding & { billNumber?: string }),
 ) {
   const { kind, ...details } = f;
   await addException(c, device, {

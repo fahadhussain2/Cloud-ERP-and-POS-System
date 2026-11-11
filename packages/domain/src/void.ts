@@ -2,13 +2,24 @@ import { businessDate } from './business-date';
 import { MAX_NOTE_LENGTH, trimmedOrNull } from './desk-text';
 import { DomainError } from './errors';
 import type { Money } from './money';
+import {
+  answeredParts,
+  paymentParts,
+  voidOrReturn,
+  type BillPayment,
+  type PaymentAnswer,
+  type PaymentCheck,
+  type PaymentKnown,
+} from './payment-check';
 import { can, effectiveLimits, type RoleGrant } from './permissions';
 import { documentNumber } from './sale-document';
+import type { PaymentMethodCode } from './tender';
 
 // Voiding a finalized bill (POS-11, PRD W5, D-002, POS spec §18, W1-12): only on the device that made it, on its own
 // business day, before its cash reaches the desk, with the PIN of someone holding `pos.void` and a reason. The bill is
 // never changed (rule 3): the void is its own signed document (family V), and the server reverses the bill's posting.
-// The server flags what looks wrong and never refuses (D-011, D-059).
+// The server flags what looks wrong and never refuses (D-011, D-059). W1-23 (D-111): never once any of the bill's money
+// has reached the shop (`voidOrReturn`): the counter checks each payment part, and the void records what it knew.
 
 /** The reasons a bill is voided (owner answer 5 to W1-12); the labels are i18n keys `override.reason.<code>`. */
 export const VOID_REASONS = [
@@ -37,6 +48,8 @@ export interface VoidableBill {
   total: Money;
   cashDue: Money;
   status: 'finalized' | 'voided';
+  /** Its payments (W1-23): where the money is decides between a void and a return. */
+  payments: readonly BillPayment[];
 }
 
 export interface VoidInput {
@@ -47,6 +60,8 @@ export interface VoidInput {
   /** The business date now. */
   today: string;
   deskStatus: CashDeskStatus;
+  /** The person's answers for the parts the desk's status doesn't settle (W1-23), by method. */
+  answers: Partial<Record<PaymentMethodCode, PaymentAnswer>>;
   approverId: string;
   approverGrants: readonly RoleGrant[];
   reason: VoidReason | null;
@@ -58,6 +73,12 @@ export type VoidProblem =
   | 'already_voided'
   | 'other_day'
   | 'handed_over'
+  /** A payment part is still unanswered (W1-23). */
+  | 'payment_unanswered'
+  /** The money has reached the shop: a return, not a void (W1-23, D-111). */
+  | 'money_arrived'
+  /** A bank, wallet or card part hasn't arrived while another part has: the customer completes it first. */
+  | 'payment_missing'
   | 'not_permitted'
   | 'window_none'
   | 'reason_required'
@@ -72,6 +93,8 @@ export type VoidCheck =
       handoverSeen: HandoverSeen;
       /** The desk couldn't be asked about a bill with cash: the server flags it if the cash was taken. */
       warning: 'desk_unknown' | null;
+      /** What was known of each part that brings money in (W1-23). */
+      paymentChecks: PaymentCheck[];
     }
   | { ok: false; problem: VoidProblem };
 
@@ -97,6 +120,11 @@ export function checkVoid(input: VoidInput): VoidCheck {
   const withCash = bill.cashDue !== 0;
   if (withCash && (input.deskStatus === 'received' || input.deskStatus === 'paid_out'))
     return { ok: false, problem: 'handed_over' };
+  const paymentChecks = answeredParts(paymentParts(bill.payments, input.deskStatus), input.answers);
+  if (paymentChecks === null) return { ok: false, problem: 'payment_unanswered' };
+  const decision = voidOrReturn(paymentChecks).decision;
+  if (decision !== 'void')
+    return { ok: false, problem: decision === 'return' ? 'money_arrived' : 'payment_missing' };
   const denied = canVoid(input.approverGrants, input.branchId);
   if (denied !== null) return { ok: false, problem: denied };
   if (input.reason === null) return { ok: false, problem: 'reason_required' };
@@ -114,12 +142,13 @@ export function checkVoid(input: VoidInput): VoidCheck {
     note,
     handoverSeen,
     warning: handoverSeen === 'unknown' ? 'desk_unknown' : null,
+    paymentChecks,
   };
 }
 
-/** `SaleVoidV1` in `@erp/contracts` is its wire schema (sync spec §6.2, POS spec §18). */
+/** `SaleVoidV2` in `@erp/contracts` is its wire schema (sync spec §6.2, POS spec §18); V1 (W1-12) has no checks. */
 export interface SaleVoidDocument {
-  version: 1;
+  version: 1 | 2;
   id: string;
   family: 'V';
   seq: number;
@@ -138,6 +167,8 @@ export interface SaleVoidDocument {
   reason: VoidReason;
   note: string | null;
   handoverSeen: HandoverSeen;
+  /** V2 (W1-23): what the counter knew of each payment part, and how; absent on V1. */
+  paymentChecks?: PaymentCheck[];
   createdAt: string;
   businessDate: string;
   clientVersion: string;
@@ -167,7 +198,7 @@ export function buildVoidDocument(
   if (!check.ok)
     throw new DomainError(check.problem, `${input.bill.number} can't be voided: ${check.problem}`);
   return {
-    version: 1,
+    version: 2,
     id: c.id,
     family: 'V',
     seq: c.seq,
@@ -184,6 +215,7 @@ export function buildVoidDocument(
     reason: check.reason,
     note: check.note,
     handoverSeen: check.handoverSeen,
+    paymentChecks: check.paymentChecks,
     createdAt: new Date(c.createdAtMs).toISOString(),
     businessDate: today,
     clientVersion: c.clientVersion,
@@ -192,7 +224,7 @@ export function buildVoidDocument(
 
 export type VoidFinding =
   | { kind: 'duplicate_void'; duplicateOf: string; duplicateOfNumber: string }
-  | { kind: 'void_not_permitted'; cause: 'not_permitted' | 'window_none' | 'other_day' }
+  | { kind: 'void_not_permitted'; cause: 'not_permitted' | 'window_none' | 'other_day' | 'money_arrived' }
   | {
       kind: 'cash_received_for_void';
       handoverId: string;
@@ -200,6 +232,8 @@ export type VoidFinding =
       handoverAt: string;
       /** The desk took the cash before the void (a void after the handover), or after it (cash for a voided bill). */
       order: 'before_void' | 'after_void';
+      /** How the counter knew the cash wasn't at the desk (W1-23): the desk's status, a person's answer, or null (V1). */
+      cashKnown: PaymentKnown | null;
     };
 
 /** What the server holds when it reviews a void. */
@@ -234,6 +268,8 @@ export function reviewVoid(document: SaleVoidDocument, context: VoidReview): Voi
   if (denied !== null) findings.push({ kind: 'void_not_permitted', cause: denied });
   else if (saleDate !== document.businessDate)
     findings.push({ kind: 'void_not_permitted', cause: 'other_day' });
+  else if (document.paymentChecks !== undefined && voidOrReturn(document.paymentChecks).decision !== 'void')
+    findings.push({ kind: 'void_not_permitted', cause: 'money_arrived' });
   if (context.handover !== null)
     findings.push({
       kind: 'cash_received_for_void',
@@ -241,6 +277,12 @@ export function reviewVoid(document: SaleVoidDocument, context: VoidReview): Voi
       handoverNumber: context.handover.number,
       handoverAt: context.handover.at,
       order: context.handover.at <= document.createdAt ? 'before_void' : 'after_void',
+      cashKnown: cashKnownOf(document),
     });
   return findings;
+}
+
+/** How the void's counter knew the bill's cash wasn't at the desk: from its cash check (V2), else null. */
+export function cashKnownOf(document: Pick<SaleVoidDocument, 'paymentChecks'>): PaymentKnown | null {
+  return document.paymentChecks?.find((c) => c.method === 'cash')?.known ?? null;
 }

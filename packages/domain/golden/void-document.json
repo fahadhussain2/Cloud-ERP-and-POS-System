@@ -1,5 +1,5 @@
 {
-  "description": "The void document (family V, POS spec §18, sync spec §6.2, W1-12): what the counter writes to its outbox. Counter C03 (…d1, branch …e1) in Asia/Karachi with the 04:00 cutoff, app version 0.9.0, the void's id 019a8000-…081. The bill and the approver as in void.json; today is the business date of the void's own time. userId is who was unlocked and asked for the void; approvedBy is whoever entered their PIN, who may be the same person. A refused check is the DomainError of its problem.",
+  "description": "The void document (family V, POS spec §18, sync spec §6.2, W1-12): what the counter writes to its outbox. Counter C03 (…d1, branch …e1) in Asia/Karachi with the 04:00 cutoff, app version 0.9.0, the void's id 019a8000-…081. The bill and the approver as in void.json; today is the business date of the void's own time. userId is who was unlocked and asked for the void; approvedBy is whoever entered their PIN, who may be the same person. A refused check is the DomainError of its problem. W1-23 (D-111): version 2, with paymentChecks: what the counter knew of each part that brings money in.",
   "cases": [
     {
       "name": "the salesman voids with the manager's PIN",
@@ -9,7 +9,7 @@
         "createdAt": "2026-11-03T09:20:00.000Z"
       },
       "expected": {
-        "version": 1,
+        "version": 2,
         "id": "019a8000-0000-7000-8000-000000000081",
         "family": "V",
         "seq": 1,
@@ -26,6 +26,14 @@
         "reason": "wrong_price",
         "note": null,
         "handoverSeen": "pending",
+        "paymentChecks": [
+          {
+            "method": "cash",
+            "amount": 432000,
+            "known": "checked",
+            "answer": "not_arrived"
+          }
+        ],
         "createdAt": "2026-11-03T09:20:00.000Z",
         "businessDate": "2026-11-03",
         "clientVersion": "0.9.0"
@@ -41,7 +49,7 @@
         "note": " printed twice "
       },
       "expected": {
-        "version": 1,
+        "version": 2,
         "id": "019a8000-0000-7000-8000-000000000081",
         "family": "V",
         "seq": 27,
@@ -58,6 +66,14 @@
         "reason": "duplicate_bill",
         "note": "printed twice",
         "handoverSeen": "pending",
+        "paymentChecks": [
+          {
+            "method": "cash",
+            "amount": 432000,
+            "known": "checked",
+            "answer": "not_arrived"
+          }
+        ],
         "createdAt": "2026-11-03T09:20:00.000Z",
         "businessDate": "2026-11-03",
         "clientVersion": "0.9.0"
@@ -69,10 +85,13 @@
         "userId": "019a0000-0000-7000-8000-0000000000a1",
         "seq": 2,
         "createdAt": "2026-11-03T09:20:00.000Z",
-        "deskStatus": "unknown"
+        "deskStatus": "unknown",
+        "answers": {
+          "cash": "not_arrived"
+        }
       },
       "expected": {
-        "version": 1,
+        "version": 2,
         "id": "019a8000-0000-7000-8000-000000000081",
         "family": "V",
         "seq": 2,
@@ -89,6 +108,14 @@
         "reason": "wrong_price",
         "note": null,
         "handoverSeen": "unknown",
+        "paymentChecks": [
+          {
+            "method": "cash",
+            "amount": 432000,
+            "known": "asked",
+            "answer": "not_arrived"
+          }
+        ],
         "createdAt": "2026-11-03T09:20:00.000Z",
         "businessDate": "2026-11-03",
         "clientVersion": "0.9.0"
@@ -101,12 +128,21 @@
         "seq": 3,
         "createdAt": "2026-11-03T09:20:00.000Z",
         "bill": {
-          "cashDue": 0
+          "cashDue": 0,
+          "payments": [
+            {
+              "method": "raast",
+              "amount": 432000
+            }
+          ]
         },
-        "deskStatus": "not_applicable"
+        "deskStatus": "not_applicable",
+        "answers": {
+          "raast": "not_arrived"
+        }
       },
       "expected": {
-        "version": 1,
+        "version": 2,
         "id": "019a8000-0000-7000-8000-000000000081",
         "family": "V",
         "seq": 3,
@@ -123,6 +159,14 @@
         "reason": "wrong_price",
         "note": null,
         "handoverSeen": "not_applicable",
+        "paymentChecks": [
+          {
+            "method": "raast",
+            "amount": 432000,
+            "known": "asked",
+            "answer": "not_arrived"
+          }
+        ],
         "createdAt": "2026-11-03T09:20:00.000Z",
         "businessDate": "2026-11-03",
         "clientVersion": "0.9.0"
@@ -136,7 +180,7 @@
         "createdAt": "2026-11-03T22:59:30.000Z"
       },
       "expected": {
-        "version": 1,
+        "version": 2,
         "id": "019a8000-0000-7000-8000-000000000081",
         "family": "V",
         "seq": 4,
@@ -153,6 +197,14 @@
         "reason": "wrong_price",
         "note": null,
         "handoverSeen": "pending",
+        "paymentChecks": [
+          {
+            "method": "cash",
+            "amount": 432000,
+            "known": "checked",
+            "answer": "not_arrived"
+          }
+        ],
         "createdAt": "2026-11-03T22:59:30.000Z",
         "businessDate": "2026-11-03",
         "clientVersion": "0.9.0"
@@ -195,7 +247,7 @@
         "createdAt": "2026-11-03T09:20:00.000Z"
       },
       "expected": {
-        "version": 1,
+        "version": 2,
         "id": "019a8000-0000-7000-8000-000000000081",
         "family": "V",
         "seq": 1000000,
@@ -212,6 +264,14 @@
         "reason": "wrong_price",
         "note": null,
         "handoverSeen": "pending",
+        "paymentChecks": [
+          {
+            "method": "cash",
+            "amount": 432000,
+            "known": "checked",
+            "answer": "not_arrived"
+          }
+        ],
         "createdAt": "2026-11-03T09:20:00.000Z",
         "businessDate": "2026-11-03",
         "clientVersion": "0.9.0"

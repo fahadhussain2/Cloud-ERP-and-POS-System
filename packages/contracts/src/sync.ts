@@ -138,6 +138,10 @@ export const CASH_DESK_COLUMNS = {
     change_due: 'money',
     handover_status: 'text',
     status: 'text',
+    // W1-23 (D-111): a return's original (guard 2), the bill's void, and the movement that gave its cash back.
+    return_of_number: 'text',
+    void_number: 'text',
+    cash_given_back_number: 'text',
   },
   suppliers: { id: 'text', code: 'text', name: 'text', phones: 'json', city: 'text', status: 'text' },
   supplier_balances: { party_id: 'text', balance: 'money', updated_at: 'text' },
