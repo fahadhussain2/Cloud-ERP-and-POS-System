@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#65](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/65) |
 | **Module** | reports (back-office screens and API, read only), with platform (PLT-12: "Trace a bill", "Send diagnostics" on the counter) |
-| **Status** | Accepted (2026-11-10) with the owner's answers 1–7 (below). Built (2026-11-10) on `w1-20-reports` |
+| **Status** | Done (2026-11-10): built in PR #138, merged to staging; the owner verified it on staging (below) |
 | **Refs** | RPT-01, RPT-03, RPT-04, RPT-05, RPT-06, RPT-10, PLT-12; PLT-09 (device health); PRD §6.8; architecture §11.3 (the counter's diagnostic log); CLAUDE.md rules 1, 5, 7, 10; D-059 (handover exceptions), D-090 (pilot order), D-100 (no legacy bills), D-101 (pilot wipe); D-110 (new, below) |
 | **Depends on** | W1-11 (cash desk, handovers, day reconciliation and its CSV), W1-13 (returns), W1-08 (stock, cost and party ledgers), W1-16 (supplier ledger), W1-22 (customers) |
 | **Size** | about 3½ days: report queries and API with integration tests 1¼; screens and CSV 1¼; "Trace a bill" ½; "Send diagnostics" ¼ (question 6); e2e and docs ¼ |
@@ -172,6 +172,10 @@ The owner accepted every recommendation in the questions below (1–7). The tria
 - `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 2,142 tests.
 - `pnpm test:integration`: 429 passed (41 files), including the reports and support API (18) and migration 0021's role update.
 - `pnpm e2e` (Edge): 54 passed; the new reports flow covers Send diagnostics on the counter, the register, a trace, an exception reviewed and the counter's diagnostics page.
+
+## Owner review on staging (2026-11-10)
+
+The owner tested the sales register, overrides, voids and returns, stock and value, ageing, exceptions with review, Trace a bill and Send diagnostics on staging: **working as expected**, with no changes needed.
 
 ## Order
 
