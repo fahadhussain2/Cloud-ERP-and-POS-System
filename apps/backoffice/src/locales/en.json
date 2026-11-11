@@ -248,6 +248,9 @@
       "toPayOut": "{{amount}} not paid out",
       "unmatched": "Scans whose bill never arrived",
       "unmatchedRow": "{{number}} for {{bill}} · {{amount}}",
+      "voidCash": "Cash taken for voided bills",
+      "voidCashOpen": "{{bill}} (voided on {{void}}) · {{amount}} · not given back yet",
+      "voidCashGivenBack": "{{bill}} (voided on {{void}}) · {{amount}} · given back on {{date}} ({{number}})",
       "exceptions": "Exceptions of the day",
       "noExceptions": "No open exceptions.",
       "fromSafe": "{{amount}} in from the safe"
@@ -485,7 +488,12 @@
         "return_over_quantity": "More returned than was sold",
         "return_original_invalid": "Return of a bill that is not here",
         "return_price_mismatch": "Return price doesn't match the sale",
-        "return_not_permitted": "Return by someone not allowed"
+        "return_not_permitted": "Return by someone not allowed",
+        "refund_before_payment": "Refund paid before the bill was paid",
+        "void_cash_duplicate": "Cash given back twice for a voided bill",
+        "void_cash_not_voided": "Cash given back for a bill that isn’t voided",
+        "void_cash_without_handover": "Cash given back the desk never took",
+        "void_cash_amount_mismatch": "Cash given back doesn’t match what was taken"
       }
     }
   },
@@ -1457,6 +1465,8 @@
         "handed_over": "Cash handed over at the desk: {{amount}} to {{cashier}} ({{number}})",
         "paid_out": "Refund paid at the desk: {{amount}} by {{cashier}} ({{number}})",
         "voided": "Voided {{number}} ({{reason}}), approved by {{approvedBy}}",
+        "void_checked": "What the counter knew when voiding: {{checks}}",
+        "cash_given_back": "Cash given back at the desk: {{amount}} by {{cashier}}, approved by {{approvedBy}} ({{number}})",
         "reissued": "Reissued as {{number}}",
         "returned": "Returned on {{number}}",
         "print_failed": "Printing failed on the counter",

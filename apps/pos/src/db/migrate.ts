@@ -283,6 +283,17 @@ export const MIGRATIONS: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    // Voids and returns by payment (W1-23, D-111): the desk's queue carries a return's original (guard 2), the bill's
+    // void and the movement that gave its cash back. A row already here gets them when it next changes on the server,
+    // as a pending bill does when it is handed over; the pull cursor is kept.
+    version: 13,
+    statements: [
+      'ALTER TABLE cash_queue ADD COLUMN return_of_number TEXT',
+      'ALTER TABLE cash_queue ADD COLUMN void_number TEXT',
+      'ALTER TABLE cash_queue ADD COLUMN cash_given_back_number TEXT',
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

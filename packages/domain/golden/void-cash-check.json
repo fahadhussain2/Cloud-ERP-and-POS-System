@@ -1,0 +1,78 @@
+{
+  "description": "May the cashier give back the cash taken for a voided bill (W1-23, D-111, owner answers 1 and 2)? Unless a case says otherwise: bill C03-S000051, voided, the desk took Rs 1,000 for it (100000), not given back yet; the session is open and the cashier's (…a5, cash.refund.pay); the approver is the manager …a2 (pos.void). Staff as in the test file. The first problem, in order: not_voided, no_cash_taken, already_given_back, no_session, not_session_cashier, not_permitted (cash.refund.pay), approver_required, approver_is_cashier, approver_not_permitted (pos.void). Always the full amount taken.",
+  "cases": [
+    {
+      "name": "the cashier gives back Rs 1,000 with the manager's PIN",
+      "input": {},
+      "expected": { "ok": true, "amount": 100000, "approverId": "019a0000-0000-7000-8000-0000000000a2" }
+    },
+    {
+      "name": "a bill that isn't voided",
+      "input": { "bill": { "status": "finalized" } },
+      "expected": { "ok": false, "problem": "not_voided" }
+    },
+    {
+      "name": "no cash was taken for it",
+      "input": { "bill": { "cashTaken": null } },
+      "expected": { "ok": false, "problem": "no_cash_taken" }
+    },
+    {
+      "name": "a zero amount is no cash taken",
+      "input": { "bill": { "cashTaken": 0 } },
+      "expected": { "ok": false, "problem": "no_cash_taken" }
+    },
+    {
+      "name": "already given back",
+      "input": { "bill": { "givenBack": true } },
+      "expected": { "ok": false, "problem": "already_given_back" }
+    },
+    {
+      "name": "no open session",
+      "input": { "session": null },
+      "expected": { "ok": false, "problem": "no_session" }
+    },
+    {
+      "name": "a closed session",
+      "input": { "session": { "status": "closed" } },
+      "expected": { "ok": false, "problem": "no_session" }
+    },
+    {
+      "name": "someone else's session",
+      "input": { "cashierId": "019a0000-0000-7000-8000-0000000000a6" },
+      "expected": { "ok": false, "problem": "not_session_cashier" }
+    },
+    {
+      "name": "a cashier without cash.refund.pay",
+      "input": {
+        "cashierId": "019a0000-0000-7000-8000-0000000000a6",
+        "session": { "cashierId": "019a0000-0000-7000-8000-0000000000a6" }
+      },
+      "expected": { "ok": false, "problem": "not_permitted", "permission": "cash.refund.pay" }
+    },
+    {
+      "name": "nobody has entered their PIN yet",
+      "input": { "approverId": null },
+      "expected": { "ok": false, "problem": "approver_required" }
+    },
+    {
+      "name": "the cashier can't approve their own give-back (owner answer 1)",
+      "input": { "approverId": "019a0000-0000-7000-8000-0000000000a5" },
+      "expected": { "ok": false, "problem": "approver_is_cashier" }
+    },
+    {
+      "name": "an approver without pos.void",
+      "input": { "approverId": "019a0000-0000-7000-8000-0000000000a1" },
+      "expected": { "ok": false, "problem": "approver_not_permitted" }
+    },
+    {
+      "name": "an approver the desk doesn't know",
+      "input": { "approverId": "019a0000-0000-7000-8000-0000000000a9" },
+      "expected": { "ok": false, "problem": "approver_not_permitted" }
+    },
+    {
+      "name": "the bill's state comes before the session",
+      "input": { "bill": { "givenBack": true }, "session": null },
+      "expected": { "ok": false, "problem": "already_given_back" }
+    }
+  ]
+}

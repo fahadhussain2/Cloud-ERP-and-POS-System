@@ -177,6 +177,7 @@ export {
   type CashMovementInput,
   type CashMovementKind,
   type CashMovementProblem,
+  type CashOutKind,
   type MovementBankAccount,
   type MovementCategory,
   type MovementSupplier,
@@ -359,8 +360,21 @@ export {
 } from './tender';
 export { reissueBill } from './reissue';
 export {
+  answeredParts,
+  paymentParts,
+  returnWouldBeVoid,
+  voidOrReturn,
+  type BillPayment,
+  type PaymentAnswer,
+  type PaymentCheck,
+  type PaymentKnown,
+  type PaymentPart,
+  type VoidOrReturn,
+} from './payment-check';
+export {
   buildVoidDocument,
   canVoid,
+  cashKnownOf,
   checkVoid,
   reviewVoid,
   VOID_REASONS,
@@ -376,3 +390,14 @@ export {
   type VoidReason,
   type VoidReview,
 } from './void';
+export {
+  buildVoidCashDocument,
+  checkVoidCash,
+  reviewVoidCash,
+  type VoidCashBill,
+  type VoidCashCheck,
+  type VoidCashFinding,
+  type VoidCashInput,
+  type VoidCashProblem,
+  type VoidCashReview,
+} from './void-cash';

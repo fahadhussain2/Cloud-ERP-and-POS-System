@@ -43,7 +43,7 @@ export function sendCsv(reply: FastifyReply, name: string, body: string) {
 }
 
 /** Everything the day's reconciliation is made from, read in one tenant transaction. */
-async function dayInput(
+export async function dayInput(
   c: pg.ClientBase,
   branchId: string,
   date: string,
@@ -108,7 +108,9 @@ async function dayInput(
     [ids],
   );
   const movements = await c.query<{ session_id: string; kind: CashMovementKind; amount: string }>(
-    'SELECT session_id, kind, amount FROM erp.cash_movements WHERE session_id = ANY ($1) ORDER BY number',
+    // A second give-back of one bill (W1-23) is kept for review and never posted, like a duplicate handover.
+    `SELECT session_id, kind, amount FROM erp.cash_movements
+     WHERE session_id = ANY ($1) AND duplicate_of_id IS NULL ORDER BY number`,
     [ids],
   );
   const of = <T extends { session_id: string }>(rows: T[], id: string) =>
@@ -162,6 +164,26 @@ async function dayInput(
      WHERE d.branch_id = $1 AND e.business_date = $2 AND e.status = 'open' GROUP BY e.kind, e.severity`,
     [branchId, date],
   );
+  // The day's voided bills the desk took cash for, and the movement that gave it back (W1-23, D-111).
+  const voidCash = await c.query<{
+    bill_number: string;
+    void_number: string;
+    amount: string;
+    given_back_number: string | null;
+    given_back_on: string | null;
+  }>(
+    `SELECT b.number AS bill_number, coalesce(b.void_number, '') AS void_number, h.amount,
+       m.number AS given_back_number, m.business_date::text AS given_back_on
+     FROM erp.sales_documents b
+     JOIN LATERAL (SELECT x.amount FROM erp.cash_handovers x
+                   WHERE x.bill_number = b.number AND x.kind = 'in' AND x.duplicate_of_id IS NULL
+                   ORDER BY x.at_device LIMIT 1) h ON true
+     LEFT JOIN LATERAL (SELECT y.number, y.business_date FROM erp.cash_movements y
+                        WHERE y.kind = 'void_cash' AND y.bill_number = b.number AND y.duplicate_of_id IS NULL
+                        ORDER BY y.at_device LIMIT 1) m ON true
+     WHERE b.branch_id = $1 AND b.business_date = $2 AND b.status = 'voided'`,
+    [branchId, date],
+  );
   const transit = await c.query<{ balance: string }>(
     `SELECT coalesce(sum(l.debit - l.credit), 0) AS balance
      FROM erp.journal_lines l JOIN erp.journal_entries e ON e.id = l.entry_id
@@ -203,6 +225,13 @@ async function dayInput(
     })),
     exceptions: exceptions.rows,
     cashInTransit: toMoney(transit.rows[0]!.balance),
+    voidCash: voidCash.rows.map((v) => ({
+      billNumber: v.bill_number,
+      voidNumber: v.void_number,
+      amount: toMoney(v.amount),
+      givenBack:
+        v.given_back_number === null ? null : { number: v.given_back_number, businessDate: v.given_back_on! },
+    })),
   };
 }
 
@@ -240,6 +269,8 @@ function dayCsv(r: DayReconciliationResponse): string {
   for (const h of r.unmatchedScans)
     rows.push(['unmatched_scan', h.number, '', h.billNumber, h.amount, h.kind]);
   for (const e of r.exceptions) rows.push(['exception', e.kind, '', '', e.count, e.severity]);
+  for (const v of r.voidCash)
+    rows.push(['void_cash', v.billNumber, '', v.voidNumber, v.amount, v.givenBack?.number ?? 'open']);
   rows.push(['cash_in_transit', '', '', '', r.cashInTransit, '']);
   return csv(['section', 'number', 'device', 'person', 'amount', 'detail'], rows);
 }

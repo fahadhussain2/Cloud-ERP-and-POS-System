@@ -1,0 +1,253 @@
+{
+  "description": "Void or return, from where the bill's money is (W1-23, D-111). The input is the bill's payments, what the desk says of its cash (the server's live answer, this desk's own records, or unknown) and the person's answers by method. The output is the parts that bring money in (never on account, never a refund row), the checks once every part is known (null while one is unanswered), and the decision: nothing arrived → void; everything arrived, or only the desk's cash still to come → return; a bank, wallet or card part not received while another part arrived → stop. Amounts in paisa: Rs 1,000 = 100000.",
+  "cases": [
+    {
+      "name": "a cash bill the desk hasn't been paid for: void, nothing asked",
+      "input": {
+        "payments": [{ "method": "cash", "amount": 100000 }],
+        "deskStatus": "pending",
+        "answers": {}
+      },
+      "expected": {
+        "parts": [{ "method": "cash", "amount": 100000, "known": "checked", "answer": "not_arrived" }],
+        "checks": [{ "method": "cash", "amount": 100000, "known": "checked", "answer": "not_arrived" }],
+        "decision": { "decision": "void" }
+      }
+    },
+    {
+      "name": "a cash bill already handed over: return",
+      "input": {
+        "payments": [{ "method": "cash", "amount": 100000 }],
+        "deskStatus": "received",
+        "answers": {}
+      },
+      "expected": {
+        "parts": [{ "method": "cash", "amount": 100000, "known": "checked", "answer": "arrived" }],
+        "checks": [{ "method": "cash", "amount": 100000, "known": "checked", "answer": "arrived" }],
+        "decision": { "decision": "return" }
+      }
+    },
+    {
+      "name": "offline, the cash part is asked: answered not paid yet → void",
+      "input": {
+        "payments": [{ "method": "cash", "amount": 100000 }],
+        "deskStatus": "unknown",
+        "answers": { "cash": "not_arrived" }
+      },
+      "expected": {
+        "parts": [{ "method": "cash", "amount": 100000, "known": null, "answer": null }],
+        "checks": [{ "method": "cash", "amount": 100000, "known": "asked", "answer": "not_arrived" }],
+        "decision": { "decision": "void" }
+      }
+    },
+    {
+      "name": "offline, answered they've paid → return",
+      "input": {
+        "payments": [{ "method": "cash", "amount": 100000 }],
+        "deskStatus": "unknown",
+        "answers": { "cash": "arrived" }
+      },
+      "expected": {
+        "parts": [{ "method": "cash", "amount": 100000, "known": null, "answer": null }],
+        "checks": [{ "method": "cash", "amount": 100000, "known": "asked", "answer": "arrived" }],
+        "decision": { "decision": "return" }
+      }
+    },
+    {
+      "name": "offline and not answered yet: no checks, the counter still asks",
+      "input": {
+        "payments": [{ "method": "cash", "amount": 100000 }],
+        "deskStatus": "unknown",
+        "answers": {}
+      },
+      "expected": {
+        "parts": [{ "method": "cash", "amount": 100000, "known": null, "answer": null }],
+        "checks": null,
+        "decision": null
+      }
+    },
+    {
+      "name": "JazzCash only, online too: always asked; not received → void",
+      "input": {
+        "payments": [{ "method": "jazzcash", "amount": 100000 }],
+        "deskStatus": "not_applicable",
+        "answers": { "jazzcash": "not_arrived" }
+      },
+      "expected": {
+        "parts": [{ "method": "jazzcash", "amount": 100000, "known": null, "answer": null }],
+        "checks": [{ "method": "jazzcash", "amount": 100000, "known": "asked", "answer": "not_arrived" }],
+        "decision": { "decision": "void" }
+      }
+    },
+    {
+      "name": "JazzCash only, received → return",
+      "input": {
+        "payments": [{ "method": "jazzcash", "amount": 100000 }],
+        "deskStatus": "not_applicable",
+        "answers": { "jazzcash": "arrived" }
+      },
+      "expected": {
+        "parts": [{ "method": "jazzcash", "amount": 100000, "known": null, "answer": null }],
+        "checks": [{ "method": "jazzcash", "amount": 100000, "known": "asked", "answer": "arrived" }],
+        "decision": { "decision": "return" }
+      }
+    },
+    {
+      "name": "on account only: nothing brings money in, nothing asked → void",
+      "input": {
+        "payments": [{ "method": "on_account", "amount": 100000 }],
+        "deskStatus": "not_applicable",
+        "answers": {}
+      },
+      "expected": { "parts": [], "checks": [], "decision": { "decision": "void" } }
+    },
+    {
+      "name": "a return's refund row brings nothing in: nothing asked (W1-12's rule stays for voiding a return)",
+      "input": {
+        "payments": [{ "method": "cash", "amount": -45000 }],
+        "deskStatus": "pending",
+        "answers": {}
+      },
+      "expected": { "parts": [], "checks": [], "decision": { "decision": "void" } }
+    },
+    {
+      "name": "split cash + JazzCash: neither arrived → void",
+      "input": {
+        "payments": [
+          { "method": "cash", "amount": 60000 },
+          { "method": "jazzcash", "amount": 40000 }
+        ],
+        "deskStatus": "pending",
+        "answers": { "jazzcash": "not_arrived" }
+      },
+      "expected": {
+        "parts": [
+          { "method": "cash", "amount": 60000, "known": "checked", "answer": "not_arrived" },
+          { "method": "jazzcash", "amount": 40000, "known": null, "answer": null }
+        ],
+        "checks": [
+          { "method": "cash", "amount": 60000, "known": "checked", "answer": "not_arrived" },
+          { "method": "jazzcash", "amount": 40000, "known": "asked", "answer": "not_arrived" }
+        ],
+        "decision": { "decision": "void" }
+      }
+    },
+    {
+      "name": "split cash + JazzCash: both arrived → return",
+      "input": {
+        "payments": [
+          { "method": "cash", "amount": 60000 },
+          { "method": "jazzcash", "amount": 40000 }
+        ],
+        "deskStatus": "received",
+        "answers": { "jazzcash": "arrived" }
+      },
+      "expected": {
+        "parts": [
+          { "method": "cash", "amount": 60000, "known": "checked", "answer": "arrived" },
+          { "method": "jazzcash", "amount": 40000, "known": null, "answer": null }
+        ],
+        "checks": [
+          { "method": "cash", "amount": 60000, "known": "checked", "answer": "arrived" },
+          { "method": "jazzcash", "amount": 40000, "known": "asked", "answer": "arrived" }
+        ],
+        "decision": { "decision": "return" }
+      }
+    },
+    {
+      "name": "split: JazzCash received, the cash still to come → return (the desk collects the bill first)",
+      "input": {
+        "payments": [
+          { "method": "cash", "amount": 60000 },
+          { "method": "jazzcash", "amount": 40000 }
+        ],
+        "deskStatus": "pending",
+        "answers": { "jazzcash": "arrived" }
+      },
+      "expected": {
+        "parts": [
+          { "method": "cash", "amount": 60000, "known": "checked", "answer": "not_arrived" },
+          { "method": "jazzcash", "amount": 40000, "known": null, "answer": null }
+        ],
+        "checks": [
+          { "method": "cash", "amount": 60000, "known": "checked", "answer": "not_arrived" },
+          { "method": "jazzcash", "amount": 40000, "known": "asked", "answer": "arrived" }
+        ],
+        "decision": { "decision": "return" }
+      }
+    },
+    {
+      "name": "split: the cash paid, the JazzCash not received → stop",
+      "input": {
+        "payments": [
+          { "method": "cash", "amount": 60000 },
+          { "method": "jazzcash", "amount": 40000 }
+        ],
+        "deskStatus": "received",
+        "answers": { "jazzcash": "not_arrived" }
+      },
+      "expected": {
+        "parts": [
+          { "method": "cash", "amount": 60000, "known": "checked", "answer": "arrived" },
+          { "method": "jazzcash", "amount": 40000, "known": null, "answer": null }
+        ],
+        "checks": [
+          { "method": "cash", "amount": 60000, "known": "checked", "answer": "arrived" },
+          { "method": "jazzcash", "amount": 40000, "known": "asked", "answer": "not_arrived" }
+        ],
+        "decision": { "decision": "stop", "method": "jazzcash", "amount": 40000 }
+      }
+    },
+    {
+      "name": "two bank or wallet parts, one received and one not → stop on the missing one",
+      "input": {
+        "payments": [
+          { "method": "card", "amount": 70000 },
+          { "method": "easypaisa", "amount": 30000 }
+        ],
+        "deskStatus": "not_applicable",
+        "answers": { "card": "arrived", "easypaisa": "not_arrived" }
+      },
+      "expected": {
+        "parts": [
+          { "method": "card", "amount": 70000, "known": null, "answer": null },
+          { "method": "easypaisa", "amount": 30000, "known": null, "answer": null }
+        ],
+        "checks": [
+          { "method": "card", "amount": 70000, "known": "asked", "answer": "arrived" },
+          { "method": "easypaisa", "amount": 30000, "known": "asked", "answer": "not_arrived" }
+        ],
+        "decision": { "decision": "stop", "method": "easypaisa", "amount": 30000 }
+      }
+    },
+    {
+      "name": "cash + on account: on account is left out; the cash pending → void",
+      "input": {
+        "payments": [
+          { "method": "cash", "amount": 50000 },
+          { "method": "on_account", "amount": 50000 }
+        ],
+        "deskStatus": "pending",
+        "answers": {}
+      },
+      "expected": {
+        "parts": [{ "method": "cash", "amount": 50000, "known": "checked", "answer": "not_arrived" }],
+        "checks": [{ "method": "cash", "amount": 50000, "known": "checked", "answer": "not_arrived" }],
+        "decision": { "decision": "void" }
+      }
+    },
+    {
+      "name": "the server's answer and the person's answer are judged the same",
+      "input": {
+        "payments": [{ "method": "cash", "amount": 100000 }],
+        "deskStatus": "paid_out",
+        "answers": { "cash": "not_arrived" }
+      },
+      "expected": {
+        "parts": [{ "method": "cash", "amount": 100000, "known": "checked", "answer": "arrived" }],
+        "checks": [{ "method": "cash", "amount": 100000, "known": "checked", "answer": "arrived" }],
+        "decision": { "decision": "return" }
+      }
+    }
+  ]
+}

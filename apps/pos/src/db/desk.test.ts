@@ -1,5 +1,11 @@
 // @vitest-environment node
-import { CashHandoverV1, CashMovementV1, CashSessionV2, CustomerCollectionV1 } from '@erp/contracts';
+import {
+  CashHandoverV1,
+  CashMovementV1,
+  CashMovementV2,
+  CashSessionV2,
+  CustomerCollectionV1,
+} from '@erp/contracts';
 import { DomainError, money } from '@erp/domain';
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -12,6 +18,7 @@ import {
   deskCustomer,
   deskLookups,
   deskState,
+  giveBackVoidCash,
   openSession,
   receiveCollection,
   recordCashMovement,
@@ -562,5 +569,112 @@ describe('collections, cash-out and the counted close (CSH-05…CSH-07)', () => 
     );
     expect(count("SELECT count(*) FROM outbox WHERE family = 'Z'")).toBe(1);
     expect(deskState(db, T0).session?.status).toBe('open');
+  });
+});
+
+describe('voids and returns by payment at the desk (W1-23, D-111)', () => {
+  const TARIQ = ID('a2');
+  const pullQueue = (rows: Record<string, unknown>[]) => applyPull(db, { cash_queue: rows }, 'cursor');
+  const giveBack = (over: { userId?: string; approverId?: string; billNumber?: string } = {}) =>
+    giveBackVoidCash(db, { userId: ALI, approverId: TARIQ, billNumber: 'C03-S000412', ...made(), ...over });
+  beforeEach(() => {
+    applyPull(
+      db,
+      {
+        users: [user(TARIQ, 'tariq')],
+        roles: [role(ID('r2'), ['pos.sale.create', 'pos.void'])],
+        user_roles: [row({ id: ID('u2'), user_id: TARIQ, role_id: ID('r2'), branch_id: null })],
+      },
+      'cursor',
+    );
+    open();
+  });
+
+  it("keeps a refund until its bill's cash comes in (guard 2): collect the bill first, then pay out", () => {
+    pullQueue([
+      queued('C03-S000415', -45000, {
+        cash_received: null,
+        change_due: null,
+        return_of_number: 'C03-S000412',
+      }),
+    ]);
+    expect(refused(() => hand({ billNumber: 'C03-S000415' }))).toBe('original_unpaid');
+    expect(count("SELECT count(*) FROM outbox WHERE family = 'H'")).toBe(0);
+    hand();
+    expect(hand({ billNumber: 'C03-S000415' }).kind).toBe('payout');
+  });
+
+  it("pays out a refund whose bill was paid at another desk, or that it can't link (a scanned code)", () => {
+    pullQueue([
+      queued('C03-S000412', 432000, { handover_status: 'received' }),
+      queued('C03-S000415', -45000, {
+        cash_received: null,
+        change_due: null,
+        return_of_number: 'C03-S000412',
+      }),
+    ]);
+    expect(hand({ billNumber: 'C03-S000415' }).kind).toBe('payout');
+    const scanned = hand({ billNumber: 'C04-S000009', method: 'scan', code: { cashDue: money(-30000) } });
+    expect(scanned).toMatchObject({ kind: 'payout', amount: 30000 });
+  });
+
+  it("lists the cash it took for a voided bill and gives it back with a manager's PIN, out of the expected cash", () => {
+    hand();
+    pullQueue([
+      queued('C03-S000412', 432000, {
+        status: 'voided',
+        handover_status: 'received',
+        void_number: 'C03-V000004',
+      }),
+    ]);
+    expect(deskState(db, T0).voidCash).toEqual([
+      {
+        number: 'C03-S000412',
+        voidNumber: 'C03-V000004',
+        amount: 432000,
+        createdAt: '2026-11-02T10:10:00.000Z',
+      },
+    ]);
+    const before = deskState(db, T0).session!.expected;
+    // Never the session's cashier, and only someone who may void (owner answer 1).
+    expect(refused(() => giveBack({ approverId: ALI }))).toBe('approver_is_cashier');
+    expect(refused(() => giveBack({ approverId: SARA }))).toBe('approver_not_permitted');
+    expect(refused(() => giveBack({ userId: BILAL }))).toBe('not_session_cashier');
+    expect(count("SELECT count(*) FROM outbox WHERE family = 'M'")).toBe(0);
+
+    const m = giveBack();
+    expect(m).toMatchObject({
+      version: 2,
+      kind: 'void_cash',
+      amount: 432000,
+      billNumber: 'C03-S000412',
+      approvedByUserId: TARIQ,
+    });
+    expect(CashMovementV2.safeParse(m).success).toBe(true);
+    expect(count("SELECT count(*) FROM outbox WHERE family = 'M'")).toBe(1);
+    const after = deskState(db, T0);
+    expect(after.voidCash).toEqual([]);
+    expect(after.session!.expected).toBe(before - 432000);
+    expect(refused(() => giveBack())).toBe('already_given_back');
+  });
+
+  it('lists a voided bill another desk took cash for, and not one given back elsewhere', () => {
+    pullQueue([
+      queued('C03-S000412', 432000, {
+        status: 'voided',
+        handover_status: 'received',
+        void_number: 'C03-V000004',
+      }),
+      queued('C03-S000420', 100000, {
+        status: 'voided',
+        handover_status: 'received',
+        void_number: 'C03-V000005',
+        cash_given_back_number: 'D02-M000003',
+      }),
+      queued('C03-S000421', 100000, { status: 'voided', void_number: 'C03-V000006' }),
+    ]);
+    expect(deskState(db, T0).voidCash.map((v) => [v.number, v.amount])).toEqual([['C03-S000412', 432000]]);
+    expect(refused(() => giveBack({ billNumber: 'C03-S000420' }))).toBe('already_given_back');
+    expect(refused(() => giveBack({ billNumber: 'C03-S000421' }))).toBe('no_cash_taken');
   });
 });

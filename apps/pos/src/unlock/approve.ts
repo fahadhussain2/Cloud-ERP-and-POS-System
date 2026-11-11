@@ -106,6 +106,25 @@ export function checkVarianceApprover(opts: {
   });
 }
 
+/**
+ * Giving back cash taken for a voided bill (W1-23, D-111, owner answer 1): someone who may void (`pos.void`), never
+ * the session's cashier.
+ */
+export function checkVoidCashApprover(opts: {
+  approver: StaffUser;
+  approverState: PinState;
+  approverGrants: readonly RoleGrant[];
+  branchId: string | null;
+  sessionCashierId: string;
+  pin: string;
+  verify: (verifier: string, pin: string) => Promise<boolean>;
+}): Promise<{ result: ApproverResult; approverState: PinState }> {
+  return checkStaffPin({
+    ...opts,
+    allowed: (grants) => opts.approver.id !== opts.sessionCashierId && can(grants, 'pos.void', opts.branchId),
+  });
+}
+
 async function checkStaffPin(opts: {
   approver: StaffUser;
   approverState: PinState;

@@ -25,7 +25,7 @@ import {
   plainAmount,
   type MoneyFormat,
 } from '@erp/ui';
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatQty, parseQuantity } from '../bill/bill-state';
@@ -87,6 +87,8 @@ export function ReturnDialog({
   timeZone,
   windowDays,
   today,
+  initialBillId,
+  beforeOpen,
   onChoose,
   onClose,
 }: {
@@ -97,6 +99,13 @@ export function ReturnDialog({
   windowDays: number;
   /** Today's business date. */
   today: string;
+  /** A bill to open at once (W1-23: a void whose money had arrived becomes its return). */
+  initialBillId?: string;
+  /**
+   * Guard 1 (W1-23): asked before a bill's lines open; false when the bill isn't returned here (it is voided
+   * instead, and the counter has taken over).
+   */
+  beforeOpen?: (bill: { id: string; number: string }) => Promise<boolean>;
   /** Puts the return on the bill (after an approval, if it needs one); answers the i18n key of what is wrong. */
   onChoose: (choice: ReturnChoice) => Promise<string | null>;
   onClose: () => void;
@@ -147,9 +156,10 @@ export function ReturnDialog({
     Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${businessDate}T00:00:00Z`)) / 86_400_000);
   const errorKey = (code: string) => (i18n.exists(`error.${code}`) ? `error.${code}` : 'error.other');
 
-  const openBill = async (b: FoundBill) => {
+  const openBill = async (b: Pick<FoundBill, 'id'>) => {
     const bill = await counter.returnableBill(b.id);
     if (bill === null) return setError(t('return.notHere'));
+    if (beforeOpen && !(await beforeOpen({ id: bill.id, number: bill.number }))) return;
     const ids = [...new Set(bill.lines.map((l) => l.itemId))];
     const looked = await Promise.all(ids.map((id) => counter.billItem(id, null)));
     setError(null);
@@ -160,6 +170,15 @@ export function ReturnDialog({
       marks: {},
     });
   };
+
+  const opened = useRef(false);
+  useEffect(() => {
+    if (initialBillId === undefined || opened.current) return;
+    opened.current = true;
+    void openBill({ id: initialBillId });
+    // Once, for the bill the dialog was opened with.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialBillId]);
 
   const addNoReceiptItem = async (r: SearchResult) => {
     if (state.step !== 'none') return;

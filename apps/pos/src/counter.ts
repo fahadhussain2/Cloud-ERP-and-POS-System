@@ -24,6 +24,7 @@ import type {
   DeskLookups,
   DeskState,
   HandoverRequest,
+  VoidCashRequest,
 } from './db/desk';
 import type { HeldBill } from './db/held';
 import type { FoundBill, ReturnableBill } from './db/returns';
@@ -168,6 +169,10 @@ export interface Counter {
   receiveCollection(
     req: Omit<CollectionRequest, 'id' | 'createdAtMs' | 'clientVersion'>,
   ): Promise<CustomerCollectionDocument>;
+  /** Gives back the cash taken for a voided bill (W1-23), with the approver's PIN checked by the screen. */
+  giveBackVoidCash(
+    req: Omit<VoidCashRequest, 'id' | 'createdAtMs' | 'clientVersion'>,
+  ): Promise<CashMovementDocument>;
   recordCashMovement(
     req: Omit<CashMovementRequest, 'id' | 'createdAtMs' | 'clientVersion'>,
   ): Promise<CashMovementDocument>;

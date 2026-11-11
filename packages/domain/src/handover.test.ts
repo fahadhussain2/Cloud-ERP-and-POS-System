@@ -125,7 +125,13 @@ interface ReviewCase {
   handover: Partial<CashHandoverDocument>;
   context: {
     /** From W1-12 the stored bill also says whether it was voided, and when. */
-    bill: { id: string; cashDue: Money; voided?: { id: string; number: string; at: string } | null } | null;
+    bill: {
+      id: string;
+      cashDue: Money;
+      voided?: { id: string; number: string; at: string; cashKnown?: 'checked' | 'asked' | null } | null;
+      /** From W1-23, a return's original and whether its cash is still pending. */
+      returnOf?: { number: string; pending: boolean } | null;
+    } | null;
     existing: { id: string; number: string } | null;
   };
 }

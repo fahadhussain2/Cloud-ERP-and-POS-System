@@ -25,12 +25,15 @@ export {
 export {
   CashHandoverV1,
   CashMovementV1,
+  CashMovementV2,
   CashSessionV1,
   CashSessionV2,
   CustomerCollectionV1,
   SaleDocumentV1,
   SaleDocumentV2,
   SaleVoidV1,
+  SaleVoidV2,
+  PaymentCheck,
 } from './documents';
 export {
   BillStatusResponseSchema,

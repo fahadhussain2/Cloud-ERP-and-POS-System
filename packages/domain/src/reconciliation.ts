@@ -59,6 +59,19 @@ export interface DayInput {
   exceptions: { kind: string; severity: 'low' | 'medium' | 'high'; count: number }[];
   /** The branch's cash in transit at the end of the day: 0 when every bill reached the drawer. */
   cashInTransit: Money;
+  /**
+   * The day's voided bills the desk took cash for (W1-23, D-111), with the movement that gave it back, or null while
+   * it is still open. Absent before W1-23.
+   */
+  voidCash?: VoidCashLine[];
+}
+
+export interface VoidCashLine {
+  billNumber: string;
+  voidNumber: string;
+  amount: Money;
+  /** The movement that gave it back, and its day; null while open. */
+  givenBack: { number: string; businessDate: string } | null;
 }
 
 export type DayHold =
@@ -113,6 +126,8 @@ export interface DayReconciliation {
   exceptions: DayInput['exceptions'];
   cashInTransit: Money;
   totalVariance: Money;
+  /** Cash taken for voided bills (W1-23): open ones first, then by bill number. */
+  voidCash: VoidCashLine[];
 }
 
 const before = (a: string, b: string) => Date.parse(a) < Date.parse(b);
@@ -126,6 +141,7 @@ const MOVEMENT_KINDS: readonly CashMovementKind[] = [
   'bank_deposit',
   'to_safe',
   'from_safe',
+  'void_cash',
 ];
 
 function summarize(s: DaySession): DaySessionSummary {
@@ -231,5 +247,6 @@ ${e.kind}`,
     ),
     cashInTransit: input.cashInTransit,
     totalVariance: sum(sessions.map((s) => s.variance ?? money(0))),
+    voidCash: sortedBy(input.voidCash ?? [], (v) => `${v.givenBack === null ? 0 : 1} ${v.billNumber}`),
   };
 }

@@ -21,7 +21,14 @@ const session = (over: Partial<DayReconciliationResponse['sessions'][number]>) =
   handedIn: 929700,
   paidOut: 45000,
   cashCollections: 500000,
-  cashOuts: { expense: 20000, supplier_payment: 0, bank_deposit: 0, to_safe: 400000, from_safe: 0 },
+  cashOuts: {
+    expense: 20000,
+    supplier_payment: 0,
+    bank_deposit: 0,
+    to_safe: 400000,
+    from_safe: 0,
+    void_cash: 0,
+  },
   expected: 1464700,
   deskExpected: 1464700,
   expectedDiffers: false,
@@ -54,6 +61,15 @@ const DAY = (acknowledged: boolean): DayReconciliationResponse => ({
   exceptions: [{ kind: 'negative_stock', severity: 'low', count: 3 }],
   cashInTransit: 432000,
   totalVariance: -30000,
+  voidCash: [
+    { billNumber: 'C03-S000051', voidNumber: 'C03-V000004', amount: 100000, givenBack: null },
+    {
+      billNumber: 'C03-S000047',
+      voidNumber: 'C03-V000003',
+      amount: 45000,
+      givenBack: { number: 'D01-M000012', businessDate: '2026-11-03' },
+    },
+  ],
 });
 
 function fakeApi() {
@@ -101,6 +117,14 @@ describe('the day reconciliation', () => {
     // Only a manager sees the button.
     expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Download CSV' }).getAttribute('href')).toMatch(/format=csv$/);
+  });
+
+  it('lists the cash taken for voided bills, open or given back (W1-23)', async () => {
+    const f = fakeApi();
+    wrap(<DayReconciliationScreen api={f.api} permissions={['reports.view']} />);
+    expect(await screen.findByText('Cash taken for voided bills')).toBeTruthy();
+    expect(screen.getByText(/C03-S000051 \(voided on C03-V000004\) · .* · not given back yet/)).toBeTruthy();
+    expect(screen.getByText(/C03-S000047 .* given back on 2026-11-03 \(D01-M000012\)/)).toBeTruthy();
   });
 
   it('lets a manager acknowledge a waiting variance', async () => {

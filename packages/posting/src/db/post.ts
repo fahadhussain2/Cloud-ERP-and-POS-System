@@ -459,7 +459,8 @@ export async function postPending(
                WHERE NOT EXISTS (SELECT 1 FROM erp.postings p WHERE p.source_type = 'payment' AND p.source_id = r.id)
                UNION ALL
                SELECT m.id, 'cash_movement', m.received_at, m.device_id, m.seq FROM erp.cash_movements m
-               WHERE NOT EXISTS (SELECT 1 FROM erp.postings p
+               WHERE m.duplicate_of_id IS NULL
+                 AND NOT EXISTS (SELECT 1 FROM erp.postings p
                                  WHERE p.source_type = 'cash_movement' AND p.source_id = m.id)
                UNION ALL
                SELECT z.id, 'cash_session', z.created_at, z.device_id, (z.payload->>'seq')::int

@@ -349,7 +349,8 @@ function openSession(): CashSessionDocument {
 }
 
 /** The desk pays a refund out from its queue. */
-const payout = (r: ReturnDocument): CashHandoverDocument =>
+/** The desk's handover of a bill's cash in, or of a return's refund out, as the queue gives it. */
+const payout = (r: ReturnDocument | SaleDocument): CashHandoverDocument =>
   buildHandoverDocument({
     session,
     cashierId: shop.cashier,
@@ -527,9 +528,15 @@ describe('a return (sync spec §6.2, posting rules §4.2)', () => {
     ]);
     expect(await shelf('OIL001', 'shop')).toBe(shopBefore + 1000);
 
-    // The refund is in the desk's queue, paid out there, and leaves it.
+    // The refund is in the desk's queue, with its original (W1-23); the bill's cash came in first, so the refund is
+    // paid out there with nothing flagged, and leaves the queue.
     const queued = (await pull(desk, 'cash_queue')).cash_queue!.find((x) => x.number === r.number);
-    expect(queued).toMatchObject({ cash_due: '-120000', handover_status: 'pending' });
+    expect(queued).toMatchObject({
+      cash_due: '-120000',
+      handover_status: 'pending',
+      return_of_number: s.number,
+    });
+    expect(results(await push(desk, [payout(s)]))).toEqual([['accepted', null, []]]);
     const h = payout(r);
     expect(results(await push(desk, [h]))).toEqual([['accepted', null, []]]);
     expect(
@@ -543,6 +550,40 @@ describe('a return (sync spec §6.2, posting rules §4.2)', () => {
 
     // Sent again: the stored result (rule 7).
     expect((await push(other, [r])).results[0]!.status).toBe('duplicate');
+  });
+
+  it('flags a refund paid out before its bill was paid, and settles it when the bill is (W1-23, guard 2)', async () => {
+    const s = sale(counter, [['OIL001', 1, 120000]]);
+    await push(counter, [s]);
+    const r = returnOf(other, s, [{ lineNo: 1, units: 1 }]);
+    await push(other, [r]);
+    // Offline, the desk couldn't link the refund slip to its bill and paid it out.
+    expect(results(await push(desk, [payout(r)]))).toEqual([['accepted', null, ['refund_before_payment']]]);
+    const flagged = () =>
+      q<{
+        status: string;
+        severity: string;
+        review_note: string | null;
+        details: { originalNumber: string };
+      }>(
+        `SELECT status, severity, review_note, details FROM erp.exceptions
+         WHERE kind = 'refund_before_payment' AND details ->> 'originalNumber' = $1`,
+        [s.number],
+      );
+    expect(await flagged()).toMatchObject([{ status: 'open', severity: 'high' }]);
+    // The bill's cash comes in: the server settles it, audited.
+    const paid = payout(s);
+    expect(results(await push(desk, [paid]))).toEqual([['accepted', null, []]]);
+    expect(await flagged()).toMatchObject([
+      { status: 'reviewed', review_note: `Bill paid on ${paid.number}` },
+    ]);
+    expect(
+      (
+        await q<{ n: number }>(
+          "SELECT count(*)::int AS n FROM erp.audit_log WHERE action = 'exception.settled'",
+        )
+      )[0]!.n,
+    ).toBeGreaterThanOrEqual(1);
   });
 
   it('puts a defective line into Damaged', async () => {

@@ -3,6 +3,7 @@ import {
   buildCollectionDocument,
   buildHandoverDocument,
   buildSessionDocument,
+  buildVoidCashDocument,
   businessDate,
   DomainError,
   expectedCash,
@@ -12,6 +13,7 @@ import {
   type CashHandoverDocument,
   type CashMovementDocument,
   type CashMovementKind,
+  type CashOutKind,
   type CashSessionDocument,
   type CollectionCustomer,
   type CollectionMethod,
@@ -30,12 +32,13 @@ import {
   type QueueEntry,
   type ReturnDocument,
   type SaleDocument,
+  type VoidCashBill,
 } from '@erp/domain';
 import { uuidv7 } from '@erp/contracts';
 
 import { checkoutSettings, type CheckoutSettings } from './checkout';
 import { creditFigures, getCustomer } from './customers';
-import { getDevice, getSync, grantsFor, type DeviceInfo } from './repo';
+import { getDevice, getSync, grantsFor, log, type DeviceInfo } from './repo';
 import type { SqlDb } from './sql';
 
 // The cash desk on its own PC (W1-10, W1-11, cash desk spec, CSH-01…CSH-07): the pulled queue, this desk's session,
@@ -70,6 +73,17 @@ export interface DeskState {
   queue: (QueueEntry & { deviceId: string })[];
   /** This desk's handovers of the last days. */
   local: LocalHandover[];
+  /** Voided bills the desk took cash for, not given back yet (W1-23, D-111), oldest first. */
+  voidCash: VoidCashRow[];
+}
+
+/** A voided bill whose cash a desk took: what the section "Cash taken for voided bills" lists. */
+export interface VoidCashRow {
+  number: string;
+  voidNumber: string | null;
+  /** The cash taken: this desk's handover's figure, else the bill's cash due. */
+  amount: Money;
+  createdAt: string;
 }
 
 const amount = (v: unknown): Money | null => (v === null || v === undefined ? null : money(Number(v)));
@@ -162,6 +176,51 @@ const queueEntry = (r: Record<string, unknown>): QueueEntry & { deviceId: string
 const QUEUE_COLUMNS = `id, number, device_id, salesperson_user_id, created_at_device, cash_due, cash_received,
   change_due, handover_status, status`;
 
+/** This desk's own `void_cash` movements, by bill (W1-23). */
+const givenBackHere = (db: SqlDb, billNumber: string): boolean =>
+  db.selectValue(
+    `SELECT 1 FROM local_documents WHERE family = 'M' AND json_extract(payload, '$.kind') = 'void_cash'
+       AND json_extract(payload, '$.billNumber') = ? LIMIT 1`,
+    [billNumber],
+  ) !== undefined;
+
+/** This desk's handover in of a bill, with its figure, or null. */
+const handedInHere = (db: SqlDb, billNumber: string): Money | null => {
+  const v = db.selectValue(
+    `SELECT json_extract(payload, '$.amount') FROM local_documents WHERE family = 'H'
+       AND json_extract(payload, '$.kind') = 'in' AND json_extract(payload, '$.billNumber') = ? LIMIT 1`,
+    [billNumber],
+  );
+  return v === undefined || v === null ? null : money(Number(v));
+};
+
+/**
+ * Voided bills whose cash was taken (by this desk, or by another as the queue says) and not given back yet (W1-23):
+ * the server keeps such a bill in the queue until its cash is given back.
+ */
+function voidCashRows(db: SqlDb): VoidCashRow[] {
+  return db
+    .selectObjects(
+      `SELECT number, created_at_device, cash_due, handover_status, status, void_number, cash_given_back_number, id
+       FROM cash_queue WHERE cash_due > 0 AND deleted_at IS NULL ORDER BY created_at_device, number`,
+    )
+    .flatMap((r) => {
+      const number = String(r['number']);
+      const voided = r['status'] === 'voided' || voidedHere(db, String(r['id']));
+      if (!voided || r['cash_given_back_number'] !== null || givenBackHere(db, number)) return [];
+      const here = handedInHere(db, number);
+      if (here === null && r['handover_status'] !== 'received') return [];
+      return [
+        {
+          number,
+          voidNumber: typeof r['void_number'] === 'string' ? r['void_number'] : null,
+          amount: here ?? money(Number(r['cash_due'])),
+          createdAt: String(r['created_at_device']),
+        },
+      ];
+    });
+}
+
 export function deskState(db: SqlDb, nowMs = Date.now()): DeskState {
   const s = lastSession(db);
   let session: DeskSessionView | null = null;
@@ -189,6 +248,7 @@ export function deskState(db: SqlDb, nowMs = Date.now()): DeskState {
         e.status === 'finalized' && voidedHere(db, e.id) ? { ...e, status: 'voided' as const } : e,
       ),
     local: localHandovers(db, nowMs),
+    voidCash: voidCashRows(db),
   };
 }
 
@@ -345,10 +405,28 @@ const voidedHere = (db: SqlDb, saleId: string): boolean =>
     [saleId],
   ) !== undefined;
 
+/**
+ * A return's original bill whose cash is still waiting in the queue (W1-23, guard 2), or null: pending as the queue
+ * says, not voided, and not handed over at this desk either.
+ */
+function unpaidOriginal(db: SqlDb, originalNumber: unknown): { number: string; amount: Money } | null {
+  if (typeof originalNumber !== 'string') return null;
+  const [o] = db.selectObjects(
+    'SELECT id, cash_due, handover_status, status FROM cash_queue WHERE number = ? AND deleted_at IS NULL LIMIT 1',
+    [originalNumber],
+  );
+  if (o === undefined || Number(o['cash_due']) <= 0) return null;
+  if (o['handover_status'] !== 'pending' || o['status'] !== 'finalized' || voidedHere(db, String(o['id'])))
+    return null;
+  if (handedInHere(db, originalNumber) !== null) return null;
+  return { number: originalNumber, amount: money(Number(o['cash_due'])) };
+}
+
 function targetOf(db: SqlDb, number: string, code: { cashDue: Money } | null): HandoverTarget {
-  const [row] = db.selectObjects(`SELECT ${QUEUE_COLUMNS} FROM cash_queue WHERE number = ? LIMIT 1`, [
-    number,
-  ]);
+  const [row] = db.selectObjects(
+    `SELECT ${QUEUE_COLUMNS}, return_of_number FROM cash_queue WHERE number = ? LIMIT 1`,
+    [number],
+  );
   if (row !== undefined) {
     const e = queueEntry(row);
     return {
@@ -359,6 +437,8 @@ function targetOf(db: SqlDb, number: string, code: { cashDue: Money } | null): H
       handoverStatus: e.handoverStatus,
       // Voided as the queue says, or by this desk itself before the server knows (W1-12).
       status: e.status === 'voided' || voidedHere(db, e.id) ? 'voided' : 'finalized',
+      // A refund waits for its bill's cash (W1-23, guard 2); a scanned code alone can't be linked.
+      unpaidOriginal: e.cashDue < 0 ? unpaidOriginal(db, row['return_of_number']) : null,
     };
   }
   if (code === null) throw new DomainError('nothing_to_collect', `${number} is not in the queue`);
@@ -595,7 +675,7 @@ export function receiveCollection(db: SqlDb, req: CollectionRequest): CustomerCo
 }
 
 export interface CashMovementRequest extends DeskRequest {
-  kind: CashMovementKind;
+  kind: CashOutKind;
   amount: Money;
   expenseCategoryId: string | null;
   supplierId: string | null;
@@ -634,6 +714,53 @@ export function recordCashMovement(db: SqlDb, req: CashMovementRequest): CashMov
       context: contextOf(r, nextDeskSeq(db, 'M'), req),
     });
     store(db, doc, doc.kind);
+    return doc;
+  });
+}
+
+export interface VoidCashRequest extends DeskRequest {
+  billNumber: string;
+  /** Whoever entered their PIN on the screen (a pos.void holder, never the session's cashier). */
+  approverId: string;
+}
+
+/** A bill as the give-back check needs it, from the queue and this desk's own documents (W1-23). */
+function voidCashBill(db: SqlDb, billNumber: string): VoidCashBill {
+  const [r] = db.selectObjects(
+    `SELECT id, cash_due, handover_status, status, cash_given_back_number FROM cash_queue
+     WHERE number = ? AND deleted_at IS NULL LIMIT 1`,
+    [billNumber],
+  );
+  const here = handedInHere(db, billNumber);
+  const voided = r !== undefined && (r['status'] === 'voided' || voidedHere(db, String(r['id'])));
+  return {
+    number: billNumber,
+    status: voided ? 'voided' : 'finalized',
+    cashTaken:
+      here ?? (r !== undefined && r['handover_status'] === 'received' ? money(Number(r['cash_due'])) : null),
+    givenBack: givenBackHere(db, billNumber) || (r !== undefined && r['cash_given_back_number'] !== null),
+  };
+}
+
+/**
+ * Gives back the cash taken for a voided bill (W1-23, D-111): a cash movement of kind void_cash, written with its
+ * outbox row in one transaction (rule 6); refused with checkVoidCash's problem as a DomainError, writing nothing.
+ */
+export function giveBackVoidCash(db: SqlDb, req: VoidCashRequest): CashMovementDocument {
+  const r = ready(db);
+  return db.transaction(() => {
+    const doc = buildVoidCashDocument({
+      session: lastSession(db),
+      cashierId: req.userId,
+      grants: grantsFor(db, req.userId),
+      branchId: r.device.branchId,
+      bill: voidCashBill(db, req.billNumber),
+      approverId: req.approverId,
+      approverGrants: grantsFor(db, req.approverId),
+      context: contextOf(r, nextDeskSeq(db, 'M'), req),
+    });
+    store(db, doc, doc.kind);
+    log(db, 'desk.void_cash', { bill: req.billNumber, number: doc.number, approvedBy: req.approverId });
     return doc;
   });
 }

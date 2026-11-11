@@ -52,6 +52,13 @@ export const EXCEPTION_KINDS = [
   'return_original_invalid',
   'return_price_mismatch',
   'return_not_permitted',
+  // Voids and returns by payment (W1-23, D-111): a refund paid out before its bill's cash came in; cash given back for
+  // a voided bill a second time, for a bill that isn't voided, without a handover, or for another amount.
+  'refund_before_payment',
+  'void_cash_duplicate',
+  'void_cash_not_voided',
+  'void_cash_without_handover',
+  'void_cash_amount_mismatch',
 ] as const;
 export type ExceptionKind = (typeof EXCEPTION_KINDS)[number];
 

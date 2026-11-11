@@ -2,13 +2,15 @@ import { businessDate } from './business-date';
 import type { DeskContext, DeskSession } from './cash-session';
 import { DomainError } from './errors';
 import { add, money, negate, sub, type Money } from './money';
+import type { PaymentKnown } from './payment-check';
 import { can, type Permission, type RoleGrant } from './permissions';
 import { documentNumber } from './sale-document';
 
 // Cash handovers at the desk (CSH-02, CSH-03, CSH-04, PRD W4, W7, cash desk spec): the live queue, the check before a
 // handover is recorded, the handover document, and the server's review of it. A bill's positive cash due is handed in;
 // a negative one (a refund) is paid out. A handover is its own document: the sale is never touched (CLAUDE.md rule 3).
-// The server flags what looks wrong, never refuses (D-011, D-059).
+// The server flags what looks wrong, never refuses (D-011, D-059). W1-23 (D-111): a return's refund isn't paid out
+// before its original bill's cash came in (guard 2); offline the desk can't tell, so the server flags it.
 
 export type HandoverKind = 'in' | 'payout';
 /** `auto`: a cash sale on the desk itself (PRD W4.5, owner answer 4 to W1-10). */
@@ -119,6 +121,11 @@ export interface HandoverTarget {
   handoverStatus: HandoverStatus;
   /** As the queue says (W1-12); absent for a bill known only from its code. */
   status?: 'finalized' | 'voided';
+  /**
+   * A return whose original bill's cash is still waiting in this desk's queue (W1-23, guard 2), or null/absent: the
+   * desk links them by the queue's `return_of_number`; a refund known only from its code can't be linked.
+   */
+  unpaidOriginal?: { number: string; amount: Money } | null;
 }
 
 export interface HandoverInput {
@@ -143,6 +150,8 @@ export type HandoverProblem =
   | 'not_session_cashier'
   | 'not_permitted'
   | 'already_handed_over'
+  /** A refund whose original bill hasn't been paid yet (W1-23, guard 2). */
+  | 'original_unpaid'
   | 'received_not_rounded'
   | 'received_short';
 
@@ -158,7 +167,12 @@ export type HandoverCheck =
       /** The salesman's figure, when the cashier changed it. */
       correctedFrom: Money | null;
     }
-  | { ok: false; problem: Exclude<HandoverProblem, 'not_permitted' | 'already_handed_over'> }
+  | {
+      ok: false;
+      problem: Exclude<HandoverProblem, 'not_permitted' | 'already_handed_over' | 'original_unpaid'>;
+    }
+  /** Collect the original first: its number and cash due. */
+  | { ok: false; problem: 'original_unpaid'; original: { number: string; amount: Money } }
   | { ok: false; problem: 'not_permitted'; permission: Permission }
   | {
       ok: false;
@@ -192,6 +206,8 @@ export function checkHandover(input: HandoverInput): HandoverCheck {
   if (target.handoverStatus === 'received' || target.handoverStatus === 'paid_out')
     return { ok: false, problem: 'already_handed_over', existing: null };
   const amount = abs(target.cashDue);
+  if (kind === 'payout' && target.unpaidOriginal)
+    return { ok: false, problem: 'original_unpaid', original: target.unpaidOriginal };
   if (kind === 'payout')
     return { ok: true, kind, amount, cashReceived: null, changeGiven: null, correctedFrom: null };
 
@@ -292,8 +308,12 @@ export type HandoverFinding =
       voidedAt: string;
       /** The handover was made before the void (pushed after it), or after it (cash for a voided bill). */
       order: 'before_void' | 'after_void';
+      /** How the void's counter knew the cash wasn't at the desk (W1-23); null for a V1 void. */
+      cashKnown: PaymentKnown | null;
     }
-  | { kind: 'handover_not_permitted'; permission: Permission };
+  | { kind: 'handover_not_permitted'; permission: Permission }
+  /** A return's refund paid out while its original bill's cash hadn't come in (W1-23, guard 2). */
+  | { kind: 'refund_before_payment'; originalNumber: string };
 
 /**
  * The server's findings on a pushed handover (sync spec §6.2), in this order: a second handover of the bill, an
@@ -302,8 +322,16 @@ export type HandoverFinding =
 export function reviewHandover(
   handover: CashHandoverDocument,
   context: {
-    /** The stored bill, or null until it arrives; with its void (W1-12), or null when it isn't voided. */
-    bill: { id: string; cashDue: Money; voided?: { id: string; number: string; at: string } | null } | null;
+    /**
+     * The stored bill, or null until it arrives; with its void (W1-12), or null when it isn't voided; for a return,
+     * its original and whether that bill's cash is still pending (W1-23).
+     */
+    bill: {
+      id: string;
+      cashDue: Money;
+      voided?: { id: string; number: string; at: string; cashKnown?: PaymentKnown | null } | null;
+      returnOf?: { number: string; pending: boolean } | null;
+    } | null;
     /** An earlier handover of the same bill and kind that isn't itself a duplicate. */
     existing: { id: string; number: string } | null;
     /** The roles the server holds for the cashier. */
@@ -339,7 +367,11 @@ export function reviewHandover(
         voidedAt: voided.at,
         // The same second counts as before, as in reviewVoid.
         order: handover.createdAt <= voided.at ? 'before_void' : 'after_void',
+        cashKnown: voided.cashKnown ?? null,
       });
+    const original = context.bill.returnOf;
+    if (original?.pending && handover.kind === 'payout' && !duplicate)
+      findings.push({ kind: 'refund_before_payment', originalNumber: original.number });
   }
   const permission = permissionFor(handover.kind);
   if (!can(context.grants, permission, context.branchId))

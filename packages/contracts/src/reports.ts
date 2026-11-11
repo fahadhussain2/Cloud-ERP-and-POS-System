@@ -9,7 +9,14 @@ export interface ReportMoney {
   minorUnits: number;
 }
 
-export type CashMovementKindName = 'expense' | 'supplier_payment' | 'bank_deposit' | 'to_safe' | 'from_safe';
+export type CashMovementKindName =
+  | 'expense'
+  | 'supplier_payment'
+  | 'bank_deposit'
+  | 'to_safe'
+  | 'from_safe'
+  // Cash given back for a voided bill (W1-23).
+  | 'void_cash';
 
 export type DayHoldResponse =
   | { kind: 'day_not_over'; dayEndsAt: string }
@@ -69,6 +76,13 @@ export interface DayReconciliationResponse {
   exceptions: { kind: string; severity: 'low' | 'medium' | 'high'; count: number }[];
   cashInTransit: number;
   totalVariance: number;
+  /** The day's voided bills the desk took cash for (W1-23): open first; `givenBack` null while open. */
+  voidCash: {
+    billNumber: string;
+    voidNumber: string;
+    amount: number;
+    givenBack: { number: string; businessDate: string } | null;
+  }[];
 }
 
 export interface CashVarianceRow {

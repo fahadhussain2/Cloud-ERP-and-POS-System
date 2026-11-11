@@ -1,0 +1,71 @@
+{
+  "description": "Guard 1 (W1-23, D-111): should a return of this bill be a void and reissue instead? Yes only for a bill with a cash part whose cash hasn't reached the desk (the server's answer, or the person's answer offline), on the bill's own business day, and with no bank, wallet or card part (one paid at the counter has, as a rule, arrived; the return asks nothing about it). Today is 2026-11-11 unless a case says otherwise. Amounts in paisa.",
+  "cases": [
+    {
+      "name": "an unpaid cash bill of today → void instead",
+      "input": {
+        "payments": [{ "method": "cash", "amount": 100000 }],
+        "cash": "not_arrived",
+        "billBusinessDate": "2026-11-11",
+        "today": "2026-11-11"
+      },
+      "expected": true
+    },
+    {
+      "name": "a paid cash bill of today → the return",
+      "input": {
+        "payments": [{ "method": "cash", "amount": 100000 }],
+        "cash": "arrived",
+        "billBusinessDate": "2026-11-11",
+        "today": "2026-11-11"
+      },
+      "expected": false
+    },
+    {
+      "name": "an unpaid cash bill of yesterday: a void isn't allowed any more → the return",
+      "input": {
+        "payments": [{ "method": "cash", "amount": 100000 }],
+        "cash": "not_arrived",
+        "billBusinessDate": "2026-11-10",
+        "today": "2026-11-11"
+      },
+      "expected": false
+    },
+    {
+      "name": "a split bill whose cash is still to come and JazzCash part paid at the counter → the return",
+      "input": {
+        "payments": [
+          { "method": "cash", "amount": 60000 },
+          { "method": "jazzcash", "amount": 40000 }
+        ],
+        "cash": "not_arrived",
+        "billBusinessDate": "2026-11-11",
+        "today": "2026-11-11"
+      },
+      "expected": false
+    },
+    {
+      "name": "cash + on account, the cash unpaid → void instead",
+      "input": {
+        "payments": [
+          { "method": "cash", "amount": 50000 },
+          { "method": "on_account", "amount": 50000 }
+        ],
+        "cash": "not_arrived",
+        "billBusinessDate": "2026-11-11",
+        "today": "2026-11-11"
+      },
+      "expected": true
+    },
+    {
+      "name": "a bill without cash (on account) → the return, nothing to wait for",
+      "input": {
+        "payments": [{ "method": "on_account", "amount": 100000 }],
+        "cash": null,
+        "billBusinessDate": "2026-11-11",
+        "today": "2026-11-11"
+      },
+      "expected": false
+    }
+  ]
+}

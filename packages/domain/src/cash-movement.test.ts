@@ -4,7 +4,7 @@ import {
   buildCashMovementDocument,
   checkCashMovement,
   type CashMovementInput,
-  type CashMovementKind,
+  type CashOutKind,
   type MovementBankAccount,
   type MovementCategory,
 } from './cash-movement';
@@ -27,7 +27,7 @@ const BANKS: Record<string, MovementBankAccount> = {
 interface Case {
   session?: DeskSession | null;
   cashierId?: string;
-  kind: CashMovementKind;
+  kind: CashOutKind;
   amount: Money;
   category?: string;
   supplier?: boolean;

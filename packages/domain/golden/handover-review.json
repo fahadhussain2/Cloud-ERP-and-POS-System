@@ -1,12 +1,15 @@
 {
-  "description": "The server's review of a pushed handover (sync spec §6.2, D-011, D-059): findings, never a refusal. Each case changes a base handover (handover-review.test.ts: D01-H000031, an 'in' of Rs 4,320 for C03-S000412 by cashier …a5) and gives what the server holds: the bill (null until it arrives), an earlier handover of the same bill and kind (null when none). A bill is matched when the handover's amount equals its cash due (in) or minus its cash due (payout). Staff: …a5 a cashier (cash.handover.receive, cash.refund.pay); …a6 cash.handover.receive only; …a1 a salesman; …a9 is unknown. Amounts in paisa. From W1-12 the stored bill may carry its void (voided: id, number, and the void's time): a handover in for a voided bill is cash_received_for_void (D-059), after the amount check and before the permission, with whether the handover was made before or after the void (the base handover is at 10:16:02 UTC); a duplicate handover brings no cash, so it is not.",
+  "description": "The server's review of a pushed handover (sync spec §6.2, D-011, D-059): findings, never a refusal. Each case changes a base handover (handover-review.test.ts: D01-H000031, an 'in' of Rs 4,320 for C03-S000412 by cashier …a5) and gives what the server holds: the bill (null until it arrives), an earlier handover of the same bill and kind (null when none). A bill is matched when the handover's amount equals its cash due (in) or minus its cash due (payout). Staff: …a5 a cashier (cash.handover.receive, cash.refund.pay); …a6 cash.handover.receive only; …a1 a salesman; …a9 is unknown. Amounts in paisa. From W1-12 the stored bill may carry its void (voided: id, number, and the void's time): a handover in for a voided bill is cash_received_for_void (D-059), after the amount check and before the permission, with whether the handover was made before or after the void (the base handover is at 10:16:02 UTC); a duplicate handover brings no cash, so it is not. W1-23 (D-111): a return's payout while its original bill's cash is still pending is refund_before_payment (a duplicate brings no cash); cash_received_for_void says how the void's counter knew (cashKnown, null for a V1 void).",
   "cases": [
     {
       "name": "the bill matches",
       "input": {
         "handover": {},
         "context": {
-          "bill": { "id": "019a5000-0000-7000-8000-000000000412", "cashDue": 432000 },
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "cashDue": 432000
+          },
           "existing": null
         }
       },
@@ -15,30 +18,51 @@
     {
       "name": "the bill hasn't arrived yet: nothing to compare",
       "input": {
-        "handover": { "saleDocumentId": null },
-        "context": { "bill": null, "existing": null }
+        "handover": {
+          "saleDocumentId": null
+        },
+        "context": {
+          "bill": null,
+          "existing": null
+        }
       },
       "expected": []
     },
     {
       "name": "an offline scan whose amount differs from the bill when it arrives",
       "input": {
-        "handover": { "saleDocumentId": null, "amount": 423000 },
+        "handover": {
+          "saleDocumentId": null,
+          "amount": 423000
+        },
         "context": {
-          "bill": { "id": "019a5000-0000-7000-8000-000000000412", "cashDue": 432000 },
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "cashDue": 432000
+          },
           "existing": null
         }
       },
       "expected": [
-        { "kind": "handover_amount_mismatch", "handoverKind": "in", "amount": 423000, "billCashDue": 432000 }
+        {
+          "kind": "handover_amount_mismatch",
+          "handoverKind": "in",
+          "amount": 423000,
+          "billCashDue": 432000
+        }
       ]
     },
     {
       "name": "a payout recorded for a sale bill",
       "input": {
-        "handover": { "kind": "payout" },
+        "handover": {
+          "kind": "payout"
+        },
         "context": {
-          "bill": { "id": "019a5000-0000-7000-8000-000000000412", "cashDue": 432000 },
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "cashDue": 432000
+          },
           "existing": null
         }
       },
@@ -54,9 +78,16 @@
     {
       "name": "a refund paid out exactly",
       "input": {
-        "handover": { "kind": "payout", "billNumber": "C03-S000415", "amount": 45000 },
+        "handover": {
+          "kind": "payout",
+          "billNumber": "C03-S000415",
+          "amount": 45000
+        },
         "context": {
-          "bill": { "id": "019a5000-0000-7000-8000-000000000415", "cashDue": -45000 },
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000415",
+            "cashDue": -45000
+          },
           "existing": null
         }
       },
@@ -71,8 +102,14 @@
           "method": "scan"
         },
         "context": {
-          "bill": { "id": "019a5000-0000-7000-8000-000000000412", "cashDue": 432000 },
-          "existing": { "id": "019a7000-0000-7000-8000-000000000071", "number": "D01-H000031" }
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "cashDue": 432000
+          },
+          "existing": {
+            "id": "019a7000-0000-7000-8000-000000000071",
+            "number": "D01-H000031"
+          }
         }
       },
       "expected": [
@@ -92,8 +129,14 @@
           "amount": 400000
         },
         "context": {
-          "bill": { "id": "019a5000-0000-7000-8000-000000000412", "cashDue": 432000 },
-          "existing": { "id": "019a7000-0000-7000-8000-000000000071", "number": "D01-H000031" }
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "cashDue": 432000
+          },
+          "existing": {
+            "id": "019a7000-0000-7000-8000-000000000071",
+            "number": "D01-H000031"
+          }
         }
       },
       "expected": [
@@ -102,19 +145,34 @@
           "duplicateOf": "019a7000-0000-7000-8000-000000000071",
           "duplicateOfNumber": "D01-H000031"
         },
-        { "kind": "handover_amount_mismatch", "handoverKind": "in", "amount": 400000, "billCashDue": 432000 }
+        {
+          "kind": "handover_amount_mismatch",
+          "handoverKind": "in",
+          "amount": 400000,
+          "billCashDue": 432000
+        }
       ]
     },
     {
       "name": "a cashier the server says can't receive cash",
       "input": {
-        "handover": { "cashierId": "019a0000-0000-7000-8000-0000000000a1" },
+        "handover": {
+          "cashierId": "019a0000-0000-7000-8000-0000000000a1"
+        },
         "context": {
-          "bill": { "id": "019a5000-0000-7000-8000-000000000412", "cashDue": 432000 },
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "cashDue": 432000
+          },
           "existing": null
         }
       },
-      "expected": [{ "kind": "handover_not_permitted", "permission": "cash.handover.receive" }]
+      "expected": [
+        {
+          "kind": "handover_not_permitted",
+          "permission": "cash.handover.receive"
+        }
+      ]
     },
     {
       "name": "a payout by someone who may receive cash but not pay refunds",
@@ -126,27 +184,48 @@
           "cashierId": "019a0000-0000-7000-8000-0000000000a6"
         },
         "context": {
-          "bill": { "id": "019a5000-0000-7000-8000-000000000415", "cashDue": -45000 },
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000415",
+            "cashDue": -45000
+          },
           "existing": null
         }
       },
-      "expected": [{ "kind": "handover_not_permitted", "permission": "cash.refund.pay" }]
+      "expected": [
+        {
+          "kind": "handover_not_permitted",
+          "permission": "cash.refund.pay"
+        }
+      ]
     },
     {
       "name": "a cashier the server doesn't know",
       "input": {
-        "handover": { "cashierId": "019a0000-0000-7000-8000-0000000000a9" },
+        "handover": {
+          "cashierId": "019a0000-0000-7000-8000-0000000000a9"
+        },
         "context": {
-          "bill": { "id": "019a5000-0000-7000-8000-000000000412", "cashDue": 432000 },
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "cashDue": 432000
+          },
           "existing": null
         }
       },
-      "expected": [{ "kind": "handover_not_permitted", "permission": "cash.handover.receive" }]
+      "expected": [
+        {
+          "kind": "handover_not_permitted",
+          "permission": "cash.handover.receive"
+        }
+      ]
     },
     {
       "name": "cash taken for a bill voided earlier (the desk was offline, W1-12)",
       "input": {
-        "handover": { "method": "scan", "saleDocumentId": null },
+        "handover": {
+          "method": "scan",
+          "saleDocumentId": null
+        },
         "context": {
           "bill": {
             "id": "019a5000-0000-7000-8000-000000000412",
@@ -166,7 +245,8 @@
           "voidId": "019a8000-0000-7000-8000-000000000081",
           "voidNumber": "C03-V000001",
           "voidedAt": "2026-11-02T10:10:00.000Z",
-          "order": "after_void"
+          "order": "after_void",
+          "cashKnown": null
         }
       ]
     },
@@ -175,7 +255,11 @@
       "input": {
         "handover": {},
         "context": {
-          "bill": { "id": "019a5000-0000-7000-8000-000000000412", "cashDue": 432000, "voided": null },
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "cashDue": 432000,
+            "voided": null
+          },
           "existing": null
         }
       },
@@ -204,14 +288,18 @@
           "voidId": "019a8000-0000-7000-8000-000000000081",
           "voidNumber": "C03-V000001",
           "voidedAt": "2026-11-02T10:20:00.000Z",
-          "order": "before_void"
+          "order": "before_void",
+          "cashKnown": null
         }
       ]
     },
     {
       "name": "a second handover of a voided bill is only a duplicate",
       "input": {
-        "handover": { "id": "019a7000-0000-7000-8000-000000000072", "number": "D01-H000032" },
+        "handover": {
+          "id": "019a7000-0000-7000-8000-000000000072",
+          "number": "D01-H000032"
+        },
         "context": {
           "bill": {
             "id": "019a5000-0000-7000-8000-000000000412",
@@ -222,7 +310,10 @@
               "at": "2026-11-02T10:10:00.000Z"
             }
           },
-          "existing": { "id": "019a7000-0000-7000-8000-000000000071", "number": "D01-H000031" }
+          "existing": {
+            "id": "019a7000-0000-7000-8000-000000000071",
+            "number": "D01-H000031"
+          }
         }
       },
       "expected": [
@@ -236,7 +327,9 @@
     {
       "name": "an amount mismatch on a voided bill: both",
       "input": {
-        "handover": { "amount": 423000 },
+        "handover": {
+          "amount": 423000
+        },
         "context": {
           "bill": {
             "id": "019a5000-0000-7000-8000-000000000412",
@@ -251,13 +344,139 @@
         }
       },
       "expected": [
-        { "kind": "handover_amount_mismatch", "handoverKind": "in", "amount": 423000, "billCashDue": 432000 },
+        {
+          "kind": "handover_amount_mismatch",
+          "handoverKind": "in",
+          "amount": 423000,
+          "billCashDue": 432000
+        },
         {
           "kind": "cash_received_for_void",
           "voidId": "019a8000-0000-7000-8000-000000000081",
           "voidNumber": "C03-V000001",
           "voidedAt": "2026-11-02T10:10:00.000Z",
-          "order": "after_void"
+          "order": "after_void",
+          "cashKnown": null
+        }
+      ]
+    },
+    {
+      "name": "a return's refund paid out while its original bill is still pending: refund_before_payment (W1-23)",
+      "input": {
+        "handover": {
+          "kind": "payout",
+          "billNumber": "C03-S000415",
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000415",
+          "amount": 45000,
+          "cashReceived": null,
+          "changeGiven": null
+        },
+        "context": {
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000415",
+            "cashDue": -45000,
+            "returnOf": {
+              "number": "C03-S000412",
+              "pending": true
+            }
+          },
+          "existing": null
+        }
+      },
+      "expected": [
+        {
+          "kind": "refund_before_payment",
+          "originalNumber": "C03-S000412"
+        }
+      ]
+    },
+    {
+      "name": "the original was handed over first: nothing (W1-23)",
+      "input": {
+        "handover": {
+          "kind": "payout",
+          "billNumber": "C03-S000415",
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000415",
+          "amount": 45000,
+          "cashReceived": null,
+          "changeGiven": null
+        },
+        "context": {
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000415",
+            "cashDue": -45000,
+            "returnOf": {
+              "number": "C03-S000412",
+              "pending": false
+            }
+          },
+          "existing": null
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "a second payout of the refund brings no cash: only the duplicate (W1-23)",
+      "input": {
+        "handover": {
+          "kind": "payout",
+          "billNumber": "C03-S000415",
+          "saleDocumentId": "019a5000-0000-7000-8000-000000000415",
+          "amount": 45000,
+          "cashReceived": null,
+          "changeGiven": null
+        },
+        "context": {
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000415",
+            "cashDue": -45000,
+            "returnOf": {
+              "number": "C03-S000412",
+              "pending": true
+            }
+          },
+          "existing": {
+            "id": "019a7000-0000-7000-8000-000000000070",
+            "number": "D01-H000030"
+          }
+        }
+      },
+      "expected": [
+        {
+          "kind": "duplicate_handover",
+          "duplicateOf": "019a7000-0000-7000-8000-000000000070",
+          "duplicateOfNumber": "D01-H000030"
+        }
+      ]
+    },
+    {
+      "name": "cash for a voided bill answered not paid yet on the counter: the finding says it was asked (W1-23)",
+      "input": {
+        "handover": {
+          "createdAt": "2026-11-02T10:30:00.000Z"
+        },
+        "context": {
+          "bill": {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "cashDue": 432000,
+            "voided": {
+              "id": "019a8000-0000-7000-8000-000000000001",
+              "number": "C03-V000001",
+              "at": "2026-11-02T10:20:00.000Z",
+              "cashKnown": "asked"
+            }
+          },
+          "existing": null
+        }
+      },
+      "expected": [
+        {
+          "kind": "cash_received_for_void",
+          "voidId": "019a8000-0000-7000-8000-000000000001",
+          "voidNumber": "C03-V000001",
+          "voidedAt": "2026-11-02T10:20:00.000Z",
+          "order": "after_void",
+          "cashKnown": "asked"
         }
       ]
     }

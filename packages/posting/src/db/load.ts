@@ -225,7 +225,7 @@ export async function loadCollection(c: pg.ClientBase, id: string): Promise<Post
   };
 }
 
-/** A stored cash-out or safe movement (W1-11), or null when there is none. */
+/** A stored cash-out or safe movement (W1-11), or cash given back (W1-23), or null for none or a duplicate. */
 export async function loadCashMovement(c: pg.ClientBase, id: string): Promise<PostingCashMovement | null> {
   const { rows } = await c.query<{
     number: string;
@@ -238,7 +238,7 @@ export async function loadCashMovement(c: pg.ClientBase, id: string): Promise<Po
   }>(
     `SELECT number, branch_id, business_date::text, kind, amount, party_id,
        coalesce(expense_category_id, bank_account_id) AS target_id
-     FROM erp.cash_movements WHERE id = $1`,
+     FROM erp.cash_movements WHERE id = $1 AND duplicate_of_id IS NULL`,
     [id],
   );
   const r = rows[0];

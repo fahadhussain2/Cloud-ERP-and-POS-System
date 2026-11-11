@@ -1,5 +1,5 @@
 {
-  "description": "Posting the desk's other documents (posting rules §4.5, W1-11): collections, cash-outs and safe movements, and the session's open and close",
+  "description": "Posting the desk's other documents (posting rules §4.5, W1-11): collections, cash-outs and safe movements, and the session's open and close W1-23 (D-111): cash given back for a voided bill (void_cash) moves it from the drawer back to cash in transit, undoing the handover.",
   "notes": "Delux's accounts by code (cash.test.ts): 1110 Cash drawer, 1130 Cash in safe (CASH_SAFE), 1150 Soneri, 1160 HBL (Raast), 1200 Accounts receivable, 2100 Accounts payable, 6310 the Tea category's account, 6500 Cash short/over. Targets map an expense category or a bank account to its account. Each posts its own amount; nothing moves stock. A party entry is due on the entry date.",
   "cases": [
     {
@@ -23,16 +23,34 @@
             "branchId": "br-main",
             "memo": "D01-R000001",
             "lines": [
-              { "accountId": "1110", "partyId": null, "debit": 500000, "credit": 0 },
-              { "accountId": "1200", "partyId": "cust-ali", "debit": 0, "credit": 500000 }
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 500000,
+                "credit": 0
+              },
+              {
+                "accountId": "1200",
+                "partyId": "cust-ali",
+                "debit": 0,
+                "credit": 500000
+              }
             ]
           },
           "movements": [],
           "partyEntries": [
-            { "partyId": "cust-ali", "role": "customer", "amount": -500000, "dueDate": "2026-11-02" }
+            {
+              "partyId": "cust-ali",
+              "role": "customer",
+              "amount": -500000,
+              "dueDate": "2026-11-02"
+            }
           ],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -57,16 +75,34 @@
             "branchId": "br-main",
             "memo": "D01-R000002",
             "lines": [
-              { "accountId": "1160", "partyId": null, "debit": 1250000, "credit": 0 },
-              { "accountId": "1200", "partyId": "cust-ali", "debit": 0, "credit": 1250000 }
+              {
+                "accountId": "1160",
+                "partyId": null,
+                "debit": 1250000,
+                "credit": 0
+              },
+              {
+                "accountId": "1200",
+                "partyId": "cust-ali",
+                "debit": 0,
+                "credit": 1250000
+              }
             ]
           },
           "movements": [],
           "partyEntries": [
-            { "partyId": "cust-ali", "role": "customer", "amount": -1250000, "dueDate": "2026-11-02" }
+            {
+              "partyId": "cust-ali",
+              "role": "customer",
+              "amount": -1250000,
+              "dueDate": "2026-11-02"
+            }
           ],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -83,7 +119,13 @@
           "amount": 100000
         }
       },
-      "expected": { "ok": false, "error": { "code": "method_unmapped", "method": "jazzcash" } }
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "method_unmapped",
+          "method": "jazzcash"
+        }
+      }
     },
     {
       "name": "a collection dated on the lock date posts the day after, flagged",
@@ -97,7 +139,9 @@
           "method": "cash",
           "amount": 100000
         },
-        "context": { "lockDate": "2026-10-31" }
+        "context": {
+          "lockDate": "2026-10-31"
+        }
       },
       "expected": {
         "ok": true,
@@ -107,21 +151,42 @@
             "branchId": "br-main",
             "memo": "D01-R000004",
             "lines": [
-              { "accountId": "1110", "partyId": null, "debit": 100000, "credit": 0 },
-              { "accountId": "1200", "partyId": "cust-ali", "debit": 0, "credit": 100000 }
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 100000,
+                "credit": 0
+              },
+              {
+                "accountId": "1200",
+                "partyId": "cust-ali",
+                "debit": 0,
+                "credit": 100000
+              }
             ]
           },
           "movements": [],
           "partyEntries": [
-            { "partyId": "cust-ali", "role": "customer", "amount": -100000, "dueDate": "2026-11-01" }
+            {
+              "partyId": "cust-ali",
+              "role": "customer",
+              "amount": -100000,
+              "dueDate": "2026-11-01"
+            }
           ],
           "exceptions": [
             {
               "kind": "posted_after_lock",
-              "details": { "businessDate": "2026-10-31", "lockDate": "2026-10-31" }
+              "details": {
+                "businessDate": "2026-10-31",
+                "lockDate": "2026-10-31"
+              }
             }
           ],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -147,14 +212,27 @@
             "branchId": "br-main",
             "memo": "D01-M000004",
             "lines": [
-              { "accountId": "6310", "partyId": null, "debit": 20000, "credit": 0 },
-              { "accountId": "1110", "partyId": null, "debit": 0, "credit": 20000 }
+              {
+                "accountId": "6310",
+                "partyId": null,
+                "debit": 20000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 20000
+              }
             ]
           },
           "movements": [],
           "partyEntries": [],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -180,16 +258,34 @@
             "branchId": "br-main",
             "memo": "D01-M000005",
             "lines": [
-              { "accountId": "2100", "partyId": "supp-addi", "debit": 800000, "credit": 0 },
-              { "accountId": "1110", "partyId": null, "debit": 0, "credit": 800000 }
+              {
+                "accountId": "2100",
+                "partyId": "supp-addi",
+                "debit": 800000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 800000
+              }
             ]
           },
           "movements": [],
           "partyEntries": [
-            { "partyId": "supp-addi", "role": "supplier", "amount": -800000, "dueDate": "2026-11-02" }
+            {
+              "partyId": "supp-addi",
+              "role": "supplier",
+              "amount": -800000,
+              "dueDate": "2026-11-02"
+            }
           ],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -215,14 +311,27 @@
             "branchId": "br-main",
             "memo": "D01-M000006",
             "lines": [
-              { "accountId": "1150", "partyId": null, "debit": 5000000, "credit": 0 },
-              { "accountId": "1110", "partyId": null, "debit": 0, "credit": 5000000 }
+              {
+                "accountId": "1150",
+                "partyId": null,
+                "debit": 5000000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 5000000
+              }
             ]
           },
           "movements": [],
           "partyEntries": [],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -248,14 +357,27 @@
             "branchId": "br-main",
             "memo": "D01-M000007",
             "lines": [
-              { "accountId": "1130", "partyId": null, "debit": 500000, "credit": 0 },
-              { "accountId": "1110", "partyId": null, "debit": 0, "credit": 500000 }
+              {
+                "accountId": "1130",
+                "partyId": null,
+                "debit": 500000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 500000
+              }
             ]
           },
           "movements": [],
           "partyEntries": [],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -281,14 +403,98 @@
             "branchId": "br-main",
             "memo": "D01-M000008",
             "lines": [
-              { "accountId": "1110", "partyId": null, "debit": 200000, "credit": 0 },
-              { "accountId": "1130", "partyId": null, "debit": 0, "credit": 200000 }
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 200000,
+                "credit": 0
+              },
+              {
+                "accountId": "1130",
+                "partyId": null,
+                "debit": 0,
+                "credit": 200000
+              }
             ]
           },
           "movements": [],
           "partyEntries": [],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "Rs 1,000 given back for a voided bill (W1-23): Dr Cash in transit / Cr Cash drawer",
+      "input": {
+        "movement": {
+          "id": "m-9",
+          "number": "D01-M000012",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "void_cash",
+          "amount": 100000,
+          "partyId": null,
+          "targetId": null
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-M000012",
+            "lines": [
+              {
+                "accountId": "1120",
+                "partyId": null,
+                "debit": 100000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 100000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "cash given back without the CASH_IN_TRANSIT role can't post (W1-23)",
+      "input": {
+        "movement": {
+          "id": "m-10",
+          "number": "D01-M000013",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "void_cash",
+          "amount": 100000,
+          "partyId": null,
+          "targetId": null
+        },
+        "context": {
+          "withoutRoles": ["CASH_IN_TRANSIT"]
+        }
+      },
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "role_unmapped",
+          "role": "CASH_IN_TRANSIT"
         }
       }
     },
@@ -306,7 +512,13 @@
           "targetId": "cat-gone"
         }
       },
-      "expected": { "ok": false, "error": { "code": "target_unmapped", "targetId": "cat-gone" } }
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "target_unmapped",
+          "targetId": "cat-gone"
+        }
+      }
     },
     {
       "name": "a supplier payment the server can't place on a supplier can't post",
@@ -322,7 +534,12 @@
           "targetId": null
         }
       },
-      "expected": { "ok": false, "error": { "code": "party_missing" } }
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "party_missing"
+        }
+      }
     },
     {
       "name": "to the safe without the CASH_SAFE role can't post",
@@ -337,9 +554,17 @@
           "partyId": null,
           "targetId": null
         },
-        "context": { "withoutRoles": ["CASH_SAFE"] }
+        "context": {
+          "withoutRoles": ["CASH_SAFE"]
+        }
       },
-      "expected": { "ok": false, "error": { "code": "role_unmapped", "role": "CASH_SAFE" } }
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "role_unmapped",
+          "role": "CASH_SAFE"
+        }
+      }
     },
     {
       "name": "an open with the float that stayed posts nothing",
@@ -360,11 +585,18 @@
         "ok": true,
         "posting": {
           "entryDate": "2026-11-03",
-          "journal": { "branchId": "br-main", "memo": "D01-Z000006", "lines": [] },
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-Z000006",
+            "lines": []
+          },
           "movements": [],
           "partyEntries": [],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -382,17 +614,26 @@
           "variance": null,
           "toSafe": 0
         },
-        "context": { "withoutRoles": ["CASH_SHORT_OVER"] }
+        "context": {
+          "withoutRoles": ["CASH_SHORT_OVER"]
+        }
       },
       "expected": {
         "ok": true,
         "posting": {
           "entryDate": "2026-11-03",
-          "journal": { "branchId": "br-main", "memo": "D01-Z000001", "lines": [] },
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-Z000001",
+            "lines": []
+          },
           "movements": [],
           "partyEntries": [],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -419,14 +660,27 @@
             "branchId": "br-main",
             "memo": "D01-Z000006",
             "lines": [
-              { "accountId": "6500", "partyId": null, "debit": 20000, "credit": 0 },
-              { "accountId": "1110", "partyId": null, "debit": 0, "credit": 20000 }
+              {
+                "accountId": "6500",
+                "partyId": null,
+                "debit": 20000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 20000
+              }
             ]
           },
           "movements": [],
           "partyEntries": [],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -453,14 +707,27 @@
             "branchId": "br-main",
             "memo": "D01-Z000006",
             "lines": [
-              { "accountId": "1110", "partyId": null, "debit": 10000, "credit": 0 },
-              { "accountId": "6500", "partyId": null, "debit": 0, "credit": 10000 }
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 10000,
+                "credit": 0
+              },
+              {
+                "accountId": "6500",
+                "partyId": null,
+                "debit": 0,
+                "credit": 10000
+              }
             ]
           },
           "movements": [],
           "partyEntries": [],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -487,16 +754,39 @@
             "branchId": "br-main",
             "memo": "D01-Z000007",
             "lines": [
-              { "accountId": "6500", "partyId": null, "debit": 30000, "credit": 0 },
-              { "accountId": "1110", "partyId": null, "debit": 0, "credit": 30000 },
-              { "accountId": "1130", "partyId": null, "debit": 1034700, "credit": 0 },
-              { "accountId": "1110", "partyId": null, "debit": 0, "credit": 1034700 }
+              {
+                "accountId": "6500",
+                "partyId": null,
+                "debit": 30000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 30000
+              },
+              {
+                "accountId": "1130",
+                "partyId": null,
+                "debit": 1034700,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 1034700
+              }
             ]
           },
           "movements": [],
           "partyEntries": [],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -523,14 +813,27 @@
             "branchId": "br-main",
             "memo": "D01-Z000008",
             "lines": [
-              { "accountId": "1110", "partyId": null, "debit": 5000, "credit": 0 },
-              { "accountId": "6500", "partyId": null, "debit": 0, "credit": 5000 }
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 5000,
+                "credit": 0
+              },
+              {
+                "accountId": "6500",
+                "partyId": null,
+                "debit": 0,
+                "credit": 5000
+              }
             ]
           },
           "movements": [],
           "partyEntries": [],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -553,11 +856,18 @@
         "ok": true,
         "posting": {
           "entryDate": "2026-11-01",
-          "journal": { "branchId": "br-main", "memo": "D01-Z000002", "lines": [] },
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-Z000002",
+            "lines": []
+          },
           "movements": [],
           "partyEntries": [],
           "exceptions": [],
-          "state": { "costs": {}, "balances": {} }
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
         }
       }
     },
@@ -575,9 +885,17 @@
           "variance": -100,
           "toSafe": 0
         },
-        "context": { "withoutRoles": ["CASH_SHORT_OVER"] }
+        "context": {
+          "withoutRoles": ["CASH_SHORT_OVER"]
+        }
       },
-      "expected": { "ok": false, "error": { "code": "role_unmapped", "role": "CASH_SHORT_OVER" } }
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "role_unmapped",
+          "role": "CASH_SHORT_OVER"
+        }
+      }
     }
   ]
 }

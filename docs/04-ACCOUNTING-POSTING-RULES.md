@@ -106,6 +106,7 @@ A reversing journal entry with every line of the original entry swapped, dated t
 |---|---|
 | Handover in (salesman brings cash) | `Dr CASH_DRAWER / Cr CASH_IN_TRANSIT`: cash_due |
 | Refund payout | `Dr CASH_IN_TRANSIT / Cr CASH_DRAWER`: refund amount |
+| Cash taken for a voided bill, given back (cash movement `void_cash`, W1-23, D-111) | `Dr CASH_IN_TRANSIT / Cr CASH_DRAWER`: the amount the desk took; undoes that bill's handover, so cash in transit comes back to 0. A second give-back of one bill is kept and never posted |
 | Sale on the cash desk device itself | Posted as §4.1; the desk writes its automatic handover (`method = auto`) in the same local transaction, which posts as a handover in (W1-10, D-097) |
 | Customer collection, cash | `Dr CASH_DRAWER / Cr AR_CONTROL (party)` |
 | Customer collection, non-cash | `Dr <bank/wallet account> / Cr AR_CONTROL (party)` |

@@ -111,6 +111,7 @@ const ops = {
   deskCustomer: (partyId: string) => desk.deskCustomer(open(), partyId),
   receiveCollection: (req: desk.CollectionRequest) => desk.receiveCollection(open(), req),
   recordCashMovement: (req: desk.CashMovementRequest) => desk.recordCashMovement(open(), req),
+  giveBackVoidCash: (req: desk.VoidCashRequest) => desk.giveBackVoidCash(open(), req),
   /** Push (sync spec §6.2–§7, W1-07): the outbox, the answer, re-queue after a restore, audit events, health. */
   outboxBatch: () => outbox.outboxBatch(open()),
   ackPush: (results: PushResult[], at: string) => outbox.ackPush(open(), results, at),

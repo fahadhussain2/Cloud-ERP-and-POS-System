@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CashMovementV1, CashSessionV2, CustomerCollectionV1 } from './documents';
+import { CashMovementV1, CashMovementV2, CashSessionV2, CustomerCollectionV1 } from './documents';
 
 // The desk's W1-11 wire schemas (cash desk spec): what a desk writes must pass, a malformed one must not.
 
@@ -126,6 +126,55 @@ describe('CashMovementV1', () => {
     expect(CashMovementV1.safeParse({ ...movement(), expenseCategoryId: null }).success).toBe(false);
     expect(CashMovementV1.safeParse({ ...movement(), bankAccountId: ID('b1') }).success).toBe(false);
     expect(CashMovementV1.safeParse({ ...movement(), note: null }).success).toBe(false);
+  });
+});
+
+describe('CashMovementV2 (W1-23)', () => {
+  const giveBack = () => ({
+    ...common,
+    version: 2,
+    family: 'M',
+    seq: 12,
+    number: 'D01-M000012',
+    kind: 'void_cash',
+    amount: 100000,
+    expenseCategoryId: null,
+    partyId: null,
+    bankAccountId: null,
+    targetName: null,
+    note: null,
+    reference: null,
+    billNumber: 'C03-S000051',
+    approvedByUserId: ID('a2'),
+  });
+
+  it('takes cash given back for a voided bill, and the V1 kinds as version 2', () => {
+    expect(CashMovementV2.safeParse(giveBack()).success).toBe(true);
+    expect(CashMovementV2.safeParse({ ...movement(), version: 2 }).success).toBe(true);
+  });
+
+  it.each([
+    ['no bill', { billNumber: undefined }],
+    ['a void number for the bill', { billNumber: 'C03-V000001' }],
+    ['no approver', { approvedByUserId: undefined }],
+    ['the cashier approving', { approvedByUserId: ID('a5') }],
+    ['a category', { expenseCategoryId: ID('c1') }],
+    ['a target name', { targetName: 'Petty cash' }],
+  ])('refuses a give-back with %s', (_name, change) => {
+    expect(CashMovementV2.safeParse({ ...giveBack(), ...change }).success).toBe(false);
+  });
+
+  it('refuses a cash-out naming a bill or an approver', () => {
+    expect(CashMovementV2.safeParse({ ...movement(), version: 2, billNumber: 'C03-S000051' }).success).toBe(
+      false,
+    );
+    expect(CashMovementV2.safeParse({ ...movement(), version: 2, approvedByUserId: ID('a2') }).success).toBe(
+      false,
+    );
+  });
+
+  it('V1 still refuses void_cash', () => {
+    expect(CashMovementV1.safeParse({ ...giveBack(), version: 1 }).success).toBe(false);
   });
 });
 

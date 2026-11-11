@@ -294,42 +294,71 @@ export type SaleDocumentV2 = z.infer<typeof SaleDocumentV2>;
  * A void of a finalized bill, version 1 (family V, sync spec §6.2, POS spec §18, W1-12): what `buildVoidDocument` in
  * `@erp/domain` makes. The bill is never changed (rule 3); the void names it by id and number.
  */
-export const SaleVoidV1 = z
-  .strictObject({
-    version: z.literal(1),
-    id: z.uuid(),
-    family: z.literal('V'),
-    seq: z.int().positive(),
-    number: z.string().regex(/^[A-Z]\d{2,}-V\d{6,}$/),
-    deviceId: z.uuid(),
-    branchId: z.uuid(),
-    saleId: z.uuid(),
-    saleNumber: z.string().regex(/^[A-Z]\d{2,}-S\d{6,}$/),
-    saleBusinessDate: z.iso.date(),
-    saleTotal: NonNegativeMoney,
-    saleCashDue: NonNegativeMoney,
-    userId: z.uuid(),
-    approvedBy: z.uuid(),
-    reason: z.enum([
-      'wrong_item',
-      'wrong_quantity',
-      'wrong_price',
-      'wrong_customer_or_payment',
-      'duplicate_bill',
-      'customer_cancelled',
-      'other',
-    ]),
-    note: z.string().min(1).max(200).nullable(),
-    handoverSeen: z.enum(['pending', 'not_applicable', 'unknown']),
-    createdAt: Instant,
-    businessDate: z.iso.date(),
-    clientVersion: z.string().min(1),
-  })
+const SALE_VOID_FIELDS = z.strictObject({
+  version: z.literal(1),
+  id: z.uuid(),
+  family: z.literal('V'),
+  seq: z.int().positive(),
+  number: z.string().regex(/^[A-Z]\d{2,}-V\d{6,}$/),
+  deviceId: z.uuid(),
+  branchId: z.uuid(),
+  saleId: z.uuid(),
+  saleNumber: z.string().regex(/^[A-Z]\d{2,}-S\d{6,}$/),
+  saleBusinessDate: z.iso.date(),
+  saleTotal: NonNegativeMoney,
+  saleCashDue: NonNegativeMoney,
+  userId: z.uuid(),
+  approvedBy: z.uuid(),
+  reason: z.enum([
+    'wrong_item',
+    'wrong_quantity',
+    'wrong_price',
+    'wrong_customer_or_payment',
+    'duplicate_bill',
+    'customer_cancelled',
+    'other',
+  ]),
+  note: z.string().min(1).max(200).nullable(),
+  handoverSeen: z.enum(['pending', 'not_applicable', 'unknown']),
+  createdAt: Instant,
+  businessDate: z.iso.date(),
+  clientVersion: z.string().min(1),
+});
+export const SaleVoidV1 = SALE_VOID_FIELDS.refine((d) => d.reason !== 'other' || d.note !== null, {
+  message: '"other" needs a note',
+}).refine((d) => (d.saleCashDue === 0) === (d.handoverSeen === 'not_applicable'), {
+  message: 'a bill without cash has nothing at the desk, and one with cash has',
+});
+export type SaleVoidV1 = z.infer<typeof SaleVoidV1>;
+
+/**
+ * What the counter knew of one payment part that brings money in (W1-23, D-111): the method, the amount, how it knew
+ * (`checked`: the desk's status; `asked`: a person) and whether the money had arrived.
+ */
+export const PaymentCheck = z.strictObject({
+  method: PaymentMethod.exclude(['on_account']),
+  amount: z.int().positive(),
+  known: z.enum(['checked', 'asked']),
+  answer: z.enum(['arrived', 'not_arrived']),
+});
+
+/**
+ * A void, version 2 (W1-23, D-111): V1 with `paymentChecks`, what the counter knew of each part of the bill's payment
+ * that brings money in. Every void the counter makes from W1-23 on; push still takes V1.
+ */
+export const SaleVoidV2 = SALE_VOID_FIELDS.extend({
+  version: z.literal(2),
+  paymentChecks: z
+    .array(PaymentCheck)
+    .refine((checks) => new Set(checks.map((c) => c.method)).size === checks.length, {
+      message: 'each method once',
+    }),
+})
   .refine((d) => d.reason !== 'other' || d.note !== null, { message: '"other" needs a note' })
   .refine((d) => (d.saleCashDue === 0) === (d.handoverSeen === 'not_applicable'), {
     message: 'a bill without cash has nothing at the desk, and one with cash has',
   });
-export type SaleVoidV1 = z.infer<typeof SaleVoidV1>;
+export type SaleVoidV2 = z.infer<typeof SaleVoidV2>;
 
 // The cash desk's documents (W1-10, cash desk spec): a handover or refund payout (family H) and a session's open or
 // close (family Z). What `buildHandoverDocument` and `buildSessionDocument` in `@erp/domain` make.
@@ -442,6 +471,7 @@ const MOVEMENT_TARGET = {
   bank_deposit: 'bankAccountId',
   to_safe: null,
   from_safe: null,
+  void_cash: null,
 } as const;
 
 /** Cash out of the drawer (CSH-06), or between the drawer and the safe (owner answer 3 to W1-11). */
@@ -479,6 +509,62 @@ export const CashMovementV1 = z
     message: 'a cash-out needs a note',
   });
 export type CashMovementV1 = z.infer<typeof CashMovementV1>;
+
+/**
+ * A cash movement, version 2 (W1-23, D-111): V1's kinds, plus `void_cash`: the full cash a desk took for a voided bill,
+ * given back with the PIN of a `pos.void` holder (`approvedByUserId`) who isn't the session's cashier. A `void_cash`
+ * names its bill and nothing else; the other kinds are as in V1, without a bill or an approver.
+ */
+export const CashMovementV2 = z
+  .strictObject({
+    version: z.literal(2),
+    id: z.uuid(),
+    family: z.literal('M'),
+    seq: z.int().positive(),
+    number: DeskNumber('M'),
+    kind: z.enum(['expense', 'supplier_payment', 'bank_deposit', 'to_safe', 'from_safe', 'void_cash']),
+    deviceId: z.uuid(),
+    branchId: z.uuid(),
+    sessionId: z.uuid(),
+    cashierId: z.uuid(),
+    amount: z.int().positive(),
+    expenseCategoryId: z.uuid().nullable(),
+    partyId: z.uuid().nullable(),
+    bankAccountId: z.uuid().nullable(),
+    targetName: z.string().min(1).nullable(),
+    note: Note,
+    reference: Reference,
+    billNumber: z
+      .string()
+      .regex(/^[A-Z]\d{2,}-S\d{6,}$/)
+      .optional(),
+    approvedByUserId: z.uuid().optional(),
+    createdAt: Instant,
+    businessDate: z.iso.date(),
+    clientVersion: z.string().min(1),
+  })
+  .refine(
+    (d) =>
+      d.kind === 'void_cash'
+        ? d.billNumber !== undefined &&
+          d.approvedByUserId !== undefined &&
+          d.approvedByUserId !== d.cashierId &&
+          d.expenseCategoryId === null &&
+          d.partyId === null &&
+          d.bankAccountId === null &&
+          d.targetName === null
+        : d.billNumber === undefined &&
+          d.approvedByUserId === undefined &&
+          (['expenseCategoryId', 'partyId', 'bankAccountId'] as const).every(
+            (field) => (d[field] !== null) === (MOVEMENT_TARGET[d.kind] === field),
+          ) &&
+          (d.note !== null || MOVEMENT_TARGET[d.kind] === null),
+    {
+      message:
+        'cash given back names its bill and an approver other than the cashier, and nothing else; a cash-out is as in V1',
+    },
+  );
+export type CashMovementV2 = z.infer<typeof CashMovementV2>;
 
 /** Counts per denomination, keyed by the denomination in minor units. */
 const Denominations = z.record(z.string().regex(/^[1-9]\d*$/), z.int().nonnegative());

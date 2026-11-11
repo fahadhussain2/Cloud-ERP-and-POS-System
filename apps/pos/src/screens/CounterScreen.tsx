@@ -46,6 +46,13 @@ import {
   type SaleVoidDocument,
   type VoidReason,
   VOID_REASONS,
+  answeredParts,
+  paymentParts,
+  returnWouldBeVoid,
+  voidOrReturn,
+  type PaymentAnswer,
+  type PaymentMethodCode,
+  type PaymentPart,
 } from '@erp/domain';
 import {
   Badge,
@@ -91,6 +98,7 @@ import { CustomerDialog, customerStrip, type CustomerChoice } from './CustomerDi
 import { CashDialog, MethodDialog, OnAccountDialog, RefundDialog, SplitDialog } from './PaymentDialogs';
 import { HoldDialog, RecallDialog } from './HoldDialogs';
 import { PaymentPad, type PadMode } from './PaymentPad';
+import { PaymentQuestionDialog } from './PaymentQuestionDialog';
 import { ReturnDialog, type ReturnChoice } from './ReturnDialog';
 import { CLIENT_VERSION } from '../version';
 import { ReprintDialog } from './ReprintDialog';
@@ -105,6 +113,9 @@ const CATALOG_POLL_MS = 1000;
 const nowMs = () => Date.now();
 
 type Zone = 'search' | 'bill';
+
+/** The person's answers to the payment questions (W1-23), by method. */
+type Answers = Partial<Record<PaymentMethodCode, PaymentAnswer>>;
 
 type DialogState =
   | { kind: 'qty'; lineId: string }
@@ -121,12 +132,23 @@ type DialogState =
   | { kind: 'hold' }
   | { kind: 'recall' }
   | { kind: 'void' }
-  | { kind: 'voidApproval'; bill: VoidListBill; desk: DeskCheck }
+  | { kind: 'voidApproval'; bill: VoidListBill; desk: DeskCheck; answers: Answers }
+  /** A payment part the counter can't know about (W1-23): asked before a void, or before a return of an unpaid bill. */
+  | {
+      kind: 'paymentQuestion';
+      bill: VoidListBill;
+      desk: DeskCheck;
+      part: PaymentPart;
+      answers: Answers;
+      purpose: 'void' | 'return';
+    }
+  /** Guard 1 (W1-23): a return of this counter's bill of today not yet paid at the desk is a void instead. */
+  | { kind: 'voidInstead'; bill: VoidListBill; desk: DeskCheck; answers: Answers }
   | { kind: 'reissue'; sale: SaleDocument }
   | { kind: 'customer' }
   | { kind: 'onAccount'; figures: CreditView }
   | { kind: 'creditApproval'; tender: Tender; needs: CreditNeed[]; overLimitBy: Money; overCapBy: Money }
-  | { kind: 'return'; windowDays: number }
+  | { kind: 'return'; windowDays: number; billId?: string }
   | { kind: 'returnApproval'; choice: ReturnChoice; needs: ReturnApprovalKind[] }
   | { kind: 'refund'; to: 'cash' | 'account' | 'transfer' }
   | { kind: 'refundApproval'; tender: Tender }
@@ -776,7 +798,7 @@ export function CounterScreen({
   /** Void (`Alt+V`, POS spec §18): one of this counter's bills of today; the desk is asked first. */
   const openVoid = () => setDialog({ kind: 'void' });
   const voidList = useCallback((filter: string) => counter.voidableBills(filter), [counter]);
-  const chooseVoid = async (bill: VoidListBill) => {
+  const chooseVoid = async (bill: VoidListBill, answers: Answers = {}) => {
     const desk: DeskCheck =
       bill.cashDue === 0
         ? { status: 'not_applicable', at: null, cashierName: null }
@@ -797,12 +819,69 @@ export function CounterScreen({
       );
       return focusSearch();
     }
-    setDialog({ kind: 'voidApproval', bill, desk });
+    askOrDecide(bill, desk, answers, 'void');
+  };
+  /**
+   * The next payment part to ask about (W1-23, D-111), or the decision once every part is known: before a void, each
+   * part that brings money in; before a return of an unpaid bill (guard 1), only its cash.
+   */
+  const askOrDecide = (bill: VoidListBill, desk: DeskCheck, answers: Answers, purpose: 'void' | 'return') => {
+    const parts = paymentParts(bill.payments, desk.status).filter(
+      (p) => purpose === 'void' || p.method === 'cash',
+    );
+    const part = parts.find((p) => p.known === null && answers[p.method] === undefined);
+    if (part) return setDialog({ kind: 'paymentQuestion', bill, desk, part, answers, purpose });
+    if (purpose === 'return') return returnOrVoidInstead(bill, desk, answers);
+    const checks = answeredParts(paymentParts(bill.payments, desk.status), answers) ?? [];
+    const d = voidOrReturn(checks);
+    if (d.decision === 'void') return setDialog({ kind: 'voidApproval', bill, desk, answers });
+    if (d.decision === 'return') {
+      // The money has reached the shop: the refund must be recorded, which only a return does.
+      returnCleared.current = bill.id;
+      setNotice(t('void.moneyArrived', { number: bill.number }));
+      return void openReturn(bill.id);
+    }
+    setDialog(null);
+    setMessage(t('void.paymentMissing', { method: methodName(d.method), amount: m(d.amount) }));
+    focusSearch();
+  };
+  const answerPayment = (arrived: boolean) => {
+    if (dialog?.kind !== 'paymentQuestion') return;
+    const answers: Answers = { ...dialog.answers, [dialog.part.method]: arrived ? 'arrived' : 'not_arrived' };
+    askOrDecide(dialog.bill, dialog.desk, answers, dialog.purpose);
+  };
+  /** A bill cleared for a return by its payment answers: the return dialog doesn't ask again (W1-23). */
+  const returnCleared = useRef<string | null>(null);
+  /**
+   * Guard 1 (W1-23, D-111), when the return dialog opens a bill: this counter's own cash bill of today that the desk
+   * hasn't been paid for is voided and reissued instead. Another counter's bill goes on: only its own counter may
+   * void it, and the desk keeps its refund until the bill is paid (guard 2). True to go on with the return.
+   */
+  const returnGuard = async (b: { id: string; number: string }): Promise<boolean> => {
+    if (returnCleared.current === b.id) return true;
+    const own = (await counter.voidableBills(b.number)).find((x) => x.id === b.id);
+    if (!own || !own.payments.some((p) => p.method === 'cash' && p.amount > 0)) return true;
+    const desk = await counter.deskCheck(own.number);
+    if (desk.status === 'received' || desk.status === 'paid_out') return true;
+    askOrDecide(own, desk, {}, 'return');
+    return false;
+  };
+  const returnOrVoidInstead = (bill: VoidListBill, desk: DeskCheck, answers: Answers) => {
+    const cash =
+      paymentParts(bill.payments, desk.status).find((p) => p.method === 'cash')?.answer ??
+      answers.cash ??
+      null;
+    const today = todayIs();
+    if (returnWouldBeVoid({ payments: bill.payments, cash, billBusinessDate: today, today }))
+      return setDialog({ kind: 'voidInstead', bill, desk, answers });
+    returnCleared.current = bill.id;
+    void openReturn(bill.id);
   };
   /** The approver's own PIN (`pos.void`, PLT-07), then the void in one local transaction, then the VOID print. */
   const attemptVoid = async (
     bill: VoidListBill,
     desk: DeskCheck,
+    answers: Answers,
     ...[approver, pin, reason, note]: Parameters<ApprovalAttempt<VoidReason>>
   ): ReturnType<ApprovalAttempt<VoidReason>> => {
     const [before, grants] = await Promise.all([
@@ -839,6 +918,7 @@ export function CounterScreen({
           reason,
           note,
           deskStatus: desk.status,
+          answers,
         });
         printDocument(done.sale, (await itemsOf(done.sale)).items, null, done.void);
         setMessage(null);
@@ -905,7 +985,7 @@ export function CounterScreen({
     focusSearch();
   };
   /** `F3` Return / exchange (POS spec §19): on an empty bill; a bill with lines is held first (F8). */
-  const openReturn = async () => {
+  const openReturn = async (billId?: string) => {
     const ob = get();
     if (!ob) return;
     if (ob.bill.lines.length > 0 || (ob.bill.returns ?? null) !== null) {
@@ -915,8 +995,8 @@ export function CounterScreen({
     const s = settings ?? (await counter.checkout());
     if (!s) return setMessage(t('pay.notReady'));
     const { windowDays } = await counter.returnPolicy([]);
-    setMessage(null);
-    setDialog({ kind: 'return', windowDays });
+    if (billId === undefined) setMessage(null);
+    setDialog(billId === undefined ? { kind: 'return', windowDays } : { kind: 'return', windowDays, billId });
   };
   const todayIs = () => businessDate(nowMs(), settings?.timeZone ?? tenantZone(), settings?.cutoffHour ?? 4);
 
@@ -1017,7 +1097,10 @@ export function CounterScreen({
       'Shift+F8': openRecall,
       'Alt+V': openVoid,
       F1: ignore,
-      F3: () => void openReturn(),
+      F3: () => {
+        returnCleared.current = null;
+        void openReturn();
+      },
       F5: ignore,
     },
     dialog === null,
@@ -1163,7 +1246,14 @@ export function CounterScreen({
       label: padMode === 'refund' ? t('keys.refund') : padMode === 'even' ? t('keys.even') : t('keys.pay'),
       run: payOrRefund,
     },
-    { keys: 'F3', label: t('keys.return'), run: () => void openReturn() },
+    {
+      keys: 'F3',
+      label: t('keys.return'),
+      run: () => {
+        returnCleared.current = null;
+        void openReturn();
+      },
+    },
     { keys: 'F4', label: t('keys.customer'), run: () => void openCustomer() },
     { keys: 'F7', label: t('keys.tier'), run: openTier },
     { keys: 'F8', label: t('keys.hold'), run: openHold },
@@ -1522,7 +1612,7 @@ export function CounterScreen({
         <ApprovalDialog<VoidReason>
           description={
             dialog.desk.status === 'unknown'
-              ? t('void.approveUnknown')
+              ? t('void.approveAsked', { number: dialog.bill.number })
               : t('void.approve', { number: dialog.bill.number })
           }
           facts={[
@@ -1530,11 +1620,65 @@ export function CounterScreen({
             [t('void.total'), m(dialog.bill.total)],
             [t('approval.seller'), nameOf(dialog.bill.sellerId)],
             [t('void.desk'), t(`void.deskStatus.${dialog.desk.status}`)],
+            // What was answered (W1-23): the approver sees it before entering their PIN.
+            ...Object.entries(dialog.answers).map(
+              ([method, a]) =>
+                [t('void.answered', { method: methodName(method) }), t(`void.answer.${a}`)] as [
+                  string,
+                  ReactNode,
+                ],
+            ),
           ]}
           staff={staff}
           reasons={VOID_REASONS}
-          onApprove={(...args) => attemptVoid(dialog.bill, dialog.desk, ...args)}
+          onApprove={(...args) => attemptVoid(dialog.bill, dialog.desk, dialog.answers, ...args)}
           onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'paymentQuestion' &&
+        (dialog.part.method === 'cash' ? (
+          <PaymentQuestionDialog
+            title={t('void.ask.cashTitle')}
+            question={t('void.ask.cash', { number: dialog.bill.number })}
+            help={t('void.ask.cashHelp')}
+            facts={[
+              [t('void.bill'), dialog.bill.number],
+              [t('void.ask.cashDue'), m(dialog.part.amount)],
+            ]}
+            yes={t('void.ask.cashYes')}
+            no={t('void.ask.cashNo')}
+            onAnswer={answerPayment}
+            onClose={() => setDialog(null)}
+          />
+        ) : (
+          <PaymentQuestionDialog
+            title={t('void.ask.accountTitle')}
+            question={t('void.ask.account', {
+              method: methodName(dialog.part.method),
+              amount: m(dialog.part.amount),
+              number: dialog.bill.number,
+            })}
+            help={t('void.ask.accountHelp')}
+            facts={[
+              [t('void.bill'), dialog.bill.number],
+              [methodName(dialog.part.method), m(dialog.part.amount)],
+            ]}
+            yes={t('void.ask.accountYes')}
+            no={t('void.ask.accountNo')}
+            onAnswer={answerPayment}
+            onClose={() => setDialog(null)}
+          />
+        ))}
+      {dialog?.kind === 'voidInstead' && (
+        <ConfirmDialog
+          title={t('return.unpaidTitle', { number: dialog.bill.number })}
+          body={t('return.unpaid', { number: dialog.bill.number })}
+          actionLabel={t('return.voidInstead')}
+          onConfirm={() => void chooseVoid(dialog.bill, dialog.answers)}
+          onClose={() => {
+            setDialog(null);
+            focusSearch();
+          }}
         />
       )}
       {dialog?.kind === 'reissue' && (
@@ -1596,6 +1740,8 @@ export function CounterScreen({
           timeZone={tenantZone()}
           windowDays={dialog.windowDays}
           today={todayIs()}
+          {...(dialog.billId === undefined ? {} : { initialBillId: dialog.billId })}
+          beforeOpen={returnGuard}
           onChoose={chooseReturn}
           onClose={() => {
             setDialog(null);

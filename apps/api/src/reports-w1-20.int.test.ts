@@ -240,7 +240,10 @@ const voidOf = (bill: SaleDocument) =>
       total: bill.amounts.total,
       cashDue: bill.cashDue,
       status: 'finalized',
+      payments: bill.payments,
     },
+    // W1-23: whatever the counter must ask, answered not arrived (the desk's own answer wins for cash).
+    answers: Object.fromEntries(bill.payments.map((p) => [p.method, 'not_arrived' as const])),
     deviceId: counter.deviceId,
     branchId,
     deskStatus: 'pending',

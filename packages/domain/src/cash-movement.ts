@@ -12,7 +12,10 @@ import { MAX_REFERENCE_LENGTH } from './tender';
 // (family M), written on the desk like a handover. A cash-out above what the drawer should hold asks first rather
 // than refusing: the drawer's figure may be what's wrong.
 
-export type CashMovementKind = 'expense' | 'supplier_payment' | 'bank_deposit' | 'to_safe' | 'from_safe';
+/** What a cashier records in the cash-out dialog. */
+export type CashOutKind = 'expense' | 'supplier_payment' | 'bank_deposit' | 'to_safe' | 'from_safe';
+/** Every desk movement of family M: the cash-outs, and cash given back for a voided bill (W1-23, `void-cash.ts`). */
+export type CashMovementKind = CashOutKind | 'void_cash';
 
 /** Every kind takes cash out of the drawer except `from_safe`. */
 export const isMoneyOut = (kind: CashMovementKind): boolean => kind !== 'from_safe';
@@ -52,7 +55,7 @@ export interface CashMovementInput {
   branchId: string;
   /** The tenant's cash rounding increment (Delux: 100 = Rs 1). */
   increment: Money;
-  kind: CashMovementKind;
+  kind: CashOutKind;
   amount: Money;
   expenseCategory: MovementCategory | null;
   supplier: MovementSupplier | null;
@@ -81,7 +84,7 @@ export type CashMovementProblem =
 export type CashMovementCheck =
   | {
       ok: true;
-      kind: CashMovementKind;
+      kind: CashOutKind;
       amount: Money;
       expenseCategoryId: string | null;
       partyId: string | null;
@@ -98,7 +101,7 @@ export type CashMovementCheck =
 const PERMISSION: Permission = 'cash.movement.create';
 
 type Target = 'expenseCategory' | 'supplier' | 'bankAccount';
-const TARGET: Record<CashMovementKind, Target | null> = {
+const TARGET: Record<CashOutKind, Target | null> = {
   expense: 'expenseCategory',
   supplier_payment: 'supplier',
   bank_deposit: 'bankAccount',
@@ -155,9 +158,12 @@ export function checkCashMovement(input: CashMovementInput): CashMovementCheck {
   };
 }
 
-/** `CashMovementV1` in `@erp/contracts` is its wire schema (cash desk spec, data model §6). */
+/**
+ * `CashMovementV1` and `CashMovementV2` in `@erp/contracts` are its wire schema (cash desk spec, data model §6). V2
+ * (W1-23) adds `void_cash`, with the voided bill and who approved giving its cash back.
+ */
 export interface CashMovementDocument {
-  version: 1;
+  version: 1 | 2;
   id: string;
   family: 'M';
   seq: number;
@@ -176,6 +182,10 @@ export interface CashMovementDocument {
   targetName: string | null;
   note: string | null;
   reference: string | null;
+  /** `void_cash` only (V2): the voided bill whose cash is given back. */
+  billNumber?: string;
+  /** `void_cash` only (V2): the `pos.void` holder who entered their PIN, never the session's cashier. */
+  approvedByUserId?: string;
   createdAt: string;
   businessDate: string;
   clientVersion: string;

@@ -2,6 +2,8 @@ import documentCases from '../golden/void-document.json';
 import reviewCases from '../golden/void-review.json';
 import checkCases from '../golden/void.json';
 import { money } from './money';
+import type { PaymentAnswer } from './payment-check';
+import type { PaymentMethodCode } from './tender';
 import { BRANCH, CONTEXT, COUNTER, grantsOf } from './testing/counter';
 import { runGolden, type GoldenFile } from './testing/golden';
 import {
@@ -29,12 +31,14 @@ const BILL: VoidableBill = {
   total: money(432000),
   cashDue: money(432000),
   status: 'finalized',
+  payments: [{ method: 'cash', amount: money(432000) }],
 };
 
 interface CheckCase {
   bill?: Partial<VoidableBill>;
   approverId?: string;
   deskStatus?: CashDeskStatus;
+  answers?: Partial<Record<PaymentMethodCode, PaymentAnswer>>;
   today?: string;
   reason?: VoidReason | null;
   note?: string | null;
@@ -47,6 +51,7 @@ const checkInput = (i: CheckCase) => {
     deviceId: COUNTER,
     branchId: BRANCH,
     deskStatus: i.deskStatus ?? 'pending',
+    answers: i.answers ?? {},
     approverId,
     approverGrants: grantsOf(approverId),
     reason: i.reason === undefined ? 'wrong_price' : i.reason,

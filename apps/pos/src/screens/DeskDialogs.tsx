@@ -6,7 +6,7 @@ import {
   PIN_MAX_FAILURES,
   sub,
   VARIANCE_REASONS,
-  type CashMovementKind,
+  type CashOutKind,
   type Money,
   type VarianceReason,
 } from '@erp/domain';
@@ -252,7 +252,7 @@ export function CollectionDialog({
 }
 
 export interface CashOutInputUi {
-  kind: CashMovementKind;
+  kind: CashOutKind;
   amount: Money;
   expenseCategoryId: string | null;
   supplierId: string | null;
@@ -262,13 +262,7 @@ export interface CashOutInputUi {
   overDrawerConfirmed: boolean;
 }
 
-const KINDS: readonly CashMovementKind[] = [
-  'expense',
-  'supplier_payment',
-  'bank_deposit',
-  'to_safe',
-  'from_safe',
-];
+const KINDS: readonly CashOutKind[] = ['expense', 'supplier_payment', 'bank_deposit', 'to_safe', 'from_safe'];
 
 export function CashOutDialog({
   lookups,
@@ -287,7 +281,7 @@ export function CashOutDialog({
 }) {
   const { t } = useTranslation();
   const m = (minor: number) => formatMoney(minor, fmt);
-  const [kind, setKind] = useState<CashMovementKind>('expense');
+  const [kind, setKind] = useState<CashOutKind>('expense');
   const [target, setTarget] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
