@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#58](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/58) |
 | **Module** | pos (return rules in `packages/domain`, returned lines in `packages/posting`, push of returns and the 90-day bill datasets in `apps/api`, the return screen, pad, print and local schema in `apps/pos`) |
-| **Status** | Accepted (2026-11-03) with the owner's answers 1–5. Built (2026-11-03) on `w1-13-return-exchange`, in review; Verify 1 done, Verify 2 and 3 to do |
+| **Status** | Done (2026-11-12): built in PR #102, merged to staging; the owner verified it on staging (below). Returns of unpaid bills are guarded by W1-23 (D-111) |
 | **Refs** | POS-12, SYN-01 (90 days of the branch's bills), CSH-04 (the first real refund), POS-13, POS-17 (the pad switches for refunds), PLT-07 (approval on the same screen), INV-01; MIG-03 dropped (owner answer 4); PRD W6, W7, Q3 (30 days, no category excluded); architecture §4.3 (the 90-day dataset), §4.4, §4.5 (an unsynced counter's bill); data model §2 (`categories.return_policy`), §5 (the return fields), §12; posting rules §4.2, §4.3, §8; sync spec §3, §6.1, §6.2; POS spec §10–§13, §15, §18; cash desk spec §6, §7; CLAUDE.md rules 1–9; D-005, D-006, D-007, D-008, D-030 (in part superseded), D-044, D-047, D-048, D-051, D-094, D-095, D-097, D-099 |
 | **Depends on** | W1-08 (a line's cost is on its movement), W1-12 (voided bills; merged), W1-10 (refund payouts, built and waiting for a real refund), W1-09 (customers, for the lookup by phone) |
 | **Size** | about 4½ days (the task list says 3): domain and contracts 1, posting ½, server (migration, push, datasets) 1, the counter (local schema, return screen, pad, print) 1½, e2e and docs ½ (owner answer 5) |
@@ -92,6 +92,10 @@
 3. **On staging** before the go/no-go (18 Dec, D-090).
 
 **Results (2026-11-03, this container):** `pnpm check` green (format, lint, typecheck, 1,741 tests with the coverage thresholds, `packages/domain` at 100%, every build). `pnpm test:integration` 281 of 282 passed; the one failure is the PostgreSQL 17 version check, as in W1-12: no Docker here, so a local PostgreSQL 16 (CI uses 17). `return.int.test.ts` covers acceptance, Shop and Damaged, the exchange, the transfer refund, `return_over_quantity`, the no-receipt approval, the wait for an unposted original, the 90-day datasets and the rebuild. `pnpm e2e` 47 passed on Playwright's Chromium (this container has Chromium build 1243 and the repo's Playwright asks for 1248, so the run pointed `PLAYWRIGHT_BROWSERS_PATH` at a folder mapping one to the other; nothing in the repo changed). **A bug found by e2e, fixed test-first:** pull sent a `date` column as a JS `Date`, so the counter got the bills' business dates as timestamps (a day off on a server not in UTC) and the no-receipt price failed; `pullColumns` now keeps a date as its text. **Not done:** Verify 2 (your PC) and Verify 3 (staging), and the owner's review.
+
+## Owner review on staging (2026-11-12)
+
+The owner ran the staging checklist (Verify 3) on the staging counter and desk: **working as expected**. Verify 2, on the owner's PC, wasn't run on its own; the staging check replaced it.
 
 ## Risks
 

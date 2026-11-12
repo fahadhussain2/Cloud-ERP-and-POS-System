@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#57](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/57) |
 | **Module** | pos (hold and void rules in `packages/domain`, the void's reversal in `packages/posting`, push of the void and the live bill check in `apps/api`, the counter's dialogs, prints and local schema in `apps/pos`; the desk's queue and scan refuse a voided bill) |
-| **Status** | Built (2026-11-03) on `w1-12-hold-void-reissue`, in review; Verify 1 done, Verify 2 and 3 to do |
+| **Status** | Done (2026-11-12): built in PR #99, merged to staging; the owner verified it on staging (below). Voids were widened by W1-23 (D-111) |
 | **Refs** | POS-08, POS-11, PLT-07 (approval on the same screen), PLT-08 (voids in the audit log), CSH-02, CSH-03 (the desk drops a voided bill), RPT-10 (`cash_received_for_void`), SYN-02; PRD W5, §4 (who may void), Q4 (the void window); architecture §4.4 (numbering, voids keep their number), §4.7 (held bills are device-local), §5.1; data model §2 (`limits.voidWindow`), §5 (the void fields, `reissue_of_id`, `overrides.kind = void`, held bills device-local), §10 (exceptions), §12 (`held_bills`); posting rules §4.4; sync spec §6.1, §6.2; POS spec §10–§13; cash desk spec §3–§5, §13; CLAUDE.md rules 1–9; D-002, D-011, D-047, D-056, D-059, D-082, D-095, D-097 |
 | **Depends on** | W1-07 (push), W1-08 (posting: the reversal reads the sale's own posting), W1-10 (the desk's queue and scan) |
 | **Size** | about 4 days (the task list says 2): hold ½ day, the void and reissue on the counter 1½, push and the reversal 1½, the desk, e2e and docs ½ |
@@ -86,6 +86,10 @@
 3. **On staging:** the same with the staging counter and desk before the pilot (1 Dec, D-090).
 
 **Results (2026-11-03, this container):** `pnpm check` green (format, lint, typecheck, 1,554 tests with the coverage thresholds, `packages/domain` at 100%, every build); `pnpm test:integration` 269 of 270 passed, the one failure being the PostgreSQL 17 version check: this container has no Docker, so the run used a local PostgreSQL 16 (CI uses 17); `void.int.test.ts` covers the void, the waiting void, the refusals, the findings, the queue, the reissue and the bill status call, and `void-window-role.int.test.ts` the role migration under forced RLS, with the rebuild check matching. `pnpm e2e` 42 passed twice in a row on Playwright's Chromium: hold and recall (`counter.spec.ts`), and in `till.spec.ts` a void before the handover leaving the desk's queue with its reissue joining it, a handed-over bill refused, and an offline void of a bill the desk took cash for, flagged `cash_received_for_void` (`before_void`). One run before that missed W1-10's 5-second queue check once (*a counter's cash bill is in the queue within 5 seconds*); not seen again. **Not done:** Verify 2 (your PC, on a copy of `erp_dev`) and Verify 3 (staging), and the owner's review.
+
+## Owner review on staging (2026-11-12)
+
+The owner ran the staging checklist (Verify 3) on the staging counter and desk: **working as expected**. Verify 2, on the owner's PC, wasn't run on its own; the staging check replaced it. The offline clash is now settled at the desk by W1-23's Give back.
 
 ## Risks
 
