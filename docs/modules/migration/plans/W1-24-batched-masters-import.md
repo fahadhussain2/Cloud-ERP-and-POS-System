@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#151](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/151) |
 | **Module** | migration (`tools/legacy-import`, the load step) |
-| **Status** | Built (2026-11-12), in review. Plan accepted by the owner (PR #152) |
+| **Status** | Done (2026-11-13): built in PR #153; the masters loaded onto production with it (results below). Plan accepted in PR #152 |
 | **Refs** | MIG-01; D-084 (the dump stays on the owner's PC), D-085 (the import runs as the app role under RLS); W0-13 (the importer); W1-14 owner answer 3 (the masters on production before 1 Dec); the runbook `docs/runbooks/load-masters-production.md` (#150) |
 | **Depends on** | W0-13 |
 | **Size** | about ½ day: the batched writes ¼, the tests and the comparison with the current importer ¼ |
@@ -102,7 +102,16 @@ With the batched writes all 18 load tests pass, the 15 existing ones unchanged.
 - Every imported table (units to expense categories, 14 tables) has the same rows, compared without ids, timestamps, `txid` and `row_version`, with the foreign keys compared by their codes: no difference.
 - **`row_version` was left out on purpose:** it comes from one shared sequence, so its numbers follow the order of the writes. The batched insert numbers all customer accounts first, then the trigger touches their parties; row by row it alternated. In both shops every customer's party is still newer than its account (`row_version` and `txid`), which is what the touch is for: the counter's next pull sends it (W1-09).
 
-**Over the tunnel:** 153 queries × 0.17 s ≈ 26 s of round trips, plus the data, so a few minutes instead of about 7 hours. The first dry run on production (the runbook, #150) confirms it.
+**Over the tunnel:** 153 queries × 0.17 s ≈ 26 s of round trips, plus the data, so a few minutes instead of about 7 hours.
+
+## On production (2026-11-13)
+
+The owner ran the runbook from this PC, over the SSH tunnel as `erp_app`:
+- **The dry run:** **1 min 24 s, 141 queries** (one transaction, so fewer than the 153 of a load), nothing written. Every count as in the runbook's table and the local comparison: 20,163 items, 29,175 identifiers, 19,109 vehicle tags, 60,489 prices, 377 parties (134 customer and 287 supplier accounts), 44 accounts (35 created, 9 updated), 35 expense categories; nothing retired.
+- **The load:** succeeded; the items show in the production back office.
+- **`erp-tenant posting-check prod delux`:** clean.
+
+Found on the way and fixed in the runbook: the container-address command broke in PowerShell (now `{{json …}}`, no `$`); the other steps need Git Bash; the local database must be up (it had stopped by itself twice that evening).
 
 ## Questions for you
 
