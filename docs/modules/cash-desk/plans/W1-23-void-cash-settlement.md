@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#140](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/140) |
 | **Module** | cash desk (the desk's screen, its payouts and cash movements) and the counter's void and return, with POS sync, posting and reports |
-| **Status** | Accepted (2026-11-11) with the owner's answers 1–4 (below), the payment questions and both return guards. Built (2026-11-11) on `w1-23-build` |
+| **Status** | Done (2026-11-12): built in PR #142, wording in PR #143, merged to staging; the owner verified it on staging (below) |
 | **Refs** | CSH-02, CSH-03, CSH-04 (refund payout), CSH-07 (expected cash), CSH-08 (day reconciliation), RPT-10, POS-11 (void and reissue), POS-12 (returns); POS spec §18 (the cash desk check), §19 (return and refund by transfer); posting rules §4.4 (void), §4.5 (cash in transit); cash desk spec §13; CLAUDE.md rules 2, 3, 4, 6, 7; D-024 (cash in transit), D-059 (`cash_received_for_void`), D-099 (void), D-108 (vouchers can't touch cash in transit); **D-111** (new) |
 | **Found** | The owner's staging checks of W1-12 (2026-11-11): the offline clash raised `cash_received_for_void` correctly, but nothing in the system could settle it; and a bill paid by JazzCash was voided like an unpaid one, with no word about a return; and a bill not yet paid at the desk could be returned, its refund payable before the bill |
 | **Depends on** | W1-10 and W1-11 (handovers, cash movements, the close), W1-12 (void and reissue), W1-13 (returns, refund by transfer), W1-20 (exceptions review) |
@@ -143,6 +143,17 @@ If the bill was reissued, the reissue is a bill like any other: it waits in the 
 - `pnpm check` (format, lint, typecheck, tests with coverage, build): pass, 2,248 tests.
 - `pnpm test:integration`: 436 passed (41 files), including the give-back in both push orders, a duplicate give-back, a V1 void, a void whose checks say the money had arrived, and a refund paid before its bill (flagged, then settled).
 - `pnpm e2e` (Edge): 57 passed; new or changed flows: the offline clash given back at the desk, a JazzCash void answered *received* that opens its return, guard 1 on an unpaid bill, guard 2 on a split bill, and the exchange and offline return on bills paid at the desk.
+
+## Owner review on staging (2026-11-12)
+
+The owner tested the plan's checks on staging: **working as expected**.
+
+- **Voids:** the JazzCash question (*Yes* opens the return, *No* voids); a split bill with JazzCash received opens the return; an offline void answered *handed over* opens the return.
+- **Guard 1:** F3 on an unpaid cash bill of today offers *Void and reissue*.
+- **Guard 2:** online, the desk refuses the refund until the bill's cash is collected. Offline, `refund_before_payment` is raised after sync and reviewed by the server once the bill is collected; with the bill paid first, nothing is raised.
+- **Give back:** an offline clash given back with a manager's PIN, with the exception reviewed by the server and the day reconciliation showing it given back; a reissue at a different price with a balanced close; Trace a bill shows the void's checks and *Cash given back*.
+
+One change came from the review: the desk-cash texts say the cash is **handed over** (the salesman takes it to the desk), PR #143. A refund code typed at an offline desk without its minus is recorded as cash collected (`handover_amount_mismatch`); that is outside W1-23 and left to its own task.
 
 ## Order
 
