@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Cash desk 1 built in W1-10 (session, live queue, scan handover, refund payout), D-097; cash desk 2 built in W1-11 (collections, cash-out, the counted close, the day reconciliation), D-098 |
+| **Status** | Cash desk 1 built in W1-10 (session, live queue, scan handover, refund payout), D-097; cash desk 2 built in W1-11 (collections, cash-out, the counted close, the day reconciliation), D-098; [W1-23](plans/W1-23-void-cash-settlement.md) done and verified on staging (voids and returns by payment, both refund guards, cash for a voided bill given back), D-111 |
 | **Requirements** | 9 (CSH-01…CSH-09) |
 | **Feature spec** | [spec.md](spec.md) (W1-10, W1-11) |
 
