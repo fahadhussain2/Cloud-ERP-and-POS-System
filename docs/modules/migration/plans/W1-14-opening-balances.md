@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#59](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/59) |
 | **Module** | migration (the opening computed in `tools/legacy-import`, the pilot wipe), with accounting (`postOpening` in `packages/posting`), sync (the `item_floors` dataset) and pos (the counter takes the cost floor) |
-| **Status** | Accepted (2026-11-04) with the owner's answers 1–5. Built (2026-11-04) on `w1-14-opening-balances`; rehearsal 1 run on `dec2025`; the stock quantity cross-check needs the owner (below) |
+| **Status** | Done (2026-11-12): built in PRs #104, #106 and #107, merged to staging; rehearsals 1 and 2 run; the owner verified it on staging (below). The pilot opening on production (Verify 5) is a go-live checklist item |
 | **Refs** | MIG-02, MIG-04, INV-01, INV-02, CAT-06 (floor = cost + margin), PRD Q2 (5%), Q9 (all stock into Shop), Q11 (the 2026 dump); migration doc §4, §7, §8, §9; posting rules §5.1, §7; data model §3, §4, §7; accounting spec §2, §5; importer spec §1, §2; sync spec §3; CLAUDE.md rules 1, 3, 4, 5, 11; D-017, D-030 (masters and openings stay), D-031, D-076, D-079, D-084, D-085, D-090, D-092, D-095, D-100 |
 | **Depends on** | W1-08 (posting engine, `averageAfterReceipt`), W0-13 (masters loaded by legacy key) |
 | **Size** | about 3½ days (the task list says 3): opening document and posting ¾, the legacy computation 1, load, post and reports ¾, the cost floor on the counter ¾, the pilot wipe ¼ (owner answer 1), the rehearsal ¼ |
@@ -57,6 +57,10 @@
 3. **You review** the reconciliation report and sign off the top 20 (or list what's wrong); the document-type signs confirmed.
 4. **Staging:** a generated opening; a counter shows no PIN down to cost + 5%.
 5. **Production, for the pilot** (owner answer 3): the masters loaded before 1 Dec, and the pilot opening once its dump arrives, by you from this PC over an SSH tunnel as the app role (password given at run time, never in git), then `posting-check prod delux`; the reconciliation report kept on this PC.
+
+## Owner review on staging (2026-11-12)
+
+The owner ran the staging check (Verify 4): **working as expected**. Rehearsal 2 settled rehearsal 1's open stock quantity (D-102) and the cost order (D-103). Left for go-live, in `docs/GO-LIVE-CHECKLIST.md`: the pilot opening from a late-November dump, loaded into production over an SSH tunnel, then `posting-check prod delux` (Verify 5, owner answers 2 and 3).
 
 ## Order
 

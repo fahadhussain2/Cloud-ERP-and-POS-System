@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-12, W0-13 done; W1-14 (opening balances, reconciliation, rehearsal 1) built |
+| **Status** | In progress: W0-12, W0-13 done; W1-14 (opening balances, reconciliation, rehearsals 1 and 2) done and verified on staging; the pilot opening on production is on the go-live checklist |
 | **Requirements** | 4 (MIG-01…MIG-04) |
 | **Feature spec needed** | Yes: importer design (parser, staging, transform, load) |
 
