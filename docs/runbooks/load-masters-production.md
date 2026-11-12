@@ -6,7 +6,9 @@
 
 **Who runs it:** the owner, from their own terminal, on this PC. The dump and the staging database never leave the PC (D-084). The database password goes from the server straight into the terminal's environment; it is never typed into a command, written to a file or shown to Claude.
 
-**Status: ready for the dry run (W1-24).** The importer now writes in batches of up to 2,000 rows per query. The `nov2026` masters (about 150,000 rows) take **153 queries** on an empty catalog. Over the tunnel each query waits one round trip to Helsinki, measured at about 0.17 s from this PC: about 26 s of waiting, plus sending the data itself (some tens of MB through SSH), so **a few minutes** for the dry run and the same for the load. The importer prints its number of queries at the end of each run. Before W1-24 it was one query per row, about 7 hours.
+**Status: in use.** First run on production 2026-11-13 (`nov2026`): the dry run took **1 min 24 s and 141 queries**, the load succeeded, posting-check clean (results in the W1-24 plan).
+
+**Timing (W1-24):** The importer now writes in batches of up to 2,000 rows per query. The `nov2026` masters (about 150,000 rows) take **153 queries** on an empty catalog. Over the tunnel each query waits one round trip to Helsinki, measured at about 0.17 s from this PC: about 26 s of waiting, plus sending the data itself (some tens of MB through SSH), so **a few minutes** for the dry run and the same for the load. The importer prints its number of queries at the end of each run. Before W1-24 it was one query per row, about 7 hours.
 
 ## How it reaches production
 
@@ -17,7 +19,7 @@
 
 ## Steps
 
-Run everything in Git Bash, from the repo root.
+Run everything in **Git Bash**, from the repo root (`cd "/d/Zorbix Products/Cloud-ERP-and-POS-System"`). PowerShell breaks steps 3 to 5: it has no `export`, `$(…)` or `time`. Only the tunnel (step 2) works in either shell.
 
 ### 1. Before
 
@@ -44,11 +46,13 @@ Run everything in Git Bash, from the repo root.
 
 ### 2. The tunnel (a second terminal tab)
 
-Find the database container's address on its own network (the line ending `_default`):
+Find the database container's address on its own network:
 
 ```bash
-ssh admin@204.168.217.64 "sudo docker inspect -f '{{range \$k, \$v := .NetworkSettings.Networks}}{{\$k}} {{\$v.IPAddress}}{{println}}{{end}}' erp-prod-db"
+ssh admin@204.168.217.64 "sudo docker inspect -f '{{json .NetworkSettings.Networks}}' erp-prod-db"
 ```
+
+It prints one line of JSON: take the `"IPAddress"` inside the network whose name ends in `_default`. (The command has no `$`, so it works in PowerShell too.)
 
 Then open the tunnel with that address, and leave it running:
 
@@ -101,7 +105,11 @@ Expected on an empty production catalog, from the `nov2026` rehearsal, with ever
 **Stop and ask** if:
 - a count is far off;
 - anything shows under *retired*;
-- the run fails. *Connection refused* means the tunnel is closed; *password authentication failed* means `PGPASSWORD` wasn't read.
+- the run fails:
+  - *ECONNREFUSED 127.0.0.1:55432*: the tunnel is closed;
+  - *ECONNREFUSED 127.0.0.1:54329*: the **local** database (the staged dump) is down: `pnpm db:up`, then run it again;
+  - *password authentication failed*: `PGPASSWORD` wasn't read in this tab;
+  - *No package.json found*: the tab isn't in the repo folder.
 
 ### 5. The load
 
@@ -125,6 +133,18 @@ pnpm legacy:import --label nov2026
   ```
 - **In the production back office:** Catalog shows the items (search a few known codes), and Customers and Suppliers show their lists. Nothing is in stock yet; that comes with the opening.
 - **Record it:** the date, the label and the counts (no names) go in the go-live checklist's line for the masters.
+
+## Looking at the data (optional, while the tunnel is open)
+
+A database client such as Beekeeper Studio can use the same tunnel:
+- **Connection:** PostgreSQL, host `127.0.0.1`, port `55432`, user `erp_app`, database `erp`, no SSL and no SSH in the client (the tunnel does both).
+- **The password:** `printf %s "$PGPASSWORD" | clip` in the Git Bash tab, paste it, then clear the clipboard with `: | clip`. Don't save it in the client.
+- **Read-only mode on:** `erp_app` can write, and this is production.
+- **The tables look empty** until the connection names the shop (forced RLS). Start each query tab with this line and run it together with the query:
+  ```sql
+  SELECT set_config('app.tenant_id', (SELECT tenant_id::text FROM erp.tenant_directory WHERE code = 'delux'), false);
+  ```
+- Disconnect the client before closing the tunnel.
 
 ## If something is wrong
 

@@ -77,7 +77,7 @@
 
 | What | Who | When |
 |---|---|---|
-| The real masters on production (items, prices, customers, suppliers) from a dump, over an SSH tunnel as the app role (W1-14 owner answer 3) | owner, with Claude | after the release, before 1 Dec |
+| The real masters on production (items, prices, customers, suppliers) from a dump, over an SSH tunnel as the app role (W1-14 owner answer 3) | owner, with Claude | **done 2026-11-13** (`nov2026`, W1-24; posting-check clean) |
 | Bill header lines (address, phone) | owner gives them | before the print test |
 | W1-01 print test at the shop | owner | after the release, on a production counter or a staging one |
 | Label template (DCAC) and stock settings on production (W1-17, W1-18) | owner | after the masters |
