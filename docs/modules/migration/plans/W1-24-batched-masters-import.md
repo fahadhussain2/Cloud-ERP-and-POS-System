@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#151](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/151) |
 | **Module** | migration (`tools/legacy-import`, the load step) |
-| **Status** | Draft (2026-11-12), for the owner to accept |
+| **Status** | Built (2026-11-12), in review. Plan accepted by the owner (PR #152) |
 | **Refs** | MIG-01; D-084 (the dump stays on the owner's PC), D-085 (the import runs as the app role under RLS); W0-13 (the importer); W1-14 owner answer 3 (the masters on production before 1 Dec); the runbook `docs/runbooks/load-masters-production.md` (#150) |
 | **Depends on** | W0-13 |
 | **Size** | about ½ day: the batched writes ¼, the tests and the comparison with the current importer ¼ |
@@ -81,9 +81,32 @@ That's minutes, not hours, and the dry run's transaction lasts as long.
    - the counts in both `summary.json` files equal.
 3. **The time, on this PC:** the local run and its query count. A run through a local `ssh -L` to the local database gives no real latency. The production estimate is the query count × 0.17 s, and the first dry run on production (the runbook) confirms it.
 
+## Results (2026-11-12)
+
+**The tests first:** the three new ones failed on the row-by-row importer, as planned:
+- 2,105 items sent 10,500 more queries than 5 items;
+- 2,100 changed prices sent 8,085 more than a run that changed nothing.
+
+With the batched writes all 18 load tests pass, the 15 existing ones unchanged.
+
+**The same result as the current importer** (`nov2026` into two fresh Delux shops on this PC):
+
+| | Current (`staging`) | Batched |
+|---|--:|--:|
+| Time, locally | 309 s | 12 s |
+| Queries to the target | about 150,000 | **153** |
+| A second run | | 33 queries, nothing changed |
+| A dry run on the loaded shop | | 21 queries |
+
+- The counts per group and the findings are equal.
+- Every imported table (units to expense categories, 14 tables) has the same rows, compared without ids, timestamps, `txid` and `row_version`, with the foreign keys compared by their codes: no difference.
+- **`row_version` was left out on purpose:** it comes from one shared sequence, so its numbers follow the order of the writes. The batched insert numbers all customer accounts first, then the trigger touches their parties; row by row it alternated. In both shops every customer's party is still newer than its account (`row_version` and `txid`), which is what the touch is for: the counter's next pull sends it (W1-09).
+
+**Over the tunnel:** 153 queries × 0.17 s ≈ 26 s of round trips, plus the data, so a few minutes instead of about 7 hours. The first dry run on production (the runbook, #150) confirms it.
+
 ## Questions for you
 
-1. **Size:** about ½ day. Accept?
+1. **Size:** about ½ day. Accept? *Accepted (PR #152).*
 
 ## Risks
 
