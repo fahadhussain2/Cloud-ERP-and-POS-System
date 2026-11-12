@@ -6,7 +6,7 @@
 
 **Who runs it:** the owner, from their own terminal, on this PC. The dump and the staging database never leave the PC (D-084). The database password goes from the server straight into the terminal's environment; it is never typed into a command, written to a file or shown to Claude.
 
-**Status: not usable yet (2026-11-12).** The importer sends one query per row, and the masters are about 150,000 rows (20,163 items, about 29,000 identifiers, 19,000 vehicle tags, 60,489 prices). Locally that takes about 2 minutes. Over the tunnel each query waits one round trip to Helsinki, measured at about 0.17 s from this PC, so the load would take **about 7 hours**, and the dry run would hold one transaction open on production for as long. The importer's writes have to be batched first (many rows per query). That is its own small task, with a plan. Once it's done, this runbook gets the new timing and its first run is the dry run in step 4.
+**Status: ready for the dry run (W1-24).** The importer now writes in batches of up to 2,000 rows per query. The `nov2026` masters (about 150,000 rows) take **153 queries** on an empty catalog. Over the tunnel each query waits one round trip to Helsinki, measured at about 0.17 s from this PC: about 26 s of waiting, plus sending the data itself (some tens of MB through SSH), so **a few minutes** for the dry run and the same for the load. The importer prints its number of queries at the end of each run. Before W1-24 it was one query per row, about 7 hours.
 
 ## How it reaches production
 
@@ -109,9 +109,9 @@ Expected on an empty production catalog, from the `nov2026` rehearsal, with ever
 pnpm legacy:import --label nov2026
 ```
 
-- The same counts as the dry run, now kept. Each group is its own transaction. (Timing: see Status.)
+- The same counts as the dry run, now kept. Each group is its own transaction. A few minutes (see Status).
 - If a run stops halfway, run it again: it continues where it stopped, matching by legacy key.
-- **Optional check:** run it a second time. It should print *unchanged* everywhere.
+- **Optional check:** run it a second time. It should print *unchanged* everywhere, in about 33 queries.
 
 ### 6. After
 

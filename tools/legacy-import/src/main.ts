@@ -148,6 +148,8 @@ try {
         `${g.padEnd(18)} created ${c.created}, updated ${c.updated}, unchanged ${c.unchanged}, retired ${c.retired}`,
       );
     }
+    // Over the tunnel to production each query waits one round trip (W1-24).
+    console.info(`queries to the target: ${result.queries.toLocaleString('en-US')}`);
     console.info(`${result.dryRun ? 'dry run: nothing was written. ' : ''}reports: ${index}`);
   }
 } catch (err) {

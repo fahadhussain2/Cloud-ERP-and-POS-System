@@ -205,6 +205,7 @@ export async function writeImportReports(r: ImportResult, labelDir: string): Pro
     label: r.label,
     dryRun: r.dryRun,
     groups: r.groups,
+    queries: r.queries,
     findings: Object.fromEntries(reports.map((rep) => [rep.file, rep.rows.length])),
   };
   await writeFile(join(dir, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');

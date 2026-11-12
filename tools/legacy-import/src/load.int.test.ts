@@ -813,6 +813,85 @@ describe('running it again', () => {
   });
 });
 
+describe('many rows, in batches (W1-24)', () => {
+  // 2,100 more items than the fixture: a second batch of items and identifiers, four of prices.
+  const MANY = 2100;
+  const generated = (bump = 0) =>
+    Array.from({ length: MANY }, (_, i) =>
+      item(`ZZZZ${String(i).padStart(4, '0')}`, `GENERATED ${i}`, {
+        CategoryID: s('ABEA'),
+        UnitID: '1',
+        SalePrice: dec(String(100 + i + bump)),
+        CostPrice: dec('50.00'),
+      }),
+    );
+  let big: TestDatabase;
+  let many: ImportResult;
+  const bq = async <T extends pg.QueryResultRow>(sql: string) => {
+    const c = new pg.Client({ connectionString: big.adminUrl });
+    await c.connect();
+    try {
+      return (await c.query<T>(sql)).rows;
+    } finally {
+      await c.end();
+    }
+  };
+  const runMany = () => run({ label: 'many', appUrl: big.appUrl });
+
+  beforeAll(async () => {
+    big = await createTestDatabase();
+    await setupTenant(big.ownerUrl, TenantSpec.parse(deluxSpec), {
+      ownerPasswordHash: 'x',
+      mustChangePassword: true,
+    });
+    await stage('many', [...ITEMS, ...generated()]);
+    many = await runMany();
+  }, 300_000);
+  afterAll(async () => {
+    await big?.drop();
+  });
+
+  it('sends about as many queries for 2,105 items as for 5', () => {
+    expect(many.groups.items.created).toBe(ITEMS.length + MANY);
+    expect(many.groups.prices.created).toBe(3 * (ITEMS.length + MANY));
+    // The extra batches only: items +1, barcodes +1, prices +3. Row by row it's about 5 per item.
+    expect(many.queries - first.queries).toBeGreaterThanOrEqual(0);
+    expect(many.queries - first.queries).toBeLessThanOrEqual(10);
+  });
+
+  it('gives every new row the right id across the batch boundary: barcodes and prices on their own items', async () => {
+    expect(
+      await bq<{ items: number; wrong_barcode: number; wrong_price: number }>(
+        `SELECT count(*)::int AS items,
+                count(*) FILTER (WHERE b.value IS DISTINCT FROM i.code)::int AS wrong_barcode,
+                count(*) FILTER (WHERE p.price IS DISTINCT FROM ((i.legacy->>'SalePrice')::numeric * 100)::bigint)::int AS wrong_price
+         FROM erp.items i
+         LEFT JOIN erp.item_identifiers b ON b.item_id = i.id AND b.kind = 'barcode' AND b.deleted_at IS NULL
+         LEFT JOIN erp.item_prices p ON p.item_id = i.id
+           AND p.tier_id = (SELECT id FROM erp.price_tiers WHERE code = 'RETAIL' AND tenant_id = i.tenant_id)
+         WHERE i.code LIKE 'ZZZZ%'`,
+      ),
+    ).toEqual([{ items: MANY, wrong_barcode: 0, wrong_price: 0 }]);
+  });
+
+  it('updates many changed rows in batches too, and a second run changes nothing', async () => {
+    await stage('many', [...ITEMS, ...generated(1)]);
+    const changed = await runMany();
+    expect(changed.groups.prices.updated).toBeGreaterThanOrEqual(MANY);
+    expect(
+      await bq<{ n: number }>(
+        `SELECT count(*)::int AS n FROM erp.items i JOIN erp.item_prices p ON p.item_id = i.id
+         JOIN erp.price_tiers t ON t.id = p.tier_id AND t.code = 'RETAIL'
+         WHERE i.code LIKE 'ZZZZ%' AND p.price <> ((i.legacy->>'SalePrice')::numeric * 100)::bigint`,
+      ),
+    ).toEqual([{ n: 0 }]);
+    const again = await runMany();
+    expect(nothingChanged(again)).toEqual([]);
+    // The updates are a few batches more than a run that only reads.
+    expect(changed.queries - again.queries).toBeLessThanOrEqual(10);
+  }, 300_000);
+});
+
 describe('the reports', () => {
   it('writes the summary, the catalog and the party reports, with every phone masked', async () => {
     const out = await mkdtemp(join(tmpdir(), 'legacy-reports-'));
@@ -836,6 +915,7 @@ describe('the reports', () => {
       const summary = JSON.parse(
         await readFile(join(out, 'fixture', 'reports', 'summary.json'), 'utf8'),
       ) as Record<string, unknown>;
+      expect(summary['queries']).toBe(first.queries);
       expect(JSON.stringify(summary)).not.toMatch(/KHAN|ADDI AUTOS/);
       for (const name of names.filter((f) => /\.(csv|html|json)$/.test(f))) {
         const text = await readFile(join(out, 'fixture', 'reports', name), 'utf8');
