@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#78](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/78) |
 | **Module** | migration (test data), with devops for the server command |
-| **Status** | Accepted (2026-10-27). Replaces the first draft (the real Delux catalog): the owner chose a generated catalog to keep it simple |
+| **Status** | Done (2026-11-12): built in PR #79, merged to staging; seeded on staging and used there for every staging check since (below). Replaces the first draft (the real Delux catalog): the owner chose a generated catalog to keep it simple |
 | **Refs** | D-076 (no production data on staging: unchanged), D-083 (`erp-tenant`), D-087 (no paid services); sync spec §3; W1-03, W1-05 Verify 3 |
 | **Depends on** | W0-11 (`erp-tenant`, the `demo` shop), W1-03 (`seedCatalog`) |
 | **Size** | about half a day |
@@ -51,6 +51,8 @@
 
 1. `pnpm check` and `pnpm test:integration`, output shown.
 2. On staging: the command reports 20,000 items; a staging counter's first catalog load finishes; the W1-05 checklist runs on it.
+
+**Owner review on staging (2026-11-12):** the staging back office shows about 20,000 items, and the staging counters and desk have run on this catalog for the staging checks of W1-05 onward (up to W1-23). Recorded late: the run itself wasn't written down when it was done.
 
 ## Risks
 
