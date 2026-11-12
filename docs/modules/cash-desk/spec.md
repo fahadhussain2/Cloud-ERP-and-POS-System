@@ -114,7 +114,7 @@ Each is written with its outbox row in **one local transaction** (rule 6), signe
 
 When a counter voids a bill offline and the desk takes its cash meanwhile, the server flags `cash_received_for_void` (§13). A section **Cash taken for voided bills** above the queue lists each voided bill whose cash this desk, or another (as the queue says), took and that isn't given back yet: the bill, its void and the amount, with **Give back Rs 1,000**. It needs the PIN of someone holding `pos.void` who is **never the session's cashier** (owner answer 1), and gives back **the full amount taken** (owner answer 2), at any desk of the branch, on any later day, in an open session (owner answer 4). It is a cash movement of kind `void_cash`, written with its outbox row in one transaction, printed as a voucher and in the session's expected cash. A reissued bill is collected from the queue as usual.
 
-**A refund waits for its bill (guard 2):** the desk won't pay out a return's refund while its original bill's cash is still pending in its queue: *This refund's bill hasn't been paid yet: collect the bill first, then pay out the refund.* A refund slip scanned offline carries only the return's own number, so it can't be linked and is paid out; the server flags `refund_before_payment` (§13).
+**A refund waits for its bill (guard 2):** the desk won't pay out a return's refund while its original bill's cash is still pending in its queue: *This refund's bill hasn't been handed over yet: collect the bill's cash first, then pay out the refund.* A refund slip scanned offline carries only the return's own number, so it can't be linked and is paid out; the server flags `refund_before_payment` (§13).
 
 ## 13. On the server
 

@@ -136,6 +136,7 @@ If the bill was reissued, the reissue is a bill like any other: it waits in the 
 | Local schema 13 adds the queue's three columns and keeps the pull cursor; a row already on a desk gets them when it next changes | Starting the pull over would re-send the whole catalog; a pending bill changes anyway when it is handed over |
 | The give-back's approval asks no reason, and the payment question's Enter answers *yes* | The void already had its reason; *yes* (the money arrived) leads to the return, the safer side |
 | Trace a bill shows the void's checks (*What the counter knew when voiding*) and *Cash given back* as their own steps | The owner sees why the counter voided and how the cash came back |
+| The desk-cash question and its messages speak of the cash being **handed over**, not the customer paying: *Has the cash for C01-S000123 already been handed over at the cash desk?* (*Yes, handed over* / *No, not yet*); the give-back goes *to whoever handed it over* (owner, 2026-11-12, testing on staging) | At Delux Autos the salesman takes the bill's cash to the desk, not the customer; the rule is the same, only the words change |
 
 ## Checks (2026-11-11)
 
