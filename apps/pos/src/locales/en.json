@@ -660,7 +660,7 @@
     },
     "voidCash": {
       "title": "Cash taken for voided bills",
-      "help": "The counter voided these bills, but this desk had taken their cash. Give it back to the customer: a manager enters their PIN. A reissued bill is collected from the queue as usual.",
+      "help": "The counter voided these bills, but this desk had taken their cash. Give it back to whoever handed it over: a manager enters their PIN. A reissued bill is collected from the queue as usual.",
       "voided": "voided",
       "voidedOn": "voided on {{number}}",
       "giveBack": "Give back {{amount}}",
@@ -682,7 +682,7 @@
     "session_open": "A session is already open on this desk.",
     "invalid_float": "Type the float in whole rupees, 0 or more.",
     "failed": "The handover was not saved: {{message}}",
-    "original_unpaid": "This refund's bill hasn't been paid yet: collect the bill first, then pay out the refund."
+    "original_unpaid": "This refund's bill hasn't been handed over yet: collect the bill's cash first, then pay out the refund."
   },
   "collection": {
     "no_session": "Open a session first (Alt+O).",
@@ -761,7 +761,7 @@
     "none": "No bill of today on this counter has that number.",
     "empty": "No bills of today on this counter to void.",
     "approve": "Void {{number}}: it keeps its number and prints as VOID. Someone who may void enters their own PIN, with the reason.",
-    "approveAsked": "Offline: the cash desk couldn't be asked, and you answered that the customer hasn't paid {{number}} yet. Void it: it keeps its number and prints as VOID. Someone who may void enters their own PIN, with the reason.",
+    "approveAsked": "Offline: the cash desk couldn't be asked, and you answered that the cash for {{number}} hasn't been handed over yet. Void it: it keeps its number and prints as VOID. Someone who may void enters their own PIN, with the reason.",
     "bill": "Bill",
     "total": "Total",
     "desk": "Cash desk",
@@ -778,11 +778,11 @@
       "not_arrived": "Not reached the shop"
     },
     "ask": {
-      "cashTitle": "Has the customer paid?",
-      "cash": "Has the customer already paid for {{number}} at the cash desk?",
-      "cashHelp": "The cash desk can't be asked right now. Check with the customer or the cashier: once paid, it is a return, not a void.",
+      "cashTitle": "Has the cash been handed over?",
+      "cash": "Has the cash for {{number}} already been handed over at the cash desk?",
+      "cashHelp": "The cash desk can't be asked right now. Check with the cashier: once the cash is handed over, it is a return, not a void.",
       "cashDue": "Cash due",
-      "cashYes": "Yes, they've paid",
+      "cashYes": "Yes, handed over",
       "cashNo": "No, not yet",
       "accountTitle": "Has the money arrived?",
       "account": "Has the shop's {{method}} account received {{amount}} for {{number}}?",
@@ -869,7 +869,7 @@
     "doneAccount": "Return {{number}} printed · {{amount}} credited to the account",
     "doneTransfer": "Return {{number}} printed · refunded by {{method}}",
     "unpaidTitle": "Void {{number}} instead?",
-    "unpaid": "{{number}} hasn't been paid at the cash desk yet. Void it and reissue it without what comes back: a return would pay out money the shop never received.",
+    "unpaid": "The cash for {{number}} hasn't been handed over at the cash desk yet. Void it and reissue it without what comes back: a return would pay out money the shop never received.",
     "voidInstead": "Void and reissue"
   },
   "refund": {
@@ -884,7 +884,7 @@
     },
     "toAccount": "The refund goes on {{name}}'s account.",
     "amount": "Refund",
-    "atDesk": "The bill goes to the cash desk's queue; the cashier pays the customer.",
+    "atDesk": "The bill goes to the cash desk's queue; the cashier pays out the refund.",
     "method": "Refund to",
     "transferApproval": "A manager approves the transfer with their PIN next.",
     "needsCustomer": "Only a customer with an account",
