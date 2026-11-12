@@ -102,7 +102,7 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 
 ### D-019 Labels keep the legacy format, printed per goods receipt
 - **Decision:** Code128 of the item code plus the supplier abbreviation of the delivering supplier. This preserves the per-unit supplier trace for future warranty claims.
-- **Status:** Accepted
+- **Status:** Accepted; the barcode is **Code 39**, not Code128 (D-055, D-106). Built in W1-17.
 
 ## Purchasing
 
@@ -676,7 +676,7 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 
 ### D-086 Observability on free plans: Grafana sends the Slack alerts and runs the uptime checks (2026-10-24)
 - **Decision:** (amends D-064)
-  - **Uptime checks: Grafana Cloud Synthetic Monitoring** instead of UptimeRobot / Better Stack: HTTPS checks of the app, POS and staging health with certificate expiry, every 5 minutes (about 50k of the free 100k checks a month).
+  - **Uptime checks: Grafana Cloud Synthetic Monitoring** instead of UptimeRobot / Better Stack: HTTPS checks of the production app and POS health with certificate expiry, every 5 minutes from two places (about 35k of the free 100k checks a month). Staging isn't checked (amended 2026-10-25: its deploys health-check themselves, and nobody depends on it being up).
   - **Slack alerts come from Grafana alerting** (free), to `#erp-critical` (with an email copy) and `#erp-alerts`. Sentry's free plan alerts by email only; its Slack integration needs a paid plan.
   - **Sentry:** two projects (`erp-server`, `erp-web`) tagged by app, env, release and request ID. **EU regions** for Sentry and Grafana Cloud, next to the server in Helsinki.
   - Grafana Alloy reads Docker's log files and gets **no Docker socket**.
@@ -695,3 +695,334 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Risk accepted:** an emergency restore on a day the B2 download cap is already used up waits until 05:00 Karachi, unless a recent backup has been copied off B2 beforehand.
 - **Status:** Accepted (changes D-077)
 
+### D-089 POS shell: SQLite on OPFS, blocking storage checks, column-listed pull, temporary PINs changed at the counter (2026-10-25)
+- **Decision:**
+  - The counter's database is **SQLite WASM in a dedicated worker on OPFS (`opfs-sahpool`)**, changed only by numbered in-place migrations; a rebuild from the server is refused while the outbox has rows (confirms D-039, D-010).
+  - **Storage checks block selling:** persistent storage, a readable database, a known schema and a readable outbox, each with a stop screen.
+  - **Pull** is one call for several datasets with one opaque cursor (architecture §5.3), and **every dataset lists the columns that may leave the server**; `password_hash` and other private columns never do. Specified in `docs/modules/sync/spec.md`.
+  - **PINs:** a manager sets a **temporary PIN** in the back office; the person chooses their own at the counter on first unlock (online), so salesmen need no back-office login and only they know their PIN.
+  - **Unlock** from a list of staff names (or the short code); 5 wrong PINs lock the user on that counter; **auto-lock after 3 minutes** idle and at closing time, not after each bill.
+  - A minimal back office arrives with it: sign in, password change, Staff PINs, Counters.
+- **Why:**
+  - Unsynced bills must survive any app update or browser clean-up (CLAUDE.md rules 6, 9).
+  - `SELECT *` would have sent password hashes to every counter.
+  - Bills are credited to whoever unlocked the counter, so PINs must stay private.
+- **Status:** Accepted (with the W1-02 plan)
+
+### D-090 Wave 1 task list and a smaller pilot on 1 Dec (2026-10-26)
+- **Decision:**
+  - Wave 1 is the 20 tasks in [WAVE-1-TASKS.md](WAVE-1-TASKS.md), one GitHub issue each; each plan is still written and accepted when its task starts (D-069).
+  - Staff and user admin is its own task (W1-04); the design pass (Tijara POS look, shared UI building blocks) is part of W1-03 and W1-04.
+  - **The shadow pilot keeps 1 Dec** with a smaller scope: the counter sale end to end, sync, posting, cash desk handover, hold and void, opening balances. Cash desk close (W1-11) joins during the pilot; the remaining tasks follow by go-live criticality.
+- **Why:** the full Wave 1 list is about 56 working days and the window about 20 (D-033 accepted this risk). Starting the pilot on time with the counter sale finds real problems earliest.
+- **Status:** Accepted
+
+### D-091 Staff and user admin: Owner manages people, managers give PINs, no one outranks themselves (2026-10-26)
+- **Decision:**
+  - **People are managed with `admin.users`** (Owner by template): add, edit, roles per branch, back-office password, deactivate. **Temporary PINs stay with `admin.devices`** (Manager and Owner, D-089). One *Staff* screen; actions follow the permissions.
+  - **Nobody gives, removes or changes what they don't hold:** a role only by someone holding all of it in its branch (`canGrantRole` in `packages/domain`, a `*` role needs `*`); a person's password, status or details only by someone who could give all their roles. **A temporary PIN** goes to anyone from someone with `admin.devices`, except to a person holding `admin.users` or `*` whom they don't outrank (`canGivePinTo`): otherwise a manager could take over the Owner's PIN on the counters.
+  - **Nobody locks the shop out:** no deactivating yourself, removing your own password or your own `admin.users`; an active Owner who can sign in always remains. Owner-affecting changes are serialized by a per-tenant advisory lock.
+  - **Back-office password is optional**; giving or resetting one means a temporary password the person must change at sign-in (as D-083), and ends their sessions. **People are deactivated, never deleted.**
+  - **Manager unlock on the counter, offline:** the manager's own PIN and `admin.devices` for the branch. A new temporary PIN clears a lock on every counter at its next pull; a pull that removes the person selling locks the counter. Locks and unlocks are kept on the counter (`pin_events`) for the audit log, pushed with W1-07.
+  - **Back-office layout** from the Tijara Goods Receipt prototype: top bar, a side menu showing only screens that exist and are permitted, hash addresses (`#/staff/<id>`).
+- **Why:**
+  - PRD §4: managers run the floor; who works here and with which rights is the owner's (owner answer 1).
+  - Without the "outranks" rule, anyone with user admin could reset the Owner's password and take over.
+  - Without the last-Owner guard, one click would need platform support (D-083) to undo.
+  - Locks hurt most when the internet is down, so the unlock works offline; the owner still has a remote path.
+- **Status:** Accepted (with the W1-04 plan, owner answers 1–4)
+
+### D-092 Bill building: list price as the floor until costs arrive, approvals by the approver's own PIN, the open bill kept per person (2026-10-27)
+- **Decision:**
+  - **Prices** (POS-04, D-004): down to the role limit and the floor needs nobody; past the seller's limit needs `pos.override.approve` with an own limit that covers the discount; below the floor, or an item with no list price, needs `pos.price.below_floor`. Compared as line totals after each line's share of the bill discount. A price **above list** is allowed and shown with a chip.
+  - **An item without a known floor uses its list price as the floor** (all imported items until costs arrive). The server sends each item's effective floor from W1-14.
+  - **Approvals on the same screen** (PLT-07): the approver's own PIN, checked offline; wrong PINs count towards their own lock. **The seller may approve their own price** when they hold the permission, still with their PIN and a reason. An approval keeps what it approved and stops holding when the price goes lower, the tier changes, or (for a bill discount) a line changes.
+  - **Reasons are a fixed list** for now (customer bargain, old or slow stock, matching a market price, regular customer, other with a note), with stable codes a later tenant table can adopt.
+  - **The open bill is kept on the counter per person** (local schema 4), saved after every change, never pushed.
+  - **Keys:** the prototype's map, with `F7` for the price tier and `D` for a bill discount; `F6` and `Alt+D` are not used (Chrome keeps them).
+- **Why:**
+  - Without a floor, the Salesman limit (100%) would let any price through with nobody approving.
+  - Every below-floor sale gets a reason, including a manager's own (RPT-10).
+  - A lock or a reload must never lose a half-built bill (POS spec §6).
+- **Status:** Accepted (with the W1-05 plan, owner answers 1–4)
+
+### D-093 Finalize and print: one rounded total, number taken in the saving transaction, A5 bill with Code 39, reprint without a PIN (2026-10-27)
+- **Decision:**
+  - **Cash rounding applies to the bill total for every tender** (POS-15, Q5): Delux rounds to Rs 1, the difference is the document's `rounding`, and every payment is a multiple of the increment.
+  - **Payment pad** as in the prototype (D-053), with tender rules in `packages/domain`. Pay is refused while a price still needs an approval. Quick cash: the next multiples of Rs 500, 1,000, 5,000 and 10,000 above the total, the three smallest, topped up with multiples of Rs 5,000.
+  - **The number is taken in the same local transaction** that saves the document and its outbox row and removes the open bill; print comes after the commit. The sale document's shape (`SaleDocumentV1`) is fixed now for W1-07.
+  - **Printing:** an HTML bill to the default printer with `--kiosk-printing`; **A5 landscape stays the Delux default** (A4 is built too); the bill code is Code 39 of the bill number and the cash due. **Thermal templates and the signed QR wait until a tenant needs them.**
+  - **Reprint** (`Alt+P`): anyone unlocked, no PIN, marked REPRINT and logged for the audit log.
+  - **W1-01 follows W1-06:** the shop test prints real bills from a staging counter.
+- **Why:**
+  - One total on screen, on paper, in the bill code and in every payment.
+  - A number taken only when the bill is saved can't leave a gap (POS-13, rule 6).
+  - The Delux printer is a laser (HP LaserJet P1005), its bills print at the cash counter and its scanners read Code 39, so a signed QR adds nothing there yet (D-048).
+  - A jammed shared printer must not stop the shop; a reprinted barcode can't collect cash twice because a handover is unique per bill.
+- **Status:** Accepted (with the W1-06 plan, owner answers 1–4)
+
+### D-094 Push sync: accept and flag, a counter pushes its own bills, restores heal themselves, SSE nudge, health on both sides (2026-10-28)
+- **Decision:**
+  - **Push** (`POST /api/sync/push`) sends up to 100 documents in sequence order with the counter's audit events and health; each document in its own transaction. An empty push is the start-up handshake. The contract is in the [sync spec](modules/sync/spec.md) §6.2.
+  - **Refused only when a document can't be trusted or stored:** unsigned, a bad signature, a malformed payload, an id or number already taken by another document, a reference that isn't the tenant's, another device's document. **Everything else is accepted** and re-checked with `reviewSale` in `packages/domain`; what looks wrong becomes an exception: below the floor or past a limit without a covering approval, **figures that don't add up (accepted and flagged, owner answer 2)**, clock skew, made while revoked, a sequence gap.
+  - **A counter pushes only its own documents,** verified with its own key. Re-enrolling a PC as a new counter while carrying its old bills is not built.
+  - **Refused bills wait on the counter under *Needs attention*;** a manager's own PIN (`admin.devices`) sends one again (owner answer 4). Anyone may open the counter's health page (`Alt+S`).
+  - **Gaps and restores heal themselves:** every answer lists each series' `through` and missing ranges, and the counter puts back what the server lacks from its 30-day copy.
+  - **A revoked counter is told so** (`device_revoked`), stops selling and keeps its bills; **Re-enable** in the back office brings it back, and documents made in between are flagged (owner answer 3).
+  - **SSE nudge:** `pg_notify` from every pulled table, one `LISTEN` connection in the API, `changes-available` at most every 2 s per tenant; the counter pulls on it and polls every 5 minutes while it is up. Caddy passes the stream unbuffered.
+  - **Offline warnings** after 8 and 48 hours without reaching the server, per tenant, never blocking a sale (owner answer 1).
+  - **Device health** on the counter and, for every counter, on the back office's Counters list; the SSE nudge and the Counters columns both stay in this task (owner answer 5).
+- **Why:**
+  - A completed sale is a fact (SYN-03, D-011): refusing one the counter computed wrongly would hide it; flagging it keeps it in the books and on the exceptions report.
+  - Verifying with the pushing device's own key keeps the trust model simple until a PC must carry another counter's bills.
+  - A restore must not lose the bills made after its point (SYN-05); the counters already hold them, so they put them back without anyone asking.
+  - The owner and managers should see a sick counter before the day's reconciliation does.
+- **Status:** Accepted (with the W1-07 plan, owner answers 1–5)
+
+### D-095 Posting engine: posted in the accepting transaction, an order of record, suspense for bills that don't add up, Raast and bank transfer on HBL (2026-10-31)
+- **Decision:**
+  - **One pure engine** (`postSale` in `packages/posting`) posts live and in the rebuild; the database layer only loads and writes. Every accepted sale is posted **in the transaction that accepts it**, under a savepoint ([accounting spec](modules/accounting/spec.md)).
+  - **A sale that can't be posted is still accepted** (SYN-03), with one `posting_failed` exception; the worker's catch-up posts it every minute until it works. The push answer to the counter doesn't change.
+  - **Order of record:** a per-tenant lock (`posting_state`) runs a tenant's postings one at a time; `postings` keeps each one's sequence and **the settings it used** (accounts by role and by method, lock date, terms). The rebuild check replays that in memory from one snapshot; the rewrite is owner-only and refused on a locked period.
+  - **Raast and bank transfer post to HBL** (owner answer 1). The tenant setup now applies a payment method's bank account from the spec (audited), so moving to another bank is a spec edit and a re-run; bills already posted stay where they were.
+  - **An item sold before its cost is known posts at cost 0** and is flagged `no_cost` (owner answer 2).
+  - **A bill whose figures don't add up is posted, with the difference on 1190 *Posting suspense*** (`SUSPENSE` role, owner answer 3).
+  - **Negative stock** is flagged once, when a location's balance crosses below zero; never blocked (INV-03).
+  - **A line's cost lives on its stock movement**; `sales_lines.unit_cost` is dropped (rule 3). Lines record their tax code (the item's or the tenant's default, `tax_codes.is_default`).
+  - **No screens in W1-08** (owner answer 4): the check result and a trial balance are recorded in the plan; reports come with W1-18 and W1-20.
+- **Why:**
+  - Live and rebuilt ledgers can't disagree when they come from the same function and the same recorded settings.
+  - A completed sale is a fact: a configuration gap or a bug must hold back its posting, never the sale or the counter.
+  - Suspense keeps stock and cash right and leaves only the difference for the accountant; cost 0 matches how the migration treats items without a cost.
+- **Status:** Accepted (with the W1-08 plan, owner answers 1–4)
+
+### D-096 Customers and credit on the counter: three pulled datasets, the limit against balance plus unsynced, a per-counter offline cap, flagged on the server (2026-10-31)
+- **Decision:**
+  - **The counter pulls `customers`, `customer_accounts` and `customer_balances`** with only the columns selling needs (name, code, phones, city, tier, credit terms, balance); addresses, tax numbers, notes and payment terms stay on the server. A party that gets a customer account later is re-sent (a trigger touches its row). Phones are shown by their last four digits (owner answer 4) and never logged.
+  - **Choosing a customer sets the bill's tier**; back to walk-in returns to the default tier (owner answer 3). A walk-in may leave a phone, stored normalized (`normalizePhone`).
+  - **The limit** is checked against the pulled balance plus this counter's on-account bills the balance can't include yet (in the outbox, or accepted after the last complete pull started). Exactly at the limit is allowed; no limit (null, D-085) is never over.
+  - **The offline daily cap** counts this counter's on-account sales to the customer **made while offline on the business day**, plus the bill (owner answer 1). Online, only the limit applies.
+  - **Over either needs an approver's own PIN** with `pos.credit.over_limit` and a reason (*Customer will pay soon, Regular customer, Owner's instruction, Other*, owner answer 2), taken at finalize for that amount and recorded as a `credit_limit` or `offline_cap` override.
+  - **The sale document stays v1** with additive, optional fields: the customer, the walk-in phone, the credit overrides and a `credit` block with the counter's view. Bills already in outboxes still parse.
+  - **The server re-checks every on-account sale** with `reviewCredit` and its own balance (all counters), and flags `credit_limit_exceeded` or `offline_cap_exceeded`; it never refuses one (D-011, owner answer 6).
+  - **Credit terms come from the legacy mapping file** (`partyCredit`) and the importer re-run until a back-office customer screen exists (owner answer 5).
+- **Why:**
+  - Credit sales must work offline (D-013) without letting one customer run up a debt no one approved.
+  - Counters can't see each other offline, so the cap is per counter and the server, which sees all of them, is where a combined breach is found.
+  - A customer's contacts are personal data: the counter keeps only what it needs to find them.
+- **Status:** Accepted (with the W1-09 plan, owner answers 1–6)
+
+### D-097 Cash desk 1: a desk is the POS app, the queue is pulled and nudged per branch, handovers are desk documents linked by bill number (2026-11-01)
+- **Decision:**
+  - **The cash desk is the POS app on a `cash_desk` device:** someone with `cash.handover.receive` lands on the Cash desk screen, `Alt+Q` switches to selling and back (the desk also sells, D-001).
+  - **A session** opens with a float (`Z` document, posts nothing) and belongs to its cashier; only they take cash. **It closes without a count** in W1-10, by anyone with `cash.session.close`, showing the expected cash; the denomination close comes with W1-11 (owner answer 1).
+  - **The queue is a pulled dataset**, `cash_queue` (the branch's bills with cash due, pending or of 7 days, no lines or customer), sent only to cash desks; **`queue-changed`** goes on its own channel to the branch's desks only, so counters aren't woken by every bill.
+  - **Enter confirms the selected bill as shown; `E` corrects** the cash received first. The correction is kept on the handover, never on the bill.
+  - **A scan selects a queued bill; a bill not in the queue is recorded from its code after Enter** (owner answer 2), with no sale id, and the server links it when the bill arrives.
+  - **Refund payouts are built now** (`kind: payout`, `cash.refund.pay`), first used with returns in W1-13 (owner answer 3).
+  - **A cash sale on the desk is handed over automatically** to the open session in the same local transaction; with no session it waits in the queue (owner answer 4).
+  - **Handovers (`H`) are desk documents**, local-first like bills, matched to the bill **by number**: the server never refuses one for its bill (it waits for it), flags a different amount (`handover_amount_mismatch`), keeps a second one as `duplicate_handover` (never posted) and flags a cashier without the permission (`handover_not_permitted`). A bill's cash and its handovers are judged under a per-bill lock.
+  - **Each handover posts `Dr CASH_DRAWER / Cr CASH_IN_TRANSIT`** (a payout the reverse) for its own amount, so the order it arrives in against its bill doesn't matter.
+- **Why:**
+  - One app keeps one local database, one outbox and one push for a PC that both sells and takes cash.
+  - Pulling the queue reuses the change feed (rule 8) and works the same online and after a reconnect; a per-branch nudge meets the 5-second target without waking every counter.
+  - Matching by bill number is what makes an offline scan work before the counter syncs; linking later, and posting the handover's own amount, keeps the books right whichever arrives first.
+  - A stray scan must not record cash that can't be taken back: documents are immutable (rule 3).
+- **Status:** Accepted (with the W1-10 plan, owner answers 1–4)
+
+### D-098 Cash desk 2: collections and cash-outs are desk documents, the close is a blind count with the safe, the day is reconciled on request (2026-11-02)
+- **Decision:**
+  - **A collection (`R`) and a cash-out (`M`) are desk documents** like a handover: local-first, in the desk's outbox, pushed only by a cash desk, reviewed and never refused (rule 7). A collection is any active method except on account, with its reference; paying more than the balance is kept as an advance. A cash-out is an expense (by category), a supplier payment, a bank deposit, or a move **to or from the safe**; one above the expected cash asks for a second Enter.
+  - **Each desk family has its own table:** collections in `payments` (direction `in`; the back office's receipts and payments join it later), every cash movement in `cash_movements`, **supplier payments included** (data model §6 had them in `payments`). The supplier ledger reads `party_ledger_entries`.
+  - **The close is a blind count by denomination** (owner answer 2): the expected cash shows only after the count, on the desk and in its session bar. A variance needs a reason and **a manager's PIN, or *Acknowledge later*** in the back office (owner answer 1); never the session's own cashier. The server keeps an acknowledgement only when it allows it. **The variance posts when the close arrives**, acknowledged or not.
+  - **What doesn't stay in the drawer goes to the safe with the close** (owner answer 3): the close carries what stays, and posts the rest `Dr CASH_SAFE / Cr CASH_DRAWER`; **1130 Cash in safe gets the `CASH_SAFE` role**. The next open's float is filled in with what stayed; a different float posts the difference to `CASH_SHORT_OVER` and is flagged `float_mismatch`. So 1110 equals the cash in the drawer after every count.
+  - **`CashSessionV2`** carries the count; push still takes W1-10's `CashSessionV1` closes, as *not counted*.
+  - **The day reconciliation is computed on request** (`reconcileDay`), never stored: *Final* only when the day is over, every active device has been heard from since with nothing older unsynced, no gap is open and no session of the day is open. With handover confirmation Required it lists the cash bills never handed over by salesman. The missing handovers are not raised as exceptions: the bills and handovers already say it.
+  - **A desk pulls four more datasets** (`suppliers`, `supplier_balances`, `expense_categories`, `bank_accounts`), never their GL accounts or a supplier's contacts.
+  - **Customer ageing at the desk waits for W1-20** (owner answer 4); the desk shows the balance and the last collection.
+- **Why:**
+  - One trust path for every desk document; a cashier's record is kept and judged on the server (D-011).
+  - Seeing the target while counting nudges the count towards it.
+  - Without the safe, the drawer's account would drift from the drawer every time the cash left it at night.
+  - A report computed from the documents can't go stale when a counter syncs late.
+- **Status:** Accepted (with the W1-11 plan, owner answers 1–5)
+
+### D-099 Hold and void: held bills stay on the counter per person, a void is its own document of family V, never after the handover (2026-11-03)
+- **Decision:**
+  - **A held bill is the open bill set aside on its counter** (`held_bills`), with an optional label, recalled only by the person who held it, at most 20 per counter, gone once its business day is over (04:00, owner answer 4). Never pushed.
+  - **A void is a signed document of its own, family `V`** (`C03-V000001`, `SaleVoidV1`), in the outbox like every document; the bill is never changed (rule 3), keeps its number and prints again with a VOID band. A family of its own keeps the bill series gapless and gives the void the same push, idempotency and gap handling as every family. **`V` joins the families** of architecture §4.4.
+  - **A bill is voided only on the device that made it** (owner answer 2), on its business day, with the PIN of someone holding `pos.void` and a reason (owner answer 5).
+  - **Never after the cash handover, for any role** (owner answer 1, as D-002 and posting rules §4.4 say): after it, a return (W1-13). The Manager and Owner templates move from `same_day` to `same_day_before_handover`, and migration 0013 moves every role with `same_day`; the value stays valid and is judged the same. A desk's own cash bill is handed over at once, so it is corrected with a return.
+  - **Before a void, the counter asks the server** whether the desk has the cash (`GET /api/sync/bills/status`, 3 s); offline it goes on with a warning. The server stores every void (rule 7) and flags `void_not_permitted`, `duplicate_void` and, for cash in the drawer for a voided bill, `cash_received_for_void` with which came first (D-059).
+  - **The void's reversal swaps the sale's own posting** (source `sales_void`), and posts only once the bill has.
+  - **A reissue is a new sale** with `reissueOf`, starting from the voided bill's customer, lines, prices and price approvals (owner answer 3).
+- **Why:**
+  - A printed, signed bill can't be edited, and a void decided offline must be a fact the server can't refuse.
+  - Voiding after the cash reached the drawer would need the cash paid back at the desk; a return already does that properly.
+  - The live check catches most leaks at the counter; the server catches the rest.
+- **Status:** Accepted (with the W1-12 plan, owner answers 1–5)
+
+
+### D-100 Return and exchange: one document of signed lines (V2 only for returns), refunds that add up, no legacy bills (2026-11-03)
+- **Decision:**
+  - **A return or exchange is an `S` document with negative lines** (D-006), written as **`SaleDocumentV2`** only when the bill has returned lines; a plain sale stays `SaleDocumentV1`, and push takes both. `kind` is derived: `return`, or `exchange` with sold lines too.
+  - **One original bill per return** (owner answer 2); the return keeps that bill's customer. Replacement items follow every sale rule; a bill discount is on the sold lines only.
+  - **A line returned in parts adds up to what was paid:** the refund for `k` of the `r` units left is the value left × `k` / `r`, half away from zero, and all that is left refunds exactly what is left (`refundFor`).
+  - **The policy** (`returnNeeds`): the tenant's `return_window_days` (30), or the category's own window; non-returnable categories; approvals `return_permission`, `return_outside_policy`, `no_receipt_return`, one approver's own PIN covering them all, with the reasons *Regular customer, Manufacturer defect, Lost bill, Bought before go-live, Owner's instruction, Other* (owner answer 3).
+  - **No receipt:** the counter suggests the lowest net price of the branch's last 90 days, else today's default-tier price; **the approver may set the price**, and the override keeps both. Cost back at the current average.
+  - **Refunds:** cash at the desk (a payout in its queue, W1-10), credit to a customer's account (not counted as unsynced credit until the balance has it), or **by transfer** with a reference and the PIN of someone with `pos.override.approve` (override `refund_transfer`, owner answer 1); an even exchange takes no payment.
+  - **No legacy bills** (owner answer 4): MIG-03 is dropped, and **D-030 is superseded in that part** (the masters and opening balances stay). A part bought before go-live is a no-receipt return; the manager checks the old bill in the read-only legacy system and sets the price; its number goes in the return's reference.
+  - **Every counter pulls the branch's last 90 days of bills** (`bills`, `bill_lines`, `bill_payments`, SYN-01), pruned past 90 days; the pulled return lines say what came back already, so nothing is derived for it.
+  - **The server never refuses a return** (rule 7): it judges it under the original bill's per-bill lock and flags `return_over_quantity`, `return_original_invalid`, `return_price_mismatch`, `return_not_permitted`. Stock comes back at the original line's cost (D-044), into Damaged for a defective line; a return posts only once its original has.
+- **Why:**
+  - One document keeps one number, one print and one cash movement for an exchange, and V2 only for returns keeps the pilot's sales untouched.
+  - Refunding the share of what is left never drifts by a paisa, however a line comes back.
+  - The legacy bills would have put a second kind of original through the lookup, the quantities, the review, the posting and the print, plus an importer step, for about a month's benefit.
+- **Trade-off:** for about the first month after go-live, returns of pre-go-live parts need a manager's PIN, and nothing stops the same old part coming back twice beyond the manager's check of the legacy system.
+- **Status:** Accepted (with the W1-13 plan, owner answers 1–5)
+
+
+### D-101 Opening balances: a posted document, reconciled from the ledgers, the floor from cost on the counter, a throwaway pilot wiped before go-live (2026-11-04)
+- **Decision:**
+  - **The opening is a document** (`opening_balances` and its lines, migration 0015) posted by `postOpening` (source `opening`) like any other, so the ledgers stay rebuildable (rule 4): stock into Shop at the legacy cost (the latest valuation rate, else the cost price, else the opening rate, else none and `no_cost`), one AR or AP line and party entry per customer or supplier due on the entry date, the counted drawer and the bank statements, the balance to Opening balance equity (posting rules §7). The importer writes a **draft**, replaces it on a re-run, and posts it once (`pnpm legacy:opening … --post`); a posted opening is never changed (a trigger).
+  - **The legacy figures are pure, golden-tested rules** (`tools/legacy-import/src/transform/opening.ts`); **which legacy document types add or take away stock is in the mapping file**, and an unmapped type stops the run after its report.
+  - **The reconciliation report** (MIG-04) reads the tenant's own ledgers after posting, compares them with the legacy computation, the legacy running balance and the four legacy report totals the owner types in (owner answer 4), and lists the top 20 customers and suppliers for sign-off.
+  - **The floor from cost** (CAT-06, D-092): `costFloor` = average × (1 + the category's margin), half away from zero, written by the posting layer as the synced `item_floors` whenever an average is set, and pulled by the counters. The counter's floor is the item's own floor, else this, else the list price.
+  - **The pilot is throwaway** (owner answer 1): no cutover posting. Before the final run, `erp-tenant wipe-pilot` removes the shop's documents and everything derived from them (as erp_owner, one transaction, audited), keeps masters, staff, PINs and settings, and revokes the counters, which are cleared and enrolled again. **This is the one exception to rules 3 and 4, for pre-go-live data only:** refused while a counter has unsynced bills (rule 9) and once `erp-tenant go-live` has marked the shop live and set the lock date.
+  - **Real data on production for the pilot** (owner answer 3): masters before 1 Dec and the pilot opening when its dump arrives, loaded from the owner's PC over an SSH tunnel as the app role. The task is built and rehearsed on the Dec 2025 copy (owner answer 2).
+- **Why:**
+  - An opening written straight into the ledgers would show up as a difference in every rebuild check.
+  - A floor that moves with the average needs its own change feed (rule 8), and the item's own floor must still win.
+  - The pilot's sales are already in legacy; netting them in the books would add a posting type, used once, for nothing the shop keeps.
+- **Trade-off:** the wipe deletes finalized documents (rules 3 and 4) once, before go-live; and a part bought during the pilot comes back in January as a no-receipt return, like any pre-go-live part (D-100).
+- **Status:** Accepted (with the W1-14 plan, owner answers 1–5)
+
+### D-102 Opening stock from the legacy stock records, physical counts from the count sheet (2026-11-05)
+- **Decision:** the opening's closing stock per item = `INV_Item.OpeningQuantity` ± the `INV_StockRecordTAB` rows up to the cutoff (their own `Quantity`, signed by document type in `opening.docTypes`), except physical-stock counts, which come from the count sheet's lines (`INV_PhysicalStockDetail.Quantity`, signed: a shortage is negative). Sale and purchase document lines are no longer summed; they still give the last purchase and the recent-sales report. The importer compares every item with the legacy Item Wise Closing Stock report when `out/<label>/legacy-closing.csv` (item, qty) is given, and reports each period and stock table's date range (`periods.csv`).
+- **Why:** rehearsal 2 (2026 dump, 1 Jul to 5 Nov, against the owner's report as on 5 Nov 2026): this rule matches **all 20,163 items and the total of 45,224.5 units**. Summing the document lines gave 130,334.5 units, because legacy stores sale-line quantities negative; the stock records alone missed 45 items, because their physical-stock rows lose a shortage's sign.
+- **Trade-off:** the opening now depends on legacy keeping a stock record for every stock document. The per-item comparison with the legacy report on each dump day is what proves that, so it is part of every rehearsal and the final run.
+- **Status:** Accepted (owner, 2026-11-05). Replaces the quantity rule of D-101 and migration doc §4.1.
+
+### D-103 Opening cost: valuation rate, else last purchase, else opening rate below Retail, else cost price (2026-11-05)
+- **Decision:** an item's opening unit cost = the latest `INV_StockRecordTAB.ValuationRate` on or before the cutoff; else the last purchase rate in the period; else `INV_Item.OpeningRate` (legacy's carried-forward average), unless it is above the item's Retail price; else `INV_Item.CostPrice`; else the opening rate even above Retail; else none (`no_cost`). With the legacy report's Average Rate in `legacy-closing.csv`, the importer writes `cost-compare.csv`: each differing item, the legacy figure the report's rate equals (`report_zero`, `opening_rate`, `cost_price`, `last_purchase`, `unexplained`) and the value difference.
+- **Why:** rehearsal 2 against the owner's Closing Stock report of 5 Nov 2026 (16,061 items in stock). The report values old stock (no 2026 purchase) at the opening rate: 863 items, where the cost price came first before. 81 items show a rate of 0 although 69 of them were bought in 2026 (LAMI001: 8 purchases at 7,500–7,800, checked with the owner); their last purchase is their cost. Two opening rates are above Retail and are typing errors (CLCD022: 8,000 against `CostPrice` 3,000 and Retail 3,950, checked with the owner). With this rule 15,976 items equal the report; the rest are those 81, the 2 typing errors and 2 items within Rs 25.
+- **Trade-off:** our stock value is Rs 45.57 M against the report's Rs 45.27 M, on purpose (the 81 items the report values at 0). The owner reviews `cost-compare.csv` on each dump day.
+- **Status:** Accepted (owner, 2026-11-05). Replaces the cost order of D-101 and migration doc §4.1.
+
+### D-104 Catalog maintenance: legacy stays the master until go-live, only the owner prices, a price history (2026-11-06)
+- **Decision:**
+  - The back office maintains the catalog (W1-15): items, identifiers, vehicle tags, tier prices, the item's own floor and the category's floor margin, through `/api/catalog`, with the row version on every save (a stale save is refused with who saved in between). An item's code never changes; items are never deleted (dormant or discontinued).
+  - **Until the shop is live (`tenants.go_live_at`, D-101), the legacy app is where items change** (owner answer 1): the importer is unchanged, the final import overwrites the catalog, and every catalog screen says so.
+  - **Only the owner changes prices** (owner answer 3): `cat.price.edit` is no longer in the Manager template, and migration 0016 removes it from the Manager roles made from the template in every tenant. A manager adds an item without prices; the owner prices it.
+  - **`price_history`** (migration 0016, CAT-07): every changed tier price and own floor with old → new, who, when and, when a price goes down, a reason from a fixed list (supplier price dropped, market price, slow stock, correction, other with a note; owner answer 2). Added to only.
+  - A category's margin change re-writes its `item_floors` through `writeFloors` (`packages/posting`), in the same transaction.
+- **Why:** one master at a time keeps the pilot simple; one person decides prices; the history answers "who changed this price and why".
+- **Trade-off:** a price changed in the new back office before go-live is lost at the final import (the notice says so); managers can't fix a price without the owner.
+- **Status:** Accepted (with the W1-15 plan, owner answers 1–4)
+
+### D-105 Purchasing: receipts and returns as drafts posted once, the bill discount capitalized exactly, cash paid at the desk (2026-11-06)
+- **Decision:**
+  - **Goods receipts and purchase returns are typed as drafts** in the back office and **posted once** (rule 3; a trigger refuses any change after posting, the pilot wipe excepted, D-101). A draft has no number; posting takes `GR`, `PR` or `SP` + six digits from a per-tenant counter in the same transaction, so abandoned drafts leave no gap.
+  - **A receipt can't be posted until its lines equal the bill total as printed** (PUR-02). The bill discount is spread over the lines' nets by largest remainder and capitalized into each line's exact value; the stock movement carries that value and the average is computed from it (`averageAfterValue`), so a rounded unit cost never shifts the books. Warnings (not blocking): a net cost more than 10 % off the last cost, Retail at or below the net cost.
+  - **Cash purchases are paid by the cashier at the desk** (owner answer 1): the receipt puts the bill on the supplier's account and the desk's supplier payment (W1-11) pays it, so the drawer count stays right. A receipt can be marked paid by bank, posting the payment with it. A supplier payment by bank is its own document (`supplier_payments`, posted when made).
+  - **A purchase return** goes out at the item's average; the supplier takes it back at the return's unit cost (offered from the receipt line's net cost); the difference goes to Purchase price variance (posting rules §5.2). Linked to a receipt, it can't return more than the line still has.
+  - **Permissions** (owner answer 2): suppliers, receipts and returns with `pur.receive` (owner, manager, purchaser); payments by bank with `acc.payment.create` (owner, accountant). Return reasons (owner answer 3): damaged, wrong item, excess quantity, poor quality, price dispute, other with a note.
+  - **Until go-live, purchases go into the legacy app** (owner answer 4); the purchasing screens say so, and anything entered here before then is removed by the pilot wipe.
+- **Why:** the supplier's bill is what the shop checks against; exact values keep the stock ledger equal to the bills; one place handles cash.
+- **Trade-off:** two steps for a cash purchase (receipt, then the desk), and a posted mistake is corrected by a return or a journal voucher, never an edit.
+- **Owner review (2026-11-07):** a supplier is deactivated (only when nothing is owed) or, if never used anywhere, deleted (marked deleted); the forms open as dialogs; a receipt line takes the item's last purchase cost.
+- **Status:** Accepted (with the W1-16 plan, owner answers 1–5)
+
+### D-106 Item labels: the legacy 40 × 28 mm roll label, every piece of a receipt, a shop setting for the maker's barcode (2026-11-07)
+- **Evidence:** the owner's photos and a legacy label PDF: a Zebra GX420t thermal-transfer printer with a roll of single 40 × 28 mm labels; on each label the shop's abbreviation (DCAC, Delux City Auto Corner) top left, the supplier's abbreviation top right, the item code as a Code 39 barcode with the code under it, and the item name on one line.
+- **Decision:**
+  - Labels print from the back office with the browser, one label per page of the roll, in the legacy layout. No A4 sheets (owner answer 1).
+  - From a **posted goods receipt** (by its number, or its Print labels button): one label per piece received, the receipt's supplier abbreviation; an item sold in fractions gets one per line. A **relabel** of items picked on the items screen: one each, the last purchase supplier, else the default supplier. Every count and abbreviation can be changed before printing; nothing is stored about what was printed.
+  - **The maker's barcode is a shop setting** ("label items that already carry the maker's barcode"). Off (a new shop's default, CAT-08), an item with a barcode other than its own code starts at 0. **Delux: on**, the shop labels every piece (owner answer 4).
+  - The template (size, margin, shop abbreviation, the name, the maker's-barcode setting) lives in `tenants.settings.labels`, changed by the owner only (`admin.settings`, owner answer 5).
+  - A code Code 39 can't carry is listed and not printed.
+- **Why:** the shop keeps its labels and scanners as they are; another shop that relies on the maker's barcode doesn't waste labels; the browser prints the way the bill already does (D-055).
+- **Trade-off:** the browser's print dialog must be set once per PC (the label printer, margins none, scale 100 %); printing straight to the Zebra without a dialog would need a local helper.
+- **Status:** Accepted (with the W1-17 plan, owner answers 1–5)
+
+### D-107 Stock operations: the storekeeper drafts, the owner or manager posts; the owner approves large losses; receiving per route (2026-11-08)
+- **Context:** W1-18 (INV-04, INV-05, INV-07). Delux's Godown is in the same building as the shop; other shops keep stock elsewhere.
+- **Decision:**
+  - **Transfers:**
+    - The purchaser/storekeeper (`inv.transfer`) types a transfer as a draft. Only the owner or the manager (`inv.transfer.post`, new) posts it (owner answer 2).
+    - Each route (from → to) is either "moves at once" (the default) or "needs receiving", an owner's setting (`transfer_routes`, owner answer 4).
+    - On a route that needs receiving, posting **sends** the stock into the branch's **In transit** location (new location kind `transit`, never sellable, one per branch). **Receiving** moves what arrived into the destination.
+    - A shortfall becomes a loss adjustment out of In transit (reason *lost*), under the same approval rule.
+  - **Adjustments:**
+    - Adjustments are the owner's and the manager's (`inv.adjust`).
+    - When the losses at the average come to more than the shop's limit (`tenants.settings.inventory.adjustmentApprovalLimit`, default Rs 10,000), and the poster can't approve (`inv.adjust.approve`, new, the owner only), it waits: stock and books don't move.
+    - The owner approves it (it posts) or sends it back to a draft with a note. Gains never wait (owner answer 3).
+  - **Postings:**
+    - A transfer step moves stock at the item's average with no journal (posting rules §5.4).
+    - An adjustment posts its net value against `INVENTORY_ADJUSTMENT` (§5.3). Each step is its own posting (`stock_transfer`, `stock_transfer_receipt`, `stock_adjustment`) and replays in a rebuild.
+  - The adjustment reasons are the owner's list: found, lost / missing, broken / damaged, theft, count correction, write-off (damaged goods, only out of Damaged), other with a note (owner answer 1).
+- **Why:**
+  - A transfer is recorded when the goods move, but stock changes only on a responsible person's post.
+  - A mistyped loss can't reach the books unseen.
+  - A setting per route can't be picked wrongly on each transfer.
+  - The same code serves a shop whose store is down the road.
+- **Trade-off:**
+  - Drafts can pile up unposted; the transfers list shows them first, and Transfer needed shows what that costs the Shop.
+  - A route that needs receiving leaves stock invisible to both ends until it is received; the On the way list shows how long.
+- **Status:** Accepted (with the W1-18 plan, owner answers 1–4)
+
+### D-108 Back-office accounting: the accountant keeps the books, reversal is the only correction, one lock date that only the owner moves back (2026-11-08)
+- **Context:** W1-19 (ACC-04, ACC-05, ACC-06, part of ACC-07). The legacy app entered customer receipts as journal vouchers and had no period lock.
+- **Decision:**
+  - **Who:** an Accountant login plus the owner keep the books (customer receipts, expenses and transfers by bank or the safe, journal vouchers, locking months). The manager gets no accounting; until Delux has an accountant, the owner does it (owner answer 1).
+  - **Documents:** a customer receipt by bank (`CR`), an expense from a bank or the safe (`EX`) and a transfer between banks, wallets, card settlement and the safe (`FT`) post when saved. A journal voucher (`JV`) is a draft, then posted, with **no approval step** (owner answer 2).
+  - **A voucher can't touch the accounts the system keeps:** `INVENTORY`, `CASH_DRAWER`, `CASH_IN_TRANSIT`. The party is required on AR/AP lines and refused elsewhere.
+  - **Corrections are reversals only:** Reverse on any posted back-office money document or voucher (supplier payments by bank included) writes a journal voucher that swaps its journal and reverses its party entries, at most once.
+  - **Fees on transfers:** a transfer takes optional charges with an expense category, so a card settlement or a bank fee posts in one entry (owner answer 6; replaces D-057 point 3).
+  - **Periods** are computed from `fiscal_year_start_month`, not stored; `tenants.lock_date` is the only record. The accountant or the owner moves it forward to the end of a month that is over, after a checklist of what still looks open; **only the owner moves it back**, with a reason, audited (`acc.period.reopen`, owner answer 5). The first lock fixes the start month (D-035).
+  - **Back-office documents dated on or before the lock date are refused** (purchasing and stock included); counter documents still post on the first open date (posting rules §1.6).
+  - **Account balances and the account ledger** come now, for the owner and the accountant (owner answer 3); the other financial reports stay in Wave 2.
+  - **The accountant adds accounts and expense categories** (`acc.chart.edit`); banks and wallets stay a setup job (owner answer 4).
+- **Why:** each kind of money movement posts the same way every time; the books, the stock ledger and the drawer can't drift apart through a voucher; a closed month stays closed unless the owner says otherwise.
+- **Trade-off:** a typing mistake costs a reversal and a new entry instead of an edit; a voucher needs no second pair of eyes, so the owner relies on the list and the audit log.
+- **Status:** Accepted (with the W1-19 plan, owner answers 1–6)
+
+### D-109 Customers in the back office: managers add them, only the owner sets tier and credit, codes `C0001`, deactivate only at zero (2026-11-09)
+- **Context:** W1-22 (POS-05, POS-07, CAT-04, PUR-01, ACC-03). A new shop had no way to get customers: only the legacy import and the e2e seed created them. W1-09 left them to the mapping file "until a back-office customer screen exists" (D-096).
+- **Decision:**
+  - **A back-office Customers screen** on the existing `parties` + `customer_accounts`: list and search with balances, add, edit, deactivate, delete one never used, and the customer's ledger, read only (owner answer 7; ageing stays in W1-20). No new table and no change to the pull: the W1-09 datasets and nudge carry every change to the counters.
+  - **Who** (owner answers 1, 2): **`cust.edit`** (owner, manager, accountant) adds and edits customers; **`cust.terms.edit`** (owner only) sets the price tier and credit terms, as only the owner changes prices (D-104). Migration 0020 grants `cust.edit` to the Manager and Accountant roles made from the templates.
+  - **A new customer** (owner answer 3) starts on the default tier with credit off; credit on needs a limit or *No limit* ticked on purpose; the offline cap starts at Rs 25,000 (PRD Q6), one constant in `packages/domain`. Phones are stored normalized (`normalizePhone`).
+  - **Codes** (owner answer 4): suggested `C0001`, `C0002`…, editable, unique across parties ignoring case, never changed after saving; legacy codes are numeric, so they never collide.
+  - **Deactivate only at a zero balance**; a customer who owes has their credit turned off instead. **Delete** only a customer never used anywhere, marked deleted; a party that is also a supplier loses only its customer account (owner answer 5).
+  - **Before go-live** (owner answer 6), imported customers show a notice that the next import overwrites changes made here; new customers are never touched by an import.
+  - **A supplier can be made a customer** too, on the same party (owner answer 8, PUR-01).
+  - **No customer creation at the counter** for now (owner answer 9): the walk-in phone covers it until a later task.
+- **Why:** a shop must be able to start selling on account without the importer; the money-at-risk fields stay with the owner; an open balance stays collectable at the desk.
+- **Trade-off:** a manager's new customer can't buy on account until the owner sets their terms; until go-live, imported customers are still changed in the legacy app or the mapping file.
+- **Status:** Accepted (with the W1-22 plan, owner answers 1–9). Amends D-096: the back office now sets credit terms; until go-live, imported customers' terms still come from the mapping file.
+
+### D-110 Reports read the ledgers on request; exceptions are reviewed, never changed; Trace a bill and Send diagnostics for support (2026-11-10)
+- **Context:** W1-20 (RPT-01, RPT-03, RPT-04, RPT-05, RPT-06, RPT-10, PLT-12). The facts are already on the server: sales, payments, overrides, voids, returns, exceptions, stock and cost, party ledgers, handovers, sync attempts and device health. Only the counter's diagnostic log never leaves it.
+- **Decision:**
+  - **Reports are read only and computed on request** from those tables, inside `withTenant`; nothing is stored. The register's totals and the ageing buckets are pure functions in `packages/domain`, golden-tested.
+  - **Who** (owner answer 1): every report needs `reports.view` (owner, manager, purchaser, accountant); cost and value also need `cost.view`, left out by the API, not only the screen. **Trace a bill** needs `support.trace` (new: owner). Cashiers and salesmen see no reports.
+  - **Dates** (owner answer 2): today by default, one branch, a range of up to 92 days, Download CSV on every report, no PDF.
+  - **The sales register** (owner answer 3): every finalized bill, returns and exchanges netted; voided bills listed struck through and left out of the totals; totals by salesman, counter and tender.
+  - **Ageing** (owner answer 4): by due date in five buckets (not yet due, 1–30, 31–60, 61–90, over 90 days overdue), credits applied to the oldest debit first; the totals equal Accounts receivable and Accounts payable.
+  - **Exceptions** (owner answer 5): the owner or manager marks one reviewed or dismissed, with a note (`exceptions.review`, new), audited; the exception itself never changes. The open high-severity count shows on the home screen.
+  - **Send diagnostics** (owner answer 6): a manager, after a PIN, sends the counter's last 5,000 log events and its health snapshot, device-signed; kept 30 days in `device_diagnostics` (new, forced RLS, not synced), shown on the device's page and in Trace a bill.
+  - **Stock** (owner answer 7): on hand now, valued at average cost (an item without a cost counts 0, as posting does); stock at a past date waits for Wave 2.
+- **Why:** one source of truth (rule 4), so a report can't disagree with the books; support can follow a bill from the counter to the books without asking the shop what happened.
+- **Trade-off:** no stock at a past date, no PDF and no financial statements (trial balance, profit and loss, balance sheet, cash book: ACC-07, Wave 2) before go-live; reports on a long range are slower than stored summaries would be, hence the 92-day cap.
+- **Status:** Accepted (with the W1-20 plan, owner answers 1–7).
+
+### D-111 No void once money has reached the shop; a refund waits for its bill's payment; cash taken for a voided bill is given back at the desk (2026-11-11)
+- **Context:** W1-23, found in the owner's staging checks of W1-12. An offline clash (`cash_received_for_void`, D-059) left *Cash in transit* below zero with no way to settle it; a bill paid by JazzCash was voided like an unpaid one, so the refund sent back left the shop with no record; and a bill not yet paid at the desk could be returned and its refund paid before the bill.
+- **Decision:**
+  - **A void is only for a bill whose money hasn't reached the shop** (widens D-099's *never after the cash handover* to every method). Before a void the counter checks each payment part: the desk's cash with the server (offline, or with no answer in 3 s, it asks *Has the customer already paid for this bill at the cash desk?*); a bank, wallet or card part always by asking, online too (*Has the shop's JazzCash account received Rs 400 for this bill?*), since the system can't see those accounts; on account asks nothing. Nothing arrived → void; everything arrived, or only the desk's cash still to come → a return; a bank, wallet or card part not received while another part arrived → stop until the customer completes it. One pure rule, `voidOrReturn`, golden-tested, used by the counter and the server; the void records each answer and who approved it (`SaleVoidV2`).
+  - **Returns of unpaid bills:** on the bill's own day, a return of a cash bill not yet paid at the desk is sent to the void instead; and the desk never pays out a return's refund while its original bill is pending in its queue (*Collect … first*). Offline the desk can't link a refund slip to its bill (Code 39 carries only the return's number and amount), so it pays out, and the server flags `refund_before_payment`, settled by itself if the bill's handover arrives later.
+  - **Cash taken for a voided bill is given back at the desk** (a cash movement of kind `void_cash`, `Dr CASH_IN_TRANSIT / Cr CASH_DRAWER`), with the owner's answers: the session's cashier with `cash.refund.pay` **and the PIN of a `pos.void` holder who is never the session's cashier** (1); always the full amount taken (2); the server then marks `cash_received_for_void` reviewed with a note naming the approver, which can be reopened (3); at any desk of the branch, on any later day, while the session is open, dated the day it happens (4).
+- **Why:** a refund must be recorded where the money really went; a void only undoes a bill that never brought money in. The give-back is the only way *Cash in transit* and the drawer agree again after a clash, and the second PIN stops a cashier and a salesman together from voiding a paid bill and taking its cash.
+- **Trade-off:** a void of a bill with a JazzCash, card or bank payment always asks a question; the voided bill's cash isn't used for its reissue in one step (the reissue is collected from the queue as usual); an early refund isn't blocked offline, only flagged after sync; handover confirmation stays **Required** for Delux (D-049).
+- **Status:** Accepted (with the W1-23 plan, owner answers 1–4). Amends D-099.

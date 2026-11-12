@@ -30,7 +30,11 @@ There are **no long-lived device secrets** besides the non-extractable key. A de
 3. The server verifies the signature with the stored public key and checks that the device is **active**. It then issues an **access token valid for 15 minutes**. Only the token's SHA-256 is stored.
 4. Requests carry `Authorization: Device <tenantId>.<token>`. The server sets the tenant context from it and looks the token up **under RLS**, the same pattern as back-office sessions (D-081).
 
-So there's no refresh token to steal or rotate. **Revoking a device** (`admin.devices`) deletes its tokens, and no new ones can be issued. Documents it already created are still accepted at sync, flagged for review (architecture §4.3, D-011).
+So there's no refresh token to steal or rotate. **Revoking a device** (`admin.devices`) deletes its tokens, and no new ones can be issued: its challenge answers `401 { error: 'device_revoked' }` (W1-07), so the counter can say so and keep its bills (POS spec §4). Any other refusal is `device_refused`; a busy (`429`) or failing (`5xx`) challenge is retried by the counter like being offline.
+
+**Re-enable** (`POST /api/devices/:id/reenable`, `admin.devices`, owner answer 3 to W1-07): the device is active again and gets tokens with the same key. The revocation is kept (`last_revoked_at`, `reenabled_at`), and documents it created in between are accepted with a `revoked_device_doc` exception (sync spec §6.2, architecture §4.3, D-011). Audited like every device change.
+
+**One token for callers asking together:** pull, push and the SSE stream start at once on the counter; one challenge serves them all (W1-07).
 
 ## 3. Document signatures
 
@@ -46,12 +50,12 @@ The server verifies with the device's stored public key. The public keys of a br
   - all digits the same (`1111`)
   - straight runs (`1234`, `9876`)
   - the user's short code
-- **Set by the user in the back office**, after re-entering their password. A manager resets a PIN from user admin (Wave 1).
+- **A temporary PIN** is given in the back office (*Staff*, `admin.devices`), and the person chooses their own at the counter on first unlock (D-089). A new temporary PIN also clears the person's lock on every counter at its next pull (W1-04).
 - **Stored as a slow hash both the server and the browser can compute:** **PBKDF2-HMAC-SHA256, 600,000 iterations** (OWASP 2023), with a 16-byte random salt, as `pbkdf2-sha256$600000$<salt>$<hash>`.
   - Argon2 would need WebAssembly in the browser; WebCrypto has PBKDF2 built in.
   - The parameters are in the string, so they can be raised later.
 - **Unlock on the counter:** pick your name or type your short code, then enter the PIN. It's checked **offline** against the verifier synced to that branch's devices.
-- **5 wrong PINs lock that user on that device** until a manager unlocks it with their own PIN. The lockout rule is a pure function in `packages/domain`. Lockouts are reported to the server's audit log at the next sync.
+- **5 wrong PINs lock that user on that device** until a manager unlocks it with their own PIN and `admin.devices` for the branch, offline (POS spec §5, W1-04). The lockout rule is a pure function in `packages/domain`. Locks and manager unlocks are kept on the counter (`pin_events`) and reported to the server's audit log by push (W1-07).
 - **Overrides (PLT-07):** the approver types their PIN on the same screen. The device checks that the approver holds the needed permission (`can()`, D-081) and writes an override record into the document, signed with it.
 - **Never a login:** the back office never accepts a PIN (D-081).
 

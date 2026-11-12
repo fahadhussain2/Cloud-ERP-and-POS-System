@@ -10,6 +10,7 @@ Production runs on one Hetzner CX33 (`erp-prod-1`, `204.168.217.64`, Helsinki, U
 | `app/` | One release of the apps (`api`, `worker`, `web`) for one environment: `compose.yaml` plus non-secret settings per environment. Deployed by `erp-deploy`. |
 | `server/files/bin/erp-deploy` | The only program the GitHub deploy key may run on the server (D-075). |
 | `db/` | PostgreSQL + pgBackRest per environment: image, config, `apply.sh`, `erp-db` (backups, canary, status, secrets, restore drills), systemd timers (D-076). `erp-tenant` and the tenant specs in `db/tenants/` (D-083). |
+| `counter-setup.md` | Setting up a counter PC in the shop: enroll, install the POS, keep the browser from deleting unsynced bills (D-089). |
 
 ## Access
 
@@ -118,6 +119,15 @@ ssh admin@204.168.217.64 sudo erp-obs status
 python infra/observability/grafana/apply.py
 ```
 
+**Uptime checks** (Grafana → Testing & synthetics → Synthetics → Checks; created by hand, the API needs another token): two HTTP checks every 5 minutes from two European probes, with the default status-200 and certificate checks. **The job names must be exactly these**, because the *Website or POS down* alert looks for them; without the checks it fires on missing data.
+
+| Job name | Target |
+|---|---|
+| `erp-app` | `https://app.zorbixtechnologies.com/api/health` |
+| `erp-pos` | `https://pos.zorbixtechnologies.com/api/health` |
+
+Staging isn't checked: its deploys health-check themselves.
+
 **Finding things:** every error response has a `reference` (the request ID).
 - In Sentry, search the `request_id` tag.
 - In Grafana → Explore → the `-logs` data source: `{env="prod"} | json | request_id="<reference>"`. The line's `trace_id` opens the request's trace.
@@ -138,6 +148,12 @@ It prints what it created, any **drift** (spec values that differ from the datab
 ```bash
 ssh admin@204.168.217.64 sudo erp-tenant setup staging demo --generated
 ```
+
+**A test catalog on staging** (W1-21): about 20,000 generated items in Delux's shape, on a staging shop with no items yet. Never real data (D-076); refused for prod:
+```bash
+ssh admin@204.168.217.64 sudo erp-tenant seed-catalog staging demo
+```
+An optional last argument sets the number of items (up to 50,000). Real searches are checked locally on `erp_dev`.
 
 **Forgotten password** (support): sets a generated temporary password that must be changed, lifts a lockout and ends the user's sessions. Give the password to the user in person or by phone:
 ```bash

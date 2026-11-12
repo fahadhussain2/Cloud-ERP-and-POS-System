@@ -1,0 +1,901 @@
+{
+  "description": "Posting the desk's other documents (posting rules §4.5, W1-11): collections, cash-outs and safe movements, and the session's open and close W1-23 (D-111): cash given back for a voided bill (void_cash) moves it from the drawer back to cash in transit, undoing the handover.",
+  "notes": "Delux's accounts by code (cash.test.ts): 1110 Cash drawer, 1130 Cash in safe (CASH_SAFE), 1150 Soneri, 1160 HBL (Raast), 1200 Accounts receivable, 2100 Accounts payable, 6310 the Tea category's account, 6500 Cash short/over. Targets map an expense category or a bank account to its account. Each posts its own amount; nothing moves stock. A party entry is due on the entry date.",
+  "cases": [
+    {
+      "name": "Rs 5,000 collected in cash: Dr Cash drawer / Cr AR, the customer owes Rs 5,000 less",
+      "input": {
+        "collection": {
+          "id": "r-1",
+          "number": "D01-R000001",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "partyId": "cust-ali",
+          "method": "cash",
+          "amount": 500000
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-R000001",
+            "lines": [
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 500000,
+                "credit": 0
+              },
+              {
+                "accountId": "1200",
+                "partyId": "cust-ali",
+                "debit": 0,
+                "credit": 500000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [
+            {
+              "partyId": "cust-ali",
+              "role": "customer",
+              "amount": -500000,
+              "dueDate": "2026-11-02"
+            }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "Rs 12,500 by Raast: Dr HBL / Cr AR",
+      "input": {
+        "collection": {
+          "id": "r-2",
+          "number": "D01-R000002",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "partyId": "cust-ali",
+          "method": "raast",
+          "amount": 1250000
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-R000002",
+            "lines": [
+              {
+                "accountId": "1160",
+                "partyId": null,
+                "debit": 1250000,
+                "credit": 0
+              },
+              {
+                "accountId": "1200",
+                "partyId": "cust-ali",
+                "debit": 0,
+                "credit": 1250000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [
+            {
+              "partyId": "cust-ali",
+              "role": "customer",
+              "amount": -1250000,
+              "dueDate": "2026-11-02"
+            }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "a collection by a method without an account can't post",
+      "input": {
+        "collection": {
+          "id": "r-3",
+          "number": "D01-R000003",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "partyId": "cust-ali",
+          "method": "jazzcash",
+          "amount": 100000
+        }
+      },
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "method_unmapped",
+          "method": "jazzcash"
+        }
+      }
+    },
+    {
+      "name": "a collection dated on the lock date posts the day after, flagged",
+      "input": {
+        "collection": {
+          "id": "r-4",
+          "number": "D01-R000004",
+          "branchId": "br-main",
+          "businessDate": "2026-10-31",
+          "partyId": "cust-ali",
+          "method": "cash",
+          "amount": 100000
+        },
+        "context": {
+          "lockDate": "2026-10-31"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-R000004",
+            "lines": [
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 100000,
+                "credit": 0
+              },
+              {
+                "accountId": "1200",
+                "partyId": "cust-ali",
+                "debit": 0,
+                "credit": 100000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [
+            {
+              "partyId": "cust-ali",
+              "role": "customer",
+              "amount": -100000,
+              "dueDate": "2026-11-01"
+            }
+          ],
+          "exceptions": [
+            {
+              "kind": "posted_after_lock",
+              "details": {
+                "businessDate": "2026-10-31",
+                "lockDate": "2026-10-31"
+              }
+            }
+          ],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "Rs 200 for tea: Dr the category's account / Cr Cash drawer",
+      "input": {
+        "movement": {
+          "id": "m-1",
+          "number": "D01-M000004",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "expense",
+          "amount": 20000,
+          "partyId": null,
+          "targetId": "cat-tea"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-M000004",
+            "lines": [
+              {
+                "accountId": "6310",
+                "partyId": null,
+                "debit": 20000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 20000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "Rs 8,000 to a supplier: Dr AP / Cr Cash drawer, we owe Rs 8,000 less",
+      "input": {
+        "movement": {
+          "id": "m-2",
+          "number": "D01-M000005",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "supplier_payment",
+          "amount": 800000,
+          "partyId": "supp-addi",
+          "targetId": null
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-M000005",
+            "lines": [
+              {
+                "accountId": "2100",
+                "partyId": "supp-addi",
+                "debit": 800000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 800000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [
+            {
+              "partyId": "supp-addi",
+              "role": "supplier",
+              "amount": -800000,
+              "dueDate": "2026-11-02"
+            }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "Rs 50,000 deposited at Soneri: Dr Soneri / Cr Cash drawer",
+      "input": {
+        "movement": {
+          "id": "m-3",
+          "number": "D01-M000006",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "bank_deposit",
+          "amount": 5000000,
+          "partyId": null,
+          "targetId": "bank-soneri"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-M000006",
+            "lines": [
+              {
+                "accountId": "1150",
+                "partyId": null,
+                "debit": 5000000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 5000000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "Rs 5,000 to the safe: Dr Cash in safe / Cr Cash drawer",
+      "input": {
+        "movement": {
+          "id": "m-4",
+          "number": "D01-M000007",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "to_safe",
+          "amount": 500000,
+          "partyId": null,
+          "targetId": null
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-M000007",
+            "lines": [
+              {
+                "accountId": "1130",
+                "partyId": null,
+                "debit": 500000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 500000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "Rs 2,000 from the safe: Dr Cash drawer / Cr Cash in safe",
+      "input": {
+        "movement": {
+          "id": "m-5",
+          "number": "D01-M000008",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "from_safe",
+          "amount": 200000,
+          "partyId": null,
+          "targetId": null
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-M000008",
+            "lines": [
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 200000,
+                "credit": 0
+              },
+              {
+                "accountId": "1130",
+                "partyId": null,
+                "debit": 0,
+                "credit": 200000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "Rs 1,000 given back for a voided bill (W1-23): Dr Cash in transit / Cr Cash drawer",
+      "input": {
+        "movement": {
+          "id": "m-9",
+          "number": "D01-M000012",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "void_cash",
+          "amount": 100000,
+          "partyId": null,
+          "targetId": null
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-M000012",
+            "lines": [
+              {
+                "accountId": "1120",
+                "partyId": null,
+                "debit": 100000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 100000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "cash given back without the CASH_IN_TRANSIT role can't post (W1-23)",
+      "input": {
+        "movement": {
+          "id": "m-10",
+          "number": "D01-M000013",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "void_cash",
+          "amount": 100000,
+          "partyId": null,
+          "targetId": null
+        },
+        "context": {
+          "withoutRoles": ["CASH_IN_TRANSIT"]
+        }
+      },
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "role_unmapped",
+          "role": "CASH_IN_TRANSIT"
+        }
+      }
+    },
+    {
+      "name": "an expense whose category has no account (unknown to the server) can't post",
+      "input": {
+        "movement": {
+          "id": "m-6",
+          "number": "D01-M000009",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "expense",
+          "amount": 20000,
+          "partyId": null,
+          "targetId": "cat-gone"
+        }
+      },
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "target_unmapped",
+          "targetId": "cat-gone"
+        }
+      }
+    },
+    {
+      "name": "a supplier payment the server can't place on a supplier can't post",
+      "input": {
+        "movement": {
+          "id": "m-7",
+          "number": "D01-M000010",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "supplier_payment",
+          "amount": 20000,
+          "partyId": null,
+          "targetId": null
+        }
+      },
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "party_missing"
+        }
+      }
+    },
+    {
+      "name": "to the safe without the CASH_SAFE role can't post",
+      "input": {
+        "movement": {
+          "id": "m-8",
+          "number": "D01-M000011",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "to_safe",
+          "amount": 20000,
+          "partyId": null,
+          "targetId": null
+        },
+        "context": {
+          "withoutRoles": ["CASH_SAFE"]
+        }
+      },
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "role_unmapped",
+          "role": "CASH_SAFE"
+        }
+      }
+    },
+    {
+      "name": "an open with the float that stayed posts nothing",
+      "input": {
+        "session": {
+          "id": "z-1",
+          "number": "D01-Z000006",
+          "branchId": "br-main",
+          "businessDate": "2026-11-03",
+          "event": "open",
+          "openingFloat": 500000,
+          "floatExpected": 500000,
+          "variance": null,
+          "toSafe": 0
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-Z000006",
+            "lines": []
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "a desk's first open posts nothing: the float is already in the books (posting rules §7)",
+      "input": {
+        "session": {
+          "id": "z-2",
+          "number": "D01-Z000001",
+          "branchId": "br-main",
+          "businessDate": "2026-11-03",
+          "event": "open",
+          "openingFloat": 500000,
+          "floatExpected": null,
+          "variance": null,
+          "toSafe": 0
+        },
+        "context": {
+          "withoutRoles": ["CASH_SHORT_OVER"]
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-Z000001",
+            "lines": []
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "an open Rs 200 below what stayed: short, Dr Cash short/over / Cr Cash drawer",
+      "input": {
+        "session": {
+          "id": "z-3",
+          "number": "D01-Z000006",
+          "branchId": "br-main",
+          "businessDate": "2026-11-03",
+          "event": "open",
+          "openingFloat": 480000,
+          "floatExpected": 500000,
+          "variance": null,
+          "toSafe": 0
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-Z000006",
+            "lines": [
+              {
+                "accountId": "6500",
+                "partyId": null,
+                "debit": 20000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 20000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "an open Rs 100 above what stayed: over, Dr Cash drawer / Cr Cash short/over",
+      "input": {
+        "session": {
+          "id": "z-4",
+          "number": "D01-Z000006",
+          "branchId": "br-main",
+          "businessDate": "2026-11-03",
+          "event": "open",
+          "openingFloat": 510000,
+          "floatExpected": 500000,
+          "variance": null,
+          "toSafe": 0
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-Z000006",
+            "lines": [
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 10000,
+                "credit": 0
+              },
+              {
+                "accountId": "6500",
+                "partyId": null,
+                "debit": 0,
+                "credit": 10000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "a close Rs 300 short with Rs 10,347 to the safe: the variance first, then the safe",
+      "input": {
+        "session": {
+          "id": "z-5",
+          "number": "D01-Z000007",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "event": "close",
+          "openingFloat": null,
+          "floatExpected": null,
+          "variance": -30000,
+          "toSafe": 1034700
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-Z000007",
+            "lines": [
+              {
+                "accountId": "6500",
+                "partyId": null,
+                "debit": 30000,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 30000
+              },
+              {
+                "accountId": "1130",
+                "partyId": null,
+                "debit": 1034700,
+                "credit": 0
+              },
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 0,
+                "credit": 1034700
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "a close Rs 50 over, nothing to the safe",
+      "input": {
+        "session": {
+          "id": "z-6",
+          "number": "D01-Z000008",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "event": "close",
+          "openingFloat": null,
+          "floatExpected": null,
+          "variance": 5000,
+          "toSafe": 0
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-Z000008",
+            "lines": [
+              {
+                "accountId": "1110",
+                "partyId": null,
+                "debit": 5000,
+                "credit": 0
+              },
+              {
+                "accountId": "6500",
+                "partyId": null,
+                "debit": 0,
+                "credit": 5000
+              }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "a W1-10 close without a count posts nothing",
+      "input": {
+        "session": {
+          "id": "z-7",
+          "number": "D01-Z000002",
+          "branchId": "br-main",
+          "businessDate": "2026-11-01",
+          "event": "close",
+          "openingFloat": null,
+          "floatExpected": null,
+          "variance": null,
+          "toSafe": 0
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-Z000002",
+            "lines": []
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {},
+            "balances": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "a short close without the CASH_SHORT_OVER role can't post",
+      "input": {
+        "session": {
+          "id": "z-8",
+          "number": "D01-Z000009",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "event": "close",
+          "openingFloat": null,
+          "floatExpected": null,
+          "variance": -100,
+          "toSafe": 0
+        },
+        "context": {
+          "withoutRoles": ["CASH_SHORT_OVER"]
+        }
+      },
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "role_unmapped",
+          "role": "CASH_SHORT_OVER"
+        }
+      }
+    }
+  ]
+}

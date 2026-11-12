@@ -1,6 +1,6 @@
 ---
 name: legacy-migration
-description: Importing the legacy SQL Server data (SSMS UTF-16 script dumps of DLX_Inventory) into the new system: parsing, staging, field mapping, cleanup reports, opening balances, 90-day bills and reconciliation. Use whenever working on tools/legacy-import, migration rehearsals or opening balances.
+description: Importing the legacy SQL Server data (SSMS UTF-16 script dumps of DLX_Inventory) into the new system: parsing, staging, field mapping, cleanup reports, opening balances and reconciliation (no sale bills, D-100). Use whenever working on tools/legacy-import, migration rehearsals or opening balances.
 ---
 
 # Legacy migration
@@ -27,7 +27,7 @@ description: Importing the legacy SQL Server data (SSMS UTF-16 script dumps of D
 - Partners `0001`/`0002` (cash purchase/sale) are not parties. A partner with both roles = one party with two accounts.
 - Opening stock = legacy closing quantity, all into **SHOP**; cost = latest `ValuationRate`, falling back to `CostPrice`.
 - AR/AP = GL control-account balance per `SubAccountCode`.
-- Last **90 days of sale bills** → `legacy_sales` (read-only), for linked returns.
+- **No sale bills** are imported (D-100, MIG-03 dropped): a part bought before go-live is a no-receipt return priced by the manager.
 
 ## Reconciliation gate (doc 05 §8)
-Exact item count · stock quantity and value vs the legacy closing-stock report · AR/AP totals vs the legacy outstanding reports · balanced opening journal · 90-day bill count and totals. The owner signs off the top 20 AR/AP balances.
+Exact item count · stock quantity and value vs the legacy closing-stock report · AR/AP totals vs the legacy outstanding reports · balanced opening journal. The owner signs off the top 20 AR/AP balances.

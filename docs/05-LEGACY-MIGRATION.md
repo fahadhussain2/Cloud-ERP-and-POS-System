@@ -125,11 +125,12 @@ Expense accounts used for cash-out at the desk become `expense_categories` (PRD 
 ## 4. Opening balances (as of close of business 31 Dec 2026)
 
 ### 4.1 Stock quantity and cost
-- **Quantity** per item = legacy closing stock as of 31 Dec 2026, computed the same way as the legacy `fn_INV_ClosingStock`: opening quantity + Σ purchase lines − Σ sale lines ± returns ± physical-stock adjustments within the period database. It is cross-checked against the legacy "Closing Stock" report total.
+- **Quantity** per item = legacy closing stock as of 31 Dec 2026, as the legacy Closing Stock report computes it (D-102): `INV_Item.OpeningQuantity` ± the `INV_StockRecordTAB` rows up to the cutoff, with physical-stock counts taken from the count sheet's signed lines. Sale lines are not summed (legacy stores their quantities negative). It is compared **per item** with the legacy Item Wise Closing Stock report on the dump day (rehearsal 2: all 20,163 items matched).
 - All of it goes into **SHOP**. Legacy has no godown split (PRD Q9: the godown is counted and transferred in January).
-- **Average cost** = the latest `INV_StockRecordTAB.ValuationRate` on or before the cutover (this mirrors legacy `fn_GetValuationRate`). Fallback: `INV_Item.CostPrice`, then `OpeningRate`. Items with no cost → flagged and valued at 0 until fixed.
+- **Average cost** (D-103) = the latest `INV_StockRecordTAB.ValuationRate` on or before the cutover (this mirrors legacy `fn_GetValuationRate`). Fallback: the last purchase rate in the period, then `INV_Item.OpeningRate` (legacy's carried-forward average, as its Closing Stock report values old stock) unless it is above Retail, then `CostPrice`. Items with no cost → flagged and valued at 0 until fixed. `cost-compare.csv` lists every item whose cost differs from the legacy report's Average Rate, with the reason.
 - **Negative quantities** (15 items in the Dec 2025 copy) → loaded as negative and listed for the first January cycle counts.
 - It is posted as an opening stock movement plus `Dr INVENTORY` in the opening entry.
+- **As built (W1-14, D-101):** the document types and their signs are in `opening.docTypes` of the mapping file (Dec 2025: 21 Purchase +, 32 Purchase return −, 31 Sale −, 22 Sale return +, 11 Physical stock + with signed quantities, proposed from the names and to be confirmed). Two cross-checks are reported per item: the legacy running balance (the latest `INV_StockRecordTAB.StockQuantity`) and the sum of the stock records' own quantities. With `out/<label>/legacy-closing.csv` (item, qty, from the legacy report) the run also writes `closing-compare.csv`, and `periods.csv` gives the legacy period and each stock table's first and last date.
 
 ### 4.2 Customer and supplier balances
 - Balance per party = Σ (`AmountDR − AmountCR`) on GL lines for the control account (`10-03-0001` customers, `20-02-0001` suppliers) **grouped by `SubAccountCode`** (= party ID), including the legacy opening-balance voucher (doctype 10).
@@ -147,7 +148,7 @@ As in [posting rules §7](04-ACCOUNTING-POSTING-RULES.md#7-opening-balances-at-c
 ## 5. Transaction history
 | Data | Migrated? | Rule |
 |---|---|---|
-| Sale bills, **last 90 days** (Dec 2025 rate ≈ 13,000 bills) | **Yes, read-only** | → `legacy_sales` / `legacy_sale_lines` (`legacy_period`, `legacy_doc_no`, date, customer, lines: item, qty, rate). Enables linked returns of pre-go-live bills (POS-12). Bills are looked up by number plus a date window, because legacy numbers restart per period database. Legacy sale-return documents in the window reduce the lines' `returned_qty`. |
+| Sale bills, last 90 days | **No** (D-100, owner answer 4 to W1-13; MIG-03 dropped) | A part bought before go-live is a no-receipt return: the manager looks the bill up in the read-only legacy system and sets the refund price; the old number is kept as the return's reference. |
 | Older sales, purchases, GL vouchers | No | They stay in the legacy DB, which is kept **read-only** for reference |
 | Purchase history | Derived only | Last supplier and last cost per item → `item_costs.last_supplier_id/last_cost` (for reorder suggestions) |
 | Sales history | Derived only | 30/90-day sales quantity per item for the **first** reorder suggestions, and "last sold date" for the dormant flag |
@@ -174,6 +175,8 @@ As in [posting rules §7](04-ACCOUNTING-POSTING-RULES.md#7-opening-balances-at-c
 The importer **never auto-deletes or auto-merges**. It reports, and the owner decides. Cleanup decisions are saved as a mapping file that is re-applied on every run.
 
 ## 8. Reconciliation checks (gate for go-live)
+
+Built in W1-14 (`reports/opening/reconciliation.html`): each check below is read from the tenant's own ledgers after posting and shown as *pass*, *differs* or *waiting* (for the legacy report totals the owner types into `legacy-totals.json`).
 | Check | Tolerance |
 |---|---|
 | Item count loaded = legacy item count | Exact |
@@ -181,7 +184,6 @@ The importer **never auto-deletes or auto-merges**. It reports, and the owner de
 | Σ customer balances and Σ supplier balances vs legacy Customer/Supplier Outstanding reports | Exact |
 | Top 20 customer and supplier balances confirmed by the owner | Signed off |
 | Opening journal balances (Dr = Cr) | Exact |
-| Legacy 90-day bills: count and Σ totals vs legacy Daily Sales Register | Exact |
 
 ## 9. Timeline
 | When | Run |
@@ -190,4 +192,5 @@ The importer **never auto-deletes or auto-merges**. It reports, and the owner de
 | By ~31 Oct | Owner provides a **current 2026 dump** (same SSMS format). Re-run the importer to confirm the per-period database structure and refresh the development data. |
 | ~10 Dec 2026 | **Rehearsal 1** on a fresh dump. Full reconciliation. |
 | ~22 Dec 2026 | **Rehearsal 2.** Timed end to end. Must take < 1 h. |
-| 31 Dec 2026, after close | **Final run** → reconciliation sign-off → set the lock date → open for business 1 Jan. |
+| 31 Dec 2026, after close | **Final run** → wipe the pilot (D-101) → reconciliation sign-off → set the lock date (`erp-tenant go-live`) → open for business 1 Jan. |
+| W1-14 (4 Nov 2026) | **Rehearsal 1** on the Dec 2025 copy, on this PC, into a fresh database: the pipeline end to end (results in the W1-14 plan). The run on the 2026 dump follows when it arrives. |

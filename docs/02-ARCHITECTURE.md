@@ -51,7 +51,7 @@ flowchart LR
 | Language | **TypeScript** everywhere (D-027) | One shared domain package for checkout rules |
 | POS app | React + Vite **PWA** (D-010) | Chromium only (Chrome/Edge), installed as an app |
 | POS local DB | **SQLite WASM** in a dedicated Web Worker, persisted on OPFS with the `opfs-sahpool` VFS **(proposed)** | Real SQL and transactions. Does not need cross-origin-isolation headers. |
-| POS search | In-memory index in a worker, built from the local DB at boot and patched on sync **(proposed)** | 20k items easily meets ≤ 100 ms. Custom normalizer for part numbers. |
+| POS search | In-memory index in the database worker, built from the local DB at boot and patched with every pulled page (W1-03) | Real catalog (19,552 items): 3–19 ms from key press to results. One part-number normalizer for importer and counter (`normalizeIdentifier`, `packages/domain`). |
 | Back office | React + Vite SPA (online only) | Shares UI and contract packages with the POS |
 | UI components | **shadcn/ui** (Radix primitives + **Tailwind CSS**), copied into `packages/ui` and themed with the prototype design tokens (D-066) | Accessible, keyboard-friendly, RTL-ready (logical utilities + Radix direction), only used components are bundled |
 | UI support libraries | TanStack Table + Virtual (tables), React Hook Form + Zod (forms, same schemas as `packages/contracts`), TanStack Router + Query (back office), i18next (i18n/RTL), Lucide (icons), `Intl` (number, currency, date formatting) | POS keeps dependencies minimal for fast start on old PCs |
@@ -101,7 +101,7 @@ infra/            # docker-compose, Caddyfile, backup config, deploy scripts
 | Users (+ PIN verifier), roles, permissions, limits | ~20 | Incremental pull |
 | Tenant/branch settings, payment methods, expense categories, reason codes | small | Incremental pull |
 | Stock balances per item/location (snapshot) | ~20k × 3 | Incremental pull |
-| Branch sale bills, last 90 days (headers + lines), incl. legacy | ~13k bills | Incremental pull |
+| Branch sale bills, last 90 days (headers, lines, payments; no legacy bills, D-100) | ~13k bills | Incremental pull (W1-13) |
 | This device's documents, last 30 days + outbox | — | Local |
 
 The bootstrap download is ~20 MB uncompressed (a few MB gzipped).
@@ -125,7 +125,7 @@ The bootstrap download is ~20 MB uncompressed (a few MB gzipped).
 - **Revocation:** revoking a device in the back office blocks its next sync. Documents it already created are still accepted, flagged for review.
 
 ### 4.4 Document numbering and time
-- Number series per device and family: `S` sales/returns/exchanges, `H` cash handovers and refund payouts, `R` collections, `M` cash movements, `Z` cash session close. Format: `{deviceCode}-{family}{seq:6}`, e.g. `C03-S000412`. Gapless and never reused (voids keep their number).
+- Number series per device and family: `S` sales/returns/exchanges, `H` cash handovers and refund payouts, `R` collections, `M` cash movements, `Z` cash session open and close, `V` voids (W1-12, D-099). Format: `{deviceCode}-{family}{seq:6}`, e.g. `C03-S000412`. Gapless and never reused (a voided bill keeps its number; its void has its own).
 - `uuid` (UUIDv7) generated on the device is the identity. The number is for humans.
 - **Business date** = local date (tenant timezone) of `created_at − day_cutoff_hours` (default cutoff 04:00). Every device can compute it with no coordination.
 - The device sends its clock with every push. If skew is greater than 5 minutes, the device health page and the exceptions report flag it. The server also stores `received_at`.
@@ -176,18 +176,19 @@ Every printed bill carries a scannable code. Its main use is as the **offline pa
 
 ### 5.2 Upstream: push
 ```
-POST /sync/push  { deviceId, clientVersion, deviceClock, documents: [ {id, family, seq, payload, signature} ... ] }
-→ 200 { results: [ {id, status: accepted|duplicate|rejected, exceptions:[...], serverSeq} ... ] }
+POST /api/sync/push  { clientVersion, schemaVersion, deviceClock, health, documents: [ {id, family, seq, payload, signature} ... ], events: [...] }
+→ 200 { serverTime, results: [ {id, status: accepted|duplicate|rejected, exceptions:[...], error} ... ], series: [ {family, through, missing} ], events: [...] }
 ```
+The exact contract, the refusal reasons, the exceptions and the counter's side are in the [sync spec](modules/sync/spec.md) §6.2–§8 (W1-07, D-094). The device is the token's; the request also carries the counter's audit events and health (§11.3), and an empty one is the start-up handshake.
 - The client sends outbox entries **in sequence order**, in batches of up to 100. When online, a push is triggered **immediately on finalize** (not on a timer), so the bill reaches the cash desk queue within seconds (§4.6).
 - The server, per document, in **one database transaction**:
   1. verifies the device token and signature
   2. validates the schema (`packages/contracts`)
   3. re-validates the business rules (`packages/domain`) and records exceptions
-  4. inserts the document, then runs the **posting engine** (stock, party and GL entries) in the same transaction
+  4. inserts the document, then runs the **posting engine** (stock, party and GL entries) in the same transaction (from W1-08)
   5. records the result in `sync_inbox`.
 - A duplicate ID returns the stored original result.
-- **Sequence gaps** (e.g. 411 then 413) are recorded. The device is asked to re-send. The gap stays visible on the device health page until it is resolved.
+- **Sequence gaps** (e.g. 411 then 413) are recorded. Every answer lists what the server holds of each series (`through` and the missing ranges), and the counter re-sends what is missing from its 30-day copy. The gap stays visible on the device health page until it is resolved.
 - Client retry uses exponential backoff with jitter. An entry is removed from the outbox only after an `accepted` or `duplicate` acknowledgement. A `rejected` entry is quarantined and shown in a "needs attention" list, never silently dropped.
 
 ### 5.3 Downstream: pull
@@ -237,6 +238,7 @@ After a server restore to time T, devices re-push documents from their 30-day lo
   - `journal_entries` / `journal_lines`: the GL.
 - Posting happens **in the same transaction** as document acceptance. Balances (`stock_balances`, `party_balances`) are updated in that same transaction.
 - Every ledger row references its source document. A **rebuild** command can regenerate all ledgers for a tenant from documents, e.g. after a posting-rule fix. Rebuilding any period on or before the lock date first requires an explicit, audited unlock. Otherwise the rebuild runs in compare-only (diagnostic) mode.
+- **Order of record (W1-08, D-095):** a tenant's postings run one at a time under a per-tenant lock (`posting_state`), and each is recorded in `postings` with its sequence and the settings it used (accounts, lock date, terms). The compare-only check replays every posting in that order **in memory**, from one read-only snapshot, so it never blocks the shop; the rewrite (`erp-tenant posting-rebuild`) replays the same way as the owner role. A document that can't be posted is still accepted, flagged `posting_failed`, and posted by the worker's catch-up job once the cause is fixed. Details: the [accounting spec](modules/accounting/spec.md).
 - **Weighted average cost:** one average per item per tenant. Outbound movements are valued at the average **at posting time** (in sync arrival order). Inbound receipts re-average. When on-hand is ≤ 0 before a receipt, the new average equals the receipt cost. Small differences from late-synced offline sales are accepted and documented (D-017). A re-costing job is a Phase 2 option.
 - Detailed rules: [04-ACCOUNTING-POSTING-RULES.md](04-ACCOUNTING-POSTING-RULES.md).
 
@@ -337,7 +339,7 @@ Goal: when something goes wrong, we can answer **what happened, to which bill, o
 | **Metrics** | OpenTelemetry / Prometheus metrics → **Grafana Cloud** (Mimir) | Hosted | Free |
 | **Traces** | **OpenTelemetry** traces for API requests, sync pushes, postings and DB queries → Grafana Tempo | Hosted | Free |
 | **Collector** | **Grafana Alloy** agent: Docker log files (no Docker socket), server metrics, backup age, PostgreSQL metrics (exporter + `pg_stat_statements`), OTLP from the apps | On the CX33 (about 80 MB; limit 300 MB) | Free |
-| **Uptime** | **Grafana Synthetic Monitoring**: `/api/health` of app, POS and staging every 5 minutes, with certificate expiry (D-086; UptimeRobot's free plan is non-commercial only) | Hosted | Free (about 50k of 100k checks a month) |
+| **Uptime** | **Grafana Synthetic Monitoring**: `/api/health` of the production app and POS every 5 minutes from two places, with certificate expiry (staging isn't checked: its deploys health-check themselves) (D-086; UptimeRobot's free plan is non-commercial only) | Hosted | Free (about 35k of 100k checks a month) |
 | **Dashboards and alert rules** | Grafana Cloud | Hosted | Free |
 | **Alert delivery** | **Slack** from Grafana alerting: `#erp-critical` (phone notifications on) and `#erp-alerts`, plus **email** backup for critical alerts | Hosted | Free |
 

@@ -1,0 +1,182 @@
+{
+  "description": "The refund the counter suggests for a return without a receipt (PRD W6 step 5, D-005, owner answer 4 to W1-13): the lowest net unit price the item sold for in the last 90 days, from the branch's bills (any tier), else `fallback` (the default tier's current price), else null (a typed price). Today is 2026-11-12; the item is …c1. A net unit price is lineTotal × 1 / qty (qty in thousandths), half away from zero. The last 90 days are today and the 89 days before it (2026-08-15 … 2026-11-12). Returned lines (qty below 0), voided bills and other items don't count. The approver may change the suggestion.",
+  "cases": [
+    {
+      "name": "the lowest of two prices",
+      "input": {
+        "itemId": "019a0000-0000-7000-8000-0000000000c1",
+        "today": "2026-11-12",
+        "sales": [
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "businessDate": "2026-11-01",
+            "qty": 1000,
+            "lineTotal": 450000,
+            "voided": false
+          },
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "businessDate": "2026-10-20",
+            "qty": 2000,
+            "lineTotal": 840000,
+            "voided": false
+          }
+        ],
+        "fallback": 480000
+      },
+      "expected": 420000
+    },
+    {
+      "name": "a bill discount lowers the net price",
+      "input": {
+        "itemId": "019a0000-0000-7000-8000-0000000000c1",
+        "today": "2026-11-12",
+        "sales": [
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "businessDate": "2026-11-01",
+            "qty": 1000,
+            "lineTotal": 435000,
+            "voided": false
+          },
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "businessDate": "2026-11-05",
+            "qty": 3000,
+            "lineTotal": 1290001,
+            "voided": false
+          }
+        ],
+        "fallback": 480000
+      },
+      "expected": 430000
+    },
+    {
+      "name": "a voided bill, a returned line and another item are left out",
+      "input": {
+        "itemId": "019a0000-0000-7000-8000-0000000000c1",
+        "today": "2026-11-12",
+        "sales": [
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "businessDate": "2026-11-01",
+            "qty": 1000,
+            "lineTotal": 450000,
+            "voided": false
+          },
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "businessDate": "2026-11-02",
+            "qty": 1000,
+            "lineTotal": 300000,
+            "voided": true
+          },
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "businessDate": "2026-11-03",
+            "qty": -1000,
+            "lineTotal": -100000,
+            "voided": false
+          },
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c2",
+            "businessDate": "2026-11-04",
+            "qty": 1000,
+            "lineTotal": 200000,
+            "voided": false
+          }
+        ],
+        "fallback": 480000
+      },
+      "expected": 450000
+    },
+    {
+      "name": "89 days ago counts, 90 days ago doesn't",
+      "input": {
+        "itemId": "019a0000-0000-7000-8000-0000000000c1",
+        "today": "2026-11-12",
+        "sales": [
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "businessDate": "2026-08-15",
+            "qty": 1000,
+            "lineTotal": 440000,
+            "voided": false
+          },
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "businessDate": "2026-08-14",
+            "qty": 1000,
+            "lineTotal": 400000,
+            "voided": false
+          },
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "businessDate": "2026-11-10",
+            "qty": 1000,
+            "lineTotal": 450000,
+            "voided": false
+          }
+        ],
+        "fallback": 480000
+      },
+      "expected": 440000
+    },
+    {
+      "name": "a fraction: 1.5 for Rs 499.50 is Rs 333 each",
+      "input": {
+        "itemId": "019a0000-0000-7000-8000-0000000000c1",
+        "today": "2026-11-12",
+        "sales": [
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "businessDate": "2026-11-01",
+            "qty": 1500,
+            "lineTotal": 49950,
+            "voided": false
+          }
+        ],
+        "fallback": 480000
+      },
+      "expected": 33300
+    },
+    {
+      "name": "no sale in 90 days: the current price",
+      "input": {
+        "itemId": "019a0000-0000-7000-8000-0000000000c1",
+        "today": "2026-11-12",
+        "sales": [],
+        "fallback": 480000
+      },
+      "expected": 480000
+    },
+    {
+      "name": "no sale and no price: the approver types one",
+      "input": {
+        "itemId": "019a0000-0000-7000-8000-0000000000c1",
+        "today": "2026-11-12",
+        "sales": [],
+        "fallback": null
+      },
+      "expected": null
+    },
+    {
+      "name": "the current price is never compared: an old sale below it still wins",
+      "input": {
+        "itemId": "019a0000-0000-7000-8000-0000000000c1",
+        "today": "2026-11-12",
+        "sales": [
+          {
+            "itemId": "019a0000-0000-7000-8000-0000000000c1",
+            "businessDate": "2026-11-01",
+            "qty": 1000,
+            "lineTotal": 500000,
+            "voided": false
+          }
+        ],
+        "fallback": 480000
+      },
+      "expected": 500000
+    }
+  ]
+}

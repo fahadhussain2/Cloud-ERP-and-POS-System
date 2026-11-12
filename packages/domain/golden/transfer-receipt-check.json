@@ -1,0 +1,51 @@
+{
+  "description": "Receiving a sent transfer (owner answer 4 to W1-18): per line, what arrived, from 0 up to what was sent (whole for pieces). What didn't arrive is the shortfall, in line order with its quantity; it is recorded as a loss adjustment out of In transit (reason lost).",
+  "cases": [
+    {
+      "name": "everything arrived",
+      "input": {
+        "lines": [
+          { "sent": 5000, "received": 5000, "allowsFraction": false },
+          { "sent": 2500, "received": 2500, "allowsFraction": true }
+        ]
+      },
+      "expected": { "problems": [], "shortfall": [] }
+    },
+    {
+      "name": "one short, one not at all",
+      "input": {
+        "lines": [
+          { "sent": 5000, "received": 4000, "allowsFraction": false },
+          { "sent": 2500, "received": 0, "allowsFraction": true }
+        ]
+      },
+      "expected": {
+        "problems": [],
+        "shortfall": [
+          { "row": 0, "qty": 1000 },
+          { "row": 1, "qty": 2500 }
+        ]
+      }
+    },
+    {
+      "name": "more than sent, below 0, half a piece and not a whole thousandth",
+      "input": {
+        "lines": [
+          { "sent": 5000, "received": 6000, "allowsFraction": false },
+          { "sent": 5000, "received": -1000, "allowsFraction": false },
+          { "sent": 5000, "received": 4500, "allowsFraction": false },
+          { "sent": 5000, "received": 4.5, "allowsFraction": true }
+        ]
+      },
+      "expected": {
+        "problems": [
+          { "problem": "more_than_sent", "row": 0 },
+          { "problem": "received_invalid", "row": 1 },
+          { "problem": "qty_fraction", "row": 2 },
+          { "problem": "received_invalid", "row": 3 }
+        ],
+        "shortfall": []
+      }
+    }
+  ]
+}

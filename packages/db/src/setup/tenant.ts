@@ -22,6 +22,9 @@ export interface SetupReport {
   tenantId: string;
   /** What this run created, e.g. `account 1150`. Empty when nothing was missing. */
   created: string[];
+  /** Settings this run changed to match the spec: only a payment method's bank account (W1-08), e.g.
+   * `payment method raast bank account: hbl → soneri`. */
+  updated: string[];
   /** Spec values that differ from the database, which were left as they are. */
   drift: string[];
   /** Setup that's still incomplete, e.g. a payment method without an account. */
@@ -155,6 +158,7 @@ export async function setupTenant(
   if (problems.length > 0) throw new TenantSpecError(problems);
 
   const created: string[] = [];
+  const updated: string[] = [];
   const drift: string[] = [];
   const differs = (what: string, field: string, database: unknown, wanted: unknown, fmt = show) => {
     if (canonical(database ?? null) !== canonical(wanted ?? null))
@@ -262,6 +266,13 @@ export async function setupTenant(
         differs(`location ${l.code}`, 'is_sellable', row.is_sellable, l.isSellable);
       }
     }
+    // Stock on its way between locations (W1-18, D-107): every branch has one, never sold from.
+    const transit = await c.query(
+      `INSERT INTO erp.locations (tenant_id, branch_id, code, name, kind, is_sellable)
+       VALUES ($1, $2, 'TRANSIT', 'In transit', 'transit', false) ON CONFLICT DO NOTHING`,
+      [tenantId, branchId],
+    );
+    if (transit.rowCount) created.push('location TRANSIT');
 
     // The chart of accounts, parents before children.
     const existing = new Map(
@@ -353,7 +364,18 @@ export async function setupTenant(
         created.push(`payment method ${m.code}`);
       } else {
         differs(`payment method ${m.code}`, 'name', row.name, m.name, quote);
-        differs(`payment method ${m.code}`, 'bank account', row.bank_code, m.bankAccount);
+        // The one setting meant to change after setup (owner answer 1 to W1-08): bills already posted keep the bank
+        // they reached, the next ones post to the new one. The row's audit trigger records the change.
+        const bank = (row.bank_code as string | null) ?? null;
+        if (bank !== m.bankAccount) {
+          await c.query('UPDATE erp.payment_methods SET bank_account_id = $1 WHERE id = $2', [
+            m.bankAccount === null ? null : bankIds.get(m.bankAccount),
+            row.id,
+          ]);
+          updated.push(
+            `payment method ${m.code} bank account: ${bank ?? 'none'} → ${m.bankAccount ?? 'none'}`,
+          );
+        }
       }
     }
 
@@ -374,24 +396,30 @@ export async function setupTenant(
       }
     }
 
-    for (const t of spec.taxCodes) {
+    // The first tax code is the default for items without their own (ACC-09).
+    for (const [i, t] of spec.taxCodes.entries()) {
       const row = await one('SELECT * FROM erp.tax_codes WHERE tenant_id = $1 AND code = $2', [
         tenantId,
         t.code,
       ]);
       if (!row) {
-        await c.query('INSERT INTO erp.tax_codes (tenant_id, code, name, rate_bp) VALUES ($1, $2, $3, $4)', [
-          tenantId,
-          t.code,
-          t.name,
-          t.rateBp,
-        ]);
+        await c.query(
+          'INSERT INTO erp.tax_codes (tenant_id, code, name, rate_bp, is_default) VALUES ($1, $2, $3, $4, $5)',
+          [tenantId, t.code, t.name, t.rateBp, i === 0],
+        );
         created.push(`tax code ${t.code}`);
       } else {
         differs(`tax code ${t.code}`, 'name', row.name, t.name, quote);
         differs(`tax code ${t.code}`, 'rate_bp', row.rate_bp, t.rateBp);
       }
     }
+    // A tenant set up before W1-08 has no default yet.
+    const marked = await c.query(
+      `UPDATE erp.tax_codes SET is_default = true WHERE tenant_id = $1 AND code = $2 AND deleted_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM erp.tax_codes WHERE tenant_id = $1 AND is_default AND deleted_at IS NULL)`,
+      [tenantId, spec.taxCodes[0]!.code],
+    );
+    if (marked.rowCount) updated.push(`tax code ${spec.taxCodes[0]!.code}: now the default`);
 
     for (const e of spec.expenseCategories) {
       const row = await one(
@@ -499,7 +527,7 @@ export async function setupTenant(
     const needsAttention = unmapped.rows.map((r) => `payment method ${r.code} has no account yet`);
 
     await c.query('COMMIT');
-    return { tenantId, created, drift, needsAttention };
+    return { tenantId, created, updated, drift, needsAttention };
   } catch (err) {
     await c.query('ROLLBACK').catch(() => undefined);
     throw err;

@@ -8,7 +8,6 @@
 
 # app <env> <web port>
 (app) {
-	encode zstd gzip
 	header {
 		# No includeSubDomains: the marketing site on the apex is managed elsewhere.
 		Strict-Transport-Security "max-age=31536000"
@@ -17,11 +16,20 @@
 		Content-Security-Policy "frame-ancestors 'none'"
 		-Server
 	}
+	# The counters' SSE nudge (sync spec §8, W1-07): every event sent at once, never compressed or buffered. The API
+	# writes a keep-alive comment every 25 s and ends the stream after 15 minutes; the counter reconnects.
+	handle /api/sync/events {
+		reverse_proxy erp-{args[0]}-api:3000 {
+			flush_interval -1
+		}
+	}
 	# The API is served on each app's own origin (D-065).
 	handle /api/* {
+		encode zstd gzip
 		reverse_proxy erp-{args[0]}-api:3000
 	}
 	handle {
+		encode zstd gzip
 		reverse_proxy erp-{args[0]}-web:{args[1]}
 	}
 	handle_errors 502 {

@@ -1,0 +1,139 @@
+{
+  "description": "Each item's latest INV_StockRecordTAB row on or before the cutoff (migration doc §4.1, legacy fn_GetValuationRate): its running StockQuantity (the cross-check of the closing stock) and its ValuationRate (the opening cost). Latest = the latest DocumentDate, then the highest TransactionID. Items in item-code order.",
+  "cases": [
+    {
+      "name": "the latest row wins, by date then transaction",
+      "input": {
+        "asOf": "2026-12-31",
+        "records": [
+          {
+            "itemId": "ABEA001",
+            "date": "2026-07-02 10:00:00.000",
+            "transactionId": "17",
+            "stockQuantity": "15.00",
+            "valuationRate": "3000.00"
+          },
+          {
+            "itemId": "ABEA001",
+            "date": "2026-07-05 10:00:00.000",
+            "transactionId": "9",
+            "stockQuantity": "12.00",
+            "valuationRate": "3050.00"
+          },
+          {
+            "itemId": "ABEA001",
+            "date": "2026-07-05 10:00:00.000",
+            "transactionId": "10",
+            "stockQuantity": "11.00",
+            "valuationRate": "3100.00"
+          }
+        ]
+      },
+      "expected": [{ "itemId": "ABEA001", "runningQty": 11000, "valuationRate": 310000 }]
+    },
+    {
+      "name": "transactions compare as numbers: 100 is after 99",
+      "input": {
+        "asOf": "2026-12-31",
+        "records": [
+          {
+            "itemId": "ABEA001",
+            "date": "2026-07-05 10:00:00.000",
+            "transactionId": "100",
+            "stockQuantity": "4.00",
+            "valuationRate": "20.00"
+          },
+          {
+            "itemId": "ABEA001",
+            "date": "2026-07-05 10:00:00.000",
+            "transactionId": "99",
+            "stockQuantity": "5.00",
+            "valuationRate": "10.00"
+          }
+        ]
+      },
+      "expected": [{ "itemId": "ABEA001", "runningQty": 4000, "valuationRate": 2000 }]
+    },
+    {
+      "name": "rows after the cutoff are ignored",
+      "input": {
+        "asOf": "2026-11-27",
+        "records": [
+          {
+            "itemId": "ABEA001",
+            "date": "2026-11-27 18:00:00.000",
+            "transactionId": "1",
+            "stockQuantity": "5.00",
+            "valuationRate": "3100.00"
+          },
+          {
+            "itemId": "ABEA001",
+            "date": "2026-11-28 09:00:00.000",
+            "transactionId": "2",
+            "stockQuantity": "4.00",
+            "valuationRate": "3300.00"
+          }
+        ]
+      },
+      "expected": [{ "itemId": "ABEA001", "runningQty": 5000, "valuationRate": 310000 }]
+    },
+    {
+      "name": "a weighted rate with many decimals is rounded half away from zero to the paisa",
+      "input": {
+        "asOf": "2026-12-31",
+        "records": [
+          {
+            "itemId": "OIL050",
+            "date": "2026-07-02 10:00:00.000",
+            "transactionId": "1",
+            "stockQuantity": "3.50",
+            "valuationRate": "1234.5650"
+          }
+        ]
+      },
+      "expected": [{ "itemId": "OIL050", "runningQty": 3500, "valuationRate": 123457 }]
+    },
+    {
+      "name": "a missing rate stays null; several items in code order",
+      "input": {
+        "asOf": "2026-12-31",
+        "records": [
+          {
+            "itemId": "CLP002",
+            "date": "2026-07-02 10:00:00.000",
+            "transactionId": "1",
+            "stockQuantity": "-3.00",
+            "valuationRate": null
+          },
+          {
+            "itemId": "ABEA001",
+            "date": "2026-07-02 10:00:00.000",
+            "transactionId": "2",
+            "stockQuantity": "1.00",
+            "valuationRate": "0.00"
+          }
+        ]
+      },
+      "expected": [
+        { "itemId": "ABEA001", "runningQty": 1000, "valuationRate": 0 },
+        { "itemId": "CLP002", "runningQty": -3000, "valuationRate": null }
+      ]
+    },
+    {
+      "name": "a row without a date stops the run",
+      "input": {
+        "asOf": "2026-12-31",
+        "records": [
+          {
+            "itemId": "ABEA001",
+            "date": null,
+            "transactionId": "1",
+            "stockQuantity": "1.00",
+            "valuationRate": "1.00"
+          }
+        ]
+      },
+      "error": "bad_date"
+    }
+  ]
+}

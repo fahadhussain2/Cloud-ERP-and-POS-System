@@ -1,0 +1,140 @@
+{
+  "description": "Posting a cash handover (posting rules §4.5, W1-10)",
+  "notes": "Delux's accounts by code (handover.test.ts): 1110 Cash drawer, 1120 Cash in transit. A handover posts its own amount (the cash due, or the refund), never the cash received or the change, and moves no stock and no party.",
+  "cases": [
+    {
+      "name": "a handover in of Rs 4,320: Dr Cash drawer / Cr Cash in transit",
+      "input": {
+        "handover": {
+          "id": "handover-1",
+          "number": "D01-H000031",
+          "billNumber": "C03-S000412",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "in",
+          "amount": 432000
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-H000031 C03-S000412",
+            "lines": [
+              { "accountId": "1110", "partyId": null, "debit": 432000, "credit": 0 },
+              { "accountId": "1120", "partyId": null, "debit": 0, "credit": 432000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "a refund payout of Rs 450: Dr Cash in transit / Cr Cash drawer",
+      "input": {
+        "handover": {
+          "id": "handover-2",
+          "number": "D01-H000034",
+          "billNumber": "C03-S000415",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "payout",
+          "amount": 45000
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-02",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-H000034 C03-S000415",
+            "lines": [
+              { "accountId": "1120", "partyId": null, "debit": 45000, "credit": 0 },
+              { "accountId": "1110", "partyId": null, "debit": 0, "credit": 45000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "dated on the lock date: posts the day after it, flagged posted_after_lock",
+      "input": {
+        "handover": {
+          "id": "handover-3",
+          "number": "D01-H000040",
+          "billNumber": "C03-S000430",
+          "branchId": "br-main",
+          "businessDate": "2026-10-31",
+          "kind": "in",
+          "amount": 150000
+        },
+        "context": { "lockDate": "2026-10-31" }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "D01-H000040 C03-S000430",
+            "lines": [
+              { "accountId": "1110", "partyId": null, "debit": 150000, "credit": 0 },
+              { "accountId": "1120", "partyId": null, "debit": 0, "credit": 150000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [
+            {
+              "kind": "posted_after_lock",
+              "details": { "businessDate": "2026-10-31", "lockDate": "2026-10-31" }
+            }
+          ],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "a chart without the cash drawer: not posted (role_unmapped)",
+      "input": {
+        "handover": {
+          "id": "handover-4",
+          "number": "D01-H000041",
+          "billNumber": "C03-S000431",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "in",
+          "amount": 150000
+        },
+        "context": { "withoutRoles": ["CASH_DRAWER"] }
+      },
+      "expected": { "ok": false, "error": { "code": "role_unmapped", "role": "CASH_DRAWER" } }
+    },
+    {
+      "name": "a chart without cash in transit: not posted (role_unmapped)",
+      "input": {
+        "handover": {
+          "id": "handover-5",
+          "number": "D01-H000042",
+          "billNumber": "C03-S000432",
+          "branchId": "br-main",
+          "businessDate": "2026-11-02",
+          "kind": "payout",
+          "amount": 45000
+        },
+        "context": { "withoutRoles": ["CASH_IN_TRANSIT"] }
+      },
+      "expected": { "ok": false, "error": { "code": "role_unmapped", "role": "CASH_IN_TRANSIT" } }
+    }
+  ]
+}

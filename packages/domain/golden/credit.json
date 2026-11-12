@@ -1,0 +1,333 @@
+{
+  "description": "The counter's credit check for an on-account amount (POS spec §15, POS-07, D-013, D-096): over the limit when balance + unsynced + amount passes it (exactly at it is fine, no limit is never over); over the offline cap only while offline, when today's offline on-account sales + amount pass it. Unless a case says otherwise the account allows credit with a Rs 100,000 limit and a Rs 25,000 cap. Amounts in paisa.",
+  "cases": [
+    {
+      "name": "within the limit, online",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 4500000,
+        "unsynced": 0,
+        "offline": false,
+        "offlineToday": 0,
+        "amount": 1000000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": [],
+        "after": 5500000,
+        "available": 5500000,
+        "overLimitBy": 0,
+        "capLeft": null,
+        "overCapBy": 0
+      }
+    },
+    {
+      "name": "exactly at the limit, with this counter's unsynced bills: allowed",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 4500000,
+        "unsynced": 500000,
+        "offline": false,
+        "offlineToday": 0,
+        "amount": 5000000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": [],
+        "after": 10000000,
+        "available": 5000000,
+        "overLimitBy": 0,
+        "capLeft": null,
+        "overCapBy": 0
+      }
+    },
+    {
+      "name": "one paisa over the limit",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 4500000,
+        "unsynced": 500000,
+        "offline": false,
+        "offlineToday": 0,
+        "amount": 5000001
+      },
+      "expected": {
+        "allowed": true,
+        "needs": ["credit_limit"],
+        "after": 10000001,
+        "available": 5000000,
+        "overLimitBy": 1,
+        "capLeft": null,
+        "overCapBy": 0
+      }
+    },
+    {
+      "name": "the unsynced bills push it over",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 6000000,
+        "unsynced": 3000000,
+        "offline": false,
+        "offlineToday": 0,
+        "amount": 2000000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": ["credit_limit"],
+        "after": 11000000,
+        "available": 1000000,
+        "overLimitBy": 1000000,
+        "capLeft": null,
+        "overCapBy": 0
+      }
+    },
+    {
+      "name": "no limit (D-085) is never over",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": null, "offlineDailyCap": 2500000 },
+        "balance": 50000000,
+        "unsynced": 0,
+        "offline": false,
+        "offlineToday": 0,
+        "amount": 10000000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": [],
+        "after": 60000000,
+        "available": null,
+        "overLimitBy": 0,
+        "capLeft": null,
+        "overCapBy": 0
+      }
+    },
+    {
+      "name": "an advance (negative balance) adds to what is available",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": -2000000,
+        "unsynced": 0,
+        "offline": false,
+        "offlineToday": 0,
+        "amount": 11500000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": [],
+        "after": 9500000,
+        "available": 12000000,
+        "overLimitBy": 0,
+        "capLeft": null,
+        "overCapBy": 0
+      }
+    },
+    {
+      "name": "online, the cap doesn't apply",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 0,
+        "unsynced": 0,
+        "offline": false,
+        "offlineToday": 2000000,
+        "amount": 3000000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": [],
+        "after": 3000000,
+        "available": 10000000,
+        "overLimitBy": 0,
+        "capLeft": null,
+        "overCapBy": 0
+      }
+    },
+    {
+      "name": "offline, under the cap",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 0,
+        "unsynced": 1000000,
+        "offline": true,
+        "offlineToday": 1000000,
+        "amount": 1000000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": [],
+        "after": 2000000,
+        "available": 9000000,
+        "overLimitBy": 0,
+        "capLeft": 1500000,
+        "overCapBy": 0
+      }
+    },
+    {
+      "name": "offline, exactly at the cap: allowed",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 0,
+        "unsynced": 1000000,
+        "offline": true,
+        "offlineToday": 1000000,
+        "amount": 1500000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": [],
+        "after": 2500000,
+        "available": 9000000,
+        "overLimitBy": 0,
+        "capLeft": 1500000,
+        "overCapBy": 0
+      }
+    },
+    {
+      "name": "offline, over the cap",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 0,
+        "unsynced": 1000000,
+        "offline": true,
+        "offlineToday": 1000000,
+        "amount": 2000000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": ["offline_cap"],
+        "after": 3000000,
+        "available": 9000000,
+        "overLimitBy": 0,
+        "capLeft": 1500000,
+        "overCapBy": 500000
+      }
+    },
+    {
+      "name": "offline with a cap of 0: every on-account sale needs an approval",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 0 },
+        "balance": 0,
+        "unsynced": 0,
+        "offline": true,
+        "offlineToday": 0,
+        "amount": 100000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": ["offline_cap"],
+        "after": 100000,
+        "available": 10000000,
+        "overLimitBy": 0,
+        "capLeft": 0,
+        "overCapBy": 100000
+      }
+    },
+    {
+      "name": "offline, already past the cap after an approved bill: nothing left",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 0,
+        "unsynced": 3000000,
+        "offline": true,
+        "offlineToday": 3000000,
+        "amount": 100000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": ["offline_cap"],
+        "after": 3100000,
+        "available": 7000000,
+        "overLimitBy": 0,
+        "capLeft": 0,
+        "overCapBy": 600000
+      }
+    },
+    {
+      "name": "offline, over the limit and the cap at once",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 9000000,
+        "unsynced": 0,
+        "offline": true,
+        "offlineToday": 2000000,
+        "amount": 2000000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": ["credit_limit", "offline_cap"],
+        "after": 11000000,
+        "available": 1000000,
+        "overLimitBy": 1000000,
+        "capLeft": 500000,
+        "overCapBy": 1500000
+      }
+    },
+    {
+      "name": "no limit, offline over the cap: only the cap",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": null, "offlineDailyCap": 2500000 },
+        "balance": 0,
+        "unsynced": 0,
+        "offline": true,
+        "offlineToday": 0,
+        "amount": 3000000
+      },
+      "expected": {
+        "allowed": true,
+        "needs": ["offline_cap"],
+        "after": 3000000,
+        "available": null,
+        "overLimitBy": 0,
+        "capLeft": 2500000,
+        "overCapBy": 500000
+      }
+    },
+    {
+      "name": "an account that doesn't allow credit",
+      "input": {
+        "account": { "creditAllowed": false, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 0,
+        "unsynced": 0,
+        "offline": false,
+        "offlineToday": 0,
+        "amount": 100000
+      },
+      "expected": { "allowed": false, "reason": "credit_not_allowed" }
+    },
+    {
+      "name": "no customer account (a walk-in, or the account was removed)",
+      "input": {
+        "account": null,
+        "balance": 0,
+        "unsynced": 0,
+        "offline": false,
+        "offlineToday": 0,
+        "amount": 100000
+      },
+      "expected": { "allowed": false, "reason": "no_account" }
+    },
+    {
+      "name": "a negative amount is refused",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 0,
+        "unsynced": 0,
+        "offline": false,
+        "offlineToday": 0,
+        "amount": -100
+      },
+      "error": "negative_amount"
+    },
+    {
+      "name": "a negative unsynced total is refused",
+      "input": {
+        "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+        "balance": 0,
+        "unsynced": -100,
+        "offline": false,
+        "offlineToday": 0,
+        "amount": 100
+      },
+      "error": "negative_amount"
+    }
+  ]
+}

@@ -58,6 +58,19 @@
   "fractionUnits": ["LITRE", "METER", "FOOT"],
   "cashPartners": ["0001", "0002"],
   "partyTiers": {},
+  "partyCredit": {},
+  "opening": {
+    "docTypes": {
+      "21": { "name": "PUR - Purchase Invoice", "sign": 1 },
+      "32": { "name": "PRT - Purchase Return Invoice", "sign": -1 },
+      "31": { "name": "SAL - Sale Invoice", "sign": -1 },
+      "22": { "name": "SRT - Sale Return Invoice", "sign": 1 },
+      "11": { "name": "PHS - Physical Stock (quantities signed: + found, - missing)", "sign": 1 }
+    },
+    "customerAccount": "10-03-0001",
+    "supplierAccount": "20-02-0001",
+    "itemOpeningQuantity": true
+  },
   "accounts": {
     "template": {
       "10-01-0001": "1110",

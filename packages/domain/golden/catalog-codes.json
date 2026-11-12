@@ -1,0 +1,214 @@
+{
+  "description": "An item's identifiers and vehicle tags as the back office saves them (CAT-02, CAT-03, W1-15). Identifiers: a value is required; the same kind and normalized value twice is one too many; the barcode equal to the item code always stays (data model §4). Vehicle tags: a make, a model or a year at least; years from 1950 to next year + 1; from not after to (an open end is fine). Problems name the row (0-based) they belong to.",
+  "cases": [
+    {
+      "name": "good codes and tags",
+      "input": {
+        "code": "ABEA001",
+        "thisYear": 2026,
+        "identifiers": [
+          {
+            "kind": "barcode",
+            "value": "ABEA001"
+          },
+          {
+            "kind": "oem",
+            "value": "16620-22010"
+          },
+          {
+            "kind": "oem",
+            "value": "16620 22011"
+          }
+        ],
+        "vehicles": [
+          {
+            "makeId": "m1",
+            "model": "COROLLA",
+            "yearFrom": 2008,
+            "yearTo": 2014,
+            "note": null
+          },
+          {
+            "makeId": null,
+            "model": "MEHRAN",
+            "yearFrom": 1990,
+            "yearTo": null,
+            "note": "VXR"
+          }
+        ]
+      },
+      "expected": []
+    },
+    {
+      "name": "the barcode of the code removed, an empty value, an OEM number twice (as typed differently)",
+      "input": {
+        "code": "ABEA001",
+        "thisYear": 2026,
+        "identifiers": [
+          {
+            "kind": "oem",
+            "value": " "
+          },
+          {
+            "kind": "oem",
+            "value": "16620-22010"
+          },
+          {
+            "kind": "oem",
+            "value": "1662022010"
+          }
+        ],
+        "vehicles": []
+      },
+      "expected": [
+        {
+          "problem": "code_barcode_missing",
+          "row": null
+        },
+        {
+          "problem": "value_required",
+          "row": 0
+        },
+        {
+          "problem": "duplicate",
+          "row": 2
+        }
+      ]
+    },
+    {
+      "name": "the same value as an OEM and a supplier reference is fine; the code's barcode in lower case counts",
+      "input": {
+        "code": "ABEA001",
+        "thisYear": 2026,
+        "identifiers": [
+          {
+            "kind": "barcode",
+            "value": "abea001"
+          },
+          {
+            "kind": "oem",
+            "value": "90915-YZZE1"
+          },
+          {
+            "kind": "supplier_ref",
+            "value": "90915YZZE1"
+          }
+        ],
+        "vehicles": []
+      },
+      "expected": []
+    },
+    {
+      "name": "an empty tag, years the wrong way round, a year too far ahead and one too old",
+      "input": {
+        "code": "ABEA001",
+        "thisYear": 2026,
+        "identifiers": [
+          {
+            "kind": "barcode",
+            "value": "ABEA001"
+          }
+        ],
+        "vehicles": [
+          {
+            "makeId": null,
+            "model": " ",
+            "yearFrom": null,
+            "yearTo": null,
+            "note": "any"
+          },
+          {
+            "makeId": "m1",
+            "model": "CIVIC",
+            "yearFrom": 2016,
+            "yearTo": 2012,
+            "note": null
+          },
+          {
+            "makeId": "m1",
+            "model": "CIVIC",
+            "yearFrom": 2026,
+            "yearTo": 2028,
+            "note": null
+          },
+          {
+            "makeId": "m1",
+            "model": null,
+            "yearFrom": 1949,
+            "yearTo": null,
+            "note": null
+          }
+        ]
+      },
+      "expected": [
+        {
+          "problem": "tag_empty",
+          "row": 0
+        },
+        {
+          "problem": "year_range",
+          "row": 1
+        },
+        {
+          "problem": "year_out_of_range",
+          "row": 2
+        },
+        {
+          "problem": "year_out_of_range",
+          "row": 3
+        }
+      ]
+    },
+    {
+      "name": "next year's model is fine",
+      "input": {
+        "code": "ABEA001",
+        "thisYear": 2026,
+        "identifiers": [
+          {
+            "kind": "barcode",
+            "value": "ABEA001"
+          }
+        ],
+        "vehicles": [
+          {
+            "makeId": "m1",
+            "model": "YARIS",
+            "yearFrom": 2027,
+            "yearTo": 2027,
+            "note": null
+          }
+        ]
+      },
+      "expected": []
+    },
+    {
+      "name": "a tag with no make, no model at all and no years is empty",
+      "input": {
+        "code": "ABEA001",
+        "thisYear": 2026,
+        "identifiers": [
+          {
+            "kind": "barcode",
+            "value": "ABEA001"
+          }
+        ],
+        "vehicles": [
+          {
+            "makeId": null,
+            "model": null,
+            "yearFrom": null,
+            "yearTo": null,
+            "note": null
+          }
+        ]
+      },
+      "expected": [
+        {
+          "problem": "tag_empty",
+          "row": 0
+        }
+      ]
+    }
+  ]
+}

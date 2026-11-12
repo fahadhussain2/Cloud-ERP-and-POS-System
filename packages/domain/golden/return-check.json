@@ -1,0 +1,180 @@
+{
+  "description": "Checking a purchase return before it is posted (PUR-03, W1-16, owner answer 3). Problems: a supplier, a location, a reason from the list (damaged, wrong_item, excess, poor_quality, price_dispute, other) and a note for other, at least one line; each line an item, a quantity above 0 (whole for pieces), a unit cost of 0 or more in whole paisa, and, when the return is linked to a goods receipt, no more than that receipt line still has (received less earlier returns; null = not linked). The total = Σ qty × unit cost, half away from zero; null when a line is invalid.",
+  "cases": [
+    {
+      "name": "a return linked to a receipt, within what it still has",
+      "input": {
+        "supplierId": "s1",
+        "locationId": "shop",
+        "reason": "damaged",
+        "note": null,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 2000,
+            "unitCost": 9469,
+            "allowsFraction": false,
+            "returnable": 3000
+          },
+          {
+            "itemId": "i2",
+            "qty": 500,
+            "unitCost": 1999,
+            "allowsFraction": true,
+            "returnable": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [],
+        "total": 19938
+      }
+    },
+    {
+      "name": "more than the receipt line still has, a fraction of pieces, and other without a note",
+      "input": {
+        "supplierId": "s1",
+        "locationId": "shop",
+        "reason": "other",
+        "note": "  ",
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 3001,
+            "unitCost": 9469,
+            "allowsFraction": true,
+            "returnable": 3000
+          },
+          {
+            "itemId": "i1",
+            "qty": 1500,
+            "unitCost": 9469,
+            "allowsFraction": false,
+            "returnable": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "note_required",
+            "row": null
+          },
+          {
+            "problem": "more_than_received",
+            "row": 0
+          },
+          {
+            "problem": "qty_fraction",
+            "row": 1
+          }
+        ],
+        "total": null
+      }
+    },
+    {
+      "name": "nothing filled in",
+      "input": {
+        "supplierId": null,
+        "locationId": null,
+        "reason": null,
+        "note": null,
+        "lines": []
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "supplier_required",
+            "row": null
+          },
+          {
+            "problem": "location_required",
+            "row": null
+          },
+          {
+            "problem": "reason_required",
+            "row": null
+          },
+          {
+            "problem": "lines_required",
+            "row": null
+          }
+        ],
+        "total": 0
+      }
+    },
+    {
+      "name": "an unknown reason; no item, quantity 0 and a negative cost",
+      "input": {
+        "supplierId": "s1",
+        "locationId": "shop",
+        "reason": "changed_mind",
+        "note": null,
+        "lines": [
+          {
+            "itemId": null,
+            "qty": 1000,
+            "unitCost": 100,
+            "allowsFraction": false,
+            "returnable": null
+          },
+          {
+            "itemId": "i1",
+            "qty": 0,
+            "unitCost": -5,
+            "allowsFraction": false,
+            "returnable": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "reason_unknown",
+            "row": null
+          },
+          {
+            "problem": "item_required",
+            "row": 0
+          },
+          {
+            "problem": "qty_positive",
+            "row": 1
+          },
+          {
+            "problem": "cost_invalid",
+            "row": 1
+          }
+        ],
+        "total": null
+      }
+    },
+    {
+      "name": "other with no note at all",
+      "input": {
+        "supplierId": "s1",
+        "locationId": "shop",
+        "reason": "other",
+        "note": null,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "unitCost": 100,
+            "allowsFraction": false,
+            "returnable": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "note_required",
+            "row": null
+          }
+        ],
+        "total": 100
+      }
+    }
+  ]
+}

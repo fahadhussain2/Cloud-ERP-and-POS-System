@@ -1,6 +1,7 @@
 import { withTenant } from '@erp/db';
 import pg from 'pg';
 
+import { OPENING_TABLES } from './opening-load';
 import { maskPhone } from './transform/rules';
 import { companyDetails } from './transform/company';
 import { buildMasters, type Findings, type Masters, type Row, type Staged } from './transform/masters';
@@ -64,8 +65,6 @@ export interface ImportResult {
 /** Category defaults accepted in the PRD: floor = cost + 5% (Q2); returns within 30 days (Q3). */
 const PRICING_RULE = { floor_min_margin_bp: 500 };
 const RETURN_POLICY = { returnable: true, window_days: 30 };
-/** Rs 25,000 a day while offline (PRD Q6, D-013). */
-const OFFLINE_DAILY_CAP = 2_500_000;
 /** The template's AR control account (posting rules §2). */
 const AR_CONTROL = '1200';
 
@@ -89,7 +88,7 @@ const USED = {
 /** Read for the AR balances in the credit-customer report. */
 const GL_LINES = 'gl_transactiondetail';
 /** Staging's own bookkeeping, and the GL lines read above for the AR balances. */
-const READ_ELSEWHERE = new Set(['_files', GL_LINES]);
+const READ_ELSEWHERE = new Set(['_files', GL_LINES, ...OPENING_TABLES]);
 
 /** JSON with sorted keys, numbers and strings alike, so database and candidate values compare equal. */
 const canonical = (v: unknown): string => {
@@ -426,8 +425,9 @@ function loadSteps(
               values: {
                 party_id: partyId(p.code),
                 price_tier_id: tier,
-                credit_allowed: true,
-                offline_daily_cap: OFFLINE_DAILY_CAP,
+                credit_allowed: p.customer!.creditAllowed,
+                credit_limit: p.customer!.creditLimit,
+                offline_daily_cap: p.customer!.offlineDailyCap,
                 legacy: { label: p.legacy['label'], BusinessPartnerID: p.code },
               },
             };

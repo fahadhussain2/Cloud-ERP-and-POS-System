@@ -1,0 +1,255 @@
+{
+  "description": "A customer receipt by bank, an expense or a transfer before it is posted (ACC-04, W1-19, D-108). Problems block it, in a fixed order: the date (required, not in the future, not on or before the lock date), the amount (a whole number of paisa above 0), then what the kind needs: a receipt a customer and a bank; an expense a category and where it is paid from (a bank, or `safe`); a transfer a from and a to (a bank, or `safe`), not the same, and charges from 0 up to below the amount, with a category when above 0. The warning (not blocking): the same key and amount already recorded on that date (a receipt: the customer; an expense: the category; a transfer: from>to).",
+  "cases": [
+    {
+      "name": "a Rs 25,000 receipt from a customer into HBL",
+      "input": {
+        "kind": "receipt",
+        "date": "2027-01-10",
+        "today": "2027-01-10",
+        "lockDate": "2026-12-31",
+        "amount": 2500000,
+        "customerId": "cust-1",
+        "bankAccountId": "bank-hbl",
+        "sameDay": []
+      },
+      "expected": {
+        "problems": [],
+        "warnings": []
+      }
+    },
+    {
+      "name": "the same receipt typed twice: a warning, not a problem",
+      "input": {
+        "kind": "receipt",
+        "date": "2027-01-10",
+        "today": "2027-01-11",
+        "lockDate": null,
+        "amount": 2500000,
+        "customerId": "cust-1",
+        "bankAccountId": "bank-hbl",
+        "sameDay": [
+          {
+            "key": "cust-2",
+            "amount": 2500000
+          },
+          {
+            "key": "cust-1",
+            "amount": 2500000
+          }
+        ]
+      },
+      "expected": {
+        "problems": [],
+        "warnings": ["possible_duplicate"]
+      }
+    },
+    {
+      "name": "a receipt with nothing filled in",
+      "input": {
+        "kind": "receipt",
+        "date": null,
+        "today": "2027-01-10",
+        "lockDate": null,
+        "amount": 0,
+        "customerId": null,
+        "bankAccountId": null,
+        "sameDay": []
+      },
+      "expected": {
+        "problems": ["date_required", "amount_invalid", "customer_required", "bank_required"],
+        "warnings": []
+      }
+    },
+    {
+      "name": "a date written another way is no date",
+      "input": {
+        "kind": "receipt",
+        "date": "10/01/2027",
+        "today": "2027-01-10",
+        "lockDate": null,
+        "amount": 100,
+        "customerId": "cust-1",
+        "bankAccountId": "bank-hbl",
+        "sameDay": []
+      },
+      "expected": {
+        "problems": ["date_required"],
+        "warnings": []
+      }
+    },
+    {
+      "name": "dated tomorrow, and a fraction of a paisa",
+      "input": {
+        "kind": "receipt",
+        "date": "2027-01-11",
+        "today": "2027-01-10",
+        "lockDate": null,
+        "amount": 100.5,
+        "customerId": "cust-1",
+        "bankAccountId": "bank-hbl",
+        "sameDay": []
+      },
+      "expected": {
+        "problems": ["date_in_future", "amount_invalid"],
+        "warnings": []
+      }
+    },
+    {
+      "name": "dated on the lock date",
+      "input": {
+        "kind": "expense",
+        "date": "2026-12-31",
+        "today": "2027-01-10",
+        "lockDate": "2026-12-31",
+        "amount": 1850000,
+        "categoryId": "cat-utilities",
+        "paidFrom": "bank-soneri",
+        "sameDay": []
+      },
+      "expected": {
+        "problems": ["date_locked"],
+        "warnings": []
+      }
+    },
+    {
+      "name": "an electricity bill paid from the safe",
+      "input": {
+        "kind": "expense",
+        "date": "2027-01-10",
+        "today": "2027-01-10",
+        "lockDate": "2026-12-31",
+        "amount": 1850000,
+        "categoryId": "cat-utilities",
+        "paidFrom": "safe",
+        "sameDay": [
+          {
+            "key": "cat-utilities",
+            "amount": 1800000
+          }
+        ]
+      },
+      "expected": {
+        "problems": [],
+        "warnings": []
+      }
+    },
+    {
+      "name": "an expense without a category or where it was paid from",
+      "input": {
+        "kind": "expense",
+        "date": "2027-01-10",
+        "today": "2027-01-10",
+        "lockDate": null,
+        "amount": 1850000,
+        "categoryId": null,
+        "paidFrom": null,
+        "sameDay": []
+      },
+      "expected": {
+        "problems": ["category_required", "paid_from_required"],
+        "warnings": []
+      }
+    },
+    {
+      "name": "the safe's cash deposited at Soneri",
+      "input": {
+        "kind": "transfer",
+        "date": "2027-01-10",
+        "today": "2027-01-10",
+        "lockDate": null,
+        "amount": 50000000,
+        "from": "safe",
+        "to": "bank-soneri",
+        "charges": 0,
+        "chargesCategoryId": null,
+        "sameDay": [
+          {
+            "key": "safe>bank-soneri",
+            "amount": 50000000
+          }
+        ]
+      },
+      "expected": {
+        "problems": [],
+        "warnings": ["possible_duplicate"]
+      }
+    },
+    {
+      "name": "card settlement into HBL, Rs 250 charges to Bank charges",
+      "input": {
+        "kind": "transfer",
+        "date": "2027-01-10",
+        "today": "2027-01-10",
+        "lockDate": null,
+        "amount": 1000000,
+        "from": "bank-card",
+        "to": "bank-hbl",
+        "charges": 25000,
+        "chargesCategoryId": "cat-bank-charges",
+        "sameDay": []
+      },
+      "expected": {
+        "problems": [],
+        "warnings": []
+      }
+    },
+    {
+      "name": "the same account twice, charges with no category",
+      "input": {
+        "kind": "transfer",
+        "date": "2027-01-10",
+        "today": "2027-01-10",
+        "lockDate": null,
+        "amount": 1000000,
+        "from": "bank-hbl",
+        "to": "bank-hbl",
+        "charges": 25000,
+        "chargesCategoryId": null,
+        "sameDay": []
+      },
+      "expected": {
+        "problems": ["same_account", "charges_category_required"],
+        "warnings": []
+      }
+    },
+    {
+      "name": "charges as large as the amount, and below 0",
+      "input": {
+        "kind": "transfer",
+        "date": "2027-01-10",
+        "today": "2027-01-10",
+        "lockDate": null,
+        "amount": 25000,
+        "from": "safe",
+        "to": "bank-hbl",
+        "charges": 25000,
+        "chargesCategoryId": "cat-bank-charges",
+        "sameDay": []
+      },
+      "expected": {
+        "problems": ["charges_invalid"],
+        "warnings": []
+      }
+    },
+    {
+      "name": "a transfer with neither end",
+      "input": {
+        "kind": "transfer",
+        "date": "2027-01-10",
+        "today": "2027-01-10",
+        "lockDate": null,
+        "amount": 25000,
+        "from": null,
+        "to": null,
+        "charges": -1,
+        "chargesCategoryId": null,
+        "sameDay": []
+      },
+      "expected": {
+        "problems": ["from_required", "to_required", "charges_invalid"],
+        "warnings": []
+      }
+    }
+  ]
+}

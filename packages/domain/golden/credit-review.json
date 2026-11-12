@@ -1,0 +1,451 @@
+{
+  "description": "The server's credit re-check of a synced sale (sync spec §6.2, POS-07, D-011, D-096): findings, never a refusal. Each case changes a base document (credit-review.test.ts: a Rs 20,000 bill fully on account to customer …f1, sold by …a1 in branch …e1) and gives what the server holds: the customer's account (a Rs 100,000 limit and a Rs 25,000 cap unless a case says otherwise), its balance before this bill (every counter's sales) and this device's offline on-account total for the customer on that business date, before this bill. Staff: …a1 a salesman (pos.credit.sell); …a2 a manager (pos.credit.sell, pos.credit.over_limit); …a4 no credit rights; …a9 is unknown.",
+  "cases": [
+    {
+      "name": "a cash sale to a customer: nothing to check",
+      "input": {
+        "document": {
+          "payments": [
+            { "method": "cash", "amount": 2000000, "cashReceived": null, "changeDue": 0, "reference": null }
+          ]
+        },
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 0, "offlineDailyCap": 0 },
+          "balanceBefore": 50000000,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "on account within the limit",
+      "input": {
+        "document": {},
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 4500000,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "exactly at the limit",
+      "input": {
+        "document": {},
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 8000000,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "over the limit with no approval",
+      "input": {
+        "document": {},
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 9000000,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": [
+        {
+          "kind": "credit_limit_exceeded",
+          "cause": "no_approval",
+          "amount": 2000000,
+          "balance": 9000000,
+          "limit": 10000000,
+          "overBy": 1000000
+        }
+      ]
+    },
+    {
+      "name": "over the limit, approved by a manager holding pos.credit.over_limit",
+      "input": {
+        "document": {
+          "overrides": [
+            {
+              "kind": "credit_limit",
+              "lineNo": null,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "pay_soon",
+              "note": null,
+              "at": "2026-11-02T10:15:20.000Z",
+              "values": { "limit": 10000000, "balance": 9000000, "unsynced": 0, "amount": 2000000 }
+            }
+          ]
+        },
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 9000000,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "over the limit, 'approved' by a salesman without pos.credit.over_limit",
+      "input": {
+        "document": {
+          "overrides": [
+            {
+              "kind": "credit_limit",
+              "lineNo": null,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "reason": "regular_customer",
+              "note": null,
+              "at": "2026-11-02T10:15:20.000Z",
+              "values": { "limit": 10000000, "balance": 9000000, "unsynced": 0, "amount": 2000000 }
+            }
+          ]
+        },
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 9000000,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": [
+        {
+          "kind": "credit_limit_exceeded",
+          "cause": "not_permitted",
+          "amount": 2000000,
+          "balance": 9000000,
+          "limit": 10000000,
+          "overBy": 1000000
+        }
+      ]
+    },
+    {
+      "name": "the counter saw room, but another counter's sales took the server's balance up: flagged",
+      "input": {
+        "document": {
+          "credit": {
+            "offline": true,
+            "balance": 2000000,
+            "balanceAsOf": "2026-11-02T08:00:00.000Z",
+            "unsynced": 0,
+            "offlineToday": 0
+          }
+        },
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 9500000,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": [
+        {
+          "kind": "credit_limit_exceeded",
+          "cause": "no_approval",
+          "amount": 2000000,
+          "balance": 9500000,
+          "limit": 10000000,
+          "overBy": 1500000
+        }
+      ]
+    },
+    {
+      "name": "no limit: never over the limit",
+      "input": {
+        "document": {},
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": null, "offlineDailyCap": 2500000 },
+          "balanceBefore": 90000000,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "an offline bill over the device's cap for the day, with no approval",
+      "input": {
+        "document": {
+          "credit": {
+            "offline": true,
+            "balance": 0,
+            "balanceAsOf": "2026-11-02T08:00:00.000Z",
+            "unsynced": 1000000,
+            "offlineToday": 1000000
+          }
+        },
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 1000000,
+          "offlineTodayBefore": 1000000
+        }
+      },
+      "expected": [
+        {
+          "kind": "offline_cap_exceeded",
+          "cause": "no_approval",
+          "amount": 2000000,
+          "offlineToday": 1000000,
+          "cap": 2500000,
+          "overBy": 500000
+        }
+      ]
+    },
+    {
+      "name": "an offline bill over the cap, approved by a manager",
+      "input": {
+        "document": {
+          "credit": {
+            "offline": true,
+            "balance": 0,
+            "balanceAsOf": "2026-11-02T08:00:00.000Z",
+            "unsynced": 1000000,
+            "offlineToday": 1000000
+          },
+          "overrides": [
+            {
+              "kind": "offline_cap",
+              "lineNo": null,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "owner_instruction",
+              "note": null,
+              "at": "2026-11-02T10:15:20.000Z",
+              "values": { "cap": 2500000, "offlineToday": 1000000, "amount": 2000000 }
+            }
+          ]
+        },
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 1000000,
+          "offlineTodayBefore": 1000000
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "an online bill is not held to the cap",
+      "input": {
+        "document": {
+          "credit": {
+            "offline": false,
+            "balance": 0,
+            "balanceAsOf": "2026-11-02T10:15:00.000Z",
+            "unsynced": 0,
+            "offlineToday": 0
+          }
+        },
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 0 },
+          "balanceBefore": 0,
+          "offlineTodayBefore": 2000000
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "over both at once, both approved by a manager",
+      "input": {
+        "document": {
+          "credit": {
+            "offline": true,
+            "balance": 9000000,
+            "balanceAsOf": "2026-11-02T08:00:00.000Z",
+            "unsynced": 0,
+            "offlineToday": 1000000
+          },
+          "overrides": [
+            {
+              "kind": "credit_limit",
+              "lineNo": null,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "other",
+              "note": "Owner on the phone",
+              "at": "2026-11-02T10:15:20.000Z",
+              "values": { "limit": 10000000, "balance": 9000000, "unsynced": 0, "amount": 2000000 }
+            },
+            {
+              "kind": "offline_cap",
+              "lineNo": null,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+              "reason": "other",
+              "note": "Owner on the phone",
+              "at": "2026-11-02T10:15:20.000Z",
+              "values": { "cap": 2500000, "offlineToday": 1000000, "amount": 2000000 }
+            }
+          ]
+        },
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 9000000,
+          "offlineTodayBefore": 1000000
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "over both, no approval: two findings, the limit first",
+      "input": {
+        "document": {
+          "credit": {
+            "offline": true,
+            "balance": 9000000,
+            "balanceAsOf": "2026-11-02T08:00:00.000Z",
+            "unsynced": 0,
+            "offlineToday": 1000000
+          }
+        },
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 9000000,
+          "offlineTodayBefore": 1000000
+        }
+      },
+      "expected": [
+        {
+          "kind": "credit_limit_exceeded",
+          "cause": "no_approval",
+          "amount": 2000000,
+          "balance": 9000000,
+          "limit": 10000000,
+          "overBy": 1000000
+        },
+        {
+          "kind": "offline_cap_exceeded",
+          "cause": "no_approval",
+          "amount": 2000000,
+          "offlineToday": 1000000,
+          "cap": 2500000,
+          "overBy": 500000
+        }
+      ]
+    },
+    {
+      "name": "the account doesn't allow credit (changed during an outage)",
+      "input": {
+        "document": {},
+        "context": {
+          "account": { "creditAllowed": false, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 0,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": [
+        {
+          "kind": "credit_limit_exceeded",
+          "cause": "credit_not_allowed",
+          "amount": 2000000,
+          "balance": 0,
+          "limit": 10000000,
+          "overBy": 0
+        }
+      ]
+    },
+    {
+      "name": "no customer account on the server (removed during an outage)",
+      "input": {
+        "document": {},
+        "context": { "account": null, "balanceBefore": 0, "offlineTodayBefore": 0 }
+      },
+      "expected": [
+        {
+          "kind": "credit_limit_exceeded",
+          "cause": "credit_not_allowed",
+          "amount": 2000000,
+          "balance": 0,
+          "limit": null,
+          "overBy": 0
+        }
+      ]
+    },
+    {
+      "name": "a seller without pos.credit.sell",
+      "input": {
+        "document": { "sellerId": "019a0000-0000-7000-8000-0000000000a4" },
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 0,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": [
+        {
+          "kind": "credit_limit_exceeded",
+          "cause": "seller_not_permitted",
+          "amount": 2000000,
+          "balance": 0,
+          "limit": 10000000,
+          "overBy": 0
+        }
+      ]
+    },
+    {
+      "name": "part cash, part on account: only the on-account part counts",
+      "input": {
+        "document": {
+          "payments": [
+            { "method": "cash", "amount": 1500000, "cashReceived": null, "changeDue": 0, "reference": null },
+            {
+              "method": "on_account",
+              "amount": 500000,
+              "cashReceived": null,
+              "changeDue": null,
+              "reference": null
+            }
+          ]
+        },
+        "context": {
+          "account": { "creditAllowed": true, "creditLimit": 10000000, "offlineDailyCap": 2500000 },
+          "balanceBefore": 9500000,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "over the limit, approved by someone the server doesn’t know",
+      "input": {
+        "document": {
+          "overrides": [
+            {
+              "kind": "credit_limit",
+              "lineNo": null,
+              "requestedBy": "019a0000-0000-7000-8000-0000000000a1",
+              "approvedBy": "019a0000-0000-7000-8000-0000000000a9",
+              "reason": "pay_soon",
+              "note": null,
+              "at": "2026-11-02T10:15:20.000Z",
+              "values": {
+                "limit": 10000000,
+                "balance": 9000000,
+                "unsynced": 0,
+                "amount": 2000000
+              }
+            }
+          ]
+        },
+        "context": {
+          "account": {
+            "creditAllowed": true,
+            "creditLimit": 10000000,
+            "offlineDailyCap": 2500000
+          },
+          "balanceBefore": 9000000,
+          "offlineTodayBefore": 0
+        }
+      },
+      "expected": [
+        {
+          "kind": "credit_limit_exceeded",
+          "cause": "not_permitted",
+          "amount": 2000000,
+          "balance": 9000000,
+          "limit": 10000000,
+          "overBy": 1000000
+        }
+      ]
+    }
+  ]
+}

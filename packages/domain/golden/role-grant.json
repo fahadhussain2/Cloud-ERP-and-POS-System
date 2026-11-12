@@ -1,0 +1,184 @@
+{
+  "description": "Nobody gives or takes away a role with more rights than they hold, in the role's branch (W1-04, PLT-05, D-081)",
+  "cases": [
+    {
+      "name": "Owner gives Owner for every branch",
+      "input": {
+        "grants": [{ "template": "owner", "branchId": null }],
+        "role": { "template": "owner" },
+        "branchId": null
+      },
+      "expected": true
+    },
+    {
+      "name": "Owner gives every other template",
+      "input": {
+        "grants": [{ "template": "owner", "branchId": null }],
+        "role": { "template": "accountant" },
+        "branchId": "b1"
+      },
+      "expected": true
+    },
+    {
+      "name": "The Manager permissions give Manager",
+      "input": {
+        "grants": [{ "template": "manager", "branchId": null }],
+        "role": { "template": "manager" },
+        "branchId": null
+      },
+      "expected": true
+    },
+    {
+      "name": "The Manager permissions give Salesman (a subset)",
+      "input": {
+        "grants": [{ "template": "manager", "branchId": null }],
+        "role": { "template": "salesman" },
+        "branchId": "b1"
+      },
+      "expected": true
+    },
+    {
+      "name": "The Manager permissions don't give Owner",
+      "input": {
+        "grants": [{ "template": "manager", "branchId": null }],
+        "role": { "template": "owner" },
+        "branchId": null
+      },
+      "expected": false
+    },
+    {
+      "name": "The Manager permissions don't give Accountant (journals, periods)",
+      "input": {
+        "grants": [{ "template": "manager", "branchId": null }],
+        "role": { "template": "accountant" },
+        "branchId": null
+      },
+      "expected": false
+    },
+    {
+      "name": "The Manager permissions don't give Cashier (cash desk rights)",
+      "input": {
+        "grants": [{ "template": "manager", "branchId": null }],
+        "role": { "template": "cashier" },
+        "branchId": "b1"
+      },
+      "expected": false
+    },
+    {
+      "name": "Every permission in the catalog by name is still not *: Owner can't be given",
+      "input": {
+        "grants": [
+          {
+            "permissions": [
+              "pos.sale.create",
+              "pos.sale.hold",
+              "pos.price.below_floor",
+              "pos.credit.sell",
+              "pos.credit.over_limit",
+              "pos.void",
+              "pos.return.create",
+              "pos.return.no_receipt",
+              "pos.return.outside_policy",
+              "pos.override.approve",
+              "cash.handover.receive",
+              "cash.refund.pay",
+              "cash.collection.receive",
+              "cash.movement.create",
+              "cash.session.close",
+              "cash.variance.approve",
+              "cat.item.edit",
+              "cat.price.edit",
+              "cat.label.print",
+              "inv.adjust",
+              "inv.transfer",
+              "inv.count",
+              "pur.order.create",
+              "pur.receive",
+              "pur.reprice.propose",
+              "pur.reprice.approve",
+              "acc.receipt.create",
+              "acc.payment.create",
+              "acc.expense.create",
+              "acc.journal.post",
+              "acc.period.close",
+              "cost.view",
+              "reports.view",
+              "reports.financial",
+              "admin.users",
+              "admin.roles",
+              "admin.settings",
+              "admin.devices"
+            ],
+            "limits": { "maxDiscountBp": 10000, "voidWindow": "same_day" },
+            "branchId": null
+          }
+        ],
+        "role": { "template": "owner" },
+        "branchId": null
+      },
+      "expected": false
+    },
+    {
+      "name": "Two roles together cover the role: Cashier + Salesman give Cashier",
+      "input": {
+        "grants": [
+          { "template": "salesman", "branchId": null },
+          { "template": "cashier", "branchId": null }
+        ],
+        "role": { "template": "cashier" },
+        "branchId": null
+      },
+      "expected": true
+    },
+    {
+      "name": "A branch-scoped Owner gives Manager in that branch",
+      "input": {
+        "grants": [{ "template": "owner", "branchId": "b1" }],
+        "role": { "template": "manager" },
+        "branchId": "b1"
+      },
+      "expected": true
+    },
+    {
+      "name": "A branch-scoped Owner doesn't give Manager in another branch",
+      "input": {
+        "grants": [{ "template": "owner", "branchId": "b1" }],
+        "role": { "template": "manager" },
+        "branchId": "b2"
+      },
+      "expected": false
+    },
+    {
+      "name": "A branch-scoped Owner doesn't give Manager for every branch",
+      "input": {
+        "grants": [{ "template": "owner", "branchId": "b1" }],
+        "role": { "template": "manager" },
+        "branchId": null
+      },
+      "expected": false
+    },
+    {
+      "name": "A custom role with only Salesman permissions is given by a Manager",
+      "input": {
+        "grants": [{ "template": "manager", "branchId": null }],
+        "role": { "permissions": ["pos.sale.create", "pos.sale.hold"] },
+        "branchId": null
+      },
+      "expected": true
+    },
+    {
+      "name": "A role with no permissions is given by anyone with a role",
+      "input": {
+        "grants": [{ "template": "salesman", "branchId": null }],
+        "role": { "permissions": [] },
+        "branchId": null
+      },
+      "expected": true
+    },
+    {
+      "name": "Nobody without roles gives anything with a permission",
+      "input": { "grants": [], "role": { "template": "salesman" }, "branchId": null },
+      "expected": false
+    }
+  ]
+}

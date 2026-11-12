@@ -1,0 +1,420 @@
+{
+  "description": "The cash desk's live queue (CSH-02, PRD W4.1): the pulled cash_queue rows still pending, minus the bills this desk has already handed over, grouped by salesman (by name, unknown names last), each group's bills oldest first, with what each salesman brings and is owed. A negative cash due is a refund to pay out. Amounts in paisa.",
+  "cases": [
+    {
+      "name": "two salesmen, a refund and the totals",
+      "input": {
+        "sellers": {
+          "019a0000-0000-7000-8000-0000000000a1": "Imran",
+          "019a0000-0000-7000-8000-0000000000a3": "Bilal"
+        },
+        "entries": [
+          {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "number": "C03-S000412",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "createdAt": "2026-11-02T10:15:30.000Z",
+            "cashDue": 432000,
+            "cashReceived": 500000,
+            "changeDue": 68000,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000077",
+            "number": "C04-S000077",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a3",
+            "createdAt": "2026-11-02T10:17:00.000Z",
+            "cashDue": 125000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000410",
+            "number": "C03-S000410",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "createdAt": "2026-11-02T10:02:00.000Z",
+            "cashDue": 90000,
+            "cashReceived": 100000,
+            "changeDue": 10000,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000415",
+            "number": "C03-S000415",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "createdAt": "2026-11-02T10:20:00.000Z",
+            "cashDue": -45000,
+            "cashReceived": null,
+            "changeDue": null,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          }
+        ],
+        "local": []
+      },
+      "expected": [
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000a3",
+          "sellerName": "Bilal",
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000077",
+              "number": "C04-S000077",
+              "createdAt": "2026-11-02T10:17:00.000Z",
+              "kind": "in",
+              "amount": 125000,
+              "cashReceived": null,
+              "changeDue": 0
+            }
+          ],
+          "toCollect": 125000,
+          "toPayOut": 0
+        },
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "sellerName": "Imran",
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000410",
+              "number": "C03-S000410",
+              "createdAt": "2026-11-02T10:02:00.000Z",
+              "kind": "in",
+              "amount": 90000,
+              "cashReceived": 100000,
+              "changeDue": 10000
+            },
+            {
+              "id": "019a5000-0000-7000-8000-000000000412",
+              "number": "C03-S000412",
+              "createdAt": "2026-11-02T10:15:30.000Z",
+              "kind": "in",
+              "amount": 432000,
+              "cashReceived": 500000,
+              "changeDue": 68000
+            },
+            {
+              "id": "019a5000-0000-7000-8000-000000000415",
+              "number": "C03-S000415",
+              "createdAt": "2026-11-02T10:20:00.000Z",
+              "kind": "payout",
+              "amount": 45000,
+              "cashReceived": null,
+              "changeDue": null
+            }
+          ],
+          "toCollect": 522000,
+          "toPayOut": 45000
+        }
+      ]
+    },
+    {
+      "name": "a bill handed over on this desk leaves the queue before the server says so",
+      "input": {
+        "sellers": { "019a0000-0000-7000-8000-0000000000a1": "Imran" },
+        "entries": [
+          {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "number": "C03-S000412",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "createdAt": "2026-11-02T10:15:30.000Z",
+            "cashDue": 432000,
+            "cashReceived": 500000,
+            "changeDue": 68000,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000413",
+            "number": "C03-S000413",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "createdAt": "2026-11-02T10:16:30.000Z",
+            "cashDue": 30000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          }
+        ],
+        "local": [
+          {
+            "billNumber": "C03-S000412",
+            "kind": "in",
+            "number": "D01-H000031",
+            "cashierId": "019a0000-0000-7000-8000-0000000000a5",
+            "at": "2026-11-02T10:16:02.000Z"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "sellerName": "Imran",
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000413",
+              "number": "C03-S000413",
+              "createdAt": "2026-11-02T10:16:30.000Z",
+              "kind": "in",
+              "amount": 30000,
+              "cashReceived": null,
+              "changeDue": 0
+            }
+          ],
+          "toCollect": 30000,
+          "toPayOut": 0
+        }
+      ]
+    },
+    {
+      "name": "received, paid out, voided and no-cash rows aren't listed; a salesman with nothing left has no group",
+      "input": {
+        "sellers": { "019a0000-0000-7000-8000-0000000000a1": "Imran" },
+        "entries": [
+          {
+            "id": "019a5000-0000-7000-8000-000000000401",
+            "number": "C03-S000401",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "createdAt": "2026-11-02T09:00:00.000Z",
+            "cashDue": 10000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "received",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000402",
+            "number": "C03-S000402",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "createdAt": "2026-11-02T09:05:00.000Z",
+            "cashDue": -10000,
+            "cashReceived": null,
+            "changeDue": null,
+            "handoverStatus": "paid_out",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000403",
+            "number": "C03-S000403",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "createdAt": "2026-11-02T09:10:00.000Z",
+            "cashDue": 20000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "pending",
+            "status": "voided"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000404",
+            "number": "C03-S000404",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "createdAt": "2026-11-02T09:15:00.000Z",
+            "cashDue": 0,
+            "cashReceived": null,
+            "changeDue": null,
+            "handoverStatus": "not_applicable",
+            "status": "finalized"
+          }
+        ],
+        "local": []
+      },
+      "expected": []
+    },
+    {
+      "name": "a salesman the desk has no name for is listed last",
+      "input": {
+        "sellers": { "019a0000-0000-7000-8000-0000000000a1": "Imran" },
+        "entries": [
+          {
+            "id": "019a5000-0000-7000-8000-000000000501",
+            "number": "C05-S000001",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a9",
+            "createdAt": "2026-11-02T09:00:00.000Z",
+            "cashDue": 10000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000412",
+            "number": "C03-S000412",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "createdAt": "2026-11-02T10:15:30.000Z",
+            "cashDue": 432000,
+            "cashReceived": 500000,
+            "changeDue": 68000,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          }
+        ],
+        "local": []
+      },
+      "expected": [
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "sellerName": "Imran",
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000412",
+              "number": "C03-S000412",
+              "createdAt": "2026-11-02T10:15:30.000Z",
+              "kind": "in",
+              "amount": 432000,
+              "cashReceived": 500000,
+              "changeDue": 68000
+            }
+          ],
+          "toCollect": 432000,
+          "toPayOut": 0
+        },
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000a9",
+          "sellerName": null,
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000501",
+              "number": "C05-S000001",
+              "createdAt": "2026-11-02T09:00:00.000Z",
+              "kind": "in",
+              "amount": 10000,
+              "cashReceived": null,
+              "changeDue": 0
+            }
+          ],
+          "toCollect": 10000,
+          "toPayOut": 0
+        }
+      ]
+    },
+    {
+      "name": "two unnamed salesmen and two with the same name: by name, then by id",
+      "input": {
+        "sellers": {
+          "019a0000-0000-7000-8000-0000000000a1": "Ali",
+          "019a0000-0000-7000-8000-0000000000a3": "Ali"
+        },
+        "entries": [
+          {
+            "id": "019a5000-0000-7000-8000-000000000601",
+            "number": "C05-S000001",
+            "sellerId": "019a0000-0000-7000-8000-0000000000b9",
+            "createdAt": "2026-11-02T09:00:00.000Z",
+            "cashDue": 10000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000602",
+            "number": "C05-S000002",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a3",
+            "createdAt": "2026-11-02T09:01:00.000Z",
+            "cashDue": 10000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000603",
+            "number": "C05-S000003",
+            "sellerId": "019a0000-0000-7000-8000-0000000000b8",
+            "createdAt": "2026-11-02T09:02:00.000Z",
+            "cashDue": 10000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          },
+          {
+            "id": "019a5000-0000-7000-8000-000000000604",
+            "number": "C05-S000004",
+            "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+            "createdAt": "2026-11-02T09:03:00.000Z",
+            "cashDue": 10000,
+            "cashReceived": null,
+            "changeDue": 0,
+            "handoverStatus": "pending",
+            "status": "finalized"
+          }
+        ],
+        "local": []
+      },
+      "expected": [
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000a1",
+          "sellerName": "Ali",
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000604",
+              "number": "C05-S000004",
+              "createdAt": "2026-11-02T09:03:00.000Z",
+              "kind": "in",
+              "amount": 10000,
+              "cashReceived": null,
+              "changeDue": 0
+            }
+          ],
+          "toCollect": 10000,
+          "toPayOut": 0
+        },
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000a3",
+          "sellerName": "Ali",
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000602",
+              "number": "C05-S000002",
+              "createdAt": "2026-11-02T09:01:00.000Z",
+              "kind": "in",
+              "amount": 10000,
+              "cashReceived": null,
+              "changeDue": 0
+            }
+          ],
+          "toCollect": 10000,
+          "toPayOut": 0
+        },
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000b8",
+          "sellerName": null,
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000603",
+              "number": "C05-S000003",
+              "createdAt": "2026-11-02T09:02:00.000Z",
+              "kind": "in",
+              "amount": 10000,
+              "cashReceived": null,
+              "changeDue": 0
+            }
+          ],
+          "toCollect": 10000,
+          "toPayOut": 0
+        },
+        {
+          "sellerId": "019a0000-0000-7000-8000-0000000000b9",
+          "sellerName": null,
+          "bills": [
+            {
+              "id": "019a5000-0000-7000-8000-000000000601",
+              "number": "C05-S000001",
+              "createdAt": "2026-11-02T09:00:00.000Z",
+              "kind": "in",
+              "amount": 10000,
+              "cashReceived": null,
+              "changeDue": 0
+            }
+          ],
+          "toCollect": 10000,
+          "toPayOut": 0
+        }
+      ]
+    }
+  ]
+}

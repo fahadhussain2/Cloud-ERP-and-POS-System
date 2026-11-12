@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import permissionCases from '../golden/permissions.json';
+import grantCases from '../golden/role-grant.json';
 import limitCases from '../golden/role-limits.json';
 import {
   can,
+  canGivePinTo,
+  canGrantRole,
   effectiveLimits,
   expandPermissions,
   isPermission,
@@ -44,6 +47,49 @@ runGolden(limitCases as GoldenFile<{ grants: GrantInput[]; branchId: string }>, 
   ),
 );
 
+const toGrant = (g: GrantInput): RoleGrant =>
+  'template' in g
+    ? grant(g.template, g.branchId)
+    : { permissions: g.permissions, limits: g.limits, branchId: g.branchId };
+
+runGolden(
+  grantCases as GoldenFile<{
+    grants: GrantInput[];
+    role: { template: RoleTemplateKey } | { permissions: string[] };
+    branchId: string | null;
+  }>,
+  (i) =>
+    canGrantRole(
+      i.grants.map(toGrant),
+      'template' in i.role ? ROLE_TEMPLATES[i.role.template].permissions : i.role.permissions,
+      i.branchId,
+    ),
+);
+
+describe('who may give a temporary PIN (W1-04, D-091)', () => {
+  it('a manager gives one to salesmen and cashiers, even with rights the manager lacks', () => {
+    expect(canGivePinTo([grant('manager')], [grant('salesman')])).toBe(true);
+    expect(canGivePinTo([grant('manager')], [grant('cashier')])).toBe(true);
+    expect(canGivePinTo([grant('manager')], [])).toBe(true);
+  });
+
+  it('a manager gives none to an Owner or to someone with user admin', () => {
+    expect(canGivePinTo([grant('manager')], [grant('owner')])).toBe(false);
+    const staffAdmin: RoleGrant = { ...grant('salesman'), permissions: ['admin.users'] };
+    expect(canGivePinTo([grant('manager')], [staffAdmin])).toBe(false);
+  });
+
+  it('someone who outranks them does: the Owner gives one to anyone', () => {
+    expect(canGivePinTo([grant('owner')], [grant('owner')])).toBe(true);
+    expect(canGivePinTo([grant('owner')], [grant('manager'), grant('accountant')])).toBe(true);
+  });
+
+  it('nobody without admin.devices gives one', () => {
+    expect(canGivePinTo([grant('salesman')], [grant('salesman')])).toBe(false);
+    expect(canGivePinTo([grant('manager', 'b1')], [grant('salesman')])).toBe(false);
+  });
+});
+
 describe('role templates', () => {
   it('use only permissions from the catalog', () => {
     for (const [key, template] of Object.entries(ROLE_TEMPLATES)) {
@@ -61,6 +107,17 @@ describe('role templates', () => {
     await expect(`${JSON.stringify(matrix, null, 2)}\n`).toMatchFileSnapshot(
       '../golden/role-matrix.snap.json',
     );
+  });
+
+  it('let the owner, a manager and an accountant edit customers, and only the owner set their terms (D-109)', () => {
+    const edit = (Object.keys(ROLE_TEMPLATES) as RoleTemplateKey[]).filter((k) =>
+      can([grant(k)], 'cust.edit', 'b1'),
+    );
+    const terms = (Object.keys(ROLE_TEMPLATES) as RoleTemplateKey[]).filter((k) =>
+      can([grant(k)], 'cust.terms.edit', 'b1'),
+    );
+    expect(edit).toEqual(['owner', 'manager', 'accountant']);
+    expect(terms).toEqual(['owner']);
   });
 
   it('expand * to the whole catalog for display', () => {

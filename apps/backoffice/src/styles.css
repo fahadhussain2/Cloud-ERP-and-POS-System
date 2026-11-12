@@ -1,10 +1,92 @@
-/* Logical properties only, so the layout works right-to-left (CLAUDE.md rule 10). */
-body {
-  margin: 0;
-  font-family: system-ui, sans-serif;
+/* The back office's styles: Tailwind on the shared tokens (D-066, W1-04). Classes come from the screens here and the
+   building blocks in packages/ui; use logical utilities only (px, ms, text-start…), so the layout works right-to-left
+   (CLAUDE.md rule 10). */
+@import 'tailwindcss' source(none);
+/* shadcn/ui's enter and exit animations (dialogs, selects). */
+@import 'tw-animate-css';
+@import '@erp/ui/theme.css';
+@source './';
+@source '../../../packages/ui/src';
+
+html,
+body,
+#root {
+  min-block-size: 100%;
 }
 
-.placeholder {
-  padding-block: 2rem;
-  padding-inline: 1.5rem;
+/*
+ * Item labels (W1-17, CAT-08): the legacy layout (owner answer 3), black on white whatever the theme (PLT-13). On
+ * screen a dashed edge shows the label's size; printed, each label is one page of the roll (owner answer 1) and only
+ * the labels print.
+ */
+.item-label {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  border: 1px dashed var(--border);
+}
+.item-label-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 700;
+  line-height: 1;
+}
+.item-label-shop {
+  font-size: 12pt;
+}
+.item-label-supplier {
+  font-size: 8pt;
+}
+.item-label-bars {
+  flex: 1;
+  min-block-size: 0;
+  margin-block-start: 1mm;
+}
+.item-label-bars svg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+/* Each character centred under its own bars; --quiet is the quiet zone on each side, set per code. */
+.item-label-code {
+  display: flex;
+  padding-inline: var(--quiet, 0);
+  font-size: 8pt;
+  line-height: 1.1;
+}
+.item-label-code > span {
+  flex: 1 1 0;
+  text-align: center;
+}
+/* Centred; a name too long for the label is cut at both ends, as legacy prints it. */
+.item-label-name {
+  display: flex;
+  justify-content: center;
+  font-size: 6pt;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.item-label-name > span {
+  flex-shrink: 0;
+}
+.label-print {
+  display: none;
+}
+@media print {
+  body:has(> .label-print) > :not(.label-print) {
+    display: none !important;
+  }
+  .label-print {
+    display: block;
+  }
+  .label-print .item-label {
+    border: 0;
+    break-after: page;
+  }
 }

@@ -96,7 +96,7 @@
         "overrides": []
       },
       "options": {},
-      "description": "Grafana Synthetic Monitoring: app, POS and staging health every 5 minutes."
+      "description": "Grafana Synthetic Monitoring: production app and POS health every 5 minutes."
     },
     {
       "id": 3,

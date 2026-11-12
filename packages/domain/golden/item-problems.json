@@ -1,0 +1,124 @@
+{
+  "description": "An item's details as the back office saves them (CAT-01, W1-15): the code trimmed and upper case, Code 39 letters, digits and dashes only, at most 20 (labels, D-019, D-055); a name of 1 to 120 characters; a category and a unit; min and max quantity in thousandths, not negative, whole for a unit without fractions, min not above max. Returns the cleaned code and name and the problems found, in this order.",
+  "cases": [
+    {
+      "name": "a good item: code upper-cased and trimmed",
+      "input": {
+        "code": " abea050 ",
+        "name": " ADJUSTER BEARING ",
+        "categoryId": "c1",
+        "unitId": "u1",
+        "allowsFraction": false,
+        "minQty": 1000,
+        "maxQty": 5000
+      },
+      "expected": {
+        "code": "ABEA050",
+        "name": "ADJUSTER BEARING",
+        "problems": []
+      }
+    },
+    {
+      "name": "nothing filled in",
+      "input": {
+        "code": "",
+        "name": "  ",
+        "categoryId": null,
+        "unitId": null,
+        "allowsFraction": false,
+        "minQty": null,
+        "maxQty": null
+      },
+      "expected": {
+        "code": "",
+        "name": "",
+        "problems": ["code_required", "name_required", "category_required", "unit_required"]
+      }
+    },
+    {
+      "name": "a code a label cannot print (a space and a slash)",
+      "input": {
+        "code": "AB EA/1",
+        "name": "X",
+        "categoryId": "c1",
+        "unitId": "u1",
+        "allowsFraction": false,
+        "minQty": null,
+        "maxQty": null
+      },
+      "expected": {
+        "code": "AB EA/1",
+        "name": "X",
+        "problems": ["code_format"]
+      }
+    },
+    {
+      "name": "a code longer than 20",
+      "input": {
+        "code": "ABCDEFGHIJKLMNOPQRSTU",
+        "name": "X",
+        "categoryId": "c1",
+        "unitId": "u1",
+        "allowsFraction": false,
+        "minQty": null,
+        "maxQty": null
+      },
+      "expected": {
+        "code": "ABCDEFGHIJKLMNOPQRSTU",
+        "name": "X",
+        "problems": ["code_format"]
+      }
+    },
+    {
+      "name": "a name of 121 characters",
+      "input": {
+        "code": "OIL050",
+        "name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "categoryId": "c1",
+        "unitId": "u1",
+        "allowsFraction": true,
+        "minQty": null,
+        "maxQty": null
+      },
+      "expected": {
+        "code": "OIL050",
+        "name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "problems": ["name_too_long"]
+      }
+    },
+    {
+      "name": "min above max, a fraction of pieces and a negative max",
+      "input": {
+        "code": "BRK010",
+        "name": "BRAKE PAD",
+        "categoryId": "c1",
+        "unitId": "u1",
+        "allowsFraction": false,
+        "minQty": 1500,
+        "maxQty": -1000
+      },
+      "expected": {
+        "code": "BRK010",
+        "name": "BRAKE PAD",
+        "problems": ["qty_negative", "qty_fraction", "min_above_max"]
+      }
+    },
+    {
+      "name": "litres may be fractions; only a min is fine",
+      "input": {
+        "code": "OIL050",
+        "name": "ENGINE OIL",
+        "categoryId": "c1",
+        "unitId": "u2",
+        "allowsFraction": true,
+        "minQty": 2500,
+        "maxQty": null
+      },
+      "expected": {
+        "code": "OIL050",
+        "name": "ENGINE OIL",
+        "problems": []
+      }
+    }
+  ]
+}

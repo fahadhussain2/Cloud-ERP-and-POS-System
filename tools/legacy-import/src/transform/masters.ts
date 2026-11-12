@@ -1,4 +1,4 @@
-import { parseQty, QTY_SCALE } from '@erp/domain';
+import { DEFAULT_OFFLINE_DAILY_CAP, parseQty, QTY_SCALE } from '@erp/domain';
 
 import { key, type Mapping } from './mapping';
 import {
@@ -68,6 +68,15 @@ export interface ItemCandidate {
   legacy: Legacy;
 }
 
+/** A customer's account: the tier and credit terms (minor units), from the mapping or the defaults. */
+export interface CustomerTerms {
+  tier: 'RETAIL' | 'MECHANIC' | 'WHOLESALE';
+  creditAllowed: boolean;
+  /** null = no limit (D-085). */
+  creditLimit: number | null;
+  offlineDailyCap: number;
+}
+
 export interface PartyCandidate {
   code: string;
   name: string;
@@ -79,7 +88,7 @@ export interface PartyCandidate {
   country: string | null;
   taxId: string | null;
   labelAbbr: string | null;
-  customer: { tier: 'RETAIL' | 'MECHANIC' | 'WHOLESALE' } | null;
+  customer: CustomerTerms | null;
   supplier: boolean;
   legacy: Legacy;
 }
@@ -113,7 +122,15 @@ export interface Findings {
     noPhone: { code: string; name: string }[];
     bothRoles: { code: string; name: string }[];
     abbreviationClashes: { abbr: string; parties: string[] }[];
-    creditCustomers: { code: string; name: string; tier: string; legacyBalance: number }[];
+    creditCustomers: {
+      code: string;
+      name: string;
+      tier: string;
+      creditAllowed: boolean;
+      creditLimit: number | null;
+      offlineDailyCap: number;
+      legacyBalance: number;
+    }[];
   };
   /** Imported before but not in this dump (filled by the load step); reported, never deleted. */
   missing: { what: 'item' | 'party'; code: string }[];
@@ -294,7 +311,14 @@ export function buildMasters(s: Staged, m: Mapping): Masters {
       country: cleanText(countryNames.get((r['countryid'] ?? '').trim())),
       taxId: cleanText(r['bpntn']),
       labelAbbr: cleanText(r['bpnameabbr']),
-      customer: role.customer ? { tier: m.partyTiers.get(code) ?? 'RETAIL' } : null,
+      customer: role.customer
+        ? {
+            tier: m.partyTiers.get(code) ?? 'RETAIL',
+            creditAllowed: m.partyCredit.get(code)?.creditAllowed ?? true,
+            creditLimit: m.partyCredit.get(code)?.creditLimit ?? null,
+            offlineDailyCap: m.partyCredit.get(code)?.offlineDailyCap ?? DEFAULT_OFFLINE_DAILY_CAP,
+          }
+        : null,
       supplier: role.supplier,
       legacy: withSourceNames(legacyOf(s.label, r), PARTNER_COLUMNS),
     };
@@ -307,6 +331,9 @@ export function buildMasters(s: Staged, m: Mapping): Masters {
         code,
         name,
         tier: p.customer.tier,
+        creditAllowed: p.customer.creditAllowed,
+        creditLimit: p.customer.creditLimit,
+        offlineDailyCap: p.customer.offlineDailyCap,
         legacyBalance: balance === undefined ? 0 : legacyMoney(balance).minor,
       });
     }

@@ -1,0 +1,107 @@
+{
+  "description": "Posting a reversal (rule 3, ACC-05, D-108, W1-19): a journal voucher that reverses a posted back-office money document or voucher. Every line of the original's journal swapped, in its order, memo `<number> <original number>`, dated its own business date (the day after the lock date when locked, posted_after_lock); each party entry reversed on its own due date. It names no role, so it never fails for a mapping. The original's posting comes in as it is stored (or as the rebuild replayed it).",
+  "cases": [
+    {
+      "name": "a customer receipt reversed: the customer owes it again",
+      "input": {
+        "reversal": {
+          "id": "jv-9",
+          "number": "JV000009",
+          "branchId": "br-main",
+          "businessDate": "2027-01-12",
+          "originalNumber": "CR000001"
+        },
+        "original": {
+          "entryDate": "2027-01-10",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "CR000001",
+            "lines": [
+              { "accountId": "1160", "partyId": null, "debit": 2500000, "credit": 0 },
+              { "accountId": "1200", "partyId": "cust-akbar", "debit": 0, "credit": 2500000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [
+            { "partyId": "cust-akbar", "role": "customer", "amount": -2500000, "dueDate": "2027-01-10" }
+          ],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-12",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "JV000009 CR000001",
+            "lines": [
+              { "accountId": "1160", "partyId": null, "debit": 0, "credit": 2500000 },
+              { "accountId": "1200", "partyId": "cust-akbar", "debit": 2500000, "credit": 0 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [
+            { "partyId": "cust-akbar", "role": "customer", "amount": 2500000, "dueDate": "2027-01-10" }
+          ],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "a transfer with charges reversed after its month was locked",
+      "input": {
+        "reversal": {
+          "id": "jv-10",
+          "number": "JV000010",
+          "branchId": "br-main",
+          "businessDate": "2027-01-31",
+          "originalNumber": "FT000002"
+        },
+        "original": {
+          "entryDate": "2027-01-10",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "FT000002",
+            "lines": [
+              { "accountId": "1160", "partyId": null, "debit": 975000, "credit": 0 },
+              { "accountId": "6310", "partyId": null, "debit": 25000, "credit": 0 },
+              { "accountId": "1180", "partyId": null, "debit": 0, "credit": 1000000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        },
+        "lockDate": "2027-01-31"
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-02-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "JV000010 FT000002",
+            "lines": [
+              { "accountId": "1160", "partyId": null, "debit": 0, "credit": 975000 },
+              { "accountId": "6310", "partyId": null, "debit": 0, "credit": 25000 },
+              { "accountId": "1180", "partyId": null, "debit": 1000000, "credit": 0 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [
+            {
+              "kind": "posted_after_lock",
+              "details": { "businessDate": "2027-01-31", "lockDate": "2027-01-31" }
+            }
+          ],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    }
+  ]
+}

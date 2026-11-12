@@ -1,0 +1,281 @@
+{
+  "description": "The void document (family V, POS spec §18, sync spec §6.2, W1-12): what the counter writes to its outbox. Counter C03 (…d1, branch …e1) in Asia/Karachi with the 04:00 cutoff, app version 0.9.0, the void's id 019a8000-…081. The bill and the approver as in void.json; today is the business date of the void's own time. userId is who was unlocked and asked for the void; approvedBy is whoever entered their PIN, who may be the same person. A refused check is the DomainError of its problem. W1-23 (D-111): version 2, with paymentChecks: what the counter knew of each part that brings money in.",
+  "cases": [
+    {
+      "name": "the salesman voids with the manager's PIN",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "seq": 1,
+        "createdAt": "2026-11-03T09:20:00.000Z"
+      },
+      "expected": {
+        "version": 2,
+        "id": "019a8000-0000-7000-8000-000000000081",
+        "family": "V",
+        "seq": 1,
+        "number": "C03-V000001",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "saleId": "019a5000-0000-7000-8000-000000000412",
+        "saleNumber": "C03-S000412",
+        "saleBusinessDate": "2026-11-03",
+        "saleTotal": 432000,
+        "saleCashDue": 432000,
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+        "reason": "wrong_price",
+        "note": null,
+        "handoverSeen": "pending",
+        "paymentChecks": [
+          {
+            "method": "cash",
+            "amount": 432000,
+            "known": "checked",
+            "answer": "not_arrived"
+          }
+        ],
+        "createdAt": "2026-11-03T09:20:00.000Z",
+        "businessDate": "2026-11-03",
+        "clientVersion": "0.9.0"
+      }
+    },
+    {
+      "name": "the manager approves their own void",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a2",
+        "seq": 27,
+        "createdAt": "2026-11-03T09:20:00.000Z",
+        "reason": "duplicate_bill",
+        "note": " printed twice "
+      },
+      "expected": {
+        "version": 2,
+        "id": "019a8000-0000-7000-8000-000000000081",
+        "family": "V",
+        "seq": 27,
+        "number": "C03-V000027",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "saleId": "019a5000-0000-7000-8000-000000000412",
+        "saleNumber": "C03-S000412",
+        "saleBusinessDate": "2026-11-03",
+        "saleTotal": 432000,
+        "saleCashDue": 432000,
+        "userId": "019a0000-0000-7000-8000-0000000000a2",
+        "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+        "reason": "duplicate_bill",
+        "note": "printed twice",
+        "handoverSeen": "pending",
+        "paymentChecks": [
+          {
+            "method": "cash",
+            "amount": 432000,
+            "known": "checked",
+            "answer": "not_arrived"
+          }
+        ],
+        "createdAt": "2026-11-03T09:20:00.000Z",
+        "businessDate": "2026-11-03",
+        "clientVersion": "0.9.0"
+      }
+    },
+    {
+      "name": "offline: the void records that the desk couldn't be asked",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "seq": 2,
+        "createdAt": "2026-11-03T09:20:00.000Z",
+        "deskStatus": "unknown",
+        "answers": {
+          "cash": "not_arrived"
+        }
+      },
+      "expected": {
+        "version": 2,
+        "id": "019a8000-0000-7000-8000-000000000081",
+        "family": "V",
+        "seq": 2,
+        "number": "C03-V000002",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "saleId": "019a5000-0000-7000-8000-000000000412",
+        "saleNumber": "C03-S000412",
+        "saleBusinessDate": "2026-11-03",
+        "saleTotal": 432000,
+        "saleCashDue": 432000,
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+        "reason": "wrong_price",
+        "note": null,
+        "handoverSeen": "unknown",
+        "paymentChecks": [
+          {
+            "method": "cash",
+            "amount": 432000,
+            "known": "asked",
+            "answer": "not_arrived"
+          }
+        ],
+        "createdAt": "2026-11-03T09:20:00.000Z",
+        "businessDate": "2026-11-03",
+        "clientVersion": "0.9.0"
+      }
+    },
+    {
+      "name": "a bill paid by Raast",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "seq": 3,
+        "createdAt": "2026-11-03T09:20:00.000Z",
+        "bill": {
+          "cashDue": 0,
+          "payments": [
+            {
+              "method": "raast",
+              "amount": 432000
+            }
+          ]
+        },
+        "deskStatus": "not_applicable",
+        "answers": {
+          "raast": "not_arrived"
+        }
+      },
+      "expected": {
+        "version": 2,
+        "id": "019a8000-0000-7000-8000-000000000081",
+        "family": "V",
+        "seq": 3,
+        "number": "C03-V000003",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "saleId": "019a5000-0000-7000-8000-000000000412",
+        "saleNumber": "C03-S000412",
+        "saleBusinessDate": "2026-11-03",
+        "saleTotal": 432000,
+        "saleCashDue": 0,
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+        "reason": "wrong_price",
+        "note": null,
+        "handoverSeen": "not_applicable",
+        "paymentChecks": [
+          {
+            "method": "raast",
+            "amount": 432000,
+            "known": "asked",
+            "answer": "not_arrived"
+          }
+        ],
+        "createdAt": "2026-11-03T09:20:00.000Z",
+        "businessDate": "2026-11-03",
+        "clientVersion": "0.9.0"
+      }
+    },
+    {
+      "name": "at 03:59 the next morning the bill is still today's",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "seq": 4,
+        "createdAt": "2026-11-03T22:59:30.000Z"
+      },
+      "expected": {
+        "version": 2,
+        "id": "019a8000-0000-7000-8000-000000000081",
+        "family": "V",
+        "seq": 4,
+        "number": "C03-V000004",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "saleId": "019a5000-0000-7000-8000-000000000412",
+        "saleNumber": "C03-S000412",
+        "saleBusinessDate": "2026-11-03",
+        "saleTotal": 432000,
+        "saleCashDue": 432000,
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+        "reason": "wrong_price",
+        "note": null,
+        "handoverSeen": "pending",
+        "paymentChecks": [
+          {
+            "method": "cash",
+            "amount": 432000,
+            "known": "checked",
+            "answer": "not_arrived"
+          }
+        ],
+        "createdAt": "2026-11-03T22:59:30.000Z",
+        "businessDate": "2026-11-03",
+        "clientVersion": "0.9.0"
+      }
+    },
+    {
+      "name": "at 04:00 the next morning it is another day",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "seq": 5,
+        "createdAt": "2026-11-03T23:00:00.000Z"
+      },
+      "error": "other_day"
+    },
+    {
+      "name": "a handed-over bill is refused",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "seq": 6,
+        "createdAt": "2026-11-03T09:20:00.000Z",
+        "deskStatus": "received"
+      },
+      "error": "handed_over"
+    },
+    {
+      "name": "an approver without pos.void is refused",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "seq": 7,
+        "createdAt": "2026-11-03T09:20:00.000Z",
+        "approverId": "019a0000-0000-7000-8000-0000000000a1"
+      },
+      "error": "not_permitted"
+    },
+    {
+      "name": "a 1,000,000th void keeps every digit",
+      "input": {
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "seq": 1000000,
+        "createdAt": "2026-11-03T09:20:00.000Z"
+      },
+      "expected": {
+        "version": 2,
+        "id": "019a8000-0000-7000-8000-000000000081",
+        "family": "V",
+        "seq": 1000000,
+        "number": "C03-V1000000",
+        "deviceId": "019a0000-0000-7000-8000-0000000000d1",
+        "branchId": "019a0000-0000-7000-8000-0000000000e1",
+        "saleId": "019a5000-0000-7000-8000-000000000412",
+        "saleNumber": "C03-S000412",
+        "saleBusinessDate": "2026-11-03",
+        "saleTotal": 432000,
+        "saleCashDue": 432000,
+        "userId": "019a0000-0000-7000-8000-0000000000a1",
+        "approvedBy": "019a0000-0000-7000-8000-0000000000a2",
+        "reason": "wrong_price",
+        "note": null,
+        "handoverSeen": "pending",
+        "paymentChecks": [
+          {
+            "method": "cash",
+            "amount": 432000,
+            "known": "checked",
+            "answer": "not_arrived"
+          }
+        ],
+        "createdAt": "2026-11-03T09:20:00.000Z",
+        "businessDate": "2026-11-03",
+        "clientVersion": "0.9.0"
+      }
+    }
+  ]
+}

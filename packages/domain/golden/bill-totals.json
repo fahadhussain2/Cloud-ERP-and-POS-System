@@ -1,0 +1,241 @@
+{
+  "description": "Bill amounts: line amount = quantity × unit price (half away from zero); the bill discount is split over the line amounts by largest remainder; total = lines − bill discount (POS spec §10, POS-04)",
+  "cases": [
+    {
+      "name": "an empty bill",
+      "input": {
+        "version": 1,
+        "sellerId": "s1",
+        "tierId": "retail",
+        "lines": [],
+        "billDiscount": 0,
+        "billApproval": null
+      },
+      "expected": { "lines": [], "subtotal": 0, "lineDiscountTotal": 0, "billDiscount": 0, "total": 0 }
+    },
+    {
+      "name": "two lines, one bargained",
+      "input": {
+        "version": 1,
+        "sellerId": "s1",
+        "tierId": "retail",
+        "lines": [
+          {
+            "id": "l1",
+            "itemId": "i1",
+            "qty": 2000,
+            "allowsFraction": false,
+            "list": 145000,
+            "floor": 130000,
+            "unitPrice": 145000,
+            "approval": null
+          },
+          {
+            "id": "l2",
+            "itemId": "i2",
+            "qty": 1000,
+            "allowsFraction": false,
+            "list": 65000,
+            "floor": 55000,
+            "unitPrice": 60000,
+            "approval": null
+          }
+        ],
+        "billDiscount": 0,
+        "billApproval": null
+      },
+      "expected": {
+        "lines": [
+          { "id": "l1", "listAmount": 290000, "amount": 290000, "billShare": 0, "net": 290000 },
+          { "id": "l2", "listAmount": 65000, "amount": 60000, "billShare": 0, "net": 60000 }
+        ],
+        "subtotal": 355000,
+        "lineDiscountTotal": 5000,
+        "billDiscount": 0,
+        "total": 350000
+      }
+    },
+    {
+      "name": "a bill discount split in proportion, the leftover paisa to the largest remainder",
+      "input": {
+        "version": 1,
+        "sellerId": "s1",
+        "tierId": "retail",
+        "lines": [
+          {
+            "id": "l1",
+            "itemId": "i1",
+            "qty": 2000,
+            "allowsFraction": false,
+            "list": 145000,
+            "floor": 130000,
+            "unitPrice": 145000,
+            "approval": null
+          },
+          {
+            "id": "l2",
+            "itemId": "i2",
+            "qty": 1000,
+            "allowsFraction": false,
+            "list": 65000,
+            "floor": 55000,
+            "unitPrice": 60000,
+            "approval": null
+          }
+        ],
+        "billDiscount": 10000,
+        "billApproval": null
+      },
+      "expected": {
+        "lines": [
+          { "id": "l1", "listAmount": 290000, "amount": 290000, "billShare": 8286, "net": 281714 },
+          { "id": "l2", "listAmount": 65000, "amount": 60000, "billShare": 1714, "net": 58286 }
+        ],
+        "subtotal": 355000,
+        "lineDiscountTotal": 5000,
+        "billDiscount": 10000,
+        "total": 340000
+      }
+    },
+    {
+      "name": "Rs 10 off three equal lines",
+      "input": {
+        "version": 1,
+        "sellerId": "s1",
+        "tierId": "retail",
+        "lines": [
+          {
+            "id": "l1",
+            "itemId": "i1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "list": 1000,
+            "floor": null,
+            "unitPrice": 1000,
+            "approval": null
+          },
+          {
+            "id": "l2",
+            "itemId": "i2",
+            "qty": 1000,
+            "allowsFraction": false,
+            "list": 1000,
+            "floor": null,
+            "unitPrice": 1000,
+            "approval": null
+          },
+          {
+            "id": "l3",
+            "itemId": "i3",
+            "qty": 1000,
+            "allowsFraction": false,
+            "list": 1000,
+            "floor": null,
+            "unitPrice": 1000,
+            "approval": null
+          }
+        ],
+        "billDiscount": 1000,
+        "billApproval": null
+      },
+      "expected": {
+        "lines": [
+          { "id": "l1", "listAmount": 1000, "amount": 1000, "billShare": 334, "net": 666 },
+          { "id": "l2", "listAmount": 1000, "amount": 1000, "billShare": 333, "net": 667 },
+          { "id": "l3", "listAmount": 1000, "amount": 1000, "billShare": 333, "net": 667 }
+        ],
+        "subtotal": 3000,
+        "lineDiscountTotal": 0,
+        "billDiscount": 1000,
+        "total": 2000
+      }
+    },
+    {
+      "name": "1.005 m at Rs 333 rounds half away from zero",
+      "input": {
+        "version": 1,
+        "sellerId": "s1",
+        "tierId": "retail",
+        "lines": [
+          {
+            "id": "l1",
+            "itemId": "i3",
+            "qty": 1005,
+            "allowsFraction": true,
+            "list": 33300,
+            "floor": 30000,
+            "unitPrice": 33300,
+            "approval": null
+          }
+        ],
+        "billDiscount": 0,
+        "billApproval": null
+      },
+      "expected": {
+        "lines": [{ "id": "l1", "listAmount": 33467, "amount": 33467, "billShare": 0, "net": 33467 }],
+        "subtotal": 33467,
+        "lineDiscountTotal": 0,
+        "billDiscount": 0,
+        "total": 33467
+      }
+    },
+    {
+      "name": "above list: the line discount is negative",
+      "input": {
+        "version": 1,
+        "sellerId": "s1",
+        "tierId": "retail",
+        "lines": [
+          {
+            "id": "l1",
+            "itemId": "i1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "list": 100000,
+            "floor": 90000,
+            "unitPrice": 110000,
+            "approval": null
+          }
+        ],
+        "billDiscount": 0,
+        "billApproval": null
+      },
+      "expected": {
+        "lines": [{ "id": "l1", "listAmount": 100000, "amount": 110000, "billShare": 0, "net": 110000 }],
+        "subtotal": 100000,
+        "lineDiscountTotal": -10000,
+        "billDiscount": 0,
+        "total": 110000
+      }
+    },
+    {
+      "name": "no list price: the list amount is the amount",
+      "input": {
+        "version": 1,
+        "sellerId": "s1",
+        "tierId": "retail",
+        "lines": [
+          {
+            "id": "l1",
+            "itemId": "i4",
+            "qty": 1000,
+            "allowsFraction": false,
+            "list": null,
+            "floor": null,
+            "unitPrice": 50000,
+            "approval": null
+          }
+        ],
+        "billDiscount": 0,
+        "billApproval": null
+      },
+      "expected": {
+        "lines": [{ "id": "l1", "listAmount": 50000, "amount": 50000, "billShare": 0, "net": 50000 }],
+        "subtotal": 50000,
+        "lineDiscountTotal": 0,
+        "billDiscount": 0,
+        "total": 50000
+      }
+    }
+  ]
+}

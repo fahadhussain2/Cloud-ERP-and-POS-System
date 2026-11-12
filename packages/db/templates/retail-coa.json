@@ -39,7 +39,15 @@
       "type": "asset",
       "parentCode": "1100",
       "isPostable": true,
-      "systemRole": null
+      "systemRole": "CASH_SAFE"
+    },
+    {
+      "code": "1190",
+      "name": "Posting suspense",
+      "type": "asset",
+      "parentCode": "1000",
+      "isPostable": true,
+      "systemRole": "SUSPENSE"
     },
     {
       "code": "1200",

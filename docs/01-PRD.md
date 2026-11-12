@@ -123,7 +123,7 @@ If either is exceeded, a manager PIN is needed. No cash moves, and the receipt s
 A finalized bill is never edited. A Manager or Cashier with the permission voids it, with a **PIN and a reason**, and optionally issues a corrected bill linked to it. Default rule: voids are allowed until the business day closes **and** before the cash handover. After that, use a return. The voided bill keeps its number and prints as VOID.
 
 ### W6. Return and exchange (one screen)
-1. Scan the bill's code, or search the bill by number, phone or date. This includes pre-cutover legacy bills from the last 90 days.
+1. Scan the bill's code, or search the bill by number, phone or date, among the branch's bills of the last 90 days. Pre-cutover legacy bills are not imported (D-100): a part bought before go-live is a no-receipt return, priced by the manager from the old bill in the read-only legacy system.
 2. Mark the lines coming back (up to the quantity originally sold, minus earlier returns). For each, record a **reason** (wrong part, unused option, defective, changed mind, other) and a **condition** (resellable goes back to Shop; defective goes to the Damaged location).
 3. Optionally add replacement items. The screen shows the net amount: the customer pays the difference or receives a refund.
 4. Refunds are at the **price originally paid**.
@@ -231,7 +231,7 @@ Printing to the shared network printer keeps working, because it only needs the 
 | POS-09 | Finalize → print the bill silently to the device's default printer (local or shared network printer) using its print profile (POS-16). The bill shows the shop header, bill number, date and time, salesman, lines, totals, tender, cash received and change, return policy line, and a scannable **bill code** (barcode or signed QR). | 1 |
 | POS-10 | Reprint (marked REPRINT, logged). | 1 |
 | POS-11 | **Void** with permission, PIN and reason within the void window; optional linked **reissue**. | 1 |
-| POS-12 | **Return / exchange** screen per W6, including legacy bill lookup (90 days), reason and condition, no-receipt flow with PIN, return window and non-returnable category rules (approver PIN when out of policy), and the role permission "can process returns" (approver PIN when missing). | 1 |
+| POS-12 | **Return / exchange** screen per W6, including bill lookup (90 days; no legacy bills, D-100), reason and condition, no-receipt flow with PIN, return window and non-returnable category rules (approver PIN when out of policy), and the role permission "can process returns" (approver PIN when missing). | 1 |
 | POS-13 | Per-device document numbering, gapless and never reused (e.g. `C03-S000412`). | 1 |
 | POS-14 | Status bar: online/offline, last sync, unsynced count, warnings when offline longer than a threshold. | 1 |
 | POS-15 | Cash rounding per tenant rule (e.g. to the nearest whole rupee), posted to a rounding account. | 1 |
@@ -319,7 +319,7 @@ All reports filter by date range and export to CSV. PDF/print is offered where i
 |---|---|---|
 | MIG-01 | Repeatable importer for masters (items, categories, brands, origins, parties, chart of accounts) with cleanup reports. | 1 |
 | MIG-02 | Opening balances at cutover: stock quantity (into Shop) and average cost, customer and supplier balances, GL opening entry. | 1 |
-| MIG-03 | The last 90 days of legacy sale bills imported read-only for return lookup. | 1 |
+| MIG-03 | ~~The last 90 days of legacy sale bills imported read-only for return lookup.~~ **Dropped (D-100):** pre-go-live returns are no-receipt returns with a manager's PIN. | – |
 | MIG-04 | Reconciliation report: counts, stock value, AR/AP totals and trial balance vs legacy. | 1 |
 
 ## 7. Non-functional requirements
@@ -392,7 +392,7 @@ Status as of 2026-10-17. All questions are resolved except Q7 (D-052).
 | Q4 | **Void window**: until handover and same business day? | **Default accepted:** yes |
 | Q5 | **Cash rounding**? | **Default accepted:** nearest Rs 1 |
 | Q6 | Default **credit limits** and **offline daily cap** for credit customers? | **Default accepted:** limit set per customer; offline cap Rs 25,000/day |
-| Q7 | Model of the shared dot-matrix printer and the label printer. Paper: continuous (tractor-feed) or single sheets? Full A4 or half page per bill? Label size? | **Partly resolved (D-055):** a legacy bill shows **A5 landscape (half A4)** paper and a **Code 39** barcode. **Still open:** printer model (label on the printer, or the printer name in Windows), paper type, label printer and label size. |
+| Q7 | Model of the shared dot-matrix printer and the label printer. Paper: continuous (tractor-feed) or single sheets? Full A4 or half page per bill? Label size? | **Partly resolved (D-055):** a legacy bill shows **A5 landscape (half A4)** paper and a **Code 39** barcode. **Labels resolved (D-106):** a Zebra GX420t with a roll of 40 × 28 mm labels. **Bills:** an HP LaserJet P1005 (see the go-live checklist). |
 | Q8 | Are the legacy accounts "Cheque in hand", "Cash memo" and "Cash for payment" still used? | **Resolved:** they have no transactions and a zero balance in the legacy data, so they are **not migrated**. The final migration re-checks them and migrates (and flags) any that hold a balance on 31 Dec 2026. Customers don't pay by cheque, so there is **no cheque payment method**. |
 | Q9 | How should stock be split between **Shop and Godown** at go-live? | **Default accepted:** all in Shop; the Godown is counted and transferred in January |
 | Q10 | Counter PCs: Windows version and browser? | **Resolved:** some counters run **Windows 7 and Windows 8** (Chrome/Edge stopped updating there in 2023). They will be **upgraded to Windows 10 before the pilot (1 Dec)**. All counters: Windows 10/11 + current Chrome or Edge. |

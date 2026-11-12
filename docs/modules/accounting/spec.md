@@ -1,0 +1,123 @@
+# Posting engine: specification
+
+| | |
+|---|---|
+| **Status** | v1 accepted with the [W1-08 plan](plans/W1-08-posting-engine.md) (D-095); built in W1-08 for sales |
+| **Refs** | INV-01, INV-02, INV-03, ACC-01, ACC-02, ACC-03, ACC-08, ACC-09; [posting rules](../../04-ACCOUNTING-POSTING-RULES.md); architecture §5.2, §7; data model §3, §4, §7, §9; CLAUDE.md rules 1, 3, 4, 5, 7; D-017, D-022, D-057, D-094, D-095 |
+
+What every operational document becomes in the books, how that is written, and how it is proven. The posting rules say **which** lines a document posts; this spec says **how** the engine posts them. Each new document type (returns W1-13, voids W1-12 (§5c), handovers W1-10, opening W1-14, receipts W1-16, stock operations W1-18, journal vouchers W1-19) adds a pure function and golden cases here, and nothing else changes.
+
+## 1. Shape
+
+| Part | Where | What it does |
+|---|---|---|
+| **Pure engine** | `packages/posting/src/sale.ts` (`postSale`), `cost.ts`, `replay.ts` | `postSale(sale, context, state)` → `{ ok: true, posting }` or `{ ok: false, error }`. No I/O, no clock. Golden cases in `packages/posting/golden/`, `fast-check` properties beside them. |
+| **Database layer** | `packages/posting/src/db/` (`load.ts`, `write.ts`, `post.ts`, `rebuild.ts`) | Loads the document, its context and the state it touches; writes the rows the engine returns. The **only** writer of the ledger tables: a repo test (`ledger-writers.test.ts`) fails on any other. |
+| **Callers** | push (`apps/api/src/sync/push.ts`), the worker's `posting-catch-up` job, `erp-tenant posting-check` / `posting-rebuild` | Push posts each accepted sale in its own transaction; the worker posts what push couldn't; the commands prove and repair the ledgers. |
+
+**Inputs.** The *sale* is the stored document (lines with their id, location, quantity in thousandths, line total and tax; the bill discount, rounding and tax total; the payments in bill order, each with its method code). The *context* is the settings: the account for each role and for each payment method (null = routed by role: cash → `CASH_IN_TRANSIT`, on account → `AR_CONTROL`), the lock date, the customer's payment terms. The *state* is what earlier postings left: each item's average cost (`null` = none known yet) and tenant-wide on-hand, and each location's balance per item.
+
+**Output.** The entry date; the journal entry (branch, memo = the bill number, lines); the stock movements; the party ledger entries; the exceptions; and the costs and balances the posting changed, as they are after it.
+
+## 2. A sale (posting rules §4.1)
+
+1. **Entry date** = the business date, or the day after the lock date when the business date is on or before it (`posted_after_lock`, medium).
+2. **Tenders**, in payment order: debit each method's account; amounts on one account (Raast and bank transfer on HBL) make one line. An on-account payment debits `AR_CONTROL` with the customer as the line's party and writes a customer ledger entry (+amount, due = entry date + the customer's terms, the same day without terms). On account without a customer → error `on_account_without_customer`.
+3. **Revenue**: credit `SALES` with Σ line totals; debit `SALES_DISCOUNT` with the bill discount; `ROUNDING` with the rounding (positive = the customer paid more = credit); credit `TAX_PAYABLE` with the tax total when it isn't 0.
+4. **Suspense**: whatever still doesn't balance (a bill that doesn't add up, D-094) goes to `SUSPENSE` (1190 *Posting suspense*), so the stock and the cash are still right. The accountant clears it with a journal voucher (W1-19).
+5. **Stock**, line by line, each line seeing the lines before it: a movement out of the line's location at the item's average (`value = qty × avg`, half away from zero, D-079); the average doesn't change; tenant-wide on-hand and the location balance go down. An item with no cost yet moves at 0 (`no_cost`, low, once per item per bill). A location balance going **from 0 or more to below 0** raises `negative_stock` (low); further sales while it stays negative don't. Never blocked (INV-03).
+6. **Cost**: debit `COGS` and credit `INVENTORY` with Σ the movements' value, when it isn't 0.
+
+Lines come out in this order: tenders, `SALES`, `SALES_DISCOUNT`, `ROUNDING`, `TAX_PAYABLE`, `SUSPENSE`, `COGS`, `INVENTORY`. Zero lines are left out. A role or method without an account is an error (`role_unmapped`, `method_unmapped`).
+
+**A line's cost is on its movement only** (`stock_movements.source_line_id`): finalized lines are never updated (rule 3). A returned line (W1-13) reads its original cost from there.
+
+**Average after a receipt** (`averageAfterReceipt`, posting rules §5.1): `(on_hand × avg + qty × net_unit_cost) / (on_hand + qty)`, half away from zero; the receipt's cost when on-hand was 0 or less or no cost was known. First used by the opening stock (W1-14) and goods receipts (W1-16).
+
+## 3. Writing a posting
+
+`postDocument(client, { tenantId, type, id, now })` runs inside the caller's tenant transaction:
+
+1. Takes the tenant's **`posting_state` row `FOR UPDATE`** (created on first use). A tenant's postings therefore run one at a time; the lock is held only for this step.
+2. If the document already has a `postings` row → `already_posted`.
+3. `SAVEPOINT posting`; loads the sale, the context as it is now and the state its lines touch; runs the engine.
+4. On success: the next `seq` and, when there are journal lines, the next journal number (`J` + 6 digits, per tenant); writes the `postings` row with the **context it used**, the journal entry and lines, the movements, the party entries; sets `item_costs` and `stock_balances` to the new values and adds to `party_balances`; writes the posting's exceptions (raising the document's `exception_count`); notes `postedAt` on an earlier `posting_failed` exception.
+5. On an engine error or any database error, including a lock that can't be had (the savepoint is taken before the lock): back to the savepoint, one `posting_failed` exception (high, `details.code`; never two for one document), `failed`. **The document stays accepted** (SYN-03). Push logs `posting.failed` as an error.
+
+Push's answer to the counter doesn't change: posting exceptions are recorded on the server only (counters on an older app know no new kinds).
+
+**Catch-up.** `postPending(pool, tenantId)` posts every accepted sale without a `postings` row in arrival order (oldest received first; a counter's bills from one push, which share a receive time, by their sequence), paging through all of them 500 at a time, so bills that never post can't hold back the ones behind them. The worker runs it for every shop at start-up and a minute after each run. It posts the bills accepted before W1-08 on its first run, and a bill held by `posting_failed` as soon as its cause is fixed (e.g. Raast mapped to a bank). The `posting_failed` exception stays open for review.
+
+## 4. Tables (migration 0009, data model §4, §7, §9)
+
+| Table | Kind | Notes |
+|---|---|---|
+| `posting_state` | per tenant | `last_seq`, `last_journal_no`; the posting lock |
+| `postings` | append-only, order of record | `seq`, `source_type`, `source_id` (unique), `entry_date`, `posted_at`, `context` (jsonb: accounts by role and method, lock date, customer terms) |
+| `journal_entries`, `journal_lines` | append-only | one-sided lines (`CHECK`); a deferred constraint trigger refuses an entry whose debits ≠ credits at commit; lines carry the branch and, on AR/AP, the party |
+| `stock_movements` | append-only | `qty_delta`, `unit_cost`, `value_delta`, `avg_cost_after` (null while no cost is known), `source_line_id`, `business_date` = the entry date |
+| `party_ledger_entries` | append-only | `role`, `entry_date`, `due_date`, `amount` (+ = owed more) |
+| `stock_balances`, `party_balances` | balances, synced | updated in place; synced rows are never deleted (a rebuild zeroes them) |
+| `item_costs` | balance | `avg_cost`, `on_hand` (tenant-wide), `last_cost`, `last_supplier_id`, `last_receipt_at` |
+
+Every table has `tenant_id` and forced RLS. The app role may insert into the append-only tables but never update or delete them. Exceptions gain `no_cost`, `posting_failed`, `posted_after_lock`.
+
+## 5. The rebuild (ACC-02, rule 4)
+
+**Check** (`checkRebuild`, `erp-tenant posting-check <env> <shop>`): in one `REPEATABLE READ READ ONLY` snapshot, replay every posting in `seq` order from its document and **its recorded context**, starting from nothing; turn the result and the stored rows into comparable text (per seq for the ledgers, per item, location and party for the balances; journal lines in order) and list every difference. It takes no lock and writes nothing, so it can run during the shop's day. Because each posting replays with the context it used, moving Raast from HBL to Soneri doesn't make old bills look wrong.
+
+**Apply** (`applyRebuild`, `erp-tenant posting-rebuild <env> <shop>`), as `erp_owner`, for after a posting-rule fix: takes the posting lock; **refused when any posting is on or before the lock date** (architecture §7: a locked period needs an explicit, audited unlock first); deletes the append-only ledger rows and `item_costs`, zeroes the synced balances, writes the replay back (keeping each posting's seq, context and posted time, renumbering the journals), writes `posting.rebuild` to the audit log, then the command runs the check. **Run it after shop hours:** it holds the posting lock for the whole rewrite, so bills pushed meanwhile are accepted but wait to post until it finishes.
+
+The ledgers come only from postings: costs set any other way (a test, a manual fix) show up as differences. Opening stock (W1-14) is a posting like any other.
+
+## 5a. A handover (posting rules §4.5, W1-10)
+
+`postHandover(handover, context)` (`packages/posting/src/handover.ts`): an `in` posts `Dr CASH_DRAWER / Cr CASH_IN_TRANSIT`, a `payout` the reverse, for the handover's own `amount`, dated its business date (or the day after the lock date, `posted_after_lock`), memo `<handover number> <bill number>`. No stock, no party. A chart without either role is `role_unmapped`. Source type `cash_handover` in `postings`; a **duplicate is never posted** (`loadHandover` returns none for it). Push posts it in the accepting transaction, the catch-up posts what push couldn't, and the rebuild check replays it with its recorded context.
+
+Because it posts its own amount, its order against its bill doesn't change the books: an offline scan often arrives first. Once every cash bill is handed over, `CASH_IN_TRANSIT` is back to 0 (posting rules §4.5's control property; tested in `handover.test.ts` and `cash-desk.int.test.ts`).
+
+## 5b. The desk's collections, cash movements and sessions (posting rules §4.5, W1-11)
+
+`packages/posting/src/cash.ts`, each for its own amount, dated its business date (or the day after the lock date), memo its number, no stock:
+
+- **`postCollection`** (source `payment`): cash → `Dr CASH_DRAWER`, any other method → the method's account (`method_unmapped` without one); `Cr AR_CONTROL` with the customer, and a customer ledger entry of −amount.
+- **`postCashMovement`** (source `cash_movement`): `expense` and `bank_deposit` → `Dr` the category's or bank's account (`context.accounts.targets`, loaded for that one id; `target_unmapped` without it) / `Cr CASH_DRAWER`; `supplier_payment` → `Dr AP_CONTROL` with the supplier and a supplier ledger entry of −amount (`party_missing` without one); `to_safe` → `Dr CASH_SAFE / Cr CASH_DRAWER`, `from_safe` the reverse.
+- **`postSession`** (source `cash_session`; the open posts under the session's id, the close under its close document's id): an open whose float differs from `floatExpected` moves the difference between `CASH_SHORT_OVER` and `CASH_DRAWER`; a close moves its variance the same way, then counted − left in the drawer to `CASH_SAFE`. A desk's first open, an open with the float that stayed and a close without a count (W1-10) post no lines.
+
+Push posts each in the accepting transaction, the catch-up posts what push couldn't (`postPending` reads all five sources), and the rebuild check replays them. After a day of desk documents and a counted close, `CASH_DRAWER` moved by exactly what the drawer did (tested in `cash.test.ts`).
+
+## 5c. Voids (posting rules §4.4, W1-12)
+
+`postVoid(void, original, context, state)` (`packages/posting/src/void.ts`, source `sales_void`): the voided sale's **own posting** comes in as it is stored (`loadSalePosting`: its journal lines in order, its stock movements in line order, its customer entries); every journal line is swapped under the memo `<void number> <bill number>`, dated the void's business date (or the day after the lock date, `posted_after_lock`); each movement comes back with the opposite quantity at its own unit cost, the average recomputed by `averageAfterReceipt` (a line that left with no cost: back at 0, the average unchanged); each customer entry is reversed on its own due date. It names no role or method, so it can't fail for a mapping. The sale's `no_cost` and `negative_stock` aren't raised again.
+
+A void posts only once its bill has (`sale_not_posted` otherwise): push posts it in the accepting transaction when the bill is posted, posts a void that was waiting right after its bill, and `postPending` reads voids whose bill has posted. A duplicate never posts. **The rebuild** replays a void against the sale's **replayed** posting, so the check stays exact. Every case nets its sale to nothing (tested in `void.test.ts` and `void.int.test.ts`).
+
+## 5d. Returns and exchanges (posting rules §4.2, §4.3, W1-13)
+
+A return or exchange is a sale document with negative lines, posted by `postSale` (source `sale`) in one entry: sold lines credit `SALES`, returned lines debit **`SALES_RETURNS`** at their refund, the bill discount and rounding as on a sale, and the payments as they are (a negative one credits cash in transit, the customer, or the method's bank). Each returned line comes back into its location (SHOP, or DAMAGED when defective) as a receipt at **`returnUnitCost`**: the original line's unit cost from its stock movement (D-044), or the current average for a no-receipt line or an original that left with no cost; with no cost at all it comes back at 0, leaves the average unknown and is flagged `no_cost`. COGS and inventory net to one pair of lines. A return whose original line is linked but hasn't posted **waits** (`original_not_posted` is never written): push posts it right after its original, and the catch-up excludes it until then and posts it after the original in the same pass. The rebuild takes the original's replayed movement.
+
+## 5e. The opening balances (posting rules §7, W1-14)
+
+`postOpening(opening, context, state)` (`packages/posting/src/opening.ts`, source `opening`, D-101): one entry dated the opening's business date (or the day after the lock date, `posted_after_lock`), memo `Opening <label>`. **Stock** lines come into their location, in line order: at the line's cost, else the current average, else 0 with `no_cost` and the average left unknown; a positive quantity sets the average by `averageAfterReceipt`; a negative one leaves at its own cost and sets the average only when none was known (not flagged: the opening reports list negative stock). `Dr INVENTORY` Σ the movements. **Customers** debit `AR_CONTROL` with the party (an advance credits it), **suppliers** credit `AP_CONTROL` (a supplier in debit debits it), each with a party entry due on the entry date; **account** lines (the counted drawer, the bank statements) go to their account; the balance goes to `OPENING_BALANCE_EQUITY`. A role is needed only when a line uses it (`role_unmapped`). The posting also carries each item's last purchase, written to `item_costs.last_cost`, `last_supplier_id`, `last_receipt_at`.
+
+The importer writes the opening as a **draft** and posts it with `postDocument(type 'opening')`; the catch-up never posts openings. A posted opening is never changed (a trigger, except as erp_owner for the pilot wipe). The rebuild replays it with its recorded context.
+
+**Writes are one statement per kind of row** (journal lines, movements, party entries and balances, costs, stock balances, floors), so a 20,000-line opening posts in seconds, also over a tunnel.
+
+**The floor from cost** (`item_floors`, D-092): whenever a posting sets an item's average, the layer writes `costFloor(avg, the category's floor_min_margin_bp)` when it changed, or marks the row deleted when the item has no cost or its category no margin. The rebuild marks every floor deleted and writes them again from the replay.
+
+**The pilot wipe** (`wipePilot`, `packages/posting/src/db/wipe.ts`, D-101) removes every table in `WIPED_TABLES`, zeroes the synced balances, marks the floors deleted and revokes the counters; every table is in `WIPED_TABLES` or `KEPT_TABLES` (a test checks the schema). `markLive` sets `go_live_at` and the lock date; the wipe is refused after it.
+
+## 5f. Purchasing (posting rules §5.1, §5.2, §6, W1-16)
+
+Three more sources, posted by the back office in the transaction that posts the document (a posting that fails refuses the post): `goods_receipt` (`postGoodsReceipt`: stock at each line's exact value, the average from that value, the last purchase, AP with the due date, paid by bank or not), `purchase_return` (`postPurchaseReturn`: out at the average, the difference to Purchase price variance) and `supplier_payment` (`postSupplierPayment`: by bank). The context records the bank's account, so the rebuild replays them as posted. The pilot wipe removes them and their counters (D-101).
+
+## 5g. Back-office accounting (posting rules §6, W1-19, D-108)
+
+Four more sources, posted by the back office in the transaction that saves or posts the document (a posting that fails, or a date on or before the lock date, refuses it): `customer_receipt`, `expense`, `fund_transfer` (each posted when saved) and `journal_voucher` (a draft, then posted). Their bank accounts and categories reach their accounts through `context.accounts.targets` (`loadContext` takes several); the safe is `CASH_SAFE`. A **reversal** is a `journal_voucher` row naming what it reverses (`reverses_type`, `reverses_id`, unique): `loadJournalVoucher` returns it as a reversal, `postReversal` swaps the original's posting as stored (`loadMoneyPosting`), and the rebuild swaps the original's replayed posting. The pilot wipe removes them and their counters (D-101).
+
+## 6. Known limits
+
+- **Arrival order** sets the cost of a late offline sale (D-017): recorded and reproducible, not re-costed (re-costing is Phase 2).
+- **Rounding drift:** Σ (on-hand × average) can differ from the `INVENTORY` balance by a few paisa; the stock valuation report (W1-20) shows it and an adjustment clears it.
+- **Rebuild speed:** the replay reads each document separately; fine for a shop's months of bills, to be batched if a tenant's history grows large.

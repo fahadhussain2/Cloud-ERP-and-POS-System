@@ -1,0 +1,55 @@
+{
+  "description": "Document numbers: {device code}-{family}{seq, at least 6 digits}, gapless per device and family (POS-13, architecture §4.4)",
+  "cases": [
+    {
+      "name": "the first sale on counter C03",
+      "input": { "deviceCode": "C03", "family": "S", "seq": 1 },
+      "expected": "C03-S000001"
+    },
+    {
+      "name": "sale 412",
+      "input": { "deviceCode": "C03", "family": "S", "seq": 412 },
+      "expected": "C03-S000412"
+    },
+    {
+      "name": "the last 6-digit number",
+      "input": { "deviceCode": "C03", "family": "S", "seq": 999999 },
+      "expected": "C03-S999999"
+    },
+    {
+      "name": "past a million, the number just gets longer",
+      "input": { "deviceCode": "C03", "family": "S", "seq": 1000000 },
+      "expected": "C03-S1000000"
+    },
+    {
+      "name": "a cash desk handover",
+      "input": { "deviceCode": "D01", "family": "H", "seq": 7 },
+      "expected": "D01-H000007"
+    },
+    {
+      "name": "a three-digit counter code",
+      "input": { "deviceCode": "C104", "family": "S", "seq": 5 },
+      "expected": "C104-S000005"
+    },
+    {
+      "name": "sequence 0 is refused",
+      "input": { "deviceCode": "C03", "family": "S", "seq": 0 },
+      "error": "invalid_sequence"
+    },
+    {
+      "name": "a fractional sequence is refused",
+      "input": { "deviceCode": "C03", "family": "S", "seq": 1.5 },
+      "error": "invalid_sequence"
+    },
+    {
+      "name": "a lower-case device code is refused",
+      "input": { "deviceCode": "c03", "family": "S", "seq": 1 },
+      "error": "invalid_device_code"
+    },
+    {
+      "name": "a device code without its kind letter is refused",
+      "input": { "deviceCode": "03", "family": "S", "seq": 1 },
+      "error": "invalid_device_code"
+    }
+  ]
+}

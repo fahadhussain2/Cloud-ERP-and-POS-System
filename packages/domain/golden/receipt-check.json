@@ -1,0 +1,387 @@
+{
+  "description": "Checking a goods receipt before it is posted (PUR-02, W1-16). Problems block posting: the header (supplier, the supplier's bill number and date, the location, at least one line), each line (an item, a quantity above 0, whole for a unit without fractions, a unit cost of 0 or more in whole paisa, a line discount of 0 up to its gross), the bill discount (0 up to Σ nets), then the bill total as printed: required, and equal to the computed total (the difference = printed − computed). Warnings don't block: a net unit cost more than 10 % above or below the item's last cost, and Retail at or below the net unit cost. Rows are 0-based; null = the receipt. Totals and the difference are null when a line or a discount is invalid.",
+  "cases": [
+    {
+      "name": "a good receipt whose lines equal the bill",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "INV-4471",
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 0,
+        "billTotal": 1340100,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 10000,
+            "unitCost": 125000,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": 125000,
+            "retail": 160000
+          },
+          {
+            "itemId": "i2",
+            "qty": 2000,
+            "unitCost": 45050,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [],
+        "warnings": [],
+        "total": 1340100,
+        "difference": 0
+      }
+    },
+    {
+      "name": "the printed total differs: posting waits, the difference shows",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "INV-4471",
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 0,
+        "billTotal": 1340000,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 10000,
+            "unitCost": 125000,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          },
+          {
+            "itemId": "i2",
+            "qty": 2000,
+            "unitCost": 45050,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "total_mismatch",
+            "row": null
+          }
+        ],
+        "warnings": [],
+        "total": 1340100,
+        "difference": -100
+      }
+    },
+    {
+      "name": "an empty draft: everything the header needs, and the total not typed yet",
+      "input": {
+        "supplierId": null,
+        "billNo": " ",
+        "billDate": null,
+        "locationId": null,
+        "billDiscount": 0,
+        "billTotal": null,
+        "lines": []
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "supplier_required",
+            "row": null
+          },
+          {
+            "problem": "bill_no_required",
+            "row": null
+          },
+          {
+            "problem": "bill_date_required",
+            "row": null
+          },
+          {
+            "problem": "location_required",
+            "row": null
+          },
+          {
+            "problem": "lines_required",
+            "row": null
+          },
+          {
+            "problem": "total_required",
+            "row": null
+          }
+        ],
+        "warnings": [],
+        "total": 0,
+        "difference": null
+      }
+    },
+    {
+      "name": "bad lines: no item, quantity 0, a fraction of pieces, a negative and a fractional cost, a discount above its line",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "77",
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 0,
+        "billTotal": 0,
+        "lines": [
+          {
+            "itemId": null,
+            "qty": 1000,
+            "unitCost": 100,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          },
+          {
+            "itemId": "i1",
+            "qty": 0,
+            "unitCost": 100,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          },
+          {
+            "itemId": "i1",
+            "qty": 1500,
+            "unitCost": -1,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          },
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "unitCost": 10.5,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          },
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "unitCost": 100,
+            "lineDiscount": 101,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "item_required",
+            "row": 0
+          },
+          {
+            "problem": "qty_positive",
+            "row": 1
+          },
+          {
+            "problem": "qty_fraction",
+            "row": 2
+          },
+          {
+            "problem": "cost_invalid",
+            "row": 2
+          },
+          {
+            "problem": "cost_invalid",
+            "row": 3
+          },
+          {
+            "problem": "discount_invalid",
+            "row": 4
+          }
+        ],
+        "warnings": [],
+        "total": null,
+        "difference": null
+      }
+    },
+    {
+      "name": "a bill discount above the lines",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "77",
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 5001,
+        "billTotal": 0,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "unitCost": 5000,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "bill_discount_invalid",
+            "row": null
+          }
+        ],
+        "warnings": [],
+        "total": null,
+        "difference": null
+      }
+    },
+    {
+      "name": "warnings after the bill discount: exactly 10 % up is quiet, more is not; 10 % down and more; Retail at the new cost",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "77",
+        "billDate": "2026-11-05",
+        "locationId": "godown",
+        "billDiscount": 0,
+        "billTotal": 4100100,
+        "lines": [
+          {
+            "itemId": "a",
+            "qty": 1000,
+            "unitCost": 1100000,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": 1000000,
+            "retail": 1500000
+          },
+          {
+            "itemId": "b",
+            "qty": 1000,
+            "unitCost": 1100100,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": 1000000,
+            "retail": 1500000
+          },
+          {
+            "itemId": "c",
+            "qty": 1000,
+            "unitCost": 900000,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": 1000000,
+            "retail": 1500000
+          },
+          {
+            "itemId": "d",
+            "qty": 1000,
+            "unitCost": 899900,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": 1000000,
+            "retail": 1500000
+          },
+          {
+            "itemId": "e",
+            "qty": 1000,
+            "unitCost": 100100,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": 100100
+          }
+        ]
+      },
+      "expected": {
+        "problems": [],
+        "warnings": [
+          {
+            "warning": "cost_up",
+            "row": 1
+          },
+          {
+            "warning": "cost_down",
+            "row": 3
+          },
+          {
+            "warning": "retail_at_or_below_cost",
+            "row": 4
+          }
+        ],
+        "total": 4100100,
+        "difference": 0
+      }
+    },
+    {
+      "name": "the bill discount brings the net cost under Retail's warning line: checked on the net, not the printed cost",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "78",
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 1000,
+        "billTotal": 10000,
+        "lines": [
+          {
+            "itemId": "a",
+            "qty": 1000,
+            "unitCost": 11000,
+            "lineDiscount": 0,
+            "allowsFraction": true,
+            "lastCost": 10000,
+            "retail": 11000
+          }
+        ]
+      },
+      "expected": {
+        "problems": [],
+        "warnings": [],
+        "total": 10000,
+        "difference": 0
+      }
+    },
+    {
+      "name": "no bill number at all",
+      "input": {
+        "supplierId": "s1",
+        "billNo": null,
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 0,
+        "billTotal": 100,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "unitCost": 100,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "bill_no_required",
+            "row": null
+          }
+        ],
+        "warnings": [],
+        "total": 100,
+        "difference": 0
+      }
+    }
+  ]
+}

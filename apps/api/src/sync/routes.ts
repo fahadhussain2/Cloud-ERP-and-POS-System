@@ -1,0 +1,447 @@
+import {
+  CASH_DESK_COLUMNS,
+  RETURN_BILL_DAYS,
+  RETURN_COLUMNS,
+  CATALOG_COLUMNS,
+  CHECKOUT_COLUMNS,
+  CounterPinChangeRequest,
+  CUSTOMER_COLUMNS,
+  makePinVerifier,
+  PULL_DATASETS,
+  PULL_LIMIT_DEFAULT,
+  PULL_LIMIT_MAX,
+  TemporaryPinRequest,
+  verifyPin,
+  type BillStatusResponse,
+  type CashDeskDataset,
+  type ReturnDataset,
+  type CatalogDataset,
+  type CheckoutDataset,
+  type CustomerDataset,
+  type PullDataset,
+  type PullResponse,
+} from '@erp/contracts';
+import { pullColumns, START, withTenant, type Cursor, type PullSource } from '@erp/db';
+import { pinProblem, PIN_MAX_FAILURES } from '@erp/domain';
+import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
+import type pg from 'pg';
+
+import { mayGivePin } from '../admin/users';
+import { requirePermission } from '../auth/routes';
+import { recordPull } from './push';
+
+// Counter sync (sync spec v1, W1-02, W1-03, W1-06, W1-09, W1-10, W1-11, D-089): pull with per-dataset column lists, and the
+// counter PIN change.
+
+interface Deps {
+  pool: pg.Pool;
+  now: () => Date;
+  requireAuth: preHandlerAsyncHookHandler;
+  requireDevice: preHandlerAsyncHookHandler;
+}
+
+const isCatalog = (d: PullDataset): d is CatalogDataset => d in CATALOG_COLUMNS;
+const isCheckout = (d: PullDataset): d is CheckoutDataset => d in CHECKOUT_COLUMNS;
+const isCustomer = (d: PullDataset): d is CustomerDataset => d in CUSTOMER_COLUMNS;
+const isCashDesk = (d: PullDataset): d is CashDeskDataset => d in CASH_DESK_COLUMNS;
+const isReturn = (d: PullDataset): d is ReturnDataset => d in RETURN_COLUMNS;
+
+/**
+ * The branch's bills of the last 90 days (W1-13, SYN-01), with their lines and payments. A day more than 90, so a
+ * counter in a time zone ahead of the server's date still gets all of its 90 days; it prunes to its own business date.
+ */
+const BILL_DAYS = RETURN_BILL_DAYS + 1;
+const RETURN_SOURCES: Record<ReturnDataset, Omit<PullSource, 'columns' | 'params'>> = {
+  bills: {
+    table: 'sales_documents',
+    where: `branch_id = $4 AND business_date > current_date - ${BILL_DAYS}`,
+  },
+  bill_lines: {
+    table: 'sales_lines',
+    where: `EXISTS (SELECT 1 FROM erp.sales_documents d
+                    WHERE d.tenant_id = sales_lines.tenant_id AND d.id = sales_lines.document_id
+                      AND d.branch_id = $4 AND d.business_date > current_date - ${BILL_DAYS})`,
+  },
+  bill_payments: {
+    table: 'sales_payments',
+    where: `EXISTS (SELECT 1 FROM erp.sales_documents d
+                    WHERE d.tenant_id = sales_payments.tenant_id AND d.id = sales_payments.document_id
+                      AND d.branch_id = $4 AND d.business_date > current_date - ${BILL_DAYS})`,
+  },
+};
+
+/** How far back the queue sends bills already handed over (sync spec §3). */
+const CASH_QUEUE_DAYS = 7;
+
+/** Customers (W1-09): only parties with a live customer account, and only customer balances. */
+const CUSTOMER_SOURCES: Record<CustomerDataset, Omit<PullSource, 'columns'>> = {
+  customers: {
+    table: 'parties',
+    where: `EXISTS (SELECT 1 FROM erp.customer_accounts a
+                    WHERE a.party_id = parties.id AND a.tenant_id = parties.tenant_id AND a.deleted_at IS NULL)`,
+  },
+  customer_accounts: { table: 'customer_accounts' },
+  customer_balances: { table: 'party_balances', where: "role = 'customer'" },
+};
+
+/** What a desk's cash-out names (W1-11): suppliers with a live supplier account and their balances; the rest by table. */
+const DESK_SOURCES: Record<Exclude<CashDeskDataset, 'cash_queue'>, Omit<PullSource, 'columns'>> = {
+  suppliers: {
+    table: 'parties',
+    where: `EXISTS (SELECT 1 FROM erp.supplier_accounts a
+                    WHERE a.party_id = parties.id AND a.tenant_id = parties.tenant_id AND a.deleted_at IS NULL)`,
+  },
+  supplier_balances: { table: 'party_balances', where: "role = 'supplier'" },
+  expense_categories: { table: 'expense_categories' },
+  bank_accounts: { table: 'bank_accounts' },
+};
+
+/** Each dataset's source and the only columns that may leave the server (sync spec §3). */
+function datasetSource(dataset: PullDataset, branchId: string, deviceId: string): PullSource {
+  // The catalog (W1-03): the shared column list, tenant-wide; each table is named like its dataset.
+  if (isCatalog(dataset))
+    return {
+      table: dataset,
+      columns: [...Object.keys(CATALOG_COLUMNS[dataset]), 'row_version', 'deleted_at'],
+    };
+  // Payment methods and print profiles (W1-06): tenant-wide; the device: only the caller's own row.
+  if (isCheckout(dataset)) {
+    const columns = [...Object.keys(CHECKOUT_COLUMNS[dataset]), 'row_version', 'deleted_at'];
+    if (dataset === 'device') return { table: 'devices', columns, where: 'id = $4', params: [deviceId] };
+    return { table: dataset, columns };
+  }
+  if (isCustomer(dataset))
+    return {
+      ...CUSTOMER_SOURCES[dataset],
+      columns: [...Object.keys(CUSTOMER_COLUMNS[dataset]), 'row_version', 'deleted_at'],
+    };
+  if (isReturn(dataset))
+    return {
+      ...RETURN_SOURCES[dataset],
+      columns: [...Object.keys(RETURN_COLUMNS[dataset]), 'row_version', 'deleted_at'],
+      params: [branchId],
+    };
+  if (isCashDesk(dataset) && dataset !== 'cash_queue')
+    return {
+      ...DESK_SOURCES[dataset],
+      columns: [...Object.keys(CASH_DESK_COLUMNS[dataset]), 'row_version', 'deleted_at'],
+    };
+  switch (dataset) {
+    // The cash desk's queue (W1-10): the branch's bills with cash to move, pending or of the last 7 days, so a received
+    // bill comes once more with its new status and the first pull stays small. A voided bill the desk took cash for
+    // stays until the cash is given back, and comes once more when it is (W1-23).
+    case 'cash_queue':
+      return {
+        table: 'sales_documents',
+        columns: [...Object.keys(CASH_DESK_COLUMNS.cash_queue), 'row_version', 'deleted_at'],
+        where: `branch_id = $4 AND cash_due <> 0
+                AND (handover_status = 'pending' OR received_at > now() - interval '${CASH_QUEUE_DAYS} days'
+                     OR (status = 'voided' AND handover_status = 'received'
+                         AND (cash_given_back_number IS NULL
+                              OR updated_at > now() - interval '${CASH_QUEUE_DAYS} days')))`,
+        params: [branchId],
+      };
+    case 'tenant':
+      return {
+        table: 'tenants',
+        columns: [
+          'id',
+          'name',
+          'base_currency',
+          'currency_minor_units',
+          'timezone',
+          'locale',
+          'tax_mode',
+          'cash_rounding_increment',
+          'day_cutoff_hour',
+          'closing_time',
+          'cash_handover_mode',
+          'offline_warning_hours',
+          'offline_strong_warning_hours',
+          'return_window_days',
+          'status',
+          'row_version',
+          'deleted_at',
+        ],
+      };
+    case 'branch':
+      return {
+        table: 'branches',
+        columns: [
+          'id',
+          'code',
+          'name',
+          'address',
+          'phone',
+          'receipt_header',
+          'status',
+          'row_version',
+          'deleted_at',
+        ],
+        where: 'id = $4',
+        params: [branchId],
+      };
+    case 'users':
+      // Never password_hash, email, password_changed_at or must_change_password.
+      return {
+        table: 'users',
+        columns: [
+          'id',
+          'username',
+          'full_name',
+          'short_code',
+          'pin_verifier',
+          'pin_must_change',
+          'status',
+          'row_version',
+          'deleted_at',
+        ],
+      };
+    case 'roles':
+      return {
+        table: 'roles',
+        columns: ['id', 'name', 'template_key', 'permissions', 'limits', 'row_version', 'deleted_at'],
+      };
+    case 'user_roles':
+      return {
+        table: 'user_roles',
+        columns: ['id', 'user_id', 'role_id', 'branch_id', 'row_version', 'deleted_at'],
+        where: 'branch_id IS NULL OR branch_id = $4',
+        params: [branchId],
+      };
+  }
+}
+
+const DIGITS = /^\d+$/;
+
+/** The opaque cursor: base64url JSON of { dataset: { txid, rowVersion } }. Null if malformed. */
+function parseCursor(text: string | undefined): Partial<Record<PullDataset, Cursor>> | null {
+  if (!text) return {};
+  try {
+    const value: unknown = JSON.parse(Buffer.from(text, 'base64url').toString('utf8'));
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const out: Partial<Record<PullDataset, Cursor>> = {};
+    for (const [k, v] of Object.entries(value)) {
+      const c = v as Partial<Cursor> | null;
+      if (
+        !(PULL_DATASETS as readonly string[]).includes(k) ||
+        !c ||
+        !DIGITS.test(String(c.txid)) ||
+        !DIGITS.test(String(c.rowVersion))
+      )
+        return null;
+      out[k as PullDataset] = { txid: String(c.txid), rowVersion: String(c.rowVersion) };
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+const encodeCursor = (c: Partial<Record<PullDataset, Cursor>>) =>
+  Buffer.from(JSON.stringify(c)).toString('base64url');
+
+export function registerSync(scope: FastifyInstance, { pool, now, requireAuth, requireDevice }: Deps) {
+  scope.get<{ Querystring: { datasets?: string; cursor?: string; limit?: string } }>(
+    '/sync/pull',
+    { preHandler: requireDevice },
+    async (req, reply) => {
+      const d = req.device!;
+      const datasets = (req.query.datasets ?? '').split(',').filter(Boolean);
+      if (datasets.length === 0 || !datasets.every((x) => (PULL_DATASETS as readonly string[]).includes(x)))
+        return reply.code(400).send({ error: 'unknown_dataset' });
+      // Bills with cash to move go only to the branch's cash desks (W1-10); a counter has no use for them.
+      if (d.kind !== 'cash_desk' && (datasets as PullDataset[]).some(isCashDesk))
+        return reply.code(403).send({ error: 'not_cash_desk' });
+      const limit = req.query.limit === undefined ? PULL_LIMIT_DEFAULT : Number(req.query.limit);
+      if (!Number.isInteger(limit) || limit < 1 || limit > PULL_LIMIT_MAX)
+        return reply.code(400).send({ error: 'bad_limit' });
+      const cursor = parseCursor(req.query.cursor);
+      if (!cursor) return reply.code(400).send({ error: 'bad_cursor' });
+
+      const body: PullResponse = { changes: {}, cursor: '', hasMore: false };
+      await withTenant(
+        pool,
+        { tenantId: d.tenantId, deviceId: d.deviceId, requestId: req.id },
+        async (_db, c) => {
+          await recordPull(c, d.tenantId, d.deviceId, now());
+          let remaining = limit;
+          for (const dataset of datasets as PullDataset[]) {
+            if (remaining === 0) {
+              body.hasMore = true;
+              break;
+            }
+            const page = await pullColumns(
+              c,
+              datasetSource(dataset, d.branchId, d.deviceId),
+              cursor[dataset] ?? START,
+              remaining,
+            );
+            body.changes[dataset] = page.rows;
+            cursor[dataset] = page.cursor;
+            remaining -= page.rows.length;
+            // A full page may have more behind it; the next call finds out.
+            if (remaining === 0) body.hasMore = true;
+          }
+        },
+      );
+      body.cursor = encodeCursor(cursor);
+      return body;
+    },
+  );
+
+  // A manager gives someone a temporary PIN (owner answer 2 to W1-02); they choose their own at a counter. Guarded by
+  // admin.devices, which managers have for counters (W0-09 gives admin.users to the owner only), and never to an Owner
+  // or a staff admin the actor doesn't outrank (canGivePinTo, D-091).
+  scope.put<{ Params: { id: string } }>(
+    '/users/:id/temporary-pin',
+    { preHandler: requirePermission(requireAuth, 'admin.devices') },
+    async (req, reply) => {
+      const body = TemporaryPinRequest.safeParse(req.body);
+      if (!body.success) return reply.code(400).send({ error: 'invalid_request' });
+      const a = req.auth!;
+      const t = now();
+      const verifier = await makePinVerifier(body.data.pin);
+      const outcome = await withTenant(
+        pool,
+        { tenantId: a.tenantId, userId: a.userId, requestId: req.id },
+        async (_db, c) => {
+          const u = await c.query<{ id: string; short_code: string | null }>(
+            'SELECT id, short_code FROM erp.users WHERE id = $1 AND deleted_at IS NULL',
+            [req.params.id],
+          );
+          const user = u.rows[0];
+          if (!user) return 'missing' as const;
+          // Not to an Owner or a staff admin the actor doesn't outrank: they could take over that PIN (D-091).
+          if (!(await mayGivePin(c, a, user.id))) return 'refused' as const;
+          const problem = pinProblem(body.data.pin, user.short_code);
+          if (problem) return { problem };
+          await c.query('UPDATE erp.users SET pin_verifier = $1, pin_must_change = true WHERE id = $2', [
+            verifier,
+            user.id,
+          ]);
+          await c.query(
+            `INSERT INTO erp.user_login_state (user_id, tenant_id, pin_failures) VALUES ($1, $2, 0)
+           ON CONFLICT (user_id) DO UPDATE SET pin_failures = 0`,
+            [user.id, a.tenantId],
+          );
+          // The verifier is stripped from the audit trigger's before/after, so record the change explicitly.
+          await c.query(
+            `INSERT INTO erp.audit_log (tenant_id, at, user_id, request_id, action, entity, entity_id)
+           VALUES ($1, $2, $3, $4, 'pin.temporary_set', 'users', $5)`,
+            [a.tenantId, t, a.userId, req.id, user.id],
+          );
+          return 'set' as const;
+        },
+      );
+      if (outcome === 'missing') return reply.code(404).send({ error: 'not_found' });
+      if (outcome === 'refused') return reply.code(403).send({ error: 'cannot_grant' });
+      if (outcome !== 'set') return reply.code(400).send({ error: 'weak_pin', problem: outcome.problem });
+      return reply.code(204).send();
+    },
+  );
+
+  // Before a void (W1-12, POS spec §18): has the cash desk taken this bill's cash? Only the device's own bills (owner
+  // answer 2). The bill's status, or, while the bill isn't here, any handover of its number (an offline scan).
+  scope.get<{ Querystring: { number?: string } }>(
+    '/sync/bills/status',
+    { preHandler: requireDevice },
+    async (req, reply) => {
+      const d = req.device!;
+      const number = req.query.number ?? '';
+      if (!/^[A-Z]\d{2,}-S\d{6,}$/.test(number)) return reply.code(400).send({ error: 'invalid_request' });
+      if (!number.startsWith(`${d.code}-`)) return reply.code(403).send({ error: 'not_own_bill' });
+      const answer: BillStatusResponse = await withTenant(
+        pool,
+        { tenantId: d.tenantId, deviceId: d.deviceId, requestId: req.id },
+        async (_db, c) => {
+          const bill = (
+            await c.query<{
+              status: 'finalized' | 'voided';
+              handover_status: BillStatusResponse['handoverStatus'];
+            }>(
+              'SELECT status, handover_status FROM erp.sales_documents WHERE number = $1 ORDER BY received_at LIMIT 1',
+              [number],
+            )
+          ).rows[0];
+          const handover = (
+            await c.query<{ kind: 'in' | 'payout'; at_device: Date; cashier: string | null }>(
+              `SELECT h.kind, h.at_device, u.full_name AS cashier FROM erp.cash_handovers h
+               LEFT JOIN erp.users u ON u.id = h.cashier_user_id
+               WHERE h.bill_number = $1 AND h.duplicate_of_id IS NULL ORDER BY h.at_device LIMIT 1`,
+              [number],
+            )
+          ).rows[0];
+          const fromHandover = handover ? (handover.kind === 'in' ? 'received' : 'paid_out') : null;
+          // A pending bill with a handover not yet linked to it still counts as handed over.
+          const handoverStatus =
+            bill === undefined || bill.handover_status === 'pending'
+              ? (fromHandover ?? bill?.handover_status ?? null)
+              : bill.handover_status;
+          return {
+            known: bill !== undefined,
+            status: bill?.status ?? null,
+            handoverStatus,
+            handedOverAt: handover?.at_device.toISOString() ?? null,
+            cashierName: handover?.cashier ?? null,
+          };
+        },
+      );
+      return answer;
+    },
+  );
+
+  // A counter replaces a temporary PIN with the person's own (sync spec §5).
+  scope.post('/sync/pin', { preHandler: requireDevice }, async (req, reply) => {
+    const body = CounterPinChangeRequest.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'invalid_request' });
+    const d = req.device!;
+    const { userId, currentPin, newPin } = body.data;
+    const t = now();
+    const result = await withTenant(
+      pool,
+      { tenantId: d.tenantId, deviceId: d.deviceId, requestId: req.id },
+      async (_db, c) => {
+        const u = await c.query<{
+          id: string;
+          short_code: string | null;
+          pin_verifier: string | null;
+          pin_must_change: boolean;
+          pin_failures: number | null;
+        }>(
+          `SELECT u.id, u.short_code, u.pin_verifier, u.pin_must_change, s.pin_failures
+         FROM erp.users u LEFT JOIN erp.user_login_state s ON s.user_id = u.id
+         WHERE u.id = $1 AND u.deleted_at IS NULL AND u.status = 'active' FOR UPDATE OF u`,
+          [userId],
+        );
+        const user = u.rows[0];
+        if (!user) return { code: 404, body: { error: 'not_found' } };
+        if ((user.pin_failures ?? 0) >= PIN_MAX_FAILURES) return { code: 403, body: { error: 'pin_locked' } };
+        if (!user.pin_must_change || !user.pin_verifier)
+          return { code: 409, body: { error: 'not_temporary' } };
+        if (!(await verifyPin(user.pin_verifier, currentPin))) {
+          await c.query(
+            `INSERT INTO erp.user_login_state (user_id, tenant_id, pin_failures) VALUES ($1, $2, 1)
+           ON CONFLICT (user_id) DO UPDATE SET pin_failures = erp.user_login_state.pin_failures + 1`,
+            [user.id, d.tenantId],
+          );
+          return { code: 401, body: { error: 'wrong_pin' } };
+        }
+        const problem = pinProblem(newPin, user.short_code);
+        if (problem) return { code: 400, body: { error: 'weak_pin', problem } };
+        await c.query('UPDATE erp.users SET pin_verifier = $1, pin_must_change = false WHERE id = $2', [
+          await makePinVerifier(newPin),
+          user.id,
+        ]);
+        await c.query('UPDATE erp.user_login_state SET pin_failures = 0 WHERE user_id = $1', [user.id]);
+        await c.query(
+          `INSERT INTO erp.audit_log (tenant_id, at, user_id, device_id, request_id, action, entity, entity_id)
+         VALUES ($1, $2, $3, $4, $5, 'pin.changed', 'users', $3)`,
+          [d.tenantId, t, user.id, d.deviceId, req.id],
+        );
+        return { code: 204, body: null };
+      },
+    );
+    return result.body === null ? reply.code(204).send() : reply.code(result.code).send(result.body);
+  });
+}

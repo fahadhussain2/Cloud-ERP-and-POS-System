@@ -8,11 +8,25 @@
 #                                                        must be changed at the first login
 #   sudo erp-tenant reset-password <env> <shop> <user>   support: a generated temporary password (must be changed),
 #                                                        also lifts a lockout and ends the user's sessions
+#   sudo erp-tenant seed-catalog staging <shop> [items]  a generated test catalog (default 20,000 items) on a staging
+#                                                        shop with no items yet (W1-21); never on prod
+#   sudo erp-tenant posting-check <env> <shop>           replays every posting from its document and lists any
+#                                                        difference with the stored ledgers (W1-08); writes nothing
+#   sudo erp-tenant posting-rebuild <env> <shop>         rewrites the shop's ledgers from the replay, then checks;
+#                                                        refused when a posting is on or before the lock date;
+#                                                        bills wait to post while it runs: after shop hours only
+#   sudo erp-tenant wipe-pilot prod <shop>               the cutover (W1-14, D-101): removes the pilot's documents
+#                                                        and ledgers, keeps masters, staff and settings, revokes the
+#                                                        counters; asks for the shop code again; refused once live or
+#                                                        while a counter has unsynced bills. Back up first.
+#   sudo erp-tenant go-live <env> <shop> <lock-date>     the final run's last step: the shop is live (no more wipes)
+#                                                        and the books up to <lock-date> are locked
 #   sudo erp-tenant list                                 the specs on this server
 #
-# <env> is prod or staging. Re-running setup is safe: it creates only what's missing and reports any value that
-# differs from the spec without changing it. It runs the API image of the environment's current release in a
-# one-off container on the database network, with the owner role's URL (migrate.env), like the migrate step.
+# <env> is prod or staging. Re-running setup is safe: it creates only what's missing, applies a payment method's
+# bank account from the spec (W1-08), and reports any other value that differs from the spec without changing it.
+# It runs the API image of the environment's current release in a one-off container on the database network, with
+# the owner role's URL (migrate.env), like the migrate step.
 set -euo pipefail
 
 ROOT=/srv/erp
@@ -89,11 +103,41 @@ case $cmd in
       die "usage: erp-tenant reset-password <env> <shop> <user>"
     make_input reset-password "$3" "$4" | run_admin "$2" || die "reset failed; the password above was not set"
     ;;
+  seed-catalog)
+    [[ ${2:-} == staging ]] || die "seed-catalog is for staging only: test data never goes to prod"
+    [[ ${3:-} =~ ^[a-z0-9][a-z0-9-]{1,31}$ ]] || die "usage: erp-tenant seed-catalog staging <shop> [items]"
+    items=${4:-20000}
+    [[ $items =~ ^[1-9][0-9]{0,4}$ ]] || die "items must be a number from 1 to 50000"
+    printf '{"action":"seed-catalog","environment":"staging","tenantCode":"%s","items":%d}' "$3" "$items" |
+      run_admin staging || die "seed failed; nothing was changed"
+    ;;
+  wipe-pilot)
+    check_env "${2:-}"
+    [[ ${3:-} =~ ^[a-z0-9][a-z0-9-]{1,31}$ ]] || die "usage: erp-tenant wipe-pilot <env> <shop>"
+    [[ -r /dev/tty ]] || die "wipe-pilot asks for the shop code again: run it with ssh -t"
+    echo "This removes every bill, desk document, posting and ledger of $3 in $2. Masters, staff and settings stay." >&2
+    read -r -p "Type the shop code again to go ahead: " confirm </dev/tty
+    [[ $confirm =~ ^[a-z0-9-]{0,32}$ ]] || die "nothing was changed"
+    printf '{"action":"wipe-pilot","tenantCode":"%s","confirm":"%s"}' "$3" "$confirm" | run_admin "$2" ||
+      die "wipe-pilot: see the lines above; nothing was changed"
+    ;;
+  go-live)
+    check_env "${2:-}"
+    [[ ${3:-} =~ ^[a-z0-9][a-z0-9-]{1,31}$ && ${4:-} =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] ||
+      die "usage: erp-tenant go-live <env> <shop> <lock-date YYYY-MM-DD>"
+    printf '{"action":"go-live","tenantCode":"%s","lockDate":"%s"}' "$3" "$4" | run_admin "$2" ||
+      die "go-live: see the lines above"
+    ;;
+  posting-check | posting-rebuild)
+    check_env "${2:-}"
+    [[ ${3:-} =~ ^[a-z0-9][a-z0-9-]{1,31}$ ]] || die "usage: erp-tenant $cmd <env> <shop>"
+    printf '{"action":"%s","tenantCode":"%s"}' "$cmd" "$3" | run_admin "$2" || die "$cmd: see the lines above"
+    ;;
   list)
     find "$SPECS" -maxdepth 1 -name '*.json' -printf '%f\n' 2>/dev/null | sed 's/\.json$//' | sort
     ;;
   *)
-    sed -n '4,12p' "$0" >&2
+    sed -n '4,25p' "$0" >&2
     exit 2
     ;;
 esac

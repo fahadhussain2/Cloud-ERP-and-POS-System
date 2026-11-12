@@ -1,2 +1,58 @@
 // Posting engine: document -> stock, party and GL entries (server only, CLAUDE.md rule 4).
-export {};
+export {
+  postCustomerReceipt,
+  postExpense,
+  postFundTransfer,
+  postJournalVoucher,
+  postReversal,
+} from './accounting';
+export { postCashMovement, postCollection, postSession } from './cash';
+export { averageAfterReceipt } from './cost';
+export {
+  holdPostingOrder,
+  postDocument,
+  postPending,
+  waitingReturns,
+  type PostOutcome,
+  type SourceType,
+} from './db/post';
+export { REVERSIBLE, type ReversibleType } from './db/load';
+export { writeFloors } from './db/write';
+export { applyRebuild, checkRebuild, RebuildRefused, type RebuildCheck } from './db/rebuild';
+export { KEPT_TABLES, markLive, WIPED_TABLES, WipeRefused, wipePilot, type WipeReport } from './db/wipe';
+export { postHandover } from './handover';
+export { postOpening } from './opening';
+export { postGoodsReceipt, postPurchaseReturn, postSupplierPayment } from './purchasing';
+export { emptyState, replay, type ReplayStep } from './replay';
+export { postSale } from './sale';
+export { postStockAdjustment, postStockTransfer } from './stock';
+export { postVoid } from './void';
+export type {
+  CostState,
+  JournalLine,
+  LedgerState,
+  PartyEntry,
+  Posting,
+  PostingCashMovement,
+  PostingCollection,
+  PostingContext,
+  PostingCustomerReceipt,
+  PostingError,
+  PostingExpense,
+  PostingFundTransfer,
+  PostingJournalVoucher,
+  PostingReversal,
+  PostingException,
+  PostingHandover,
+  PostingOpening,
+  LastPurchase,
+  PostingResult,
+  PostingRole,
+  PostingSale,
+  PostingSaleLine,
+  PostingSessionEvent,
+  PostingStockAdjustment,
+  PostingStockTransfer,
+  PostingVoid,
+  StockMovement,
+} from './types';

@@ -1,0 +1,286 @@
+{
+  "description": "Checking a stock adjustment before it is posted (INV-05, W1-18, owner answer 1). Problems: a location; a reason from the list (found, lost, damaged, theft, count_correction, write_off, other) and a note for other; a write-off only out of a Damaged location and only losses (posting rules §5.3); at least one line; each line an item, a quantity other than 0 (above 0 found, below 0 gone; whole for pieces), each item once. Warning, never a problem (INV-03): a loss takes more than the location has (onHand null = not known).",
+  "cases": [
+    {
+      "name": "one found, one broken, within what the shop has",
+      "input": {
+        "locationId": "shop",
+        "locationKind": "shop",
+        "reason": "count_correction",
+        "note": null,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 2000,
+            "allowsFraction": false,
+            "onHand": 0
+          },
+          {
+            "itemId": "i2",
+            "qty": -1000,
+            "allowsFraction": false,
+            "onHand": 4000
+          },
+          {
+            "itemId": "i3",
+            "qty": -750,
+            "allowsFraction": true,
+            "onHand": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [],
+        "warnings": []
+      }
+    },
+    {
+      "name": "a loss of more than the shop has: a warning, still allowed",
+      "input": {
+        "locationId": "shop",
+        "locationKind": "shop",
+        "reason": "lost",
+        "note": null,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": -3000,
+            "allowsFraction": false,
+            "onHand": 2000
+          }
+        ]
+      },
+      "expected": {
+        "problems": [],
+        "warnings": [
+          {
+            "warning": "below_zero",
+            "row": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "writing off damaged goods",
+      "input": {
+        "locationId": "damaged",
+        "locationKind": "damaged",
+        "reason": "write_off",
+        "note": "Cracked in the rain",
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": -2000,
+            "allowsFraction": false,
+            "onHand": 2000
+          }
+        ]
+      },
+      "expected": {
+        "problems": [],
+        "warnings": []
+      }
+    },
+    {
+      "name": "a write-off out of the shop, and a gain written off",
+      "input": {
+        "locationId": "shop",
+        "locationKind": "shop",
+        "reason": "write_off",
+        "note": null,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "onHand": 2000
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "write_off_not_damaged",
+            "row": null
+          },
+          {
+            "problem": "write_off_gain",
+            "row": 0
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "name": "nothing filled in",
+      "input": {
+        "locationId": null,
+        "locationKind": null,
+        "reason": null,
+        "note": null,
+        "lines": []
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "location_required",
+            "row": null
+          },
+          {
+            "problem": "reason_required",
+            "row": null
+          },
+          {
+            "problem": "lines_required",
+            "row": null
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "name": "a reason that isn't on the list",
+      "input": {
+        "locationId": "shop",
+        "locationKind": "shop",
+        "reason": "rats",
+        "note": null,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": -1000,
+            "allowsFraction": false,
+            "onHand": 2000
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "reason_unknown",
+            "row": null
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "name": "other without a note",
+      "input": {
+        "locationId": "shop",
+        "locationKind": "shop",
+        "reason": "other",
+        "note": "   ",
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": -1000,
+            "allowsFraction": false,
+            "onHand": 2000
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "note_required",
+            "row": null
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "name": "other with no note at all",
+      "input": {
+        "locationId": "shop",
+        "locationKind": "shop",
+        "reason": "other",
+        "note": null,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": -1000,
+            "allowsFraction": false,
+            "onHand": 2000
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "note_required",
+            "row": null
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "name": "a line with no item, a zero, a fraction of pieces, an item twice and not a whole thousandth",
+      "input": {
+        "locationId": "godown",
+        "locationKind": "storage",
+        "reason": "found",
+        "note": null,
+        "lines": [
+          {
+            "itemId": null,
+            "qty": 1000,
+            "allowsFraction": false,
+            "onHand": null
+          },
+          {
+            "itemId": "i1",
+            "qty": 0,
+            "allowsFraction": false,
+            "onHand": 1000
+          },
+          {
+            "itemId": "i2",
+            "qty": -1500,
+            "allowsFraction": false,
+            "onHand": 5000
+          },
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "allowsFraction": false,
+            "onHand": 1000
+          },
+          {
+            "itemId": "i3",
+            "qty": 0.5,
+            "allowsFraction": true,
+            "onHand": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "item_required",
+            "row": 0
+          },
+          {
+            "problem": "qty_zero",
+            "row": 1
+          },
+          {
+            "problem": "qty_fraction",
+            "row": 2
+          },
+          {
+            "problem": "item_repeated",
+            "row": 3
+          },
+          {
+            "problem": "qty_zero",
+            "row": 4
+          }
+        ],
+        "warnings": []
+      }
+    }
+  ]
+}

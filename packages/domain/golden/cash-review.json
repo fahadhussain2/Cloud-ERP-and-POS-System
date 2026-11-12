@@ -1,0 +1,194 @@
+{
+  "description": "The server's review of the desk's other documents (sync spec §6.2, W1-11): never a refusal (rule 7), only findings. `doc` picks a base document from cash-review in drawer.test.ts (R: D01-R000001 by the cashier …a5; M: D01-M000004 by …a5; open: D01-Z000006 by …a5 with a Rs 5,000 float; close: D01-Z000007 of …a5's session, closed by …a5, Rs 300 short, acknowledged by the manager …a2) and `changes` overrides its fields. Staff as in testing/desk.ts. cash_not_permitted: the server says someone lacked a permission (ownVariance when the acknowledger is the session's own cashier); float_mismatch: an open's float differs from what stayed at the desk's last close.",
+  "cases": [
+    {
+      "name": "a collection by the cashier",
+      "input": {
+        "doc": "R"
+      },
+      "expected": []
+    },
+    {
+      "name": "a collection by someone without cash.collection.receive",
+      "input": {
+        "doc": "R",
+        "changes": {
+          "cashierId": "019a0000-0000-7000-8000-0000000000a6"
+        }
+      },
+      "expected": [
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a6",
+          "permission": "cash.collection.receive",
+          "ownVariance": false
+        }
+      ]
+    },
+    {
+      "name": "a cash-out by the cashier",
+      "input": {
+        "doc": "M"
+      },
+      "expected": []
+    },
+    {
+      "name": "a cash-out by someone the server doesn't know",
+      "input": {
+        "doc": "M",
+        "changes": {
+          "cashierId": "019a0000-0000-7000-8000-0000000000a9"
+        }
+      },
+      "expected": [
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a9",
+          "permission": "cash.movement.create",
+          "ownVariance": false
+        }
+      ]
+    },
+    {
+      "name": "an open with the float that stayed",
+      "input": {
+        "doc": "open"
+      },
+      "expected": []
+    },
+    {
+      "name": "a desk's first open has nothing to compare",
+      "input": {
+        "doc": "open",
+        "changes": {
+          "floatExpected": null,
+          "openingFloat": 123400
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "an open Rs 200 below what stayed",
+      "input": {
+        "doc": "open",
+        "changes": {
+          "openingFloat": 480000
+        }
+      },
+      "expected": [
+        {
+          "kind": "float_mismatch",
+          "openingFloat": 480000,
+          "floatExpected": 500000
+        }
+      ]
+    },
+    {
+      "name": "an open by a manager without cash.handover.receive",
+      "input": {
+        "doc": "open",
+        "changes": {
+          "userId": "019a0000-0000-7000-8000-0000000000a2"
+        }
+      },
+      "expected": [
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a2",
+          "permission": "cash.handover.receive",
+          "ownVariance": false
+        }
+      ]
+    },
+    {
+      "name": "a close acknowledged by the manager",
+      "input": {
+        "doc": "close"
+      },
+      "expected": []
+    },
+    {
+      "name": "a close acknowledged later",
+      "input": {
+        "doc": "close",
+        "changes": {
+          "acknowledgedByUserId": null
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "a close by a salesman, acknowledged by a salesman",
+      "input": {
+        "doc": "close",
+        "changes": {
+          "userId": "019a0000-0000-7000-8000-0000000000a1",
+          "acknowledgedByUserId": "019a0000-0000-7000-8000-0000000000a1"
+        }
+      },
+      "expected": [
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a1",
+          "permission": "cash.session.close",
+          "ownVariance": false
+        },
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a1",
+          "permission": "cash.variance.approve",
+          "ownVariance": false
+        }
+      ]
+    },
+    {
+      "name": "a senior cashier acknowledging their own session's variance",
+      "input": {
+        "doc": "close",
+        "sessionCashierId": "019a0000-0000-7000-8000-0000000000a7",
+        "changes": {
+          "userId": "019a0000-0000-7000-8000-0000000000a7",
+          "acknowledgedByUserId": "019a0000-0000-7000-8000-0000000000a7"
+        }
+      },
+      "expected": [
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a7",
+          "permission": "cash.variance.approve",
+          "ownVariance": true
+        }
+      ]
+    },
+    {
+      "name": "the session's cashier unknown to the server (its open hasn't arrived): no own-variance finding",
+      "input": {
+        "doc": "close",
+        "sessionCashierId": null
+      },
+      "expected": []
+    },
+    {
+      "name": "a W1-10 close (version 1) has no acknowledgement to judge",
+      "input": {
+        "doc": "close",
+        "changes": {
+          "version": 1,
+          "acknowledgedByUserId": "019a0000-0000-7000-8000-0000000000a1"
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "a W1-10 open (version 1) has no float to compare",
+      "input": {
+        "doc": "open",
+        "changes": {
+          "version": 1,
+          "openingFloat": 480000
+        }
+      },
+      "expected": []
+    }
+  ]
+}

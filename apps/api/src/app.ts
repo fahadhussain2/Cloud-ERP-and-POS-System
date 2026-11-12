@@ -1,9 +1,24 @@
+import { createChangeFeed } from '@erp/db';
 import { enterContext, isRequestId, newRequestId } from '@erp/observability';
 import Fastify, { type FastifyError, type FastifyServerOptions } from 'fastify';
 import type pg from 'pg';
 
+import { registerAdmin } from './admin/routes';
+import { registerUsers } from './admin/users';
 import { registerAuth } from './auth/routes';
+import { registerLabels } from './catalog/labels';
+import { registerCatalog } from './catalog/routes';
+import { registerAccounting } from './accounting/routes';
+import { registerInventory } from './inventory/routes';
+import { registerCustomers } from './customers/routes';
+import { registerPurchasing } from './purchasing/routes';
 import { registerDevices } from './devices/routes';
+import { registerEvents } from './sync/events';
+import { registerReports } from './reports/routes';
+import { registerReportViews } from './reports/views';
+import { registerPush } from './sync/push';
+import { registerSync } from './sync/routes';
+import { registerSupport } from './support/routes';
 
 export interface AppOptions extends FastifyServerOptions {
   // The image tag of this release (D-075); the deploy checks it after starting.
@@ -68,7 +83,24 @@ export function buildApp({
     void app.register(
       async (api) => {
         const requireAuth = await registerAuth(api, { pool, now });
-        registerDevices(api, { pool, now, requireAuth });
+        const requireDevice = registerDevices(api, { pool, now, requireAuth });
+        registerSync(api, { pool, now, requireAuth, requireDevice });
+        registerPush(api, { pool, now, requireDevice });
+        // One LISTEN connection for every counter's SSE stream, opened by the first one (SYN-04).
+        const feed = createChangeFeed(pool, { onError: (err) => api.log.warn({ err }, 'sync change feed') });
+        api.addHook('onClose', () => feed.close());
+        registerEvents(api, { feed, requireDevice });
+        registerAdmin(api, { pool, requireAuth });
+        registerUsers(api, { pool, now, requireAuth });
+        registerReports(api, { pool, now, requireAuth });
+        registerReportViews(api, { pool, now, requireAuth });
+        registerSupport(api, { pool, now, requireAuth, requireDevice });
+        registerCatalog(api, { pool, now, requireAuth });
+        registerLabels(api, { pool, requireAuth });
+        registerPurchasing(api, { pool, now, requireAuth });
+        registerCustomers(api, { pool, requireAuth });
+        registerInventory(api, { pool, now, requireAuth });
+        registerAccounting(api, { pool, now, requireAuth });
       },
       { prefix: '/api' },
     );

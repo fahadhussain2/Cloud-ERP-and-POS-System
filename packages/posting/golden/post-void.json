@@ -1,0 +1,521 @@
+{
+  "description": "A void's reversal (posting rules §4.4, W1-12): from the voided sale's own posting, as stored, and the costs and balances now.",
+  "notes": "Accounts by code (posting rules §2): 1120 cash in transit, 1160 HBL (Raast), 1200 AR, 1300 inventory, 4100 sales, 4120 sales discount, 4210 rounding, 5100 COGS. Branch …e1, location SHOP …f1. Every journal line of the sale is swapped, in its order, under the memo '<void number> <bill number>', dated the void's business date (the day after the lock date when locked, flagged posted_after_lock). Each stock movement comes back with the opposite quantity at the sale's own unit cost, the average recomputed as a receipt at that cost (averageAfterReceipt); a line that left with no cost (avgCostAfter null) comes back at 0 and leaves the average as it is. Each customer ledger entry is reversed on its own due date. The sale's exceptions (no_cost, negative_stock) are not raised again: stock coming back never goes below zero. Quantities in thousandths, money in paisa.",
+  "cases": [
+    {
+      "name": "a cash bill voided before its handover: every line swapped, cash in transit back to 0, the stock back at the sale's own costs (the average has risen since)",
+      "input": {
+        "void": {
+          "id": "019a8000-0000-7000-8000-000000000081",
+          "number": "C03-V000001",
+          "saleNumber": "C03-S000412",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "businessDate": "2026-11-03"
+        },
+        "original": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "019a0000-0000-7000-8000-0000000000e1",
+            "memo": "C03-S000412",
+            "lines": [
+              { "accountId": "1120", "partyId": null, "debit": 432000, "credit": 0 },
+              { "accountId": "4100", "partyId": null, "debit": 0, "credit": 432000 },
+              { "accountId": "5100", "partyId": null, "debit": 290000, "credit": 0 },
+              { "accountId": "1300", "partyId": null, "debit": 0, "credit": 290000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000001",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": -2000,
+              "unitCost": 100000,
+              "valueDelta": -200000,
+              "avgCostAfter": 100000
+            },
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000002",
+              "itemId": "019a0000-0000-7000-8000-0000000000c2",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": -1000,
+              "unitCost": 90000,
+              "valueDelta": -90000,
+              "avgCostAfter": 90000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "019a0000-0000-7000-8000-0000000000c1": { "avgCost": 100000, "onHand": 1000 },
+              "019a0000-0000-7000-8000-0000000000c2": { "avgCost": 90000, "onHand": 0 }
+            },
+            "balances": {
+              "019a0000-0000-7000-8000-0000000000f1": {
+                "019a0000-0000-7000-8000-0000000000c1": 1000,
+                "019a0000-0000-7000-8000-0000000000c2": 0
+              }
+            }
+          }
+        },
+        "state": {
+          "costs": {
+            "019a0000-0000-7000-8000-0000000000c1": { "avgCost": 110000, "onHand": 3000 },
+            "019a0000-0000-7000-8000-0000000000c2": { "avgCost": 90000, "onHand": 0 }
+          },
+          "balances": {
+            "019a0000-0000-7000-8000-0000000000f1": {
+              "019a0000-0000-7000-8000-0000000000c1": 3000,
+              "019a0000-0000-7000-8000-0000000000c2": 0
+            }
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "019a0000-0000-7000-8000-0000000000e1",
+            "memo": "C03-V000001 C03-S000412",
+            "lines": [
+              { "accountId": "1120", "partyId": null, "debit": 0, "credit": 432000 },
+              { "accountId": "4100", "partyId": null, "debit": 432000, "credit": 0 },
+              { "accountId": "5100", "partyId": null, "debit": 0, "credit": 290000 },
+              { "accountId": "1300", "partyId": null, "debit": 290000, "credit": 0 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000001",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": 2000,
+              "unitCost": 100000,
+              "valueDelta": 200000,
+              "avgCostAfter": 106000
+            },
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000002",
+              "itemId": "019a0000-0000-7000-8000-0000000000c2",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": 1000,
+              "unitCost": 90000,
+              "valueDelta": 90000,
+              "avgCostAfter": 90000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": {
+              "019a0000-0000-7000-8000-0000000000c1": { "avgCost": 106000, "onHand": 5000 },
+              "019a0000-0000-7000-8000-0000000000c2": { "avgCost": 90000, "onHand": 1000 }
+            },
+            "balances": {
+              "019a0000-0000-7000-8000-0000000000f1": {
+                "019a0000-0000-7000-8000-0000000000c1": 5000,
+                "019a0000-0000-7000-8000-0000000000c2": 1000
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "on account, an item with no cost yet: the customer ledger reversed on the same due date; the stock back at 0 and still no average; the sale's exceptions aren't raised again",
+      "input": {
+        "void": {
+          "id": "019a8000-0000-7000-8000-000000000082",
+          "number": "C03-V000002",
+          "saleNumber": "C03-S000420",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "businessDate": "2026-11-03"
+        },
+        "original": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "019a0000-0000-7000-8000-0000000000e1",
+            "memo": "C03-S000420",
+            "lines": [
+              {
+                "accountId": "1200",
+                "partyId": "019a3000-0000-7000-8000-0000000000c1",
+                "debit": 150000,
+                "credit": 0
+              },
+              { "accountId": "4100", "partyId": null, "debit": 0, "credit": 150000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000001",
+              "itemId": "019a0000-0000-7000-8000-0000000000c3",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": -1000,
+              "unitCost": 0,
+              "valueDelta": 0,
+              "avgCostAfter": null
+            }
+          ],
+          "partyEntries": [
+            {
+              "partyId": "019a3000-0000-7000-8000-0000000000c1",
+              "role": "customer",
+              "amount": 150000,
+              "dueDate": "2026-12-03"
+            }
+          ],
+          "exceptions": [
+            { "kind": "no_cost", "details": { "itemId": "019a0000-0000-7000-8000-0000000000c3" } },
+            {
+              "kind": "negative_stock",
+              "details": {
+                "itemId": "019a0000-0000-7000-8000-0000000000c3",
+                "locationId": "019a0000-0000-7000-8000-0000000000f1",
+                "balance": -1000
+              }
+            }
+          ],
+          "state": {
+            "costs": { "019a0000-0000-7000-8000-0000000000c3": { "avgCost": null, "onHand": -1000 } },
+            "balances": {
+              "019a0000-0000-7000-8000-0000000000f1": { "019a0000-0000-7000-8000-0000000000c3": -1000 }
+            }
+          }
+        },
+        "state": {
+          "costs": { "019a0000-0000-7000-8000-0000000000c3": { "avgCost": null, "onHand": -1000 } },
+          "balances": {
+            "019a0000-0000-7000-8000-0000000000f1": { "019a0000-0000-7000-8000-0000000000c3": -1000 }
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "019a0000-0000-7000-8000-0000000000e1",
+            "memo": "C03-V000002 C03-S000420",
+            "lines": [
+              {
+                "accountId": "1200",
+                "partyId": "019a3000-0000-7000-8000-0000000000c1",
+                "debit": 0,
+                "credit": 150000
+              },
+              { "accountId": "4100", "partyId": null, "debit": 150000, "credit": 0 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000001",
+              "itemId": "019a0000-0000-7000-8000-0000000000c3",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": 1000,
+              "unitCost": 0,
+              "valueDelta": 0,
+              "avgCostAfter": null
+            }
+          ],
+          "partyEntries": [
+            {
+              "partyId": "019a3000-0000-7000-8000-0000000000c1",
+              "role": "customer",
+              "amount": -150000,
+              "dueDate": "2026-12-03"
+            }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": { "019a0000-0000-7000-8000-0000000000c3": { "avgCost": null, "onHand": 0 } },
+            "balances": {
+              "019a0000-0000-7000-8000-0000000000f1": { "019a0000-0000-7000-8000-0000000000c3": 0 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Raast with a bill discount and rounding: the bank, sales, discount and rounding lines swapped; stock still below zero comes back at the sale's cost",
+      "input": {
+        "void": {
+          "id": "019a8000-0000-7000-8000-000000000083",
+          "number": "C03-V000003",
+          "saleNumber": "C03-S000413",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "businessDate": "2026-11-03"
+        },
+        "original": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "019a0000-0000-7000-8000-0000000000e1",
+            "memo": "C03-S000413",
+            "lines": [
+              { "accountId": "1160", "partyId": null, "debit": 135000, "credit": 0 },
+              { "accountId": "4100", "partyId": null, "debit": 0, "credit": 145050 },
+              { "accountId": "4120", "partyId": null, "debit": 10000, "credit": 0 },
+              { "accountId": "4210", "partyId": null, "debit": 50, "credit": 0 },
+              { "accountId": "5100", "partyId": null, "debit": 120000, "credit": 0 },
+              { "accountId": "1300", "partyId": null, "debit": 0, "credit": 120000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000001",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": -1000,
+              "unitCost": 120000,
+              "valueDelta": -120000,
+              "avgCostAfter": 120000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": { "019a0000-0000-7000-8000-0000000000c1": { "avgCost": 120000, "onHand": 0 } },
+            "balances": {
+              "019a0000-0000-7000-8000-0000000000f1": { "019a0000-0000-7000-8000-0000000000c1": 0 }
+            }
+          }
+        },
+        "state": {
+          "costs": { "019a0000-0000-7000-8000-0000000000c1": { "avgCost": 120000, "onHand": -2000 } },
+          "balances": {
+            "019a0000-0000-7000-8000-0000000000f1": { "019a0000-0000-7000-8000-0000000000c1": -2000 }
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "019a0000-0000-7000-8000-0000000000e1",
+            "memo": "C03-V000003 C03-S000413",
+            "lines": [
+              { "accountId": "1160", "partyId": null, "debit": 0, "credit": 135000 },
+              { "accountId": "4100", "partyId": null, "debit": 145050, "credit": 0 },
+              { "accountId": "4120", "partyId": null, "debit": 0, "credit": 10000 },
+              { "accountId": "4210", "partyId": null, "debit": 0, "credit": 50 },
+              { "accountId": "5100", "partyId": null, "debit": 0, "credit": 120000 },
+              { "accountId": "1300", "partyId": null, "debit": 120000, "credit": 0 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000001",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": 1000,
+              "unitCost": 120000,
+              "valueDelta": 120000,
+              "avgCostAfter": 120000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": { "019a0000-0000-7000-8000-0000000000c1": { "avgCost": 120000, "onHand": -1000 } },
+            "balances": {
+              "019a0000-0000-7000-8000-0000000000f1": { "019a0000-0000-7000-8000-0000000000c1": -1000 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "the void's day is locked: it posts the day after and is flagged",
+      "input": {
+        "void": {
+          "id": "019a8000-0000-7000-8000-000000000084",
+          "number": "C03-V000004",
+          "saleNumber": "C03-S000430",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "businessDate": "2026-11-03"
+        },
+        "original": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "019a0000-0000-7000-8000-0000000000e1",
+            "memo": "C03-S000430",
+            "lines": [
+              { "accountId": "1120", "partyId": null, "debit": 80000, "credit": 0 },
+              { "accountId": "4100", "partyId": null, "debit": 0, "credit": 80000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000001",
+              "itemId": "019a0000-0000-7000-8000-0000000000c3",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": -1000,
+              "unitCost": 0,
+              "valueDelta": 0,
+              "avgCostAfter": null
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": { "019a0000-0000-7000-8000-0000000000c3": { "avgCost": null, "onHand": 4000 } },
+            "balances": {
+              "019a0000-0000-7000-8000-0000000000f1": { "019a0000-0000-7000-8000-0000000000c3": 4000 }
+            }
+          }
+        },
+        "state": {
+          "costs": { "019a0000-0000-7000-8000-0000000000c3": { "avgCost": null, "onHand": 4000 } },
+          "balances": {
+            "019a0000-0000-7000-8000-0000000000f1": { "019a0000-0000-7000-8000-0000000000c3": 4000 }
+          }
+        },
+        "context": { "lockDate": "2026-11-03" }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-04",
+          "journal": {
+            "branchId": "019a0000-0000-7000-8000-0000000000e1",
+            "memo": "C03-V000004 C03-S000430",
+            "lines": [
+              { "accountId": "1120", "partyId": null, "debit": 0, "credit": 80000 },
+              { "accountId": "4100", "partyId": null, "debit": 80000, "credit": 0 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000001",
+              "itemId": "019a0000-0000-7000-8000-0000000000c3",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": 1000,
+              "unitCost": 0,
+              "valueDelta": 0,
+              "avgCostAfter": null
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [
+            {
+              "kind": "posted_after_lock",
+              "details": { "businessDate": "2026-11-03", "lockDate": "2026-11-03" }
+            }
+          ],
+          "state": {
+            "costs": { "019a0000-0000-7000-8000-0000000000c3": { "avgCost": null, "onHand": 5000 } },
+            "balances": {
+              "019a0000-0000-7000-8000-0000000000f1": { "019a0000-0000-7000-8000-0000000000c3": 5000 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "one item on two lines: each line comes back in order, the average moving with each",
+      "input": {
+        "void": {
+          "id": "019a8000-0000-7000-8000-000000000085",
+          "number": "C03-V000005",
+          "saleNumber": "C03-S000440",
+          "branchId": "019a0000-0000-7000-8000-0000000000e1",
+          "businessDate": "2026-11-03"
+        },
+        "original": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "019a0000-0000-7000-8000-0000000000e1",
+            "memo": "C03-S000440",
+            "lines": [
+              { "accountId": "1120", "partyId": null, "debit": 200000, "credit": 0 },
+              { "accountId": "4100", "partyId": null, "debit": 0, "credit": 200000 },
+              { "accountId": "5100", "partyId": null, "debit": 150000, "credit": 0 },
+              { "accountId": "1300", "partyId": null, "debit": 0, "credit": 150000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000001",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": -1000,
+              "unitCost": 75000,
+              "valueDelta": -75000,
+              "avgCostAfter": 75000
+            },
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000002",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": -1000,
+              "unitCost": 75000,
+              "valueDelta": -75000,
+              "avgCostAfter": 75000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": { "019a0000-0000-7000-8000-0000000000c1": { "avgCost": 75000, "onHand": 0 } },
+            "balances": {
+              "019a0000-0000-7000-8000-0000000000f1": { "019a0000-0000-7000-8000-0000000000c1": 0 }
+            }
+          }
+        },
+        "state": {
+          "costs": { "019a0000-0000-7000-8000-0000000000c1": { "avgCost": 80000, "onHand": 1000 } },
+          "balances": {
+            "019a0000-0000-7000-8000-0000000000f1": { "019a0000-0000-7000-8000-0000000000c1": 1000 }
+          }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-03",
+          "journal": {
+            "branchId": "019a0000-0000-7000-8000-0000000000e1",
+            "memo": "C03-V000005 C03-S000440",
+            "lines": [
+              { "accountId": "1120", "partyId": null, "debit": 0, "credit": 200000 },
+              { "accountId": "4100", "partyId": null, "debit": 200000, "credit": 0 },
+              { "accountId": "5100", "partyId": null, "debit": 0, "credit": 150000 },
+              { "accountId": "1300", "partyId": null, "debit": 150000, "credit": 0 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000001",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": 1000,
+              "unitCost": 75000,
+              "valueDelta": 75000,
+              "avgCostAfter": 77500
+            },
+            {
+              "sourceLineId": "019a5100-0000-7000-8000-000000000002",
+              "itemId": "019a0000-0000-7000-8000-0000000000c1",
+              "locationId": "019a0000-0000-7000-8000-0000000000f1",
+              "qtyDelta": 1000,
+              "unitCost": 75000,
+              "valueDelta": 75000,
+              "avgCostAfter": 76667
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": { "019a0000-0000-7000-8000-0000000000c1": { "avgCost": 76667, "onHand": 3000 } },
+            "balances": {
+              "019a0000-0000-7000-8000-0000000000f1": { "019a0000-0000-7000-8000-0000000000c1": 3000 }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

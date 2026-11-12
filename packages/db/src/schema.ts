@@ -54,6 +54,13 @@ export const tenants = erp.table('tenants', {
   lockDate: date('lock_date'),
   settings: jsonb('settings').notNull(),
   status: text('status', { enum: ['active', 'suspended', 'closed'] }).notNull(),
+  /** Hours without reaching the server before the counter warns, and warns strongly (SYN-06, W1-07). */
+  offlineWarningHours: smallint('offline_warning_hours').notNull(),
+  offlineStrongWarningHours: smallint('offline_strong_warning_hours').notNull(),
+  /** Days a sale may be returned without an approval (PRD Q3, W1-13); a category may set its own. */
+  returnWindowDays: integer('return_window_days').notNull(),
+  /** Set by the final run: from then on the pilot wipe is refused (D-101, W1-14). */
+  goLiveAt: timestamp('go_live_at', { withTimezone: true }),
   ...syncColumns,
   ...auditColumns,
 });
@@ -77,7 +84,7 @@ export const locations = erp.table('locations', {
   branchId: uuid('branch_id').notNull(),
   code: text('code').notNull(),
   name: text('name').notNull(),
-  kind: text('kind', { enum: ['shop', 'storage', 'damaged'] }).notNull(),
+  kind: text('kind', { enum: ['shop', 'storage', 'damaged', 'transit'] }).notNull(),
   isSellable: boolean('is_sellable').notNull(),
   ...syncColumns,
   ...auditColumns,
@@ -101,6 +108,8 @@ export const users = erp.table('users', {
   status: text('status', { enum: ['active', 'disabled'] }).notNull(),
   passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
   mustChangePassword: boolean('must_change_password').notNull(),
+  /** A temporary PIN set by a manager, to be replaced at a counter (D-089). */
+  pinMustChange: boolean('pin_must_change').notNull(),
   ...syncColumns,
   ...auditColumns,
 });
@@ -111,6 +120,7 @@ export const userLoginState = erp.table('user_login_state', {
   failedLogins: smallint('failed_logins').notNull(),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  pinFailures: smallint('pin_failures').notNull(),
 });
 
 export const roles = erp.table('roles', {
@@ -177,6 +187,10 @@ export const devices = erp.table('devices', {
   enrolledByUserId: uuid('enrolled_by_user_id'),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   revokedByUserId: uuid('revoked_by_user_id'),
+  /** Kept through a Re-enable (W1-07): documents made between the two are flagged. */
+  lastRevokedAt: timestamp('last_revoked_at', { withTimezone: true }),
+  reenabledAt: timestamp('reenabled_at', { withTimezone: true }),
+  reenabledByUserId: uuid('reenabled_by_user_id'),
   /** Null = the tenant's default print profile (D-055). */
   printProfileId: uuid('print_profile_id'),
   ...syncColumns,
@@ -276,6 +290,8 @@ export const taxCodes = erp.table('tax_codes', {
   code: text('code').notNull(),
   name: text('name').notNull(),
   rateBp: integer('rate_bp').notNull(),
+  /** Used by items without their own code (ACC-09); one per tenant. */
+  isDefault: boolean('is_default').notNull(),
   ...syncColumns,
   ...auditColumns,
 });
@@ -461,4 +477,823 @@ export const itemPrices = erp.table('item_prices', {
   price: bigint('price', { mode: 'number' }).notNull(),
   ...syncColumns,
   ...auditColumns,
+});
+
+/** A finalized sale, return or exchange as pushed (data model §5, W1-07); `id` is the device-made UUIDv7. */
+export const salesDocuments = erp.table('sales_documents', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  number: text('number').notNull(),
+  seq: integer('seq').notNull(),
+  kind: text('kind', { enum: ['sale', 'return', 'exchange'] }).notNull(),
+  status: text('status', { enum: ['finalized', 'voided'] }).notNull(),
+  businessDate: date('business_date').notNull(),
+  createdAtDevice: timestamp('created_at_device', { withTimezone: true }).notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  salespersonUserId: uuid('salesperson_user_id').notNull(),
+  customerPartyId: uuid('customer_party_id'),
+  walkinPhone: text('walkin_phone'),
+  priceTierId: uuid('price_tier_id').notNull(),
+  subtotal: bigint('subtotal', { mode: 'number' }).notNull(),
+  lineDiscountTotal: bigint('line_discount_total', { mode: 'number' }).notNull(),
+  billDiscount: bigint('bill_discount', { mode: 'number' }).notNull(),
+  rounding: bigint('rounding', { mode: 'number' }).notNull(),
+  taxTotal: bigint('tax_total', { mode: 'number' }).notNull(),
+  total: bigint('total', { mode: 'number' }).notNull(),
+  cashDue: bigint('cash_due', { mode: 'number' }).notNull(),
+  handoverStatus: text('handover_status', {
+    enum: ['not_applicable', 'pending', 'received', 'paid_out'],
+  }).notNull(),
+  payload: jsonb('payload').notNull(),
+  payloadHash: bytea('payload_hash').notNull(),
+  signature: bytea('signature').notNull(),
+  clientVersion: text('client_version').notNull(),
+  exceptionCount: integer('exception_count').notNull(),
+  // The cash payment's figures, for the cash desk's queue (W1-10).
+  cashReceived: bigint('cash_received', { mode: 'number' }),
+  changeDue: bigint('change_due', { mode: 'number' }),
+  // The bill's void and the voided bill a reissue replaces (W1-12).
+  voidDocumentId: uuid('void_document_id'),
+  voidReasonCode: text('void_reason_code'),
+  voidedAt: timestamp('voided_at', { withTimezone: true }),
+  voidedByUserId: uuid('voided_by_user_id'),
+  voidApprovedByUserId: uuid('void_approved_by_user_id'),
+  reissueOfId: uuid('reissue_of_id'),
+  reissueOfNumber: text('reissue_of_number'),
+  // The bill a return is of, or none (W1-13).
+  returnOfId: uuid('return_of_id'),
+  returnOfNumber: text('return_of_number'),
+  noReceipt: boolean('no_receipt').notNull(),
+  noReceiptRef: text('no_receipt_ref'),
+  // The void's number, and the movement that gave back the cash the desk took for a voided bill (W1-23).
+  voidNumber: text('void_number'),
+  cashGivenBackNumber: text('cash_given_back_number'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+/** A device's void of one of its bills (W1-12, family V), linked to the bill by number. */
+export const salesVoids = erp.table('sales_voids', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  number: text('number').notNull(),
+  seq: integer('seq').notNull(),
+  saleDocumentId: uuid('sale_document_id'),
+  saleNumber: text('sale_number').notNull(),
+  voidedByUserId: uuid('voided_by_user_id').notNull(),
+  approvedByUserId: uuid('approved_by_user_id').notNull(),
+  reasonCode: text('reason_code', {
+    enum: [
+      'wrong_item',
+      'wrong_quantity',
+      'wrong_price',
+      'wrong_customer_or_payment',
+      'duplicate_bill',
+      'customer_cancelled',
+      'other',
+    ],
+  }).notNull(),
+  note: text('note'),
+  handoverSeen: text('handover_seen', { enum: ['pending', 'not_applicable', 'unknown'] }).notNull(),
+  // What the counter knew of each payment part (W1-23, SaleVoidV2); null for a V1 void.
+  paymentChecks: jsonb('payment_checks'),
+  atDevice: timestamp('at_device', { withTimezone: true }).notNull(),
+  businessDate: date('business_date').notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  duplicateOfId: uuid('duplicate_of_id'),
+  payload: jsonb('payload').notNull(),
+  payloadHash: bytea('payload_hash').notNull(),
+  signature: bytea('signature').notNull(),
+  clientVersion: text('client_version').notNull(),
+  exceptionCount: integer('exception_count').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const salesLines = erp.table('sales_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  documentId: uuid('document_id').notNull(),
+  lineNo: smallint('line_no').notNull(),
+  itemId: uuid('item_id').notNull(),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+  listPrice: bigint('list_price', { mode: 'number' }),
+  unitPrice: bigint('unit_price', { mode: 'number' }).notNull(),
+  lineDiscount: bigint('line_discount', { mode: 'number' }).notNull(),
+  billShare: bigint('bill_share', { mode: 'number' }).notNull(),
+  lineTotal: bigint('line_total', { mode: 'number' }).notNull(),
+  floorPriceAtSale: bigint('floor_price_at_sale', { mode: 'number' }),
+  taxCodeId: uuid('tax_code_id'),
+  taxAmount: bigint('tax_amount', { mode: 'number' }).notNull(),
+  locationId: uuid('location_id'),
+  // A returned line (W1-13): the line it returns, why, and in what condition.
+  originalLineId: uuid('original_line_id'),
+  returnReasonCode: text('return_reason_code', {
+    enum: ['wrong_part', 'unused_option', 'defective', 'changed_mind', 'other'],
+  }),
+  returnCondition: text('return_condition', { enum: ['resellable', 'defective'] }),
+  returnNote: text('return_note'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+export const salesPayments = erp.table('sales_payments', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  documentId: uuid('document_id').notNull(),
+  lineNo: smallint('line_no').notNull(),
+  methodId: uuid('method_id').notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  cashReceived: bigint('cash_received', { mode: 'number' }),
+  changeDue: bigint('change_due', { mode: 'number' }),
+  reference: text('reference'),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+/** Approvals on a document (PLT-07); `lineId` null = the bill discount. */
+export const overrides = erp.table('overrides', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  documentId: uuid('document_id').notNull(),
+  lineId: uuid('line_id'),
+  kind: text('kind', {
+    enum: [
+      'below_list',
+      'below_floor',
+      'credit_limit',
+      'offline_cap',
+      'no_receipt_return',
+      'return_permission',
+      'return_outside_policy',
+      'void',
+      'reprint',
+      'refund_transfer',
+    ],
+  }).notNull(),
+  requestedByUserId: uuid('requested_by_user_id').notNull(),
+  approvedByUserId: uuid('approved_by_user_id').notNull(),
+  reasonCode: text('reason_code').notNull(),
+  note: text('note'),
+  values: jsonb('values').notNull(),
+  atDevice: timestamp('at_device', { withTimezone: true }).notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+const family = (name: string) => text(name, { enum: ['S', 'H', 'R', 'M', 'Z'] });
+
+/** Each pushed document's result (sync spec §6.2). */
+export const syncInbox = erp.table('sync_inbox', {
+  tenantId: uuid('tenant_id').notNull(),
+  documentId: uuid('document_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  family: family('family').notNull(),
+  seq: integer('seq').notNull(),
+  status: text('status', { enum: ['accepted', 'rejected'] }).notNull(),
+  result: jsonb('result').notNull(),
+  payloadHash: bytea('payload_hash').notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  attempts: integer('attempts').notNull(),
+});
+
+/** Exceptions for review (data model §10, RPT-10). */
+export const exceptions = erp.table('exceptions', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  kind: text('kind').notNull(),
+  severity: text('severity', { enum: ['low', 'medium', 'high'] }).notNull(),
+  documentType: text('document_type'),
+  documentId: uuid('document_id'),
+  deviceId: uuid('device_id'),
+  userId: uuid('user_id'),
+  businessDate: date('business_date').notNull(),
+  details: jsonb('details').notNull(),
+  status: text('status', { enum: ['open', 'reviewed', 'dismissed'] }).notNull(),
+  reviewedByUserId: uuid('reviewed_by_user_id'),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  reviewNote: text('review_note'),
+  ...auditColumns,
+});
+
+/** Every seq from 1 to `through` has arrived; `maxSeq` is the highest seen (sync spec §7). */
+export const deviceSeries = erp.table('device_series', {
+  tenantId: uuid('tenant_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  family: family('family').notNull(),
+  through: integer('through').notNull(),
+  maxSeq: integer('max_seq').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+export const sequenceGaps = erp.table('sequence_gaps', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  family: family('family').notNull(),
+  fromSeq: integer('from_seq').notNull(),
+  toSeq: integer('to_seq').notNull(),
+  openedAt: timestamp('opened_at', { withTimezone: true }).notNull(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+});
+
+/** Each device's last health snapshot (PLT-09). */
+export const deviceStatus = erp.table('device_status', {
+  tenantId: uuid('tenant_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull(),
+  lastPushAt: timestamp('last_push_at', { withTimezone: true }),
+  lastPullAt: timestamp('last_pull_at', { withTimezone: true }),
+  clientVersion: text('client_version'),
+  schemaVersion: integer('schema_version'),
+  outboxCount: integer('outbox_count'),
+  oldestUnsyncedAt: timestamp('oldest_unsynced_at', { withTimezone: true }),
+  quarantinedCount: integer('quarantined_count'),
+  storagePersisted: boolean('storage_persisted'),
+  storageUsage: bigint('storage_usage', { mode: 'number' }),
+  storageQuota: bigint('storage_quota', { mode: 'number' }),
+  clockSkewMs: integer('clock_skew_ms'),
+});
+
+/** A counter's diagnostic log and health, sent by a manager (PLT-12, migration 0021, W1-20); kept 30 days. */
+export const deviceDiagnostics = erp.table('device_diagnostics', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  sentByUserId: uuid('sent_by_user_id').notNull(),
+  atDevice: timestamp('at_device', { withTimezone: true }).notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  health: jsonb('health').notNull(),
+  events: jsonb('events').notNull(),
+  eventCount: integer('event_count').notNull(),
+});
+
+// Ledgers (migration 0009, W1-08): written only by packages/posting (rule 4).
+
+const role = (name: string) => text(name, { enum: ['customer', 'supplier'] });
+
+/** One row per tenant, locked by every posting: the last posting seq and journal number. */
+export const postingState = erp.table('posting_state', {
+  tenantId: uuid('tenant_id').primaryKey(),
+  lastSeq: bigint('last_seq', { mode: 'number' }).notNull(),
+  lastJournalNo: bigint('last_journal_no', { mode: 'number' }).notNull(),
+});
+
+/** The order of record, with the settings each posting used. */
+export const postings = erp.table('postings', {
+  tenantId: uuid('tenant_id').notNull(),
+  seq: bigint('seq', { mode: 'number' }).notNull(),
+  sourceType: text('source_type', {
+    enum: ['sale', 'cash_handover', 'payment', 'cash_movement', 'cash_session', 'sales_void', 'opening'],
+  }).notNull(),
+  sourceId: uuid('source_id').notNull(),
+  entryDate: date('entry_date').notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }).notNull(),
+  context: jsonb('context').notNull(),
+});
+
+export const journalEntries = erp.table('journal_entries', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number').notNull(),
+  entryDate: date('entry_date').notNull(),
+  sourceType: text('source_type').notNull(),
+  sourceId: uuid('source_id').notNull(),
+  memo: text('memo'),
+  reversalOfId: uuid('reversal_of_id'),
+  postingSeq: bigint('posting_seq', { mode: 'number' }).notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }).notNull(),
+  createdByUserId: uuid('created_by_user_id'),
+});
+
+export const journalLines = erp.table('journal_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  entryId: uuid('entry_id').notNull(),
+  lineNo: smallint('line_no').notNull(),
+  accountId: uuid('account_id').notNull(),
+  partyId: uuid('party_id'),
+  branchId: uuid('branch_id').notNull(),
+  debit: bigint('debit', { mode: 'number' }).notNull(),
+  credit: bigint('credit', { mode: 'number' }).notNull(),
+  memo: text('memo'),
+});
+
+export const stockMovements = erp.table('stock_movements', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  postingSeq: bigint('posting_seq', { mode: 'number' }).notNull(),
+  itemId: uuid('item_id').notNull(),
+  locationId: uuid('location_id').notNull(),
+  qtyDelta: numeric('qty_delta', { precision: 14, scale: 3 }).notNull(),
+  unitCost: bigint('unit_cost', { mode: 'number' }).notNull(),
+  valueDelta: bigint('value_delta', { mode: 'number' }).notNull(),
+  avgCostAfter: bigint('avg_cost_after', { mode: 'number' }),
+  sourceType: text('source_type').notNull(),
+  sourceId: uuid('source_id').notNull(),
+  sourceLineId: uuid('source_line_id'),
+  businessDate: date('business_date').notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }).notNull(),
+});
+
+export const stockBalances = erp.table('stock_balances', {
+  tenantId: uuid('tenant_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  locationId: uuid('location_id').notNull(),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  ...syncColumns,
+});
+
+/** One weighted average per item, tenant-wide (D-017); `avgCost` null = no cost known yet. */
+export const itemCosts = erp.table('item_costs', {
+  tenantId: uuid('tenant_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  avgCost: bigint('avg_cost', { mode: 'number' }),
+  onHand: numeric('on_hand', { precision: 14, scale: 3 }).notNull(),
+  lastCost: bigint('last_cost', { mode: 'number' }),
+  lastSupplierId: uuid('last_supplier_id'),
+  lastReceiptAt: timestamp('last_receipt_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+/** The floor from cost per item (CAT-06, D-092, W1-14), kept by the posting layer; pulled by the counters. */
+export const itemFloors = erp.table('item_floors', {
+  tenantId: uuid('tenant_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  floor: bigint('floor', { mode: 'number' }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  ...syncColumns,
+});
+
+/** The next number per document family, taken when a back-office document is posted (W1-16). */
+export const documentCounters = erp.table('document_counters', {
+  tenantId: uuid('tenant_id').notNull(),
+  family: text('family').notNull(),
+  lastNo: bigint('last_no', { mode: 'number' }).notNull(),
+});
+
+/** A goods receipt with the supplier's bill (PUR-02, W1-16): a draft until posted, then never changed. */
+export const goodsReceipts = erp.table('goods_receipts', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number'),
+  branchId: uuid('branch_id').notNull(),
+  supplierPartyId: uuid('supplier_party_id'),
+  supplierBillNo: text('supplier_bill_no'),
+  supplierBillDate: date('supplier_bill_date'),
+  businessDate: date('business_date').notNull(),
+  locationId: uuid('location_id').notNull(),
+  paidFromBankAccountId: uuid('paid_from_bank_account_id'),
+  billDiscount: bigint('bill_discount', { mode: 'number' }).notNull(),
+  billTotal: bigint('bill_total', { mode: 'number' }),
+  total: bigint('total', { mode: 'number' }),
+  dueDate: date('due_date'),
+  notes: text('notes'),
+  status: text('status').notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  rowVersion: bigint('row_version', { mode: 'bigint' }).notNull(),
+  ...auditColumns,
+});
+
+export const goodsReceiptLines = erp.table('goods_receipt_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  receiptId: uuid('receipt_id').notNull(),
+  lineNo: integer('line_no').notNull(),
+  itemId: uuid('item_id'),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+  unitCost: bigint('unit_cost', { mode: 'number' }).notNull(),
+  lineDiscount: bigint('line_discount', { mode: 'number' }).notNull(),
+  value: bigint('value', { mode: 'number' }),
+});
+
+/** A purchase return / debit note (PUR-03, W1-16): a draft until posted, then never changed. */
+export const purchaseReturns = erp.table('purchase_returns', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number'),
+  branchId: uuid('branch_id').notNull(),
+  supplierPartyId: uuid('supplier_party_id'),
+  goodsReceiptId: uuid('goods_receipt_id'),
+  locationId: uuid('location_id').notNull(),
+  businessDate: date('business_date').notNull(),
+  reasonCode: text('reason_code'),
+  note: text('note'),
+  total: bigint('total', { mode: 'number' }),
+  status: text('status').notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  rowVersion: bigint('row_version', { mode: 'bigint' }).notNull(),
+  ...auditColumns,
+});
+
+export const purchaseReturnLines = erp.table('purchase_return_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  returnId: uuid('return_id').notNull(),
+  lineNo: integer('line_no').notNull(),
+  itemId: uuid('item_id'),
+  receiptLineId: uuid('receipt_line_id'),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+  unitCost: bigint('unit_cost', { mode: 'number' }).notNull(),
+});
+
+/** A supplier payment by bank from the back office (PUR-09, W1-16), posted when made. */
+export const supplierPayments = erp.table('supplier_payments', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  supplierPartyId: uuid('supplier_party_id').notNull(),
+  bankAccountId: uuid('bank_account_id').notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  businessDate: date('business_date').notNull(),
+  reference: text('reference'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  ...auditColumns,
+});
+
+/** Which transfer routes need receiving (W1-18, owner answer 4); a route with no row moves at once. */
+export const transferRoutes = erp.table('transfer_routes', {
+  tenantId: uuid('tenant_id').notNull(),
+  fromLocationId: uuid('from_location_id').notNull(),
+  toLocationId: uuid('to_location_id').notNull(),
+  needsReceiving: boolean('needs_receiving').notNull(),
+  ...auditColumns,
+});
+
+/** A stock transfer between locations (INV-04, W1-18): a draft, then posted at once or sent and received. */
+export const stockTransfers = erp.table('stock_transfers', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number'),
+  branchId: uuid('branch_id').notNull(),
+  fromLocationId: uuid('from_location_id').notNull(),
+  toLocationId: uuid('to_location_id').notNull(),
+  businessDate: date('business_date').notNull(),
+  note: text('note'),
+  status: text('status').notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  postedByUserId: uuid('posted_by_user_id'),
+  receiptId: uuid('receipt_id'),
+  receivedOn: date('received_on'),
+  receivedAt: timestamp('received_at', { withTimezone: true }),
+  receivedByUserId: uuid('received_by_user_id'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  rowVersion: bigint('row_version', { mode: 'bigint' }).notNull(),
+  ...auditColumns,
+});
+
+export const stockTransferLines = erp.table('stock_transfer_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  transferId: uuid('transfer_id').notNull(),
+  lineNo: integer('line_no').notNull(),
+  itemId: uuid('item_id'),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+  receivedQty: numeric('received_qty', { precision: 14, scale: 3 }),
+});
+
+/** A stock adjustment (INV-05, W1-18): a draft, awaiting the owner's approval when large, then posted. */
+export const stockAdjustments = erp.table('stock_adjustments', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number'),
+  branchId: uuid('branch_id').notNull(),
+  locationId: uuid('location_id').notNull(),
+  businessDate: date('business_date').notNull(),
+  reasonCode: text('reason_code'),
+  note: text('note'),
+  stockTransferId: uuid('stock_transfer_id'),
+  status: text('status').notNull(),
+  lossValue: bigint('loss_value', { mode: 'number' }),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  submittedByUserId: uuid('submitted_by_user_id'),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  approvedByUserId: uuid('approved_by_user_id'),
+  rejectedAt: timestamp('rejected_at', { withTimezone: true }),
+  rejectedByUserId: uuid('rejected_by_user_id'),
+  rejectionNote: text('rejection_note'),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  postedByUserId: uuid('posted_by_user_id'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  rowVersion: bigint('row_version', { mode: 'bigint' }).notNull(),
+  ...auditColumns,
+});
+
+export const stockAdjustmentLines = erp.table('stock_adjustment_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  adjustmentId: uuid('adjustment_id').notNull(),
+  lineNo: integer('line_no').notNull(),
+  itemId: uuid('item_id'),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+});
+
+/** Every price change: who, when, old → new and why (CAT-07, W1-15); added to only. */
+export const priceHistory = erp.table('price_history', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  tierId: uuid('tier_id'),
+  oldValue: bigint('old_value', { mode: 'number' }),
+  newValue: bigint('new_value', { mode: 'number' }),
+  source: text('source').notNull(),
+  reasonCode: text('reason_code'),
+  note: text('note'),
+  userId: uuid('user_id'),
+  at: timestamp('at', { withTimezone: true }).notNull(),
+});
+
+/** The opening balances at cutover (MIG-02, posting rules §7, W1-14): a draft until it is posted, then never changed. */
+export const openingBalances = erp.table('opening_balances', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  label: text('label').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  asOf: date('as_of').notNull(),
+  businessDate: date('business_date').notNull(),
+  status: text('status', { enum: ['draft', 'posted'] }).notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  legacy: jsonb('legacy'),
+  ...auditColumns,
+});
+
+export const openingBalanceLines = erp.table('opening_balance_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  openingId: uuid('opening_id').notNull(),
+  lineNo: integer('line_no').notNull(),
+  kind: text('kind', { enum: ['stock', 'customer', 'supplier', 'account'] }).notNull(),
+  itemId: uuid('item_id'),
+  locationId: uuid('location_id'),
+  qty: numeric('qty', { precision: 14, scale: 3 }),
+  unitCost: bigint('unit_cost', { mode: 'number' }),
+  lastCost: bigint('last_cost', { mode: 'number' }),
+  lastSupplierId: uuid('last_supplier_id'),
+  lastReceiptAt: timestamp('last_receipt_at', { withTimezone: true }),
+  partyId: uuid('party_id'),
+  accountId: uuid('account_id'),
+  amount: bigint('amount', { mode: 'number' }),
+});
+
+export const partyLedgerEntries = erp.table('party_ledger_entries', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  postingSeq: bigint('posting_seq', { mode: 'number' }).notNull(),
+  partyId: uuid('party_id').notNull(),
+  role: role('role').notNull(),
+  entryDate: date('entry_date').notNull(),
+  dueDate: date('due_date').notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  sourceType: text('source_type').notNull(),
+  sourceId: uuid('source_id').notNull(),
+  memo: text('memo'),
+  postedAt: timestamp('posted_at', { withTimezone: true }).notNull(),
+});
+
+export const partyBalances = erp.table('party_balances', {
+  tenantId: uuid('tenant_id').notNull(),
+  partyId: uuid('party_id').notNull(),
+  role: role('role').notNull(),
+  balance: bigint('balance', { mode: 'number' }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  ...syncColumns,
+});
+
+const VARIANCE_REASONS = [
+  'change_error',
+  'wrong_bill_confirmed',
+  'unrecorded_cash_out',
+  'counterfeit_note',
+  'unknown',
+  'other',
+] as const;
+
+/** A cash desk's session (W1-10, data model §6): opened by its open document, closed by its close document. */
+export const cashSessions = erp.table('cash_sessions', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  number: text('number').notNull(),
+  cashierUserId: uuid('cashier_user_id').notNull(),
+  openedAt: timestamp('opened_at', { withTimezone: true }).notNull(),
+  businessDate: date('business_date').notNull(),
+  openingFloat: bigint('opening_float', { mode: 'number' }).notNull(),
+  closedAt: timestamp('closed_at', { withTimezone: true }),
+  closedByUserId: uuid('closed_by_user_id'),
+  closeDocumentId: uuid('close_document_id'),
+  closeNumber: text('close_number'),
+  expectedCash: bigint('expected_cash', { mode: 'number' }),
+  status: text('status', { enum: ['open', 'closed'] }).notNull(),
+  payload: jsonb('payload').notNull(),
+  signature: bytea('signature').notNull(),
+  closePayload: jsonb('close_payload'),
+  closeSignature: bytea('close_signature'),
+  clientVersion: text('client_version').notNull(),
+  // The counted close (W1-11): only the acknowledgement may be set later, from the back office.
+  floatExpected: bigint('float_expected', { mode: 'number' }),
+  countedCash: bigint('counted_cash', { mode: 'number' }),
+  denominations: jsonb('denominations'),
+  variance: bigint('variance', { mode: 'number' }),
+  varianceReasonCode: text('variance_reason_code', { enum: VARIANCE_REASONS }),
+  varianceNote: text('variance_note'),
+  leftInDrawer: bigint('left_in_drawer', { mode: 'number' }),
+  acknowledgedByUserId: uuid('acknowledged_by_user_id'),
+  acknowledgedAt: timestamp('acknowledged_at', { withTimezone: true }),
+  exceptionCount: integer('exception_count').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+/** A handover in or a refund payout as a desk pushed it (W1-10, data model §6). */
+export const cashHandovers = erp.table('cash_handovers', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  number: text('number').notNull(),
+  seq: integer('seq').notNull(),
+  sessionId: uuid('session_id').notNull(),
+  salesDocumentId: uuid('sales_document_id'),
+  billNumber: text('bill_number').notNull(),
+  kind: text('kind', { enum: ['in', 'payout'] }).notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  receivedAmount: bigint('received_amount', { mode: 'number' }),
+  changeGiven: bigint('change_given', { mode: 'number' }),
+  correctedFrom: bigint('corrected_from', { mode: 'number' }),
+  method: text('method', { enum: ['queue', 'scan', 'auto'] }).notNull(),
+  cashierUserId: uuid('cashier_user_id').notNull(),
+  atDevice: timestamp('at_device', { withTimezone: true }).notNull(),
+  businessDate: date('business_date').notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  duplicateOfId: uuid('duplicate_of_id'),
+  payload: jsonb('payload').notNull(),
+  payloadHash: bytea('payload_hash').notNull(),
+  signature: bytea('signature').notNull(),
+  clientVersion: text('client_version').notNull(),
+  exceptionCount: integer('exception_count').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+/** A customer collection a desk pushed (W1-11, data model §6); bank receipts and payments join it later. */
+export const payments = erp.table('payments', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  number: text('number').notNull(),
+  seq: integer('seq').notNull(),
+  direction: text('direction', { enum: ['in', 'out'] }).notNull(),
+  partyId: uuid('party_id').notNull(),
+  methodId: uuid('method_id').notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  reference: text('reference'),
+  note: text('note'),
+  sessionId: uuid('session_id').notNull(),
+  cashierUserId: uuid('cashier_user_id').notNull(),
+  atDevice: timestamp('at_device', { withTimezone: true }).notNull(),
+  businessDate: date('business_date').notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  payload: jsonb('payload').notNull(),
+  payloadHash: bytea('payload_hash').notNull(),
+  signature: bytea('signature').notNull(),
+  clientVersion: text('client_version').notNull(),
+  exceptionCount: integer('exception_count').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+/** A cash-out or safe movement a desk pushed (W1-11, data model §6). */
+export const cashMovements = erp.table('cash_movements', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  number: text('number').notNull(),
+  seq: integer('seq').notNull(),
+  kind: text('kind', {
+    enum: ['expense', 'supplier_payment', 'bank_deposit', 'to_safe', 'from_safe', 'void_cash'],
+  }).notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  expenseCategoryId: uuid('expense_category_id'),
+  partyId: uuid('party_id'),
+  bankAccountId: uuid('bank_account_id'),
+  note: text('note'),
+  reference: text('reference'),
+  // Cash given back for a voided bill (W1-23): its bill, the approver, and the give-back it repeats.
+  billNumber: text('bill_number'),
+  approvedByUserId: uuid('approved_by_user_id'),
+  duplicateOfId: uuid('duplicate_of_id'),
+  sessionId: uuid('session_id').notNull(),
+  cashierUserId: uuid('cashier_user_id').notNull(),
+  atDevice: timestamp('at_device', { withTimezone: true }).notNull(),
+  businessDate: date('business_date').notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  payload: jsonb('payload').notNull(),
+  payloadHash: bytea('payload_hash').notNull(),
+  signature: bytea('signature').notNull(),
+  clientVersion: text('client_version').notNull(),
+  exceptionCount: integer('exception_count').notNull(),
+  ...syncColumns,
+  ...auditColumns,
+});
+
+/** A customer's payment into a bank account (ACC-04, W1-19): posted when saved, then never changed. */
+export const customerReceipts = erp.table('customer_receipts', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  customerPartyId: uuid('customer_party_id').notNull(),
+  bankAccountId: uuid('bank_account_id').notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  businessDate: date('business_date').notNull(),
+  reference: text('reference'),
+  note: text('note'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  ...auditColumns,
+});
+
+/** An expense paid from a bank account or the safe (ACC-04, W1-19); no bank account = the safe. */
+export const expenses = erp.table('expenses', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  expenseCategoryId: uuid('expense_category_id').notNull(),
+  paidFromBankAccountId: uuid('paid_from_bank_account_id'),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  businessDate: date('business_date').notNull(),
+  reference: text('reference'),
+  note: text('note'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  ...auditColumns,
+});
+
+/** Money between banks, wallets, card settlement and the safe, with its charges (ACC-04, W1-19, owner answer 6). */
+export const fundTransfers = erp.table('fund_transfers', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number').notNull(),
+  branchId: uuid('branch_id').notNull(),
+  fromBankAccountId: uuid('from_bank_account_id'),
+  toBankAccountId: uuid('to_bank_account_id'),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  charges: bigint('charges', { mode: 'number' }).notNull(),
+  chargesCategoryId: uuid('charges_category_id'),
+  businessDate: date('business_date').notNull(),
+  reference: text('reference'),
+  note: text('note'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  ...auditColumns,
+});
+
+/** A journal voucher (ACC-05, W1-19): a draft, then posted once; a reversal names what it reverses. */
+export const journalVouchers = erp.table('journal_vouchers', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  number: text('number'),
+  branchId: uuid('branch_id').notNull(),
+  businessDate: date('business_date').notNull(),
+  narration: text('narration'),
+  status: text('status', { enum: ['draft', 'posted'] }).notNull(),
+  reversesType: text('reverses_type'),
+  reversesId: uuid('reverses_id'),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  postedByUserId: uuid('posted_by_user_id'),
+  deviceId: uuid('device_id'),
+  exceptionCount: integer('exception_count').notNull(),
+  rowVersion: bigint('row_version', { mode: 'bigint' }).notNull(),
+  ...auditColumns,
+});
+
+export const journalVoucherLines = erp.table('journal_voucher_lines', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  voucherId: uuid('voucher_id').notNull(),
+  lineNo: integer('line_no').notNull(),
+  accountId: uuid('account_id'),
+  partyId: uuid('party_id'),
+  debit: bigint('debit', { mode: 'number' }).notNull(),
+  credit: bigint('credit', { mode: 'number' }).notNull(),
+  memo: text('memo'),
 });

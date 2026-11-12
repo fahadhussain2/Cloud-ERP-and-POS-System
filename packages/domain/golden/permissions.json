@@ -117,6 +117,41 @@
       "expected": false
     },
     {
+      "name": "Purchaser types a transfer but can't post it (owner answer 2 to W1-18)",
+      "input": { "roles": ["purchaser"], "permission": "inv.transfer.post" },
+      "expected": false
+    },
+    {
+      "name": "Purchaser drafts transfers",
+      "input": { "roles": ["purchaser"], "permission": "inv.transfer" },
+      "expected": true
+    },
+    {
+      "name": "Purchaser can't adjust stock",
+      "input": { "roles": ["purchaser"], "permission": "inv.adjust" },
+      "expected": false
+    },
+    {
+      "name": "Manager posts transfers",
+      "input": { "roles": ["manager"], "permission": "inv.transfer.post" },
+      "expected": true
+    },
+    {
+      "name": "Manager adjusts stock but can't approve a large loss (owner answer 3 to W1-18)",
+      "input": { "roles": ["manager"], "permission": "inv.adjust.approve" },
+      "expected": false
+    },
+    {
+      "name": "Owner approves a large loss",
+      "input": { "roles": ["owner"], "permission": "inv.adjust.approve" },
+      "expected": true
+    },
+    {
+      "name": "Salesman doesn't move stock",
+      "input": { "roles": ["salesman"], "permission": "inv.transfer" },
+      "expected": false
+    },
+    {
       "name": "Accountant posts journals",
       "input": { "roles": ["accountant"], "permission": "acc.journal.post" },
       "expected": true
@@ -125,6 +160,51 @@
       "name": "Accountant closes periods",
       "input": { "roles": ["accountant"], "permission": "acc.period.close" },
       "expected": true
+    },
+    {
+      "name": "Only the owner reopens a period (owner answer 5 to W1-19)",
+      "input": { "roles": ["accountant"], "permission": "acc.period.reopen" },
+      "expected": false
+    },
+    {
+      "name": "The owner reopens a period",
+      "input": { "roles": ["owner"], "permission": "acc.period.reopen" },
+      "expected": true
+    },
+    {
+      "name": "Accountant adds accounts and expense categories (owner answer 4 to W1-19)",
+      "input": { "roles": ["accountant"], "permission": "acc.chart.edit" },
+      "expected": true
+    },
+    {
+      "name": "Manager has no accounting (owner answer 1 to W1-19)",
+      "input": { "roles": ["manager"], "permission": "acc.chart.edit" },
+      "expected": false
+    },
+    {
+      "name": "Manager reviews exceptions (owner answer 5 to W1-20)",
+      "input": { "roles": ["manager"], "permission": "exceptions.review" },
+      "expected": true
+    },
+    {
+      "name": "Accountant sees exceptions but doesn't review them",
+      "input": { "roles": ["accountant"], "permission": "exceptions.review" },
+      "expected": false
+    },
+    {
+      "name": "Owner traces a bill (PLT-12, owner answer 1 to W1-20)",
+      "input": { "roles": ["owner"], "permission": "support.trace" },
+      "expected": true
+    },
+    {
+      "name": "Manager doesn't trace bills: the owner's only",
+      "input": { "roles": ["manager"], "permission": "support.trace" },
+      "expected": false
+    },
+    {
+      "name": "Cashier sees no reports",
+      "input": { "roles": ["cashier"], "permission": "reports.view" },
+      "expected": false
     },
     {
       "name": "Accountant doesn't sell",

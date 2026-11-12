@@ -10,7 +10,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@erp/contracts": "workspace:*",
+    "@erp/domain": "workspace:*",
     "@erp/observability": "workspace:*",
+    "@erp/print": "workspace:*",
+    "@erp/ui": "workspace:*",
     "i18next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
@@ -18,11 +22,14 @@
   },
   "devDependencies": {
     "@sentry/vite-plugin": "catalog:",
+    "@tailwindcss/vite": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "jsdom": "catalog:",
+    "tailwindcss": "catalog:",
+    "tw-animate-css": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:"
   }

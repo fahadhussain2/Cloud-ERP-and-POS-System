@@ -16,6 +16,7 @@
 5. **Immutable:** corrections are reversal entries (void, return, or a reversing journal), never edits.
 6. **Period lock:** nothing posts on or before `tenants.lock_date`. A late-synced offline document dated inside a locked period posts on the first open date, with its original business date kept on the document, and raises an exception.
 7. **Money** is integer minor units. Allocations (e.g. a bill discount spread across lines) use largest-remainder rounding, so line amounts always sum exactly to the total.
+8. **A document that can't be posted is still accepted** (SYN-03): it gets a `posting_failed` exception and posts by itself once the cause is fixed (e.g. a payment method mapped to a bank). How the engine posts, records its order and proves the ledgers is in the [accounting spec](modules/accounting/spec.md) (W1-08, D-095).
 
 ## 2. Default chart of accounts (retail template)
 
@@ -26,13 +27,14 @@ New tenants get this tree. Delux's legacy accounts are mapped into it ([migratio
 | **1000** | **Assets** | asset | |
 | 1110 | Cash drawer (cash desk) | asset | `CASH_DRAWER` |
 | 1120 | Cash in transit, counters (awaiting handover / payout) | asset | `CASH_IN_TRANSIT` |
-| 1130 | Cash in safe | asset | |
+| 1130 | Cash in safe | asset | `CASH_SAFE` (W1-11) |
 | 1140 | Cheques in hand | asset | |
 | 1150 | Bank: Soneri | asset | (bank_accounts) |
 | 1160 | Bank: HBL | asset | (bank_accounts) |
 | 1170 | Wallet: JazzCash | asset | (bank_accounts) |
 | 1171 | Wallet: Easypaisa | asset | (bank_accounts) |
 | 1180 | Card settlement clearing | asset | (bank_accounts) |
+| 1190 | Posting suspense (differences of bills that don't add up, cleared by journal voucher) | asset | `SUSPENSE` |
 | 1200 | Accounts receivable (customers) | asset | `AR_CONTROL` |
 | 1300 | Inventory | asset | `INVENTORY` |
 | **2000** | **Liabilities** | liability | |
@@ -78,6 +80,9 @@ Note: the legacy "Purchases" account sat under Liabilities. Purchases now go **i
 | On account | `Dr AR_CONTROL (party)`: remainder put on the customer's account; party ledger due date = date + terms |
 | Cost | `Dr COGS / Cr INVENTORY`: Σ qty × avg cost (stock movement out of SHOP) |
 | Tax (future) | `Cr TAX_PAYABLE`: tax_total |
+| Difference | `Dr/Cr SUSPENSE`: whatever still doesn't balance, on a bill whose figures don't add up (a counter bug, D-094). Its stock and cash still post (W1-08 owner answer 3). |
+
+An item sold before its cost is known (not received, not in the opening stock) posts at cost 0 and is flagged `no_cost` (W1-08 owner answer 2). The cost of each line is kept on its stock movement.
 
 Line price concessions (negotiated below list) are **not** separate GL entries. Sales are recorded at the price actually charged. Concessions are a management report (RPT-03).
 
@@ -88,28 +93,31 @@ Line price concessions (negotiated below list) are **not** separate GL entries. 
 | Settlement, cash | `Cr CASH_IN_TRANSIT`: refund due, paid out at the desk (§4.5) |
 | Settlement, account customer | `Cr AR_CONTROL (party)` |
 | Settlement, non-cash refund by transfer | `Cr <bank/wallet account>` |
-| Cost reversal | `Dr INVENTORY / Cr COGS`: qty × **the original line's unit_cost** (for legacy-bill or no-receipt returns: the current avg cost). Stock goes into SHOP (resellable) or DAMAGED (defective). Both are Inventory until written off. |
+| Cost reversal | `Dr INVENTORY / Cr COGS`: qty × **the original line's unit_cost**, from its stock movement (for a no-receipt return, or an original that left with no cost: the current avg cost; D-044, W1-13). A return posts only once its original bill has posted (it waits, like a void). Stock goes into SHOP (resellable) or DAMAGED (defective). Both are Inventory until written off. |
 
 ### 4.3 Exchange (mixed lines)
 §4.1 for the positive lines plus §4.2 for the negative lines, in **one** journal entry. Only the **net** settlement moves: `cash_due` > 0 is collected, < 0 is refunded.
 
 ### 4.4 Void
-A reversing journal entry with every line of the original entry swapped, dated the void date. Stock movements are reversed at the same unit costs, and party ledger entries are reversed. A void is only allowed before the cash handover (D-002 / PRD W5), so `CASH_IN_TRANSIT` is cleared by the reversal itself.
+A reversing journal entry with every line of the original entry swapped, dated the void's business date (the day after the lock date when locked). Stock movements are reversed at the same unit costs (the average recomputed as a receipt at that cost; a line that left with no cost comes back at 0 and leaves the average as it is), and party ledger entries are reversed on their own due dates. A void is only allowed before the cash handover, for every role (D-002 / PRD W5, owner answer 1 to W1-12), so `CASH_IN_TRANSIT` is cleared by the reversal itself. A void reaches the books only after its bill has posted; one whose bill hasn't arrived or hasn't posted waits (W1-12). Cash taken at the desk for a voided bill anyway still posts its handover, so `CASH_IN_TRANSIT` shows it until it is explained (`cash_received_for_void`, D-059).
 
 ### 4.5 Cash desk events
 | Event | Entry |
 |---|---|
 | Handover in (salesman brings cash) | `Dr CASH_DRAWER / Cr CASH_IN_TRANSIT`: cash_due |
 | Refund payout | `Dr CASH_IN_TRANSIT / Cr CASH_DRAWER`: refund amount |
-| Sale on the cash desk device itself | Posted as §4.1, plus an automatic handover in the same entry |
+| Cash taken for a voided bill, given back (cash movement `void_cash`, W1-23, D-111) | `Dr CASH_IN_TRANSIT / Cr CASH_DRAWER`: the amount the desk took; undoes that bill's handover, so cash in transit comes back to 0. A second give-back of one bill is kept and never posted |
+| Sale on the cash desk device itself | Posted as §4.1; the desk writes its automatic handover (`method = auto`) in the same local transaction, which posts as a handover in (W1-10, D-097) |
 | Customer collection, cash | `Dr CASH_DRAWER / Cr AR_CONTROL (party)` |
 | Customer collection, non-cash | `Dr <bank/wallet account> / Cr AR_CONTROL (party)` |
 | Supplier payment from the drawer | `Dr AP_CONTROL (party) / Cr CASH_DRAWER` |
 | Expense from the drawer | `Dr <expense category account> / Cr CASH_DRAWER` |
 | Bank deposit | `Dr <bank account> / Cr CASH_DRAWER` |
-| Float in / out | `Dr CASH_DRAWER / Cr CASH (safe)`, or reversed |
-| Drawer close, shortage | `Dr CASH_SHORT_OVER / Cr CASH_DRAWER`: variance |
+| From / to the safe | `Dr CASH_DRAWER / Cr CASH_SAFE`, or reversed (cash movements `from_safe`, `to_safe`, W1-11) |
+| Session open, float below what stayed at the last close | `Dr CASH_SHORT_OVER / Cr CASH_DRAWER`: the difference (above: reversed); the float itself posts nothing (W1-11, owner answer 3) |
+| Drawer close, shortage | `Dr CASH_SHORT_OVER / Cr CASH_DRAWER`: variance, when the close arrives, acknowledged or not |
 | Drawer close, overage | `Dr CASH_DRAWER / Cr CASH_SHORT_OVER`: variance |
+| Drawer close, what doesn't stay in the drawer | `Dr CASH_SAFE / Cr CASH_DRAWER`: counted − left in the drawer (W1-11) |
 
 With `cash_handover_mode = off`, the automatic handover posts the same entry in the same transaction as the sale, so the posting logic is the same in both modes.
 
@@ -132,6 +140,8 @@ A handover always posts the bill's **cash due** (or refund amount). The salesman
 - If on_hand > 0: `new_avg = (on_hand × avg + qty × net_unit_cost) / (on_hand + qty)`, rounded to minor units.
 - If on_hand ≤ 0 before the receipt: `new_avg = net_unit_cost`.
 
+**As built (W1-16, D-105):** `postGoodsReceipt` posts each line's exact net value (the bill discount already in it) and computes the average from that value; paid by bank adds `Dr AP_CONTROL / Cr <bank>` in the same entry. A cash purchase is paid at the desk (§4.5).
+
 ### 5.2 Purchase return (debit note)
 `Dr AP_CONTROL (party)`: return value at the return line's unit_cost (normally the original purchase cost).
 `Cr INVENTORY`: qty × current avg cost.
@@ -145,6 +155,13 @@ Any difference goes to `PURCHASE_PRICE_VARIANCE` (Dr or Cr).
 ### 5.4 Transfer between locations
 Stock ledger only (out of one location, into another, at the same cost). **No GL entry**, because both locations are the same Inventory account.
 
+**As built (W1-18, D-107):**
+- `postStockTransfer` moves each line out of its from location and into its to location at the item's current average (no cost known: 0), with no journal; the average and the quantity on hand don't change. It posts a transfer that moves at once, the sending (from → In transit) and the receiving (In transit → to, what arrived) as separate postings (`stock_transfer`, `stock_transfer_receipt`).
+- `postStockAdjustment` moves each line in or out at the average and posts the **net** value as one pair (gain: Dr INVENTORY / Cr INVENTORY_ADJUSTMENT; loss: the reverse; none when it nets to 0). An item with no cost moves at 0, flagged `no_cost`.
+- Stock below 0 is flagged `negative_stock`, never refused.
+
+**As built (W1-16):** `postPurchaseReturn`; with no cost known the stock leaves at the return's cost (flagged `no_cost`), and stock below 0 is flagged, never refused.
+
 ## 6. Back-office documents
 | Document | Entry |
 |---|---|
@@ -153,6 +170,12 @@ Stock ledger only (out of one location, into another, at the same cost). **No GL
 | Expense (bank) | `Dr <expense> / Cr <bank>` |
 | Bank-to-bank / bank-to-safe transfer | `Dr <to> / Cr <from>` |
 | Journal voucher | As entered (must balance). The party is required on AR/AP lines. |
+
+**As built (W1-19, D-108):**
+- `postCustomerReceipt` (source `customer_receipt`, `CR`), `postExpense` (`expense`, `EX`: paid from a bank or the safe, `CASH_SAFE`) and `postFundTransfer` (`fund_transfer`, `FT`) post when saved. A transfer's **charges** (owner answer 6) debit their expense category's account in the same entry: the destination gets the amount less the charges and the source goes down by the whole amount. This replaces the card-settlement voucher of §9.3.
+- `postJournalVoucher` (`journal_voucher`, `JV`) posts the lines as entered; a line on AR or AP writes its party entry, due on the entry date. A voucher can't use `INVENTORY`, `CASH_DRAWER` or `CASH_IN_TRANSIT` (`checkJournalVoucher`): stock is corrected by an adjustment, the drawer at the desk.
+- **Reversal** (`postReversal`): a journal voucher that swaps every line of a posted back-office document's journal and reverses its party entries on their own due dates, once per document. Sales are corrected only by void and return.
+- **The lock date:** a back-office document dated on or before it is refused; a counter document still posts on the first open date (§1.6). Only the owner moves the lock date back, with a reason, audited.
 
 ## 7. Opening balances at cutover (Delux, 1 Jan 2027)
 A single opening entry dated **2027-01-01** with `source_type = 'opening'`, plus lock date **2026-12-31**:
@@ -165,6 +188,8 @@ A single opening entry dated **2027-01-01** with `source_type = 'opening'`, plus
 | `Dr CASH_DRAWER` | Counted opening float |
 | `Dr <bank accounts>` | **Bank statement** balances at 31 Dec (the legacy GL is not trusted for this) |
 | `Cr OPENING_BALANCE_EQUITY` | The balancing figure |
+
+It is a document like any other (`opening_balances`, source `opening`, W1-14, D-101), posted by `postOpening`, so a rebuild reproduces it: a stock line without a cost comes in at the current average, else at 0 with `no_cost`; a negative quantity leaves at its own cost; each customer and supplier entry is due on the entry date (ageing starts at go-live). The shadow pilot's postings are not netted: the pilot is wiped before the final run (D-101).
 
 The accountant later reclassifies Opening Balance Equity into partners' capital and drawings with a journal voucher. Legacy equity and P&L balances are **not** carried over: the legacy books were periodic with no inventory, so they do not reconcile with a perpetual-inventory balance sheet.
 

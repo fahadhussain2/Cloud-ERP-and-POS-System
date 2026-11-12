@@ -64,7 +64,8 @@ const hostOf = (origin: string): string | null => {
 
 type Audit = (action: string, userId: string | null, detail?: Record<string, unknown>) => Promise<unknown>;
 
-async function loadGrants(c: pg.ClientBase, userId: string): Promise<RoleGrant[]> {
+/** A person's roles, as a request's grants (also checked for a manager who sends a counter's diagnostics, W1-20). */
+export async function loadGrants(c: pg.ClientBase, userId: string): Promise<RoleGrant[]> {
   const { rows } = await c.query<{ permissions: string[]; limits: RoleLimits; branch_id: string | null }>(
     `SELECT r.permissions, r.limits, ur.branch_id
      FROM erp.user_roles ur JOIN erp.roles r ON r.tenant_id = ur.tenant_id AND r.id = ur.role_id
@@ -347,11 +348,21 @@ export function requirePermission(
   requireAuth: preHandlerAsyncHookHandler,
   permission: Permission,
 ): preHandlerAsyncHookHandler[] {
+  return requireAnyPermission(requireAuth, [permission]);
+}
+
+/** preHandlers for a route that needs a logged-in user with at least one of `permissions` (branch-free roles). */
+export function requireAnyPermission(
+  requireAuth: preHandlerAsyncHookHandler,
+  permissions: readonly Permission[],
+): preHandlerAsyncHookHandler[] {
   return [
     requireAuth,
     async (req: FastifyRequest, reply: FastifyReply) => {
-      if (!can(req.auth!.grants, permission, null))
-        await reply.code(403).send({ error: 'forbidden', permission });
+      if (!permissions.some((p) => can(req.auth!.grants, p, null)))
+        await reply
+          .code(403)
+          .send({ error: 'forbidden', permission: permissions.length === 1 ? permissions[0] : permissions });
     },
   ];
 }

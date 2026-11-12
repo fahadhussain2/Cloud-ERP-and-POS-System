@@ -1,0 +1,100 @@
+{
+  "description": "The bill code printed as Code 39: '<bill number> <cash due in whole rupees>', and reading a scan back (POS spec §13, architecture §4.5, D-055). Unit Rs 1 = 100.",
+  "cases": [
+    {
+      "name": "a cash bill",
+      "input": { "encode": { "number": "C03-S000412", "cashDue": 432000 } },
+      "expected": "C03-S000412 4320"
+    },
+    {
+      "name": "a bill paid without cash",
+      "input": { "encode": { "number": "C03-S000413", "cashDue": 0 } },
+      "expected": "C03-S000413 0"
+    },
+    {
+      "name": "a cash refund (W1-13)",
+      "input": { "encode": { "number": "C03-S000414", "cashDue": -125000 } },
+      "expected": "C03-S000414 -1250"
+    },
+    {
+      "name": "paisa in the cash due are refused (it is always rounded)",
+      "input": { "encode": { "number": "C03-S000412", "cashDue": 432050 } },
+      "error": "invalid_bill_code"
+    },
+    {
+      "name": "a number that isn't a document number is refused",
+      "input": { "encode": { "number": "c03-s412", "cashDue": 432000 } },
+      "error": "invalid_bill_code"
+    },
+    {
+      "name": "reading a scan",
+      "input": { "parse": "C03-S000412 4320" },
+      "expected": { "number": "C03-S000412", "cashDue": 432000 }
+    },
+    {
+      "name": "a scan with spaces around it and the scanner's Enter",
+      "input": { "parse": "  C03-S000412 4320\r\n" },
+      "expected": { "number": "C03-S000412", "cashDue": 432000 }
+    },
+    {
+      "name": "a scanned refund",
+      "input": { "parse": "C03-S000414 -1250" },
+      "expected": { "number": "C03-S000414", "cashDue": -125000 }
+    },
+    {
+      "name": "a scanned bill paid without cash",
+      "input": { "parse": "C03-S000413 0" },
+      "expected": { "number": "C03-S000413", "cashDue": 0 }
+    },
+    {
+      "name": "a seven-digit sequence",
+      "input": { "parse": "C03-S1000000 150" },
+      "expected": { "number": "C03-S1000000", "cashDue": 15000 }
+    },
+    {
+      "name": "a number without the amount is refused",
+      "input": { "parse": "C03-S000412" },
+      "error": "invalid_bill_code"
+    },
+    {
+      "name": "an amount with decimals is refused",
+      "input": { "parse": "C03-S000412 43.20" },
+      "error": "invalid_bill_code"
+    },
+    {
+      "name": "two spaces in the middle are refused",
+      "input": { "parse": "C03-S000412  4320" },
+      "error": "invalid_bill_code"
+    },
+    {
+      "name": "lower case is refused",
+      "input": { "parse": "c03-s000412 4320" },
+      "error": "invalid_bill_code"
+    },
+    {
+      "name": "an item label is refused",
+      "input": { "parse": "ABEA001" },
+      "error": "invalid_bill_code"
+    },
+    {
+      "name": "a refund code prints a minus (W1-10)",
+      "input": { "encode": { "number": "C03-S000415", "cashDue": -45000 } },
+      "expected": "C03-S000415 -450"
+    },
+    {
+      "name": "a refund of zero ('-0') is refused",
+      "input": { "parse": "C03-S000414 -0" },
+      "error": "invalid_bill_code"
+    },
+    {
+      "name": "a doubled minus is refused",
+      "input": { "parse": "C03-S000414 --450" },
+      "error": "invalid_bill_code"
+    },
+    {
+      "name": "a plus sign is refused",
+      "input": { "parse": "C03-S000412 +4320" },
+      "error": "invalid_bill_code"
+    }
+  ]
+}

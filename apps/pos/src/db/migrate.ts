@@ -1,0 +1,334 @@
+import type { SqlDb } from './sql';
+
+// The counter's schema (POS spec §1–§2, data model §12, CLAUDE.md rule 9, D-089): numbered migrations, each in one
+// transaction, applied in place. Never drop and rebuild while the outbox has rows. Append new migrations; never
+// edit one that a counter may already have run.
+
+export interface Migration {
+  version: number;
+  statements: readonly string[];
+}
+
+export const MIGRATIONS: readonly Migration[] = [
+  {
+    version: 1,
+    statements: [
+      `CREATE TABLE meta (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        schema_version INTEGER NOT NULL,
+        device_id TEXT, tenant_id TEXT, branch_id TEXT, device_code TEXT, device_kind TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      )`,
+      'INSERT INTO meta (id, schema_version) VALUES (1, 0)',
+      // Pull cursor, last pull/push, server clock offset: small values by key (sync spec §4).
+      'CREATE TABLE sync_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+      'CREATE TABLE local_series (family TEXT PRIMARY KEY, next_seq INTEGER NOT NULL)',
+      `CREATE TABLE outbox (
+        id TEXT PRIMARY KEY,
+        family TEXT NOT NULL,
+        seq INTEGER NOT NULL,
+        payload TEXT NOT NULL,
+        signature TEXT,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'sent', 'quarantined')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT,
+        created_at TEXT NOT NULL,
+        UNIQUE (family, seq)
+      )`,
+      `CREATE TABLE local_documents (
+        id TEXT PRIMARY KEY, family TEXT NOT NULL, seq INTEGER NOT NULL, number TEXT NOT NULL,
+        kind TEXT NOT NULL, business_date TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL
+      )`,
+      // Pulled datasets (sync spec §3). Users get real columns (unlock reads them); the rest stay as JSON.
+      `CREATE TABLE users (
+        id TEXT PRIMARY KEY, username TEXT NOT NULL, full_name TEXT NOT NULL, short_code TEXT,
+        pin_verifier TEXT, pin_must_change INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE roles (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, template_key TEXT, permissions TEXT NOT NULL, limits TEXT NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE user_roles (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL, role_id TEXT NOT NULL, branch_id TEXT,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE TABLE tenant (id TEXT PRIMARY KEY, data TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT)',
+      'CREATE TABLE branch (id TEXT PRIMARY KEY, data TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT)',
+      // Wrong PINs per person on this counter (POS spec §5); survives reloads.
+      'CREATE TABLE pin_state (user_id TEXT PRIMARY KEY, failures INTEGER NOT NULL, locked INTEGER NOT NULL, updated_at TEXT NOT NULL)',
+      // The last ~5,000 events, for "Send diagnostics" (architecture §11.3).
+      'CREATE TABLE diagnostic_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, kind TEXT NOT NULL, detail TEXT NOT NULL)',
+    ],
+  },
+  {
+    // The catalog (W1-03, sync spec §3): exactly the pulled columns. Money is whole minor units (rule 1). Removed rows
+    // are deleted, so deleted_at stays empty; the search index loads each table with one query.
+    version: 2,
+    statements: [
+      `CREATE TABLE price_tiers (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, sort INTEGER NOT NULL, is_default INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE units (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, allows_fraction INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE categories (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, parent_id TEXT, pricing_rule TEXT NOT NULL,
+        return_policy TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE TABLE brands (id TEXT PRIMARY KEY, name TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT)',
+      'CREATE TABLE origins (id TEXT PRIMARY KEY, name TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT)',
+      'CREATE TABLE vehicle_makes (id TEXT PRIMARY KEY, name TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT)',
+      `CREATE TABLE items (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, category_id TEXT, brand_id TEXT, origin_id TEXT,
+        unit_id TEXT, variant TEXT, spec TEXT, bin_location TEXT, floor_price INTEGER, tax_code_id TEXT,
+        status TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE item_identifiers (
+        id TEXT PRIMARY KEY, item_id TEXT NOT NULL, kind TEXT NOT NULL, value TEXT NOT NULL,
+        normalized_value TEXT NOT NULL, is_primary INTEGER NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX item_identifiers_item ON item_identifiers (item_id)',
+      `CREATE TABLE item_compatibility (
+        id TEXT PRIMARY KEY, item_id TEXT NOT NULL, make_id TEXT, model TEXT, year_from INTEGER, year_to INTEGER,
+        note TEXT, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX item_compatibility_item ON item_compatibility (item_id)',
+      `CREATE TABLE item_prices (
+        id TEXT PRIMARY KEY, item_id TEXT NOT NULL, tier_id TEXT NOT NULL, price INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX item_prices_item ON item_prices (item_id)',
+    ],
+  },
+  {
+    // PIN locks and manager unlocks on this counter (W1-04, POS spec §5): kept until push reports them to the
+    // server's audit log (W1-07). Not documents, so not in the outbox's numbered series.
+    version: 3,
+    statements: [
+      `CREATE TABLE pin_events (
+        id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('locked', 'unlocked')), user_id TEXT NOT NULL,
+        by_user_id TEXT, at TEXT NOT NULL, pushed_at TEXT
+      )`,
+    ],
+  },
+  {
+    // The bill each person is building (W1-05, POS spec §10): saved after every change, so a lock or a reload never
+    // loses it. Never pushed; finalizing (W1-06) removes it in the same transaction as the document.
+    version: 4,
+    statements: [
+      'CREATE TABLE open_bills (user_id TEXT PRIMARY KEY, bill TEXT NOT NULL, updated_at TEXT NOT NULL)',
+    ],
+  },
+  {
+    // Paying and printing (W1-06, POS spec §12–§13, sync spec §3): the pulled payment methods, print profiles and this
+    // device's own row, exactly the pulled columns; and the reprints, kept until push reports them (W1-07).
+    version: 5,
+    statements: [
+      `CREATE TABLE payment_methods (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, is_cash INTEGER NOT NULL,
+        requires_reference INTEGER NOT NULL, is_active INTEGER NOT NULL, sort INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE print_profiles (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, paper_format TEXT NOT NULL, code_type TEXT NOT NULL,
+        copies INTEGER NOT NULL, template_options TEXT NOT NULL, is_tenant_default INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE device (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, print_profile_id TEXT, status TEXT NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE reprints (
+        id TEXT PRIMARY KEY, document_id TEXT NOT NULL, number TEXT NOT NULL, user_id TEXT NOT NULL, at TEXT NOT NULL,
+        pushed_at TEXT
+      )`,
+      // The reprint list reads the last 30 days, newest first.
+      'CREATE INDEX local_documents_created ON local_documents (created_at)',
+    ],
+  },
+  {
+    // Push (W1-07, sync spec §7): a document keeps its signature after its outbox row is acked, so it can be pushed
+    // again after a server restore; the re-queue reads documents by series.
+    version: 6,
+    statements: [
+      'ALTER TABLE local_documents ADD COLUMN signature TEXT',
+      'CREATE INDEX local_documents_series ON local_documents (family, seq)',
+    ],
+  },
+  {
+    // Customers and credit (W1-09, POS spec §15, sync spec §3): the pulled customers, accounts and balances, exactly
+    // the pulled columns (a balance is keyed by its party); and when the server accepted each document, so a bill
+    // stops counting as unsynced once a complete pull that started after it has brought the balance.
+    version: 7,
+    statements: [
+      `CREATE TABLE customers (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, phones TEXT NOT NULL, city TEXT,
+        status TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE customer_accounts (
+        id TEXT PRIMARY KEY, party_id TEXT NOT NULL, price_tier_id TEXT NOT NULL, credit_allowed INTEGER NOT NULL,
+        credit_limit INTEGER, offline_daily_cap INTEGER NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX customer_accounts_party ON customer_accounts (party_id)',
+      `CREATE TABLE customer_balances (
+        party_id TEXT PRIMARY KEY, balance INTEGER NOT NULL, updated_at TEXT NOT NULL, row_version TEXT NOT NULL,
+        deleted_at TEXT
+      )`,
+      'ALTER TABLE local_documents ADD COLUMN accepted_at TEXT',
+    ],
+  },
+  {
+    // The cash desk (W1-10, cash desk spec, sync spec §3): the pulled queue, exactly its columns; this desk's sessions;
+    // its handovers (family H) and session documents (family Z) live in local_documents and the outbox like bills,
+    // found by bill number for the duplicate check. A counter has these tables too and leaves them empty.
+    version: 8,
+    statements: [
+      `CREATE TABLE cash_queue (
+        id TEXT PRIMARY KEY, number TEXT NOT NULL, device_id TEXT NOT NULL, salesperson_user_id TEXT NOT NULL,
+        created_at_device TEXT NOT NULL, business_date TEXT NOT NULL, cash_due INTEGER NOT NULL, cash_received INTEGER,
+        change_due INTEGER, handover_status TEXT NOT NULL, status TEXT NOT NULL, row_version TEXT NOT NULL,
+        deleted_at TEXT
+      )`,
+      'CREATE INDEX cash_queue_number ON cash_queue (number)',
+      `CREATE TABLE cash_sessions (
+        id TEXT PRIMARY KEY, number TEXT NOT NULL, cashier_user_id TEXT NOT NULL, opened_at TEXT NOT NULL,
+        opening_float INTEGER NOT NULL, closed_at TEXT, closed_by_user_id TEXT,
+        status TEXT NOT NULL CHECK (status IN ('open', 'closed'))
+      )`,
+      "CREATE INDEX local_documents_bill ON local_documents (json_extract(payload, '$.billNumber')) WHERE family = 'H'",
+    ],
+  },
+  {
+    // Cash desk 2 (W1-11, cash desk spec, sync spec §3): what a cash-out names, exactly the pulled columns (a supplier's
+    // balance is keyed by its party); the count on this desk's sessions. Collections (R) and cash movements (M) live
+    // in local_documents and the outbox like handovers. A counter has these tables too and leaves them empty.
+    version: 9,
+    statements: [
+      `CREATE TABLE suppliers (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, phones TEXT NOT NULL, city TEXT,
+        status TEXT NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE supplier_balances (
+        party_id TEXT PRIMARY KEY, balance INTEGER NOT NULL, updated_at TEXT NOT NULL, row_version TEXT NOT NULL,
+        deleted_at TEXT
+      )`,
+      `CREATE TABLE expense_categories (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, is_active INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      `CREATE TABLE bank_accounts (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, is_active INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'ALTER TABLE cash_sessions ADD COLUMN counted_cash INTEGER',
+      'ALTER TABLE cash_sessions ADD COLUMN variance INTEGER',
+      'ALTER TABLE cash_sessions ADD COLUMN left_in_drawer INTEGER',
+      "CREATE INDEX local_documents_session ON local_documents (json_extract(payload, '$.sessionId')) WHERE family IN ('H', 'R', 'M')",
+    ],
+  },
+  {
+    // Hold, void and reissue (W1-12, POS spec §17–§18): bills set aside by the person who held them, as their open
+    // bill was, until their business day is over; never pushed. Voids (family V) live in local_documents and the
+    // outbox like every document, found by the bill they void.
+    version: 10,
+    statements: [
+      `CREATE TABLE held_bills (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL, held_at TEXT NOT NULL, business_date TEXT NOT NULL, label TEXT,
+        bill TEXT NOT NULL
+      )`,
+      'CREATE INDEX held_bills_user ON held_bills (user_id, held_at)',
+      "CREATE INDEX local_documents_sale ON local_documents (json_extract(payload, '$.saleId')) WHERE family = 'V'",
+    ],
+  },
+  {
+    // Return and exchange (W1-13, POS spec §19, SYN-01): the branch's bills of the last 90 days, exactly the pulled
+    // columns, for finding a bill and what came back of it already; pruned past 90 days at start-up. This counter's
+    // own returns are found in local_documents by the bill they return.
+    version: 11,
+    statements: [
+      `CREATE TABLE bills (
+        id TEXT PRIMARY KEY, number TEXT NOT NULL, device_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
+        business_date TEXT NOT NULL, created_at_device TEXT NOT NULL, customer_party_id TEXT, walkin_phone TEXT,
+        total INTEGER NOT NULL, return_of_id TEXT, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX bills_number ON bills (number)',
+      'CREATE INDEX bills_day ON bills (business_date)',
+      'CREATE INDEX bills_customer ON bills (customer_party_id) WHERE customer_party_id IS NOT NULL',
+      'CREATE INDEX bills_phone ON bills (walkin_phone) WHERE walkin_phone IS NOT NULL',
+      `CREATE TABLE bill_lines (
+        id TEXT PRIMARY KEY, document_id TEXT NOT NULL, line_no INTEGER NOT NULL, item_id TEXT NOT NULL,
+        qty INTEGER NOT NULL, unit_price INTEGER NOT NULL, line_total INTEGER NOT NULL, original_line_id TEXT,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX bill_lines_document ON bill_lines (document_id, line_no)',
+      'CREATE INDEX bill_lines_item ON bill_lines (item_id)',
+      'CREATE INDEX bill_lines_original ON bill_lines (original_line_id) WHERE original_line_id IS NOT NULL',
+      `CREATE TABLE bill_payments (
+        id TEXT PRIMARY KEY, document_id TEXT NOT NULL, method_id TEXT NOT NULL, amount INTEGER NOT NULL,
+        row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+      'CREATE INDEX bill_payments_document ON bill_payments (document_id)',
+      "CREATE INDEX local_documents_return_of ON local_documents (json_extract(payload, '$.returnOf.id')) WHERE family = 'S'",
+    ],
+  },
+  {
+    // The floor from cost (W1-14, D-092): pulled with the catalog, one row per item with a known cost.
+    version: 12,
+    statements: [
+      `CREATE TABLE item_floors (
+        item_id TEXT PRIMARY KEY, floor INTEGER NOT NULL, row_version TEXT NOT NULL, deleted_at TEXT
+      )`,
+    ],
+  },
+  {
+    // Voids and returns by payment (W1-23, D-111): the desk's queue carries a return's original (guard 2), the bill's
+    // void and the movement that gave its cash back. A row already here gets them when it next changes on the server,
+    // as a pending bill does when it is handed over; the pull cursor is kept.
+    version: 13,
+    statements: [
+      'ALTER TABLE cash_queue ADD COLUMN return_of_number TEXT',
+      'ALTER TABLE cash_queue ADD COLUMN void_number TEXT',
+      'ALTER TABLE cash_queue ADD COLUMN cash_given_back_number TEXT',
+    ],
+  },
+];
+
+export const LATEST_VERSION = MIGRATIONS.length;
+
+export class DbTooNewError extends Error {
+  constructor(
+    readonly found: number,
+    readonly known: number,
+  ) {
+    super(`the local database is version ${found}; this app knows up to ${known}`);
+    this.name = 'DbTooNewError';
+  }
+}
+
+/** The schema version, 0 for a database that has never been migrated. */
+export function currentVersion(db: SqlDb): number {
+  const hasMeta = db.selectValue("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'meta'");
+  return hasMeta ? Number(db.selectValue('SELECT schema_version FROM meta WHERE id = 1')) : 0;
+}
+
+/** Brings the database to the latest version, one transaction per migration. Returns the new version. */
+export function migrate(db: SqlDb, migrations: readonly Migration[] = MIGRATIONS): number {
+  const latest = migrations.at(-1)?.version ?? 0;
+  const found = currentVersion(db);
+  if (found > latest) throw new DbTooNewError(found, latest);
+  for (const m of migrations) {
+    if (m.version <= found) continue;
+    db.transaction(() => {
+      for (const statement of m.statements) db.exec(statement);
+      db.exec('UPDATE meta SET schema_version = ? WHERE id = 1', [m.version]);
+    });
+  }
+  return Math.max(found, latest);
+}
+
+/** A rebuild from the server is allowed only with an empty outbox (rule 9): unsynced bills are never dropped. */
+export const rebuildAllowed = (db: SqlDb): boolean =>
+  Number(db.selectValue('SELECT count(*) FROM outbox')) === 0;

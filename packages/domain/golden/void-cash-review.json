@@ -1,0 +1,142 @@
+{
+  "description": "The server's findings on a pushed void_cash movement (W1-23, D-111, sync spec §6.2). Unless a case says otherwise: D01-M000012 gives back Rs 1,000 (100000) for C03-S000051, by the cashier …a5 (cash.refund.pay) in their own session, approved by the manager …a2 (pos.void); the stored bill is voided and its handover in took Rs 1,000. In order: a second give-back of the bill (alone: never posted); a bill that isn't voided (once it is here); no handover, or another amount; a cashier without cash.refund.pay; an approver who is the session's cashier (ownVariance) or without pos.void. Never refused (rule 7).",
+  "cases": [
+    { "name": "a give-back as it should be", "input": {}, "expected": [] },
+    {
+      "name": "the bill hasn't arrived yet: judged on what is here",
+      "input": { "context": { "bill": null } },
+      "expected": []
+    },
+    {
+      "name": "a second give-back of the bill: only the duplicate",
+      "input": {
+        "context": { "existing": { "id": "019a7000-0000-7000-8000-000000000011", "number": "D01-M000011" } }
+      },
+      "expected": [
+        {
+          "kind": "void_cash_duplicate",
+          "duplicateOf": "019a7000-0000-7000-8000-000000000011",
+          "duplicateOfNumber": "D01-M000011"
+        }
+      ]
+    },
+    {
+      "name": "the earlier give-back is this one (reviewed again): not a duplicate",
+      "input": {
+        "context": { "existing": { "id": "019a7000-0000-7000-8000-000000000012", "number": "D01-M000012" } }
+      },
+      "expected": []
+    },
+    {
+      "name": "a bill that isn't voided",
+      "input": { "context": { "bill": { "status": "finalized" } } },
+      "expected": [{ "kind": "void_cash_not_voided" }]
+    },
+    {
+      "name": "no handover in for the bill",
+      "input": { "context": { "handover": null } },
+      "expected": [{ "kind": "void_cash_without_handover" }]
+    },
+    {
+      "name": "another amount than the desk took",
+      "input": { "context": { "handover": { "amount": 90000 } } },
+      "expected": [{ "kind": "void_cash_amount_mismatch", "amount": 100000, "taken": 90000 }]
+    },
+    {
+      "name": "a cashier without cash.refund.pay",
+      "input": {
+        "movement": { "cashierId": "019a0000-0000-7000-8000-0000000000a6" },
+        "context": { "sessionCashierId": "019a0000-0000-7000-8000-0000000000a6" }
+      },
+      "expected": [
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a6",
+          "permission": "cash.refund.pay",
+          "ownVariance": false
+        }
+      ]
+    },
+    {
+      "name": "approved by the session's own cashier",
+      "input": { "movement": { "approvedByUserId": "019a0000-0000-7000-8000-0000000000a5" } },
+      "expected": [
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "permission": "pos.void",
+          "ownVariance": true
+        }
+      ]
+    },
+    {
+      "name": "before the session's open arrives, the document's cashier is the session's",
+      "input": {
+        "movement": { "approvedByUserId": "019a0000-0000-7000-8000-0000000000a5" },
+        "context": { "sessionCashierId": null }
+      },
+      "expected": [
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "permission": "pos.void",
+          "ownVariance": true
+        }
+      ]
+    },
+    {
+      "name": "a movement without an approver",
+      "input": { "movement": { "approvedByUserId": null } },
+      "expected": [
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a5",
+          "permission": "pos.void",
+          "ownVariance": true
+        }
+      ]
+    },
+    {
+      "name": "an approver without pos.void",
+      "input": { "movement": { "approvedByUserId": "019a0000-0000-7000-8000-0000000000a1" } },
+      "expected": [
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a1",
+          "permission": "pos.void",
+          "ownVariance": false
+        }
+      ]
+    },
+    {
+      "name": "every finding but the duplicate at once",
+      "input": {
+        "movement": {
+          "cashierId": "019a0000-0000-7000-8000-0000000000a6",
+          "approvedByUserId": "019a0000-0000-7000-8000-0000000000a1"
+        },
+        "context": {
+          "bill": { "status": "finalized" },
+          "handover": null,
+          "sessionCashierId": "019a0000-0000-7000-8000-0000000000a6"
+        }
+      },
+      "expected": [
+        { "kind": "void_cash_not_voided" },
+        { "kind": "void_cash_without_handover" },
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a6",
+          "permission": "cash.refund.pay",
+          "ownVariance": false
+        },
+        {
+          "kind": "cash_not_permitted",
+          "userId": "019a0000-0000-7000-8000-0000000000a1",
+          "permission": "pos.void",
+          "ownVariance": false
+        }
+      ]
+    }
+  ]
+}

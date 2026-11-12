@@ -1,0 +1,100 @@
+{
+  "description": "Posting an expense from the back office (posting rules §6, ACC-04, W1-19): Dr the category's account / Cr the bank's account it was paid from, or CASH_SAFE when paid from the safe (paidFrom null). A category or bank without an account is target_unmapped; paid from the safe without CASH_SAFE in the chart, role_unmapped. No stock, no party.",
+  "cases": [
+    {
+      "name": "the electricity bill, Rs 18,500 from Soneri",
+      "input": {
+        "expense": {
+          "id": "ex-1",
+          "number": "EX000001",
+          "branchId": "br-main",
+          "businessDate": "2027-01-10",
+          "categoryId": "cat-utilities",
+          "paidFrom": "bank-soneri",
+          "amount": 1850000
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-10",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "EX000001",
+            "lines": [
+              { "accountId": "6210", "partyId": null, "debit": 1850000, "credit": 0 },
+              { "accountId": "1150", "partyId": null, "debit": 0, "credit": 1850000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "paid from the safe",
+      "input": {
+        "expense": {
+          "id": "ex-2",
+          "number": "EX000002",
+          "branchId": "br-main",
+          "businessDate": "2027-01-10",
+          "categoryId": "cat-utilities",
+          "paidFrom": null,
+          "amount": 450000
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-10",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "EX000002",
+            "lines": [
+              { "accountId": "6210", "partyId": null, "debit": 450000, "credit": 0 },
+              { "accountId": "1130", "partyId": null, "debit": 0, "credit": 450000 }
+            ]
+          },
+          "movements": [],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": { "costs": {}, "balances": {} }
+        }
+      }
+    },
+    {
+      "name": "a category with no account is refused",
+      "input": {
+        "expense": {
+          "id": "ex-3",
+          "number": "EX000003",
+          "branchId": "br-main",
+          "businessDate": "2027-01-10",
+          "categoryId": "cat-unknown",
+          "paidFrom": "bank-soneri",
+          "amount": 100
+        }
+      },
+      "expected": { "ok": false, "error": { "code": "target_unmapped", "targetId": "cat-unknown" } }
+    },
+    {
+      "name": "from the safe with no CASH_SAFE in the chart",
+      "input": {
+        "expense": {
+          "id": "ex-4",
+          "number": "EX000004",
+          "branchId": "br-main",
+          "businessDate": "2027-01-10",
+          "categoryId": "cat-utilities",
+          "paidFrom": null,
+          "amount": 100
+        },
+        "unmapped": "CASH_SAFE"
+      },
+      "expected": { "ok": false, "error": { "code": "role_unmapped", "role": "CASH_SAFE" } }
+    }
+  ]
+}

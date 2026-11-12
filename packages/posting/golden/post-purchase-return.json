@@ -1,0 +1,223 @@
+{
+  "description": "Posting a purchase return (debit note, posting rules §5.2, PUR-03, W1-16): per line, stock out of its location at the item's current average (no cost known: at the return's unit cost, flagged no_cost), the average unchanged; Dr AP_CONTROL (the supplier) Σ qty × the return's unit cost; Cr INVENTORY Σ the stock's value; the difference to PURCHASE_PRICE_VARIANCE (Cr when the supplier takes it back for more than its average, Dr when for less). Lines in the order AP_CONTROL, INVENTORY, PURCHASE_PRICE_VARIANCE; a zero line is left out. The supplier is owed less on the entry date. Stock below 0 is flagged negative_stock, never refused.",
+  "cases": [
+    {
+      "name": "2 back at the Rs 1,250 paid, while the average is Rs 1,225: Rs 50 of variance in the shop's favour",
+      "input": {
+        "purchaseReturn": {
+          "id": "pr-1",
+          "number": "PR000001",
+          "branchId": "br-main",
+          "businessDate": "2026-11-07",
+          "supplierId": "sup-naveed",
+          "lines": [
+            { "id": "prl-1", "itemId": "item-a", "locationId": "loc-shop", "qty": 2000, "unitCost": 125000 }
+          ]
+        },
+        "state": {
+          "costs": { "item-a": { "avgCost": 122500, "onHand": 20000 } },
+          "balances": { "loc-shop": { "item-a": 10000 } }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-07",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "PR000001",
+            "lines": [
+              { "accountId": "2100", "partyId": "sup-naveed", "debit": 250000, "credit": 0 },
+              { "accountId": "1300", "partyId": null, "debit": 0, "credit": 245000 },
+              { "accountId": "5300", "partyId": null, "debit": 0, "credit": 5000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "prl-1",
+              "itemId": "item-a",
+              "locationId": "loc-shop",
+              "qtyDelta": -2000,
+              "unitCost": 122500,
+              "valueDelta": -245000,
+              "avgCostAfter": 122500
+            }
+          ],
+          "partyEntries": [
+            { "partyId": "sup-naveed", "role": "supplier", "amount": -250000, "dueDate": "2026-11-07" }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-a": { "avgCost": 122500, "onHand": 18000 } },
+            "balances": { "loc-shop": { "item-a": 8000 } }
+          }
+        }
+      }
+    },
+    {
+      "name": "taken back for less than the average: the variance is a cost",
+      "input": {
+        "purchaseReturn": {
+          "id": "pr-2",
+          "number": "PR000002",
+          "branchId": "br-main",
+          "businessDate": "2026-11-07",
+          "supplierId": "sup-naveed",
+          "lines": [
+            { "id": "prl-2", "itemId": "item-a", "locationId": "loc-shop", "qty": 2000, "unitCost": 120000 }
+          ]
+        },
+        "state": {
+          "costs": { "item-a": { "avgCost": 122500, "onHand": 20000 } },
+          "balances": { "loc-shop": { "item-a": 10000 } }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-07",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "PR000002",
+            "lines": [
+              { "accountId": "2100", "partyId": "sup-naveed", "debit": 240000, "credit": 0 },
+              { "accountId": "1300", "partyId": null, "debit": 0, "credit": 245000 },
+              { "accountId": "5300", "partyId": null, "debit": 5000, "credit": 0 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "prl-2",
+              "itemId": "item-a",
+              "locationId": "loc-shop",
+              "qtyDelta": -2000,
+              "unitCost": 122500,
+              "valueDelta": -245000,
+              "avgCostAfter": 122500
+            }
+          ],
+          "partyEntries": [
+            { "partyId": "sup-naveed", "role": "supplier", "amount": -240000, "dueDate": "2026-11-07" }
+          ],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-a": { "avgCost": 122500, "onHand": 18000 } },
+            "balances": { "loc-shop": { "item-a": 8000 } }
+          }
+        }
+      }
+    },
+    {
+      "name": "an item with no cost and none in Shop: out at the return's cost, no variance, both flagged",
+      "input": {
+        "purchaseReturn": {
+          "id": "pr-3",
+          "number": "PR000003",
+          "branchId": "br-main",
+          "businessDate": "2026-11-07",
+          "supplierId": "sup-hafeez",
+          "lines": [
+            { "id": "prl-3", "itemId": "item-b", "locationId": "loc-shop", "qty": 1000, "unitCost": 5000 }
+          ]
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2026-11-07",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "PR000003",
+            "lines": [
+              { "accountId": "2100", "partyId": "sup-hafeez", "debit": 5000, "credit": 0 },
+              { "accountId": "1300", "partyId": null, "debit": 0, "credit": 5000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "prl-3",
+              "itemId": "item-b",
+              "locationId": "loc-shop",
+              "qtyDelta": -1000,
+              "unitCost": 5000,
+              "valueDelta": -5000,
+              "avgCostAfter": null
+            }
+          ],
+          "partyEntries": [
+            { "partyId": "sup-hafeez", "role": "supplier", "amount": -5000, "dueDate": "2026-11-07" }
+          ],
+          "exceptions": [
+            { "kind": "no_cost", "details": { "itemId": "item-b" } },
+            {
+              "kind": "negative_stock",
+              "details": { "itemId": "item-b", "locationId": "loc-shop", "balance": -1000 }
+            }
+          ],
+          "state": {
+            "costs": { "item-b": { "avgCost": null, "onHand": -1000 } },
+            "balances": { "loc-shop": { "item-b": -1000 } }
+          }
+        }
+      }
+    },
+    {
+      "name": "before the lock date: posted the day after, and flagged",
+      "input": {
+        "purchaseReturn": {
+          "id": "pr-4",
+          "number": "PR000004",
+          "branchId": "br-main",
+          "businessDate": "2026-12-31",
+          "supplierId": "sup-naveed",
+          "lines": [
+            { "id": "prl-4", "itemId": "item-a", "locationId": "loc-shop", "qty": 1000, "unitCost": 122500 }
+          ]
+        },
+        "state": {
+          "costs": { "item-a": { "avgCost": 122500, "onHand": 20000 } },
+          "balances": { "loc-shop": { "item-a": 10000 } }
+        },
+        "lockDate": "2026-12-31"
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "PR000004",
+            "lines": [
+              { "accountId": "2100", "partyId": "sup-naveed", "debit": 122500, "credit": 0 },
+              { "accountId": "1300", "partyId": null, "debit": 0, "credit": 122500 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "prl-4",
+              "itemId": "item-a",
+              "locationId": "loc-shop",
+              "qtyDelta": -1000,
+              "unitCost": 122500,
+              "valueDelta": -122500,
+              "avgCostAfter": 122500
+            }
+          ],
+          "partyEntries": [
+            { "partyId": "sup-naveed", "role": "supplier", "amount": -122500, "dueDate": "2027-01-01" }
+          ],
+          "exceptions": [
+            {
+              "kind": "posted_after_lock",
+              "details": { "businessDate": "2026-12-31", "lockDate": "2026-12-31" }
+            }
+          ],
+          "state": {
+            "costs": { "item-a": { "avgCost": 122500, "onHand": 19000 } },
+            "balances": { "loc-shop": { "item-a": 9000 } }
+          }
+        }
+      }
+    }
+  ]
+}

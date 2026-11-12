@@ -1,8 +1,10 @@
 import { initBrowserSentry } from '@erp/observability/browser';
+import '@erp/ui/fonts';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nextProvider } from 'react-i18next';
 
+import { httpApi } from './api';
 import { App } from './App';
 import { i18n } from './i18n';
 import './styles.css';
@@ -22,7 +24,7 @@ document.title = i18n.t('app.title');
 createRoot(root).render(
   <StrictMode>
     <I18nextProvider i18n={i18n}>
-      <App />
+      <App api={httpApi()} />
     </I18nextProvider>
   </StrictMode>,
 );

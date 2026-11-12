@@ -1,0 +1,275 @@
+{
+  "description": "A change of an item's prices in the back office (CAT-04, CAT-05, CAT-07, W1-15): the tier prices by tier code and the item's own floor (null = none, the cost floor or list price applies), in paisa. Prices are whole paisa, not negative; Retail is required. A reason is required when any price goes down (owner answer 2): supplier_price, market_price, slow_stock, correction, or other with a note. A floor above Retail is allowed with a warning. Returns the changes, one per target that changed (tiers in the given order, then the floor), for the price history.",
+  "cases": [
+    {
+      "name": "Retail up: no reason needed",
+      "input": {
+        "before": {
+          "tiers": {
+            "RETAIL": 400000,
+            "MECHANIC": 380000,
+            "WHOLESALE": 360000
+          },
+          "floor": null
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 420000,
+            "MECHANIC": 380000,
+            "WHOLESALE": 360000
+          },
+          "floor": null
+        },
+        "reason": null,
+        "note": null
+      },
+      "expected": {
+        "problems": [],
+        "warnings": [],
+        "changes": [
+          {
+            "target": "RETAIL",
+            "old": 400000,
+            "new": 420000
+          }
+        ]
+      }
+    },
+    {
+      "name": "Mechanic down without a reason is refused",
+      "input": {
+        "before": {
+          "tiers": {
+            "RETAIL": 400000,
+            "MECHANIC": 380000,
+            "WHOLESALE": 360000
+          },
+          "floor": null
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 400000,
+            "MECHANIC": 370000,
+            "WHOLESALE": 360000
+          },
+          "floor": null
+        },
+        "reason": null,
+        "note": null
+      },
+      "expected": {
+        "problems": ["reason_required"],
+        "warnings": [],
+        "changes": [
+          {
+            "target": "MECHANIC",
+            "old": 380000,
+            "new": 370000
+          }
+        ]
+      }
+    },
+    {
+      "name": "down with a reason; a floor set for the first time",
+      "input": {
+        "before": {
+          "tiers": {
+            "RETAIL": 400000,
+            "MECHANIC": 380000,
+            "WHOLESALE": 360000
+          },
+          "floor": null
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 390000,
+            "MECHANIC": 380000,
+            "WHOLESALE": 360000
+          },
+          "floor": 330000
+        },
+        "reason": "market_price",
+        "note": null
+      },
+      "expected": {
+        "problems": [],
+        "warnings": [],
+        "changes": [
+          {
+            "target": "RETAIL",
+            "old": 400000,
+            "new": 390000
+          },
+          {
+            "target": "floor",
+            "old": null,
+            "new": 330000
+          }
+        ]
+      }
+    },
+    {
+      "name": "clearing the item's own floor is not a price going down",
+      "input": {
+        "before": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": 350000
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": null
+        },
+        "reason": null,
+        "note": null
+      },
+      "expected": {
+        "problems": [],
+        "warnings": [],
+        "changes": [
+          {
+            "target": "floor",
+            "old": 350000,
+            "new": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "other needs a note; a floor above Retail warns",
+      "input": {
+        "before": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": 380000
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": 410000
+        },
+        "reason": "other",
+        "note": " "
+      },
+      "expected": {
+        "problems": ["note_required"],
+        "warnings": ["floor_above_retail"],
+        "changes": [
+          {
+            "target": "floor",
+            "old": 380000,
+            "new": 410000
+          }
+        ]
+      }
+    },
+    {
+      "name": "a price for a tier that had none; Retail cleared, a negative and a fractional price",
+      "input": {
+        "before": {
+          "tiers": {
+            "RETAIL": 400000,
+            "MECHANIC": null,
+            "WHOLESALE": 360000
+          },
+          "floor": null
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": null,
+            "MECHANIC": 380000,
+            "WHOLESALE": -1
+          },
+          "floor": 1.5
+        },
+        "reason": "correction",
+        "note": null
+      },
+      "expected": {
+        "problems": ["retail_required", "price_invalid"],
+        "warnings": [],
+        "changes": [
+          {
+            "target": "RETAIL",
+            "old": 400000,
+            "new": null
+          },
+          {
+            "target": "MECHANIC",
+            "old": null,
+            "new": 380000
+          },
+          {
+            "target": "WHOLESALE",
+            "old": 360000,
+            "new": -1
+          },
+          {
+            "target": "floor",
+            "old": null,
+            "new": 1.5
+          }
+        ]
+      }
+    },
+    {
+      "name": "an unknown reason is refused; nothing changed needs no reason",
+      "input": {
+        "before": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": null
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": null
+        },
+        "reason": "cheaper_somewhere",
+        "note": null
+      },
+      "expected": {
+        "problems": ["reason_unknown"],
+        "warnings": [],
+        "changes": []
+      }
+    },
+    {
+      "name": "other with no note at all needs one",
+      "input": {
+        "before": {
+          "tiers": {
+            "RETAIL": 400000
+          },
+          "floor": null
+        },
+        "after": {
+          "tiers": {
+            "RETAIL": 390000
+          },
+          "floor": null
+        },
+        "reason": "other",
+        "note": null
+      },
+      "expected": {
+        "problems": ["note_required"],
+        "warnings": [],
+        "changes": [
+          {
+            "target": "RETAIL",
+            "old": 400000,
+            "new": 390000
+          }
+        ]
+      }
+    }
+  ]
+}

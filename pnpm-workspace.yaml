@@ -2,6 +2,7 @@ packages:
   - apps/*
   - packages/*
   - tools/*
+  - e2e
 
 # One version of each shared tool for the whole repo (D-071).
 catalog:
@@ -9,6 +10,9 @@ catalog:
   '@fastify/cookie': ^11.1.3
   '@fastify/rate-limit': ^11.2.1
   '@fastify/otel': 0.21.2
+  '@fontsource/barlow-condensed': 5.3.0
+  '@fontsource/ibm-plex-mono': 5.3.0
+  '@fontsource/ibm-plex-sans': 5.3.0
   '@opentelemetry/api': 1.9.1
   '@opentelemetry/context-async-hooks': 2.12.0
   '@opentelemetry/exporter-metrics-otlp-http': 0.223.0
@@ -21,9 +25,12 @@ catalog:
   '@opentelemetry/sdk-node': 0.223.0
   '@opentelemetry/semantic-conventions': 1.43.0
   '@node-rs/argon2': ^2.2.2
+  '@playwright/test': 1.64.0
   '@sentry/node': 10.76.2
   '@sentry/react': 10.76.2
   '@sentry/vite-plugin': 5.4.1
+  '@sqlite.org/sqlite-wasm': 3.53.4-build2
+  '@tailwindcss/vite': 4.3.3
   '@testing-library/react': ^16.3.3
   '@types/node': ^24.19.2
   '@types/pg': ^8.23.1
@@ -31,6 +38,8 @@ catalog:
   '@types/react-dom': ^19.3.0
   '@vitejs/plugin-react': ^6.1.2
   '@vitest/coverage-v8': ^5.0.5
+  class-variance-authority: 0.7.1
+  clsx: 2.1.1
   drizzle-orm: ^0.45.4
   eslint: ^10.13.0
   eslint-config-prettier: ^10.1.8
@@ -40,18 +49,25 @@ catalog:
   globals: ^17.13.0
   i18next: ^26.5.0
   jsdom: ^30.1.3
+  lucide-react: 1.55.0
   pg: ^8.23.1
   pino: ^10.4.0
   prettier: ^3.9.10
+  radix-ui: 1.8.1
   react: ^19.3.1
   react-dom: ^19.3.1
   react-i18next: ^17.1.0
+  tailwind-merge: 3.7.0
+  tailwindcss: 4.3.3
   tsup: ^9.0.0
+  tw-animate-css: 1.4.0
   tsx: ^4.23.15
   typescript: ^6.0.3
   typescript-eslint: ^8.72.0
   vite: ^8.3.0
+  vite-plugin-pwa: 2.0.0
   vitest: ^5.0.5
+  workbox-window: 7.4.1
   zod: ^4.6.7
 
 # esbuild (used by tsup and tsx) needs its install script to fetch its binary.
