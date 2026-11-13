@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#168](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/168) |
 | **Module** | platform (the back-office layout from W1-04; touches no other module's screens) |
-| **Status** | Draft (2026-11-14), waiting for the owner. The look is agreed from the [mockup](https://claude.ai/artifact/EBa8edxXQzJLAxXboErgWU) (expanded and collapsed, 2026-11-14) |
+| **Status** | Plan accepted by the owner (2026-11-14, PR #169, answers 1–3: yes, as recommended). Not built yet. The look is agreed from the [mockup](https://claude.ai/artifact/EBa8edxXQzJLAxXboErgWU) (expanded and collapsed, 2026-11-14) |
 | **Refs** | W1-04 (the layout and the menu, owner answer 4: only screens that exist and that the person may open), W1-20 owner answer 5 (the Exceptions count in the menu); D-066 (shadcn/ui, Lucide), D-067 and PLT-13 (colour tokens for both themes), D-090 (the back-office design pass); CLAUDE.md rule 10 (i18n keys, logical CSS) |
 | **Depends on** | W1-04 (the layout), W1-20 (the Exceptions count) |
 | **Size** | about 2 days |
@@ -94,6 +94,8 @@ The back-office menu grew one entry per task since W1-04 and is now hard to scan
 3. **On staging, by the owner:** sign in as owner and as a manager: the seven rows, opening and closing, the rail and its flyouts, the search, Sign out; a reload keeps the menu as it was left; a narrow window shows the rail.
 
 ## Questions for you
+
+**Answered 2026-11-14: yes to all three, as recommended.** The search is built now, for screens only; the shop's name stays out of the account menu; the first screen after sign-in is Customers.
 
 1. **The search box: build it now, for screens only?** It's about half a day of the two. Without it the top bar holds the location and the account menu only. *Recommended: yes, screens only; searching items or bills from it is a later task.*
 2. **Leave the shop's name out of the account menu for now?** Showing it needs the name in `/auth/me` (contract, API, an integration test). *Recommended: yes, leave it out; add it with the theme switcher, which reworks this menu anyway.*
