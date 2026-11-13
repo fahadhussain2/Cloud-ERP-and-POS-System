@@ -12,6 +12,7 @@ export interface MenuItem {
   key:
     | 'staff'
     | 'counters'
+    | 'shopSettings'
     | 'dayReconciliation'
     | 'cashVariance'
     | 'salesRegister'
@@ -180,7 +181,11 @@ export const MENU: readonly {
   },
   {
     group: 'shop',
-    items: [{ key: 'counters', href: href.counters, needs: ['admin.devices'], screens: ['counters'] }],
+    items: [
+      { key: 'counters', href: href.counters, needs: ['admin.devices'], screens: ['counters'] },
+      // The shop's name and bill header, the owner's (W1-25, D-112).
+      { key: 'shopSettings', href: href.shopSettings, needs: ['admin.settings'], screens: ['shopSettings'] },
+    ],
   },
   {
     // The cash reports (W1-11, CSH-08, RPT-02).

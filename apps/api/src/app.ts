@@ -4,6 +4,7 @@ import Fastify, { type FastifyError, type FastifyServerOptions } from 'fastify';
 import type pg from 'pg';
 
 import { registerAdmin } from './admin/routes';
+import { registerShopSettings } from './admin/shop-settings';
 import { registerUsers } from './admin/users';
 import { registerAuth } from './auth/routes';
 import { registerLabels } from './catalog/labels';
@@ -97,6 +98,7 @@ export function buildApp({
         registerSupport(api, { pool, now, requireAuth, requireDevice });
         registerCatalog(api, { pool, now, requireAuth });
         registerLabels(api, { pool, requireAuth });
+        registerShopSettings(api, { pool, requireAuth });
         registerPurchasing(api, { pool, now, requireAuth });
         registerCustomers(api, { pool, requireAuth });
         registerInventory(api, { pool, now, requireAuth });

@@ -564,6 +564,8 @@ export function CounterScreen({
     items: PrintJob['items'],
     reprint: PrintJob['reprint'],
     voided: SaleVoidDocument | null = null,
+    // A reprint reads them fresh: the owner may have changed the bill header since (W1-25, D-112).
+    using: CheckoutSettings | null = settings,
   ) => {
     const c = document.customerId === null ? undefined : customers.find((x) => x.id === document.customerId);
     try {
@@ -571,14 +573,14 @@ export function CounterScreen({
         document,
         customer:
           document.customerId === null ? null : { code: c?.code ?? '', name: c?.name ?? document.customerId },
-        profile: settings?.printProfile ?? null,
+        profile: using?.printProfile ?? null,
         shopName,
-        headerLines: [...(settings?.receiptHeader ?? []), ...(settings?.printProfile?.headerLines ?? [])],
+        headerLines: using?.receiptHeader ?? [],
         items,
         sellerName: nameOf(document.sellerId),
-        methodNames: Object.fromEntries((settings?.methods ?? []).map((x) => [x.code, x.name])),
+        methodNames: Object.fromEntries((using?.methods ?? []).map((x) => [x.code, x.name])),
         money,
-        timeZone: tenantZone(),
+        timeZone: using?.timeZone ?? tenantZone(),
         reprint,
         voided: voided && {
           number: voided.number,
@@ -699,8 +701,13 @@ export function CounterScreen({
     if (!document) return;
     const at = new Date().toISOString();
     await counter.recordReprint({ documentId: document.id, number: document.number, userId: user.id, at });
-    const [{ items }, voided] = await Promise.all([itemsOf(document), counter.voidOf(document.id)]);
-    printDocument(document, items, { at, by: user.fullName }, voided);
+    const [{ items }, voided, fresh] = await Promise.all([
+      itemsOf(document),
+      counter.voidOf(document.id),
+      counter.checkout(),
+    ]);
+    setSettings(fresh);
+    printDocument(document, items, { at, by: user.fullName }, voided, fresh);
     setDialog(null);
     setNotice(t('reprint.done', { number: document.number }));
     focusSearch();

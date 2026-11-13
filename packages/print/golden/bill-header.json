@@ -1,0 +1,46 @@
+{
+  "description": "The header lines under the shop name on the bill and the desk slip, in order: the branch's address, phone and extra lines, then the print profile's lines; each trimmed, blank ones dropped (POS spec §13, W1-25)",
+  "cases": [
+    {
+      "name": "nothing set: only the shop name prints",
+      "input": { "address": null, "phone": null, "lines": [], "profileLines": [] },
+      "expected": []
+    },
+    {
+      "name": "address, phone, extra lines, then the profile's lines",
+      "input": {
+        "address": "Shop 14, Auto Market, Karachi",
+        "phone": "021-1234567",
+        "lines": ["Dealers in genuine parts", "Open 10 to 8"],
+        "profileLines": ["Counter copy"]
+      },
+      "expected": [
+        "Shop 14, Auto Market, Karachi",
+        "021-1234567",
+        "Dealers in genuine parts",
+        "Open 10 to 8",
+        "Counter copy"
+      ]
+    },
+    {
+      "name": "blank values are dropped and the rest trimmed",
+      "input": {
+        "address": "   ",
+        "phone": " 021-1234567 ",
+        "lines": ["", "  Dealers in genuine parts  ", " "],
+        "profileLines": ["  "]
+      },
+      "expected": ["021-1234567", "Dealers in genuine parts"]
+    },
+    {
+      "name": "no address, a phone and one extra line",
+      "input": {
+        "address": null,
+        "phone": "0300-1234567",
+        "lines": ["Wholesale and retail"],
+        "profileLines": []
+      },
+      "expected": ["0300-1234567", "Wholesale and retail"]
+    }
+  ]
+}

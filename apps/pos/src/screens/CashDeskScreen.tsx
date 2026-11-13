@@ -287,7 +287,7 @@ export function CashDeskScreen({
         slip,
         profile: settings?.printProfile ?? null,
         shopName,
-        headerLines: [...(settings?.receiptHeader ?? []), ...(settings?.printProfile?.headerLines ?? [])],
+        headerLines: settings?.receiptHeader ?? [],
         cashierName: user.fullName,
         money: fmt,
         timeZone,

@@ -173,6 +173,7 @@ export {
   type CustomerRow,
 } from './customers';
 export { LabelItemsRequest, LabelTemplateRequest, type LabelLineView, type LabelsView } from './labels';
+export { SHOP_EXTRA_LINES_MAX, SHOP_LINE_MAX, ShopSettingsRequest, type ShopSettingsView } from './shop';
 export {
   AdjustmentDraft,
   InventorySettingsRequest,

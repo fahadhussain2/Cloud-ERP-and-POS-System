@@ -35,6 +35,7 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 - A shop is a reviewed JSON spec (`infra/db/tenants/<name>.json`, schema `TenantSpec` in `packages/contracts`), created by `setupTenant` (`packages/db`): **create-if-missing**, drift reported and never applied.
 - The chart of accounts is the retail template (`packages/db/templates/retail-coa.json`) plus the shop's banks and wallets, checked by `validateChartOfAccounts` (`packages/domain`) before anything is written.
 - On the server: `sudo erp-tenant setup <env> <name>` (the owner types the password) and `reset-password` for support; see [infra/README.md](../../../infra/README.md#tenants-d-083).
+- **After creation the shop's name and bill header are the owner's** (D-112): setup creates them from the spec but no longer compares them; see *The shop's name and bill header* below.
 - A generated password sets `must_change_password`: the API then answers `403 password_change_required` on every route except `GET /api/auth/me`, `POST /api/auth/logout` and `PUT /api/users/me/password`.
 
 ## Counter PINs and back-office minimum (W1-02, D-089)
@@ -69,6 +70,12 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 - **Audit:** row changes by the W0-09 triggers; `password.set_by_admin` and `password.removed` by the API.
 - **Leaver routine:** deactivate the person, then check *Counters*: an offline counter only learns at its next sync, and until then the person can still unlock it.
 - **Counter side:** manager unlock offline, lock reset on a new PIN, lock when the person selling is removed (POS spec §5).
+
+## The shop's name and bill header (W1-25, D-112)
+
+- **Back office → Shop → *Shop and bill*** (owner only, `admin.settings`): the shop name, the branch's address, phone and up to 3 extra lines, and the bill's policy line; each line up to 60 characters; a preview in the bill's order.
+- **API:** `GET` and `PUT /api/settings/shop` (`apps/api/src/admin/shop-settings.ts`); one audited transaction on `tenants`, `branches` and the default `print_profiles`. Counters pull the changed rows (they're already in the pull and nudged).
+- **The header's order:** `billHeaderLines` in `packages/print`, used by the counter, the cash desk and the preview.
 
 ## Related
 
