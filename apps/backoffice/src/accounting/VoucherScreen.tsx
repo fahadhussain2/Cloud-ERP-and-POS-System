@@ -21,7 +21,6 @@ import type { Api } from '../api';
 import { moneyText, moneyValue } from '../catalog/data';
 import { href, navigate } from '../router';
 import {
-  AccountingNotice,
   accountingRefusal,
   AccountSelect,
   ErrorText,
@@ -207,7 +206,6 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
           )
         }
       />
-      <AccountingNotice lookups={lookups} />
       <Panel className="grid gap-3.5 p-3.5 sm:grid-cols-[12rem_1fr]">
         <TextField
           label={t('accounting.fields.date')}

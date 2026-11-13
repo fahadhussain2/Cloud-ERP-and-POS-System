@@ -9,7 +9,6 @@ import { checkTransfer, isDateLocked, isEmptyDraft } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
-  AlertTitle,
   Button,
   Input,
   LABEL_CLASS,
@@ -37,18 +36,6 @@ import { inventoryRefusal, locationName, problemText, today, useInventoryLookups
 // Stock transfers (W1-18, INV-04; owner answers 2 and 4): the storekeeper types one, the owner or the manager posts
 // it. On a route that moves at once posting moves the stock; on one that needs receiving it is sent, on the way until
 // someone receives what arrived. Stock may go below 0: the screen warns, it still posts (INV-03).
-
-/** Until go-live stock is moved in the legacy app; practice transfers are removed by the pilot wipe. */
-export function StockNotice({ lookups }: { lookups: InventoryLookups }) {
-  const { t } = useTranslation();
-  if (lookups.live) return null;
-  return (
-    <Alert>
-      <AlertTitle>{t('inventory.notLive.title')}</AlertTitle>
-      <AlertDescription>{t('inventory.notLive.text')}</AlertDescription>
-    </Alert>
-  );
-}
 
 const TONE: Record<string, ChipTone> = {
   draft: 'warn',
@@ -91,7 +78,6 @@ export function TransfersScreen({ api }: { api: Api }) {
           )
         }
       />
-      <StockNotice lookups={lookups} />
       <div className="flex flex-wrap gap-2" role="group" aria-label={t('inventory.transfers.show')}>
         {(['', 'in_transit', 'draft'] as const).map((f) => (
           <Button
@@ -354,7 +340,6 @@ function TransferForm({
           </span>
         }
       />
-      <StockNotice lookups={lookups} />
       {message && (
         <Alert variant={message.error ? 'destructive' : 'default'}>
           <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>

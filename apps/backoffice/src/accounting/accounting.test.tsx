@@ -193,6 +193,12 @@ describe('the money list', () => {
     expect(screen.queryByRole('button', { name: a.money.newTransfer })).toBeNull();
     expect(screen.getByRole('button', { name: a.money.newExpense })).toBeTruthy();
   });
+
+  it('shows no go-live notice during the pilot (D-113)', async () => {
+    show(<MoneyScreen api={fakeApi(lookups({ live: false })).api} />);
+    await screen.findByText('EX000001');
+    expect(screen.queryByText(/legacy app/i)).toBeNull();
+  });
 });
 
 describe('a journal voucher', () => {

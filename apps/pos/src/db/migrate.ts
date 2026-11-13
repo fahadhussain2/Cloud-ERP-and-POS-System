@@ -294,6 +294,22 @@ export const MIGRATIONS: readonly Migration[] = [
       'ALTER TABLE cash_queue ADD COLUMN cash_given_back_number TEXT',
     ],
   },
+  {
+    // Stock on the counter (W1-27, POS-02, sync spec §3): the branch's Shop and Godown and their balances, exactly the
+    // pulled columns; a balance is keyed by item and location. New tables only: the local database is never dropped
+    // (rule 9), and the new datasets start from the beginning on the next pull.
+    version: 14,
+    statements: [
+      `CREATE TABLE locations (
+        id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, row_version TEXT NOT NULL,
+        deleted_at TEXT
+      )`,
+      `CREATE TABLE stock_balances (
+        item_id TEXT NOT NULL, location_id TEXT NOT NULL, qty INTEGER NOT NULL, row_version TEXT NOT NULL,
+        deleted_at TEXT, PRIMARY KEY (item_id, location_id)
+      )`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

@@ -1,6 +1,7 @@
 import {
   AddNameRequest,
   CreateItemRequest,
+  ITEM_LEVEL_FILTERS,
   SetIdentifiersRequest,
   SetPricesRequest,
   SetVehiclesRequest,
@@ -9,6 +10,8 @@ import {
   type CatalogLookups,
   type ItemDetail,
   type ItemList,
+  type ItemRow,
+  type StockLevel,
 } from '@erp/contracts';
 import { withTenant } from '@erp/db';
 import {
@@ -63,6 +66,7 @@ const thousandths = (v: unknown) => (v === null || v === undefined ? null : Math
 const units = (t: number | null | undefined) => (t === null || t === undefined ? null : t / 1000);
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const likeEscape = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The item's row version, or the answer that someone saved in between (with who and when). */
 async function checkVersion(c: Client, table: 'items' | 'categories', id: string, rowVersion: string) {
@@ -184,38 +188,93 @@ export function registerCatalog(scope: FastifyInstance, { pool, now, requireAuth
     }
   };
 
+  // The list (W1-15) with each item's stock (W1-26 plan): the quantity in every shop- and storage-kind location
+  // (Shop, Godown; not Damaged or transit), the unit, the average cost and the value of that stock (owner answer 1),
+  // and a level from the item's minimum (Low at or below it, owner answer 2). Filtered, sorted and paged here, so
+  // the page stays as fast with 20,000 items; the total value counts every match. Cost and value need cost.view.
   scope.get('/catalog/items', { preHandler: read }, async (req, reply) => {
     const qs = req.query as Record<string, string | undefined>;
     const text = (qs['q'] ?? '').trim();
     const pageSize = Math.min(PAGE_SIZE_MAX, Math.max(1, Number(qs['pageSize']) || PAGE_SIZE));
     const page = Math.max(1, Number(qs['page']) || 1);
+    const level = qs['level'] || null;
+    const sort = qs['sort'] || 'code';
+    const dir = qs['dir'] || 'asc';
+    if (
+      (level !== null && !(ITEM_LEVEL_FILTERS as readonly string[]).includes(level)) ||
+      (dir !== 'asc' && dir !== 'desc') ||
+      (sort !== 'code' && sort !== 'value' && !UUID.test(sort))
+    )
+      return reply.code(400).send({ error: 'invalid_request' });
+    const values = allowed(req, 'cost.view');
     const words = text
       .split(/\s+/)
       .filter(Boolean)
       .map((w) => `%${likeEscape(w)}%`);
     const normalized = normalizeIdentifier(text);
     return run(req, reply, async (c) => {
+      const locations = (
+        await c.query<{ id: string; name: string }>(
+          `SELECT id, name FROM erp.locations WHERE deleted_at IS NULL AND kind IN ('shop', 'storage')
+           ORDER BY kind = 'shop' DESC, code`,
+        )
+      ).rows;
+      const sortLocation = UUID.test(sort) ? sort : null;
+      if (sortLocation !== null && !locations.some((l) => l.id === sortLocation))
+        throw new Refusal(400, { error: 'invalid_request' });
+      // Without cost.view the value is no sort: by code instead.
+      const key = sortLocation !== null ? 'sort_qty' : sort === 'value' && values ? 'value' : 'code';
+      const order = `${key} ${dir === 'desc' && (key !== 'code' || sort === 'code') ? 'DESC' : 'ASC'}, code`;
       const { rows } = await c.query<Row>(
-        `SELECT i.id, i.code, i.name, b.name AS brand, cat.name AS category, i.status,
-           (SELECT p.price FROM erp.item_prices p JOIN erp.price_tiers t ON t.id = p.tier_id
-            WHERE p.item_id = i.id AND p.deleted_at IS NULL AND t.code = 'RETAIL') AS retail,
-           count(*) OVER () AS total
-         FROM erp.items i
-         JOIN erp.categories cat ON cat.id = i.category_id
-         LEFT JOIN erp.brands b ON b.id = i.brand_id
-         WHERE i.deleted_at IS NULL
-           AND ($1::uuid IS NULL OR i.category_id = $1)
-           AND ($2::uuid IS NULL OR i.brand_id = $2)
-           AND ($3::text IS NULL OR i.status = $3)
-           AND (cardinality($4::text[]) = 0
-             OR NOT EXISTS (
-               SELECT 1 FROM unnest($4::text[]) w
-               WHERE NOT (i.code ILIKE w OR i.name ILIKE w OR coalesce(b.name, '') ILIKE w))
-             OR ($5 <> '' AND EXISTS (
-               SELECT 1 FROM erp.item_identifiers x
-               WHERE x.item_id = i.id AND x.deleted_at IS NULL AND x.normalized_value LIKE $5 || '%')))
-         ORDER BY i.code
-         LIMIT $6 OFFSET $7`,
+        `WITH shown AS (
+           SELECT id FROM erp.locations WHERE deleted_at IS NULL AND kind IN ('shop', 'storage')
+         ), base AS (
+           SELECT i.id, i.code, i.name, b.name AS brand, cat.name AS category, i.status,
+             u.code AS unit, u.allows_fraction AS fraction, k.avg_cost,
+             (SELECT p.price FROM erp.item_prices p JOIN erp.price_tiers t ON t.id = p.tier_id
+              WHERE p.item_id = i.id AND p.deleted_at IS NULL AND t.code = 'RETAIL') AS retail,
+             coalesce(s.stock, '{}'::jsonb) AS stock,
+             coalesce(s.below, false) AS below,
+             coalesce(s.sort_qty, 0) AS sort_qty,
+             CASE WHEN coalesce(s.on_hand, 0) <= 0 THEN 'out'
+                  WHEN i.min_qty > 0 AND s.on_hand <= i.min_qty THEN 'low'
+                  ELSE 'ok' END AS level,
+             -- As mulQty: rounded half away from zero; an item without a cost counts 0, as posting does.
+             CASE WHEN k.avg_cost IS NULL THEN 0
+                  ELSE round(coalesce(s.on_hand, 0) * k.avg_cost)::bigint END AS value
+           FROM erp.items i
+           JOIN erp.categories cat ON cat.id = i.category_id
+           JOIN erp.units u ON u.id = i.unit_id
+           LEFT JOIN erp.brands b ON b.id = i.brand_id
+           LEFT JOIN erp.item_costs k ON k.item_id = i.id
+           LEFT JOIN LATERAL (
+             SELECT jsonb_object_agg(sb.location_id, (sb.qty * 1000)::bigint) AS stock,
+               sum(sb.qty) AS on_hand,
+               bool_or(sb.qty < 0) AS below,
+               sum(sb.qty) FILTER (WHERE sb.location_id = $8::uuid) AS sort_qty
+             FROM erp.stock_balances sb
+             WHERE sb.item_id = i.id AND sb.qty <> 0 AND sb.location_id IN (SELECT id FROM shown)
+           ) s ON true
+           WHERE i.deleted_at IS NULL
+             AND ($1::uuid IS NULL OR i.category_id = $1)
+             AND ($2::uuid IS NULL OR i.brand_id = $2)
+             AND ($3::text IS NULL OR i.status = $3)
+             AND (cardinality($4::text[]) = 0
+               OR NOT EXISTS (
+                 SELECT 1 FROM unnest($4::text[]) w
+                 WHERE NOT (i.code ILIKE w OR i.name ILIKE w OR coalesce(b.name, '') ILIKE w))
+               OR ($5 <> '' AND EXISTS (
+                 SELECT 1 FROM erp.item_identifiers x
+                 WHERE x.item_id = i.id AND x.deleted_at IS NULL AND x.normalized_value LIKE $5 || '%')))
+         ), matched AS (
+           SELECT * FROM base
+           WHERE $9::text IS NULL OR ($9 = 'below' AND below) OR level = $9
+         )
+         -- One row even past the last page, so the count and the total value always come back.
+         SELECT t.total, t.total_value, r.*
+         FROM (SELECT count(*) AS total, coalesce(sum(value), 0) AS total_value FROM matched) t
+         LEFT JOIN LATERAL (SELECT * FROM matched ORDER BY ${order} LIMIT $6 OFFSET $7) r ON true
+         ORDER BY ${order.replace(/(^|, )(\w+)/g, '$1r.$2')}`,
         [
           qs['category'] || null,
           qs['brand'] || null,
@@ -224,34 +283,32 @@ export function registerCatalog(scope: FastifyInstance, { pool, now, requireAuth
           likeEscape(normalized),
           pageSize,
           (page - 1) * pageSize,
+          sortLocation,
+          level,
         ],
       );
-      let total = Number(rows[0]?.['total'] ?? 0);
-      // A page past the end still says how many there are.
-      if (rows.length === 0 && page > 1)
-        total = Number(
-          (
-            await c.query<{ n: string }>(
-              `SELECT count(*)::text AS n FROM erp.items i LEFT JOIN erp.brands b ON b.id = i.brand_id
-               WHERE i.deleted_at IS NULL AND ($1::uuid IS NULL OR i.category_id = $1)
-                 AND ($2::uuid IS NULL OR i.brand_id = $2) AND ($3::text IS NULL OR i.status = $3)
-                 AND (cardinality($4::text[]) = 0 OR NOT EXISTS (SELECT 1 FROM unnest($4::text[]) w
-                   WHERE NOT (i.code ILIKE w OR i.name ILIKE w OR coalesce(b.name, '') ILIKE w)))`,
-              [qs['category'] || null, qs['brand'] || null, qs['status'] || null, words],
-            )
-          ).rows[0]!.n,
-        );
       const out: ItemList = {
-        total,
-        items: rows.map((r) => ({
-          id: r['id'] as string,
-          code: r['code'] as string,
-          name: r['name'] as string,
-          brand: (r['brand'] as string | null) ?? null,
-          category: r['category'] as string,
-          status: r['status'] as ItemList['items'][number]['status'],
-          retail: num(r['retail']),
-        })),
+        total: Number(rows[0]?.['total'] ?? 0),
+        locations,
+        ...(values ? { totalValue: Number(rows[0]?.['total_value'] ?? 0) } : {}),
+        items: rows
+          .filter((r) => r['id'] !== null)
+          .map((r): ItemRow => ({
+            id: r['id'] as string,
+            code: r['code'] as string,
+            name: r['name'] as string,
+            brand: (r['brand'] as string | null) ?? null,
+            category: r['category'] as string,
+            status: r['status'] as ItemRow['status'],
+            retail: num(r['retail']),
+            unit: r['unit'] as string,
+            fraction: r['fraction'] as boolean,
+            stock: Object.fromEntries(
+              Object.entries(r['stock'] as Record<string, number | string>).map(([k, v]) => [k, Number(v)]),
+            ),
+            level: r['level'] as StockLevel,
+            ...(values ? { avgCost: num(r['avg_cost']), value: Number(r['value']) } : {}),
+          })),
       };
       return out;
     });
@@ -709,6 +766,7 @@ export function registerCatalog(scope: FastifyInstance, { pool, now, requireAuth
           editPrices: allowed(req, 'cat.price.edit'),
           viewCost: allowed(req, 'cost.view'),
           printLabels: allowed(req, 'cat.label.print'),
+          stockCard: (['inv.transfer', 'inv.adjust', 'cost.view'] as const).some((p) => allowed(req, p)),
         },
       };
       return out;

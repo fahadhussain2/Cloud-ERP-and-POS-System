@@ -56,7 +56,7 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   const page = await office.newPage();
   await signIn(page);
   await menu(page, bo.nav.money);
-  await expect(page.getByText(a.notLive.title)).toBeVisible();
+  await expect(page.getByText(/legacy app/i)).toHaveCount(0); // no go-live notice (D-113)
 
   // A Rs 25,000 bank receipt from Rehman Autos into HBL.
   const before = await owes();

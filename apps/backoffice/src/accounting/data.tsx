@@ -1,6 +1,6 @@
 import type { AccountingLookups, AccountRow, PartyHit } from '@erp/contracts';
 import { lineEffect } from '@erp/domain';
-import { Alert, AlertDescription, AlertTitle, formatMoney, Input } from '@erp/ui';
+import { formatMoney, Input } from '@erp/ui';
 import type { TFunction } from 'i18next';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -74,18 +74,6 @@ export function ErrorText({ text }: { text: string | null }) {
       {text}
     </p>
   ) : null;
-}
-
-/** Until go-live the books are kept in the legacy app (D-108); anything here is removed by the pilot wipe. */
-export function AccountingNotice({ lookups }: { lookups: AccountingLookups }) {
-  const { t } = useTranslation();
-  if (lookups.live) return null;
-  return (
-    <Alert>
-      <AlertTitle>{t('accounting.notLive.title')}</AlertTitle>
-      <AlertDescription>{t('accounting.notLive.text')}</AlertDescription>
-    </Alert>
-  );
 }
 
 /** A customer or supplier, found by code, name or phone. */

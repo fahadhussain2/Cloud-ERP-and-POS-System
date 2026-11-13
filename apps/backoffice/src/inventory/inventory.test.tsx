@@ -183,6 +183,8 @@ describe('a transfer', () => {
     expect(await screen.findByText(en.inventory.warnings.below_zero)).toBeDefined();
     expect(screen.getByRole('button', { name: en.inventory.saveDraft })).toBeDefined();
     expect(screen.queryByRole('button', { name: en.inventory.post })).toBeNull();
+    // Before go-live too, no notice (D-113).
+    expect(screen.queryByText(/legacy app/i)).toBeNull();
   });
 
   it('greys out Post and says why when its date is on or before the lock date (D-108)', async () => {

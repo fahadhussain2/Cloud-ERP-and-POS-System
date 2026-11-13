@@ -26,7 +26,6 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../api';
 import { href } from '../router';
 import { catalogRefusal, moneyText, moneyValue, NONE, qtyText, qtyValue, useLookups } from './data';
-import { LiveNotice } from './LiveNotice';
 import { statusTone } from './ItemsScreen';
 
 // One item (W1-15): details (CAT-01), codes and vehicles (CAT-02, CAT-03), prices and floor (CAT-04, CAT-05) and the
@@ -111,7 +110,6 @@ export function ItemScreen({ api, id }: { api: Api; id: string }) {
           </span>
         }
       />
-      <LiveNotice lookups={lookups} />
       {message && (
         <Alert variant={message.error ? 'destructive' : 'default'}>
           <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>

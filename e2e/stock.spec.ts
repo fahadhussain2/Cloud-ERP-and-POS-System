@@ -57,7 +57,7 @@ test('the manager moves and corrects stock; a large loss waits for the owner', a
 
   // 5 cans from the Shop to the Godown: the route moves at once.
   await menu(page, bo.nav.transfers);
-  await expect(page.getByText(bo.inventory.notLive.title)).toBeVisible();
+  await expect(page.getByText(/legacy app/i)).toHaveCount(0); // no go-live notice (D-113)
   await page.getByRole('link', { name: bo.inventory.transfers.add }).click();
   await page.getByLabel(bo.inventory.fields.from).selectOption({ label: 'Shop' });
   await page.getByLabel(bo.inventory.fields.to).selectOption({ label: 'Godown' });
@@ -118,5 +118,28 @@ test('the manager moves and corrects stock; a large loss waits for the owner', a
   await expect(card.getByRole('link', { name: 'AD000002' })).toBeVisible();
   await expect(card.getByRole('link', { name: 'TR000001' })).toHaveCount(2);
   await expect(card.getByRole('link', { name: 'GR000001' })).toBeVisible();
+  await owner.close();
+});
+
+// W1-26: the items list shows the same stock per location, its value at the average, and links to the stock card.
+test("the items list shows the item's stock in the Shop and the Godown, and its value", async ({
+  browser,
+}) => {
+  const owner = await browser.newContext();
+  const op = await owner.newPage();
+  await signIn(op, OWNER.username, OWNER_PASSWORD);
+  await menu(op, bo.nav.items);
+  await op.getByLabel(bo.catalog.items.search).fill('ENOL001');
+  const list = op.getByRole('table', { name: bo.catalog.items.title });
+  const row = list.getByRole('row', { name: /ENOL001/ });
+  await expect(list.getByRole('row')).toHaveCount(3); // the header, ENOL001 and the total
+  // Godown 5, Shop −1 (in red): 4 cans at Rs 4,900.
+  await expect(row.getByRole('link', { name: '-1' })).toBeVisible();
+  await expect(row).toContainText(/19,600/);
+  await expect(list.getByRole('row').filter({ hasText: bo.catalog.items.totalValue })).toContainText(
+    /19,600/,
+  );
+  await row.getByRole('link', { name: '5' }).click();
+  await expect(op.getByRole('table', { name: bo.inventory.card.movements })).toBeVisible();
   await owner.close();
 });

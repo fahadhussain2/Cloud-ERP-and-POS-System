@@ -86,6 +86,8 @@ export {
   PULL_DATASETS,
   PULL_LIMIT_DEFAULT,
   PULL_LIMIT_MAX,
+  STOCK_COLUMNS,
+  STOCK_DATASETS,
   TemporaryPinRequest,
   type CashDeskDataset,
   type ReturnDataset,
@@ -95,6 +97,7 @@ export {
   type ColumnType,
   type PullDataset,
   type PullResponse,
+  type StockDataset,
 } from './sync';
 export type {
   AcknowledgementStatus,
@@ -134,6 +137,7 @@ export {
   AddNameRequest,
   CreateItemRequest,
   IdentifierKind,
+  ITEM_LEVEL_FILTERS,
   ItemStatus,
   SetIdentifiersRequest,
   SetPricesRequest,
@@ -143,8 +147,10 @@ export {
   VehicleTag,
   type CatalogLookups,
   type ItemDetail,
+  type ItemLevelFilter,
   type ItemList,
   type ItemRow,
+  type StockLevel,
 } from './catalog';
 export {
   CreateSupplierRequest,

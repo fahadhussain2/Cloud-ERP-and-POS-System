@@ -220,7 +220,7 @@ describe('pull', () => {
   });
 
   it('refuses unknown datasets, bad cursors and limits, and requests without a valid device token', async () => {
-    expect((await pull(token, 'datasets=stock_balances')).json()).toEqual({ error: 'unknown_dataset' });
+    expect((await pull(token, 'datasets=item_costs')).json()).toEqual({ error: 'unknown_dataset' });
     expect((await pull(token, 'datasets=users&cursor=not-a-cursor')).json()).toEqual({ error: 'bad_cursor' });
     expect((await pull(token, 'datasets=users&limit=5000')).json()).toEqual({ error: 'bad_limit' });
     expect((await app().inject({ method: 'GET', url: '/api/sync/pull?datasets=users' })).statusCode).toBe(
