@@ -173,6 +173,58 @@ test('a price changed on the server reaches the counter at once through the nudg
   }
 });
 
+test('the owner renames the shop and sets the bill header; the counter shows and prints them at once (W1-25)', async ({
+  page,
+  browser,
+}) => {
+  // window.print() records what the print container shows, as in counter.spec.ts.
+  await page.addInitScript(() => {
+    const w = window as unknown as { printed: string[] };
+    w.printed = [];
+    window.print = () => void w.printed.push(document.getElementById('print-root')?.innerText ?? '');
+  });
+  const [before] = await sql<{ name: string }>('SELECT name FROM erp.tenants');
+  await page.goto(POS);
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await synced(page);
+
+  const office = await browser.newContext();
+  try {
+    const bop = await office.newPage();
+    await bop.goto(BACKOFFICE);
+    await bop.getByLabel(bo.login.shopCode).fill(SHOP);
+    await bop.getByLabel(bo.login.username).fill(OWNER.username);
+    await bop.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
+    await bop.getByRole('button', { name: bo.login.submit }).click();
+    await bop
+      .getByRole('navigation', { name: bo.nav.menu })
+      .getByRole('link', { name: bo.nav.shopSettings })
+      .click();
+    await expect(bop.getByRole('textbox', { name: bo.shop.fields.name })).toHaveValue(before!.name);
+    await bop.getByRole('textbox', { name: bo.shop.fields.name }).fill('E2E City Auto Corner');
+    await bop.getByRole('textbox', { name: bo.shop.fields.phone }).fill('021-1234567');
+    await bop.getByRole('textbox', { name: bo.shop.fields.line1 }).fill('Dealers in genuine parts');
+    await bop.getByRole('button', { name: bo.shop.save }).click();
+    await expect(bop.getByRole('status')).toHaveText(bo.shop.saved);
+
+    // The nudge makes the counter pull: the status bar has the new name well inside the minute between pulls.
+    await expect(page.getByText('E2E City Auto Corner')).toBeVisible({ timeout: 10_000 });
+    await page.keyboard.press('Alt+P');
+    const reprint = page.getByRole('dialog', { name: pos.reprint.title });
+    await expect(reprint.getByRole('option').first()).toBeVisible();
+    await reprint.getByLabel(pos.reprint.search).press('Enter');
+    await expect(notice(page)).toHaveText(/reprinted$/);
+    const copy = (await page.evaluate(() => (window as unknown as { printed: string[] }).printed)).at(-1)!;
+    // The print container's text has no line breaks between its lines.
+    expect(copy).toMatch(/E2E City Auto Corner\s*021-1234567\s*Dealers in genuine parts\s*SALE BILL/);
+  } finally {
+    await office.close();
+    // Back as it was, for the flows after this one.
+    await sql('UPDATE erp.tenants SET name = $1', [before!.name]);
+    await sql("UPDATE erp.branches SET phone = NULL, receipt_header = '{}'");
+  }
+});
+
 test('a bill the server refuses waits under Needs attention; a manager’s Try again sends it', async ({
   page,
 }) => {

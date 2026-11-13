@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#155](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/155) |
 | **Module** | platform (with pos for the printed bill, and `packages/print`) |
-| **Status** | Draft (2026-11-13), for the owner to accept |
+| **Status** | Built (2026-11-13), in review. Plan accepted by the owner (PR #156, answers 1–3: yes) |
 | **Refs** | PLT-01 (receipt header), POS-09 (what the bill shows); POS spec §13; data model (`tenants`, `branches`, `print_profiles`); D-083 (setup from a spec, never overwrites), D-106 (the label template, the same owner-only pattern); go-live checklist: *Bill header*, *Bill print test* |
 | **Depends on** | W1-06 (the printed bill), W1-17 (`admin.settings`, the owner-only settings pattern) |
 | **Size** | about 1 day |

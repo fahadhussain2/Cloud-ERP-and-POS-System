@@ -16,6 +16,7 @@ import {
   type SaleDocument,
   type Tender,
 } from '@erp/domain';
+import { billHeaderLines } from '@erp/print';
 
 import { parseOpenBill } from '../bill/open-bill';
 import { creditFigures } from './customers';
@@ -53,7 +54,7 @@ export interface CheckoutSettings {
   cutoffHour: number;
   methods: PaymentMethodRow[];
   printProfile: PrintProfile | null;
-  /** The branch's receipt header lines, printed under the shop name. */
+  /** Every header line printed under the shop name, in order: the branch's, then the profile's (W1-25). */
   receiptHeader: string[];
 }
 
@@ -123,24 +124,34 @@ export function checkoutSettings(db: SqlDb): CheckoutSettings | null {
       requiresReference: Number(r['requires_reference']) === 1,
       sort: Number(r['sort']),
     }));
+  const profile = printProfile(db);
   return {
     increment: money(String(t['cash_rounding_increment'])),
     timeZone: String(t['timezone']),
     cutoffHour: Number(t['day_cutoff_hour']),
     methods,
-    printProfile: printProfile(db),
-    receiptHeader: receiptHeader(db),
+    printProfile: profile,
+    receiptHeader: receiptHeader(db, profile?.headerLines ?? []),
   };
 }
 
-/** The branch's address and phone, then its `receipt_header.lines` (POS spec §13). */
-function receiptHeader(db: SqlDb): string[] {
+/** The whole header in print order: the branch's address, phone and `receipt_header.lines`, then the profile's
+ * `headerLines` (POS spec §13, `billHeaderLines`, W1-25). */
+function receiptHeader(db: SqlDb, profileLines: string[]): string[] {
   const data = text(db.selectValue('SELECT data FROM branch WHERE deleted_at IS NULL LIMIT 1'));
-  if (data === null) return [];
-  const b = JSON.parse(data) as { address?: unknown; phone?: unknown; receipt_header?: { lines?: unknown } };
+  const b = (data === null ? {} : JSON.parse(data)) as {
+    address?: unknown;
+    phone?: unknown;
+    receipt_header?: { lines?: unknown };
+  };
+  const str = (v: unknown) => (typeof v === 'string' ? v : null);
   const lines = b.receipt_header?.lines;
-  const extra: unknown[] = Array.isArray(lines) ? (lines as unknown[]) : [];
-  return [b.address, b.phone, ...extra].filter((l): l is string => typeof l === 'string' && l.trim() !== '');
+  return billHeaderLines({
+    address: str(b.address),
+    phone: str(b.phone),
+    lines: Array.isArray(lines) ? lines.flatMap((l) => (typeof l === 'string' ? [l] : [])) : [],
+    profileLines,
+  });
 }
 
 /** The device's own profile, else the tenant default (POS spec §13). */

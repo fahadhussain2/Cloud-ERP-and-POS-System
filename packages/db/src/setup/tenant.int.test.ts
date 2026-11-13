@@ -38,7 +38,7 @@ describe('setting up Delux', () => {
   it('creates the tenant with the reviewed settings and the login directory entry', async () => {
     const [t] = await q<Record<string, unknown>>('SELECT * FROM erp.tenants WHERE id = :tenant');
     expect(t).toMatchObject({
-      name: 'Delux Autos',
+      name: 'Delux City Auto Corner',
       base_currency: 'PKR',
       currency_minor_units: 2,
       timezone: 'Asia/Karachi',
@@ -186,6 +186,34 @@ describe('running it again', () => {
     ]);
     expect(await q('SELECT closing_time FROM erp.tenants WHERE id = :tenant')).toEqual([
       { closing_time: '20:00:00' },
+    ]);
+  });
+
+  it('leaves the name and bill header to the owner: what they set in the back office is not drift (D-112)', async () => {
+    await q("UPDATE erp.tenants SET name = 'City Auto Corner' WHERE id = :tenant");
+    await q(
+      `UPDATE erp.branches SET address = 'Shop 14, Auto Market', phone = '021-1234567',
+         receipt_header = '{"lines": ["Dealers in genuine parts"]}' WHERE tenant_id = :tenant`,
+    );
+    await q(
+      `UPDATE erp.print_profiles SET template_options = template_options || '{"policyText": "No returns on electrics."}'
+       WHERE tenant_id = :tenant AND is_tenant_default`,
+    );
+    const report = await setupTenant(db.ownerUrl, spec, { ownerPasswordHash: 'x', mustChangePassword: true });
+    expect(report.created).toEqual([]);
+    expect(report.updated).toEqual([]);
+    expect(report.drift).toEqual([]);
+    expect(await q('SELECT name FROM erp.tenants WHERE id = :tenant')).toEqual([
+      { name: 'City Auto Corner' },
+    ]);
+    expect(await q('SELECT address, receipt_header FROM erp.branches WHERE tenant_id = :tenant')).toEqual([
+      { address: 'Shop 14, Auto Market', receipt_header: { lines: ['Dealers in genuine parts'] } },
+    ]);
+    // The rest of the profile is still the spec's: a changed paper format is drift as before.
+    const a4 = TenantSpec.parse({ ...deluxSpec, printProfile: { ...deluxSpec.printProfile, copies: 2 } });
+    const drift = await setupTenant(db.ownerUrl, a4, { ownerPasswordHash: 'x', mustChangePassword: true });
+    expect(drift.drift).toEqual([
+      `print profile "${deluxSpec.printProfile.name}" copies: database 1, spec 2`,
     ]);
   });
 });

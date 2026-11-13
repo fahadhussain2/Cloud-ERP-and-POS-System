@@ -226,6 +226,31 @@ describe('checkout settings', () => {
       policyText: null,
     });
   });
+
+  it("give the whole header in print order: the branch's address, phone and lines, then the profile's (W1-25)", () => {
+    ready();
+    expect(checkoutSettings(db)!.receiptHeader).toEqual(['Shop 14, Auto Market']);
+    pull({
+      branch: [
+        row({
+          id: ID('e1'),
+          code: 'MAIN',
+          name: 'Main',
+          address: 'Plaza 4, Karachi',
+          phone: ' 021-1234567 ',
+          receipt_header: { lines: ['Dealers in genuine parts', ' '] },
+          status: 'active',
+          row_version: '5',
+        }),
+      ],
+    });
+    expect(checkoutSettings(db)!.receiptHeader).toEqual([
+      'Plaza 4, Karachi',
+      '021-1234567',
+      'Dealers in genuine parts',
+      'Shop 14, Auto Market',
+    ]);
+  });
 });
 
 describe('finalizing a sale (one transaction)', () => {

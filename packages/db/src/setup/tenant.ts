@@ -203,7 +203,7 @@ export async function setupTenant(
       );
       created.push(`tenant ${spec.code}`);
     } else {
-      differs('tenant', 'name', tenant.name, spec.name, quote);
+      // The shop's name is the owner's once the shop exists (back office, W1-25, D-112): not drift.
       differs('tenant', 'legal_name', tenant.legal_name, spec.legalName, quote);
       differs('tenant', 'base_currency', tenant.base_currency, spec.baseCurrency);
       differs('tenant', 'currency_minor_units', tenant.currency_minor_units, spec.currencyMinorUnits);
@@ -243,10 +243,8 @@ export async function setupTenant(
       );
       created.push(`branch ${b.code}`);
     } else {
+      // The address, phone and header lines are the owner's once the branch exists (W1-25, D-112): not drift.
       differs(`branch ${b.code}`, 'name', branch.name, b.name, quote);
-      differs(`branch ${b.code}`, 'address', branch.address, b.address ?? null, quote);
-      differs(`branch ${b.code}`, 'phone', branch.phone, b.phone ?? null, quote);
-      differs(`branch ${b.code}`, 'receipt_header', branch.receipt_header, b.receiptHeader, canonical);
     }
     const branchId = branch!.id as string;
     for (const l of spec.locations) {
@@ -461,7 +459,18 @@ export async function setupTenant(
       differs(what, 'paper_format', profile.paper_format, p.paperFormat);
       differs(what, 'code_type', profile.code_type, p.codeType);
       differs(what, 'copies', profile.copies, p.copies);
-      differs(what, 'template_options', profile.template_options, p.templateOptions, canonical);
+      // The policy line is the owner's (W1-25, D-112); the rest of the options are still the spec's.
+      const withoutPolicy = (o: unknown) =>
+        Object.fromEntries(
+          Object.entries((o ?? {}) as Record<string, unknown>).filter(([k]) => k !== 'policyText'),
+        );
+      differs(
+        what,
+        'template_options',
+        withoutPolicy(profile.template_options),
+        withoutPolicy(p.templateOptions),
+        canonical,
+      );
     }
 
     // The six role templates (D-081); a role already made from a template is left as the owner edited it.
