@@ -33,7 +33,6 @@ import type { Api } from '../api';
 import { moneyText, moneyValue, qtyText, qtyValue } from '../catalog/data';
 import { carry, href, navigate, takeCarried } from '../router';
 import { ItemPicker } from './ItemPicker';
-import { PurchasingNotice } from './PurchasingNotice';
 import { DocumentList } from './ReceiptScreen';
 import { problemText, purchasingRefusal, today, usePurchasingLookups, type PickedItem } from './data';
 
@@ -68,7 +67,6 @@ export function ReturnsScreen({ api }: { api: Api }) {
           )
         }
       />
-      <PurchasingNotice lookups={lookups} />
       <DocumentList
         list={list}
         lookups={lookups}
@@ -290,7 +288,6 @@ function ReturnForm({
           </span>
         }
       />
-      <PurchasingNotice lookups={lookups} />
       {message && (
         <Alert variant={message.error ? 'destructive' : 'default'}>
           <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>

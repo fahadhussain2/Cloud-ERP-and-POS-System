@@ -18,7 +18,6 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { catalogRefusal, useLookups } from './data';
-import { LiveNotice } from './LiveNotice';
 
 // Categories (W1-15, CAT-05): each category's floor margin, the "+ 5 %" of floor = cost + margin (PRD Q2). Changing it
 // re-writes the category's floors from cost at once, so the counters get them at their next pull. The owner only
@@ -44,7 +43,6 @@ export function CategoriesScreen({ api }: { api: Api }) {
   return (
     <>
       <PageHeader title={t('catalog.categories.title')} help={t('catalog.categories.help')} />
-      <LiveNotice lookups={lookups} />
       {message && (
         <Alert variant={message.error ? 'destructive' : 'default'}>
           <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>

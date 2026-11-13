@@ -261,14 +261,11 @@ describe("a customer's page", () => {
     expect(rows[2]!.textContent).toMatch(/Bank receipt CR000001.*-Rs\s?1,000.*Rs\s?3,500/);
   });
 
-  it('warns on an imported customer before go-live only', async () => {
+  it('shows no go-live notice on an imported customer, even before go-live (D-113)', async () => {
     const imported = { ...DETAIL, customer: { ...DETAIL.customer, imported: true } };
     show(<CustomerScreen api={fakeApi(lookups({ live: false }), {}, imported).api} id="c1" />);
-    expect(await screen.findByText(en.customers.notLive.title)).toBeDefined();
-    cleanup();
-    show(<CustomerScreen api={fakeApi(lookups({ live: true }), {}, imported).api} id="c1" />);
     await screen.findByRole('table');
-    expect(screen.queryByText(en.customers.notLive.title)).toBeNull();
+    expect(screen.queryByText(/legacy app/i)).toBeNull();
   });
 
   it('saves edited terms with both row versions', async () => {

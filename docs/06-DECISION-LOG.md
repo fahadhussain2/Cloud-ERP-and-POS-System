@@ -1037,3 +1037,10 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** the name and header are what customers see on every bill, and the shop changes them (a new phone, a new line) without support or a release.
 - **Trade-off:** the spec in git can differ from a live shop's name and header without anyone being told; the audit log is the record of what changed. The shop code (`delux`) and the POS origin never change (D-065).
 - **Status:** Accepted (with the W1-25 plan, owner answers 1–3). Amends D-083.
+
+### D-113 No go-live notices in the back office (2026-11-15)
+- **Context:** until go-live the back office showed a notice on the catalog, imported customers, purchasing, stock and accounting screens: items and imported customers still change in the legacy app (the next import overwrites them, D-104, D-109), and purchases, stock movements and accounting entries made here are practice, removed by the pilot wipe (D-105, D-107, D-108). After the W1-26 release review the owner found the box repeated something they already know.
+- **Decision:** **remove the notices from every screen, for everyone** (owner, 2026-11-15). The rules themselves don't change: the final import still overwrites the catalog and imported customers, and the pilot wipe still removes practice documents. The `live` flag stays in the lookups; no screen uses it now.
+- **Why:** the owner runs the back office and knows the rules; the box took space on every screen.
+- **Trade-off:** staff who use the back office during the pilot (1–31 Dec) aren't warned on screen. The owner tells them before the pilot (go-live checklist): items and imported customers still change in the legacy app, and back-office purchases, stock movements and accounting entries are practice until go-live.
+- **Status:** Accepted (owner, 2026-11-15). Amends D-104, D-105, D-107, D-108 and D-109 (the notice parts only).

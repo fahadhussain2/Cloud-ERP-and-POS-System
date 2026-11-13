@@ -183,10 +183,10 @@ describe('a goods receipt', () => {
     expect(f.calls.find((c) => c.path.endsWith('/post'))!.body).toEqual({ rowVersion: '4' });
   });
 
-  it('says a cash bill is paid at the desk, and warns until go-live', async () => {
+  it('says a cash bill is paid at the desk, with no go-live notice (D-113)', async () => {
     show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
     expect(await screen.findByText(en.purchasing.receipts.cashHint)).toBeDefined();
-    expect(screen.getByText(en.purchasing.notLive.title)).toBeDefined();
+    expect(screen.queryByText(/legacy app/i)).toBeNull();
   });
 
   // Owner's review of W1-19: a receipt with nothing on its lines isn't saved.

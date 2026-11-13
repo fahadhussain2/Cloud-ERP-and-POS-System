@@ -26,7 +26,7 @@ import { qtyText, qtyValue } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
 import { carry, href, navigate, takeCarried } from '../router';
 import { inventoryRefusal, locationName, problemText, today, useInventoryLookups } from './data';
-import { StatusOf, StockNotice } from './TransferScreen';
+import { StatusOf } from './TransferScreen';
 
 // Stock adjustments (W1-18, INV-05; owner answers 1 and 3): found (+) or gone (−) at one location, with a reason,
 // valued at the average and posted against Inventory adjustments. A loss above the shop's limit, posted by someone
@@ -61,7 +61,6 @@ export function AdjustmentsScreen({ api }: { api: Api }) {
           )
         }
       />
-      <StockNotice lookups={lookups} />
       <Panel className="px-1.5 pb-2.5">
         {list === null ? (
           <p className="p-2 text-muted-foreground">{t('app.loading')}</p>
@@ -309,7 +308,6 @@ function AdjustmentForm({
           </span>
         }
       />
-      <StockNotice lookups={lookups} />
       {message && (
         <Alert variant={message.error ? 'destructive' : 'default'}>
           <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>

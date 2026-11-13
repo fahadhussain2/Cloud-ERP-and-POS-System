@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { FormDialog } from '../staff/dialogs';
-import { AccountingNotice, accountingRefusal, ErrorText, useAccountingLookups } from './data';
+import { accountingRefusal, ErrorText, useAccountingLookups } from './data';
 
 // Periods and the lock date (ACC-06, owner answer 5 to W1-19, D-108). The months are worked out from the shop's start
 // month; a month is locked when it ends on or before the lock date. The accountant or the owner locks the next month
@@ -63,7 +63,6 @@ export function PeriodsScreen({ api }: { api: Api }) {
           )
         }
       />
-      <AccountingNotice lookups={lookups} />
       {periods.years
         .slice()
         .reverse()

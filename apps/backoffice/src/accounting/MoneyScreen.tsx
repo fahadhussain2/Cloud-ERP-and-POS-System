@@ -28,7 +28,6 @@ import { moneyValue } from '../catalog/data';
 import { href, navigate } from '../router';
 import { FormDialog } from '../staff/dialogs';
 import {
-  AccountingNotice,
   accountingRefusal,
   ErrorText,
   LineEffectHint,
@@ -109,7 +108,6 @@ export function MoneyScreen({ api }: { api: Api }) {
           </div>
         }
       />
-      <AccountingNotice lookups={lookups} />
       {done && (
         <p role="status" className="m-0 text-sm text-ok">
           {done}

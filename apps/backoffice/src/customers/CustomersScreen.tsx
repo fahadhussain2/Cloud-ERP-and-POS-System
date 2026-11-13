@@ -2,7 +2,6 @@ import type { CustomerDetail, CustomerLookups, CustomerRow } from '@erp/contract
 import {
   Alert,
   AlertDescription,
-  AlertTitle,
   Button,
   formatMoney,
   Input,
@@ -699,12 +698,6 @@ export function CustomerScreen({ api, id }: { api: Api; id: string }) {
           )
         }
       />
-      {c.imported && !lookups.live && (
-        <Alert>
-          <AlertTitle>{t('customers.notLive.title')}</AlertTitle>
-          <AlertDescription>{t('customers.notLive.text')}</AlertDescription>
-        </Alert>
-      )}
       <CustomerDialog
         key={`edit-${c.rowVersion}-${c.accountVersion}`}
         api={api}

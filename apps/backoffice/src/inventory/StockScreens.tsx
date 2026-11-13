@@ -24,7 +24,6 @@ import { moneyText, moneyValue, qtyText } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
 import { href, navigate } from '../router';
 import { inventoryRefusal, locationName, useInventoryLookups } from './data';
-import { StockNotice } from './TransferScreen';
 
 // Reading and setting up the stock (W1-18): an item's stock card (INV-07), Transfer needed (PRD W13) and the owner's
 // stock settings (owner answers 3 and 4).
@@ -226,7 +225,6 @@ export function TransferNeededScreen({ api }: { api: Api }) {
           )
         }
       />
-      <StockNotice lookups={lookups} />
       <Panel className="px-1.5 pb-2.5">
         {rows === null ? (
           <p className="p-2 text-muted-foreground">{t('app.loading')}</p>
