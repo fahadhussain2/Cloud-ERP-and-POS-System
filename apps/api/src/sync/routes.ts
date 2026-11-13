@@ -2,6 +2,7 @@ import {
   CASH_DESK_COLUMNS,
   RETURN_BILL_DAYS,
   RETURN_COLUMNS,
+  STOCK_COLUMNS,
   CATALOG_COLUMNS,
   CHECKOUT_COLUMNS,
   CounterPinChangeRequest,
@@ -20,6 +21,7 @@ import {
   type CustomerDataset,
   type PullDataset,
   type PullResponse,
+  type StockDataset,
 } from '@erp/contracts';
 import { pullColumns, START, withTenant, type Cursor, type PullSource } from '@erp/db';
 import { pinProblem, PIN_MAX_FAILURES } from '@erp/domain';
@@ -45,6 +47,18 @@ const isCheckout = (d: PullDataset): d is CheckoutDataset => d in CHECKOUT_COLUM
 const isCustomer = (d: PullDataset): d is CustomerDataset => d in CUSTOMER_COLUMNS;
 const isCashDesk = (d: PullDataset): d is CashDeskDataset => d in CASH_DESK_COLUMNS;
 const isReturn = (d: PullDataset): d is ReturnDataset => d in RETURN_COLUMNS;
+const isStock = (d: PullDataset): d is StockDataset => d in STOCK_COLUMNS;
+
+/**
+ * Stock on the counter (W1-27, POS-02): the device's branch's shop- and storage-kind locations and their balances;
+ * never Damaged or In transit, never cost or value.
+ */
+const SHOWN_LOCATIONS = `SELECT l.id FROM erp.locations l
+  WHERE l.branch_id = $4 AND l.kind IN ('shop', 'storage') AND l.deleted_at IS NULL`;
+const STOCK_SOURCES: Record<StockDataset, Omit<PullSource, 'columns' | 'params'>> = {
+  locations: { table: 'locations', where: "branch_id = $4 AND kind IN ('shop', 'storage')" },
+  stock_balances: { table: 'stock_balances', where: `location_id IN (${SHOWN_LOCATIONS})` },
+};
 
 /**
  * The branch's bills of the last 90 days (W1-13, SYN-01), with their lines and payments. A day more than 90, so a
@@ -119,6 +133,12 @@ function datasetSource(dataset: PullDataset, branchId: string, deviceId: string)
     return {
       ...RETURN_SOURCES[dataset],
       columns: [...Object.keys(RETURN_COLUMNS[dataset]), 'row_version', 'deleted_at'],
+      params: [branchId],
+    };
+  if (isStock(dataset))
+    return {
+      ...STOCK_SOURCES[dataset],
+      columns: [...Object.keys(STOCK_COLUMNS[dataset]), 'row_version', 'deleted_at'],
       params: [branchId],
     };
   if (isCashDesk(dataset) && dataset !== 'cash_queue')

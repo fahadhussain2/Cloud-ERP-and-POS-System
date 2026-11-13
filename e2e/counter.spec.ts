@@ -560,10 +560,27 @@ test('pay is refused while a price waits for an approval; exact cash prints S000
   await expect(page.getByText('0 bills waiting to sync')).toBeVisible({ timeout: 5000 });
 });
 
+/** BRPD001's Shop quantity as the search result shows it (W1-27), the search then cleared. */
+const shopStock = async (page: Page) => {
+  const box = page.getByRole('combobox');
+  await box.fill('brpd001');
+  const cell = page
+    .getByRole('listbox', { name: pos.search.results })
+    .getByRole('option')
+    .first()
+    .getByTestId('stock');
+  await expect(cell).toBeVisible();
+  const text = (await cell.textContent()) ?? '';
+  await box.fill('');
+  return Number(text.split(' · ')[0]!.replace('−', '-'));
+};
+
 test('cash with change, typed and by quick cash; less than the total is refused', async ({ page }) => {
   await recordPrints(page);
   await page.goto(POS);
   await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  // W1-27: each result shows its Shop and Godown stock; a sale here comes off the Shop at once.
+  const before = await shopStock(page);
   await addToBill(page, 'fnbl001');
   await page.keyboard.press('F9');
   await answer(page, pos.pay.cashReceived, '1000');
@@ -587,6 +604,8 @@ test('cash with change, typed and by quick cash; less than the total is refused'
   expect(await printed(page)).toHaveLength(2);
   // Online, both bills reach the server at once (SYN-02, W1-07).
   await expect(page.getByText('0 bills waiting to sync')).toBeVisible({ timeout: 5000 });
+  // One BRPD001 sold: one fewer in the Shop, before and after the server has it.
+  await expect.poll(() => shopStock(page)).toBe(before - 1);
 });
 
 test('Raast needs its reference; a split pays cash and JazzCash with cash received', async ({ page }) => {

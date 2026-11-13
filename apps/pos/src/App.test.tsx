@@ -504,6 +504,8 @@ describe('the counter screen (W1-03)', () => {
     status: 'active',
     price: 450000,
     rank: 4,
+    fraction: false,
+    stock: [],
     ...over,
   });
   const unlocked = async (counter: Counter) => {
@@ -542,6 +544,44 @@ describe('the counter screen (W1-03)', () => {
     expect(plain(options[0]!.textContent)).toContain('Rs 4,500');
     expect(options[1]!.textContent).toContain(en.item.status.dormant);
     expect(options[1]!.textContent).toContain(en.search.noPrice);
+  });
+
+  it("shows each result's Shop and Godown stock: amber when only the Godown has it, red below zero (W1-27)", async () => {
+    const stock = (shop: number, godown: number) => [
+      { locationId: 'l-shop', name: 'Shop', kind: 'shop' as const, qty: toQty(shop) },
+      { locationId: 'l-godown', name: 'Godown', kind: 'storage' as const, qty: toQty(godown) },
+    ];
+    const { counter } = fakeCounter({
+      search: () =>
+        Promise.resolve([
+          result('A1', { stock: stock(8000, 4000) }),
+          result('B2', { stock: stock(0, 6000) }),
+          result('C3', { stock: stock(-2000, 0) }),
+          result('D4', { stock: stock(0, 0) }),
+          result('E5', { fraction: true, stock: stock(4500, 10000) }),
+        ]),
+    });
+    const box = await unlocked(counter);
+    fireEvent.change(box, { target: { value: 'pads' } });
+    const options = await screen.findAllByRole('option');
+    // The heading names the locations, from the back office.
+    expect(screen.getByText('Shop · Godown')).toBeDefined();
+    const cell = (i: number) => within(options[i]!).getByTestId('stock');
+    expect(cell(0).textContent).toBe('8 · 4');
+    expect(cell(0).getAttribute('aria-label')).toBe('Shop 8, Godown 4');
+    // None in the Shop, some in the Godown: send someone to the godown.
+    expect(within(cell(1)).getByText('0').className).toMatch(/text-warn/);
+    expect(within(cell(2)).getByText('-2').className).toMatch(/text-destructive/);
+    expect(cell(3).className).toMatch(/text-muted-foreground/);
+    expect(cell(4).textContent).toBe('4.5 · 10');
+  });
+
+  it('shows no stock column before the locations have come', async () => {
+    const { counter } = fakeCounter({ search: () => Promise.resolve([result('A1')]) });
+    const box = await unlocked(counter);
+    fireEvent.change(box, { target: { value: 'pads' } });
+    const [option] = await screen.findAllByRole('option');
+    expect(within(option!).queryByTestId('stock')).toBeNull();
   });
 
   it('moves the selection with the arrow keys, F2 goes back to the search, Esc clears it', async () => {
@@ -666,6 +706,8 @@ describe('the bill (W1-05, POS spec §10–§11)', () => {
               status: 'active',
               price: priceIn(i.itemId, opts?.tierId ?? null),
               rank: 1 as const,
+              fraction: false,
+              stock: [],
             })),
         ),
       billItem: (id, tier) => Promise.resolve(ITEMS[id] ? { ...ITEMS[id], list: priceIn(id, tier) } : null),

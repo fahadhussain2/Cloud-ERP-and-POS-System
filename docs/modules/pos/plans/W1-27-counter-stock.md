@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#164](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/164) |
 | **Module** | pos (with sync for the new datasets) |
-| **Status** | Draft (2026-11-15), for the owner to accept |
+| **Status** | Built (2026-11-15), in review. Plan accepted by the owner (PR #165, answers 1–3: yes) |
 | **Refs** | POS-02 (the search *"shows Shop and Godown stock, tier price and bin location"*), INV-01 (stock balances), INV-03 (negative stock allowed); POS spec §9; sync spec §3 (*"Stock balances are added by their task with the same rules"*); W1-26 (the same columns in the back office) |
 | **Depends on** | W1-03 (the counter's search and the catalog pull), W1-08 (stock balances kept by posting), W1-09 (the counter's own bills against a pulled balance) |
 | **Size** | about 1 day |
@@ -95,3 +95,21 @@ The PRD asks for it from Wave 1 (POS-02), and POS spec §9 says *"Stock (Shop ·
 | A busy day sends many balance changes to every counter | Each sale changes one or two small rows; the pull already pages and resumes |
 | An offline counter shows old numbers | Expected and visible (*Offline since*); its own sales still count at once |
 | Before the pilot opening, every number is 0 | Expected; Verify 3 |
+
+## Results (2026-11-15)
+
+- **Built** as planned:
+  - `STOCK_COLUMNS` in `packages/contracts`, and the two sources in `apps/api/src/sync/routes.ts`.
+  - On the counter: local schema 14, the pull keyed by item and location, `apps/pos/src/db/stock.ts`, and the database worker's search filling in each result's stock.
+  - The column in `CounterScreen.tsx`.
+- **The sale's location** on the counter is the branch's first shop location by code, the one posting takes a sale from.
+- **An existing test** used `stock_balances` as its example of an unknown dataset; it now uses `item_costs`, which must never be one.
+- **Tests first** (all failed before the build):
+  - `apps/api/src/sync-stock.int.test.ts` (4 tests);
+  - `apps/pos/src/db/stock.test.ts` (9 tests, including the speed test: 50 results out of 20,000 items);
+  - 2 counter screen tests;
+  - in `e2e/counter.spec.ts`, a sale coming off the Shop.
+- **Checks:**
+  - `pnpm check`: 2,273 tests;
+  - `pnpm test:integration`: 460 tests;
+  - `pnpm e2e`: 59 passed.
