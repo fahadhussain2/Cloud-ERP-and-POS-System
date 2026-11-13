@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#155](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/155) |
 | **Module** | platform (with pos for the printed bill, and `packages/print`) |
-| **Status** | Built (2026-11-13), in review. Plan accepted by the owner (PR #156, answers 1–3: yes) |
+| **Status** | Done (2026-11-13): built in PR #157, released to production in PR #158, real header set and printed on production. Plan accepted by the owner (PR #156, answers 1–3: yes) |
 | **Refs** | PLT-01 (receipt header), POS-09 (what the bill shows); POS spec §13; data model (`tenants`, `branches`, `print_profiles`); D-083 (setup from a spec, never overwrites), D-106 (the label template, the same owner-only pattern); go-live checklist: *Bill header*, *Bill print test* |
 | **Depends on** | W1-06 (the printed bill), W1-17 (`admin.settings`, the owner-only settings pattern) |
 | **Size** | about 1 day |
@@ -88,3 +88,9 @@ The pilot on 1 Dec prints real bills to customers, and the W1-01 print test shou
 | A long line wraps or is cut on the A5 bill | The 60-character limit; the staging print test (Verify 2) on the real printer |
 | Someone changes the header by mistake | Owner only; every change in the audit log with before and after |
 | An offline counter prints the old header for a while | Expected: it prints the new one from its next pull. The header is not a business rule, so nothing is refused or reconciled |
+
+## Results (2026-11-13)
+
+- **Built** in PR #157. `pnpm check` (2,257 tests), `pnpm test:integration` (446) and `pnpm e2e` (58) passed, and CI was green. The new e2e flow caught a reprint that printed the header loaded when the counter screen opened; a reprint now reads it fresh.
+- **On staging** (Verify 2): the owner changed the `demo` shop's name and header, printed and reprinted bills, then put them back. Passed.
+- **On production** (Verify 3): released in PR #158 (no migrations; version `a4d19588…`). The owner typed Delux's real name, address and phone in Shop → *Shop and bill*, and a print on a production counter showed the real header.
