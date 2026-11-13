@@ -44,6 +44,7 @@
     },
     "staff": "Staff",
     "counters": "Counters",
+    "shopSettings": "Shop and bill",
     "signOut": "Sign out",
     "signedIn": "Signed in",
     "dayReconciliation": "Day reconciliation",
@@ -224,6 +225,31 @@
       "download": "Download",
       "help": "A manager sends them from the counter (Alt+S, Send diagnostics). Kept 30 days."
     }
+  },
+  "shop": {
+    "title": "Shop and bill",
+    "help": "The shop's name and the lines printed at the top and bottom of every bill and desk slip. Counters print the change from their next sync; bills already printed stay as they were.",
+    "branch": "Branch: {{name}}",
+    "fields": {
+      "name": "Shop name",
+      "address": "Address",
+      "phone": "Phone",
+      "line1": "Extra line 1",
+      "line2": "Extra line 2",
+      "line3": "Extra line 3",
+      "policy": "Policy line"
+    },
+    "policyHint": "Printed at the bottom of the bill. Leave empty for the default.",
+    "defaultPolicy": "Exchange or return within 30 days with this bill.",
+    "preview": "Bill preview",
+    "problems": {
+      "nameRequired": "The shop needs a name.",
+      "tooLong": "At most {{max}} characters, to fit on one line of the bill."
+    },
+    "save": "Save",
+    "saved": "Saved. Counters print it from their next sync.",
+    "refused": "Not saved: only the owner can change the shop's name and bill.",
+    "failed": "Not saved. Check the fields and try again."
   },
   "reports": {
     "branch": "Branch",

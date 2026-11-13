@@ -1026,3 +1026,14 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** a refund must be recorded where the money really went; a void only undoes a bill that never brought money in. The give-back is the only way *Cash in transit* and the drawer agree again after a clash, and the second PIN stops a cashier and a salesman together from voiding a paid bill and taking its cash.
 - **Trade-off:** a void of a bill with a JazzCash, card or bank payment always asks a question; the voided bill's cash isn't used for its reissue in one step (the reissue is collected from the queue as usual); an early refund isn't blocked offline, only flagged after sync; handover confirmation stays **Required** for Delux (D-049).
 - **Status:** Accepted (with the W1-23 plan, owner answers 1–4). Amends D-099.
+
+### D-112 The shop's name and bill header are the owner's once the shop exists (2026-11-13)
+- **Context:** W1-25, found after the Wave 1 release: production still said *Delux Autos* (the shop is *Delux City Auto Corner*) and the bill header was empty, and nothing after setup could change either. D-083's setup never overwrites a live shop, and reported every difference from the spec as drift.
+- **Decision:**
+  - **The owner sets them in the back office** (Shop → *Shop and bill*, `admin.settings`): the shop name (`tenants.name`), the branch's address, phone and up to 3 extra header lines (`branches.receipt_header.lines`), and the bill's policy line (the default print profile's `template_options.policyText`; empty = the default). Each line up to 60 characters, to fit the A5 bill (owner answer 2). One audited transaction; the counters and the cash desk pull and print it from their next sync.
+  - **The header's order is one rule,** `billHeaderLines` in `packages/print` (address, phone, extra lines, then the profile's own `headerLines`), used by the counter, the cash desk and the back office's preview.
+  - **Setup no longer reports these fields as drift.** A spec still gives a new shop its first name and header; after that they're the shop's. The branch's own name, the legal name and the rest of the print profile are still compared with the spec.
+  - **Bills already printed don't change;** a reprint prints the header as it is now (the header isn't part of the bill's data, rule 3).
+- **Why:** the name and header are what customers see on every bill, and the shop changes them (a new phone, a new line) without support or a release.
+- **Trade-off:** the spec in git can differ from a live shop's name and header without anyone being told; the audit log is the record of what changed. The shop code (`delux`) and the POS origin never change (D-065).
+- **Status:** Accepted (with the W1-25 plan, owner answers 1–3). Amends D-083.

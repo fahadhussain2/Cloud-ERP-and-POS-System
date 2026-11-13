@@ -60,6 +60,8 @@ export interface ImportResult {
   unusedTables: string[];
   /** The shop's own details, for the bill header (no customer data, no credentials). */
   company: { field: string; value: string }[];
+  /** Queries sent to the app database: each waits one round trip, so this predicts a run over a tunnel (W1-24). */
+  queries: number;
 }
 
 /** Category defaults accepted in the PRD: floor = cost + 5% (Q2); returns within 30 days (Q3). */
@@ -157,6 +159,68 @@ async function readStaging(
 type Client = pg.PoolClient;
 const zero = (): GroupCount => ({ created: 0, updated: 0, unchanged: 0, retired: 0 });
 
+// The writes go in batches (W1-24): one query per up to BATCH rows, not one per row, because over the SSH
+// tunnel to production every query waits a round trip. The rows travel as one jsonb array and
+// jsonb_populate_recordset reads them with the table's own column types (arrays and jsonb included).
+const BATCH = 2000;
+const batches = <T>(rows: T[]): T[][] =>
+  Array.from({ length: Math.ceil(rows.length / BATCH) }, (_, i) => rows.slice(i * BATCH, (i + 1) * BATCH));
+
+/** Inserts the rows in batches. With `keyColumn`, returns the new ids by that key (from the rows, not by position). */
+async function insertRows(
+  c: Client,
+  tenantId: string,
+  table: string,
+  columns: string[],
+  rows: Record<string, unknown>[],
+  keyColumn?: string,
+): Promise<Map<string, string>> {
+  const ids = new Map<string, string>();
+  const cols = columns.join(', ');
+  for (const batch of batches(rows)) {
+    const r = await c.query<{ id: string; _key: string }>(
+      `INSERT INTO erp.${table} (tenant_id, ${cols})
+       SELECT $1, ${cols} FROM jsonb_populate_recordset(NULL::erp.${table}, $2::jsonb)
+       ${keyColumn ? `RETURNING id, ${keyColumn} AS _key` : ''}`,
+      [tenantId, JSON.stringify(batch)],
+    );
+    if (keyColumn) for (const row of r.rows) ids.set(row._key, row.id);
+  }
+  return ids;
+}
+
+/** Updates the changed columns, one batched query per set of changed columns. */
+async function updateRows(
+  c: Client,
+  table: string,
+  changes: { id: string; changed: string[]; values: Record<string, unknown> }[],
+): Promise<void> {
+  const bySet = new Map<string, typeof changes>();
+  for (const ch of changes) {
+    const set = ch.changed.join(',');
+    const group = bySet.get(set);
+    if (group) group.push(ch);
+    else bySet.set(set, [ch]);
+  }
+  for (const [set, group] of bySet) {
+    const cols = set.split(',');
+    for (const batch of batches(group))
+      await c.query(
+        `UPDATE erp.${table} t SET ${cols.map((col) => `${col} = v.${col}`).join(', ')}
+         FROM jsonb_populate_recordset(NULL::erp.${table}, $1::jsonb) v WHERE t.id = v.id`,
+        [
+          JSON.stringify(
+            batch.map((ch) => {
+              const row: Record<string, unknown> = { id: ch.id };
+              for (const col of cols) row[col] = ch.values[col];
+              return row;
+            }),
+          ),
+        ],
+      );
+  }
+}
+
 /**
  * Upserts `rows` into `table` by `keyOf`, comparing `columns` only: inserts what's missing, updates what
  * differs, leaves the rest untouched (no audit noise). Returns the ids by key.
@@ -179,29 +243,35 @@ async function upsert<R extends Record<string, unknown>>(
     ).rows.map((r) => [r._key, r]),
   );
   const ids = new Map([...existing].map(([k, r]) => [k, r.id]));
+  const toInsert: { key: string; values: R }[] = [];
+  const toUpdate: { id: string; changed: string[]; values: R }[] = [];
   for (const { key, values } of rows) {
     const old = existing.get(key);
     if (!old) {
-      const cols = ['tenant_id', ...columns];
-      const r = await c.query<{ id: string }>(
-        `INSERT INTO erp.${table} (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING id`,
-        [tenantId, ...columns.map((col) => values[col])],
-      );
-      ids.set(key, r.rows[0]!.id);
-      count.created += 1;
+      toInsert.push({ key, values });
       continue;
     }
     const changed = columns.filter((col) => canonical(old[col]) !== canonical(values[col]));
-    if (changed.length === 0) {
-      count.unchanged += 1;
-      continue;
-    }
-    await c.query(
-      `UPDATE erp.${table} SET ${changed.map((col, i) => `${col} = $${i + 2}`).join(', ')} WHERE id = $1`,
-      [old.id, ...changed.map((col) => values[col])],
-    );
-    count.updated += 1;
+    if (changed.length === 0) count.unchanged += 1;
+    else toUpdate.push({ id: old.id, changed, values });
   }
+  const created = await insertRows(
+    c,
+    tenantId,
+    table,
+    columns,
+    toInsert.map((r) => r.values),
+    keyColumn,
+  );
+  for (const { key } of toInsert) {
+    const id = created.get(key);
+    // The key the database computes must be the one the importer computed, or later steps would miss the row.
+    if (!id) throw new Error(`erp.${table}: the new row ${key} came back under another key`);
+    ids.set(key, id);
+  }
+  count.created += toInsert.length;
+  await updateRows(c, table, toUpdate);
+  count.updated += toUpdate.length;
   return ids;
 }
 
@@ -224,37 +294,31 @@ async function syncChildren(
   ).rows)
     existing.set(`${r.item_id}|${keyOf(r)}`, r);
   const seen = new Set<string>();
+  const toInsert: Record<string, unknown>[] = [];
+  const toUpdate: { id: string; changed: string[]; values: Record<string, unknown> }[] = [];
   for (const w of wanted) {
     const k = `${w.itemId}|${w.key}`;
     seen.add(k);
     const old = existing.get(k);
-    const values = { item_id: w.itemId, ...w.values };
+    const values: Record<string, unknown> = { item_id: w.itemId, ...w.values };
     if (!old) {
-      const cols = ['tenant_id', ...Object.keys(values)];
-      await c.query(
-        `INSERT INTO erp.${table} (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')})`,
-        [tenantId, ...Object.values(values)],
-      );
-      count.created += 1;
+      toInsert.push(values);
       continue;
     }
-    const changed = columns.filter(
-      (col) => canonical(old[col]) !== canonical(values[col as keyof typeof values]),
-    );
+    const changed = columns.filter((col) => canonical(old[col]) !== canonical(values[col]));
     if (changed.length === 0) count.unchanged += 1;
-    else {
-      await c.query(
-        `UPDATE erp.${table} SET ${changed.map((col, i) => `${col} = $${i + 2}`).join(', ')} WHERE id = $1`,
-        [old.id, ...changed.map((col) => values[col as keyof typeof values])],
-      );
-      count.updated += 1;
-    }
+    else toUpdate.push({ id: old.id, changed, values });
   }
-  for (const [k, old] of existing) {
-    if (seen.has(k) || !itemIds.has(old.item_id)) continue;
-    await c.query(`UPDATE erp.${table} SET deleted_at = now() WHERE id = $1`, [old.id]);
-    count.retired += 1;
-  }
+  await insertRows(c, tenantId, table, ['item_id', ...columns], toInsert);
+  count.created += toInsert.length;
+  await updateRows(c, table, toUpdate);
+  count.updated += toUpdate.length;
+  const retired = [...existing]
+    .filter(([k, old]) => !seen.has(k) && itemIds.has(old.item_id))
+    .map(([, old]) => old.id);
+  for (const batch of batches(retired))
+    await c.query(`UPDATE erp.${table} SET deleted_at = now() WHERE id = ANY($1::uuid[])`, [batch]);
+  count.retired += retired.length;
 }
 
 export async function importMasters(opts: ImportOptions): Promise<ImportResult> {
@@ -265,6 +329,15 @@ export async function importMasters(opts: ImportOptions): Promise<ImportResult> 
   const { staged, unusedTables } = await readStaging(opts.stagingUrl, opts.label, arCodes);
   const masters = buildMasters(staged, opts.mapping);
   const pool = new pg.Pool({ connectionString: opts.appUrl, max: 2 });
+  // Every query to the target, BEGIN and COMMIT included: over a tunnel each one waits a round trip (W1-24).
+  let queries = 0;
+  pool.on('connect', (client) => {
+    const send = client.query.bind(client) as (...args: unknown[]) => unknown;
+    (client as unknown as { query: (...args: unknown[]) => unknown }).query = (...args) => {
+      queries += 1;
+      return send(...args);
+    };
+  });
   try {
     const dir = await pool.query<{ tenant_id: string }>(
       'SELECT tenant_id FROM erp.tenant_directory WHERE code = $1',
@@ -296,6 +369,7 @@ export async function importMasters(opts: ImportOptions): Promise<ImportResult> 
       partyPhones: Object.fromEntries(masters.parties.map((p) => [p.code, p.phones.map(maskPhone)])),
       unusedTables,
       company: companyDetails(staged.company, staged.parameters),
+      queries,
     };
   } finally {
     await pool.end();

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Module** | devops (the release), with migration and pos for what follows it |
-| **Status** | Draft (2026-11-12), for the owner to accept |
+| **Status** | Released (2026-11-12, 18:47 Karachi) in PR #148: production runs `43b0b8a5`; setup and posting-check clean (results below). Left: the owner's click-through, the November restore drill (#95), then step 5 |
 | **Refs** | D-063 (releases after shop hours), D-065 (the POS origin never changes), D-075 (one image per tree, health check, roll back), D-080 (`main` moves only by releases; hourly deferred runs), D-090 (pilot from 1 Dec), D-101 (the pilot wipe); [GO-LIVE-CHECKLIST](../../../GO-LIVE-CHECKLIST.md); `infra/README.md` → Deploys |
 | **Depends on** | Every Wave 1 build task verified on staging (W1-02 to W1-23, done 2026-11-12) |
 | **Size** | the release itself is one evening, about 1 hour of watching and checks; the follow-ups are listed with who does them |
@@ -77,13 +77,31 @@
 
 | What | Who | When |
 |---|---|---|
-| The real masters on production (items, prices, customers, suppliers) from a dump, over an SSH tunnel as the app role (W1-14 owner answer 3) | owner, with Claude | after the release, before 1 Dec |
+| The real masters on production (items, prices, customers, suppliers) from a dump, over an SSH tunnel as the app role (W1-14 owner answer 3) | owner, with Claude | **done 2026-11-13** (`nov2026`, W1-24; posting-check clean) |
 | Bill header lines (address, phone) | owner gives them | before the print test |
 | W1-01 print test at the shop | owner | after the release, on a production counter or a staging one |
 | Label template (DCAC) and stock settings on production (W1-17, W1-18) | owner | after the masters |
 | Staff, roles and PINs on production; the storekeeper as Purchaser; the accountant, if any | owner | before 1 Dec |
 | The pilot counters and the cash desk enrolled on production (`infra/counter-setup.md`) | owner, with Claude | the last days of November |
 | The pilot opening from a late-November dump, then `posting-check prod delux` (W1-14 owner answers 2, 3) | owner, with Claude | by ~28 Nov |
+
+## Results (2026-11-12)
+
+The owner accepted the plan by asking to release the same day (questions 1 and 3), and chose to run the production commands themselves (question 2).
+
+| Step | Result |
+|---|---|
+| Before | Staging CI green; *Backup check* green (15:42 Karachi). Staging was redeployed at its tip twice (after the docs merges and after #147) so its tree matched `main` |
+| The release | #148 merged 18:26 Karachi; CI on `main` green; the deploy deferred (shop hours) |
+| **Forced deploy, 18:46** | **A one-off exception to D-063, with the owner's OK:** production has no users before the pilot, and the 24 Oct release had no checkout, so no counter could hold unsynced bills. From the pilot on 1 Dec, releases are after 20:00 again |
+| Deploy | Images reused (no build); `migrate: applied 16` (`0007` to `0022`); api, worker and web healthy; the internet check passed; no rollback. `/api/health` on both origins: `ok`, version `43b0b8a5` |
+| `releases.log` | `2026-11-12T13:47:00Z deploy 43b0b8a5… ok`, after the 24 Oct release `4fe3586a` |
+| `erp-tenant setup prod delux` | created account `1190`; bank transfer and Raast mapped to `hbl`; tax code `ZERO` the default; drift none; needs attention none. (It asks for the owner's password on every run but uses it only when it creates the owner: the existing password is unchanged) |
+| `erp-tenant posting-check prod delux` | *the ledgers match their documents* |
+| Click-through by the owner | to do |
+| Restore drill (#95) | to do, the next UTC day |
+
+Found on the way: the shop's name is *Delux Autos* in the tenant spec; the real one is *Delux City Auto Corner*. Nothing can change a live shop's name or bill header yet; it goes with the go-live checklist's bill header item (the owner: not now).
 
 ## When
 
