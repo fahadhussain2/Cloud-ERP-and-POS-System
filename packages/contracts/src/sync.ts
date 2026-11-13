@@ -189,6 +189,18 @@ export const RETURN_DATASETS = Object.keys(RETURN_COLUMNS) as ReturnDataset[];
 /** How far back the bills go (SYN-01). */
 export const RETURN_BILL_DAYS = 90;
 
+/**
+ * Stock on the counter (W1-27, POS-02): the device's branch's shop- and storage-kind locations (Shop, Godown; never
+ * Damaged or In transit) and their balances, keyed on the counter by item and location. Never cost or value.
+ */
+export const STOCK_COLUMNS = {
+  locations: { id: 'text', code: 'text', name: 'text', kind: 'text' },
+  stock_balances: { item_id: 'text', location_id: 'text', qty: 'qty' },
+} as const satisfies Record<string, Record<string, ColumnType>>;
+
+export type StockDataset = keyof typeof STOCK_COLUMNS;
+export const STOCK_DATASETS = Object.keys(STOCK_COLUMNS) as StockDataset[];
+
 export const PULL_DATASETS = [
   'tenant',
   'branch',
@@ -200,6 +212,7 @@ export const PULL_DATASETS = [
   ...(Object.keys(CUSTOMER_COLUMNS) as CustomerDataset[]),
   ...(Object.keys(CASH_DESK_COLUMNS) as CashDeskDataset[]),
   ...(Object.keys(RETURN_COLUMNS) as ReturnDataset[]),
+  ...(Object.keys(STOCK_COLUMNS) as StockDataset[]),
 ] as const;
 export type PullDataset =
   | 'tenant'
@@ -211,7 +224,8 @@ export type PullDataset =
   | CheckoutDataset
   | CustomerDataset
   | CashDeskDataset
-  | ReturnDataset;
+  | ReturnDataset
+  | StockDataset;
 
 export const PULL_LIMIT_DEFAULT = 500;
 export const PULL_LIMIT_MAX = 1000;

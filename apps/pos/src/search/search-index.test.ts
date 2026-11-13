@@ -47,6 +47,9 @@ describe('a search result', () => {
       status: 'active',
       price: 450000,
       rank: 1,
+      // The database worker fills in the stock (W1-27); the index knows whether the unit allows fractions.
+      fraction: false,
+      stock: [],
     });
   });
 

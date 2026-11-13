@@ -1,5 +1,5 @@
 import type { CatalogDataset } from '@erp/contracts';
-import { money, normalizeIdentifier, type Money, type NewLine } from '@erp/domain';
+import { money, normalizeIdentifier, type Money, type NewLine, type Qty } from '@erp/domain';
 
 import type { LineItem } from '../bill/open-bill';
 
@@ -14,6 +14,14 @@ export interface Vehicle {
   model: string | null;
   yearFrom: number | null;
   yearTo: number | null;
+}
+
+/** An item's quantity in one of the branch's shown locations (W1-27): the Shop or the Godown, in thousandths. */
+export interface StockQty {
+  locationId: string;
+  name: string;
+  kind: 'shop' | 'storage';
+  qty: Qty;
 }
 
 export interface SearchResult {
@@ -32,6 +40,10 @@ export interface SearchResult {
   price: number | null;
   /** 1 exact code or barcode · 2 exact identifier · 3 identifier prefix · 4 words. */
   rank: 1 | 2 | 3 | 4;
+  /** The unit allows fractions (METER, FOOT, LITRE): its stock shows decimals. */
+  fraction: boolean;
+  /** The Shop first, then the Godown (W1-27); filled in by the database worker, empty before the first pull. */
+  stock: StockQty[];
 }
 
 export interface Tier {
@@ -391,6 +403,8 @@ export class SearchIndex {
       status: String(item['status']),
       price: this.priceIn(e.id, tier),
       rank,
+      fraction: Boolean(this.rows.units.get(String(item['unit_id']))?.['allows_fraction']),
+      stock: [],
     };
   }
 }

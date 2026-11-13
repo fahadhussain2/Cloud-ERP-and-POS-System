@@ -10,6 +10,7 @@ import * as customers from './customers';
 import * as desk from './desk';
 import * as held from './held';
 import * as returns from './returns';
+import { stockFor } from './stock';
 import * as voids from './void';
 import { currentVersion, migrate } from './migrate';
 import * as outbox from './outbox';
@@ -67,7 +68,15 @@ const ops = {
     // After the last page of a pull, not each page: a first load is ~125 pages.
     if (args[2]) index.warm();
   },
-  search: (text: string, opts?: SearchOptions) => index.search(text, opts),
+  /** The search (POS spec §9) with each result's Shop and Godown stock, read for the shown results only (W1-27). */
+  search: (text: string, opts?: SearchOptions) => {
+    const results = index.search(text, opts);
+    const stock = stockFor(
+      open(),
+      results.map((r) => r.id),
+    );
+    return results.map((r) => ({ ...r, stock: stock.get(r.id) ?? [] }));
+  },
   /** The bill (POS spec §10): what a line takes from the catalog, the tiers, and each person's open bill. */
   tiers: () => index.tiers(),
   billItem: (itemId: string, tierId: string | null) => index.billItem(itemId, tierId),

@@ -107,7 +107,7 @@ POS-02, CAT-02. One search box (`F2`) on the counter screen; it works the same o
 - **At most 50 results.** Empty text shows a short hint instead of results.
 - A **scan** (characters typed faster than a person types, ending in Enter) adds the item it matches to the bill at once, even before the results are shown (§10).
 
-**Each result shows:** code, name, variant and spec, the first OEM number, the vehicle tag (*Corolla 2009–2014*), bin location, and the price in the bill's tier (§10; the default tier until another is chosen). Dormant and discontinued items carry a chip. Stock (Shop · Godown) is added with W1-08.
+**Each result shows:** code, name, variant and spec, the first OEM number, the vehicle tag (*Corolla 2009–2014*), bin location, and the price in the bill's tier (§10; the default tier until another is chosen). Dormant and discontinued items carry a chip. **Stock (W1-27):** the Shop and the Godown as `8 · 4`, headed with the locations' names. The Shop's 0 is amber when the Godown has some, below zero is red, none anywhere is grey. It is the pulled balance less this counter's own bills the balance can't include yet (the §15 rule): a sale comes off the Shop at once, offline too; a voided one gives it back; a resellable return adds; a held bill doesn't count. Every salesman sees it; it is information only and never refuses a sale (INV-03). No cost or floor on the counter.
 
 **Keys:** `F2` search · `↑ ↓` select · `Esc` clear · `Alt+L` lock. `Enter` adds the selected item to the bill (§10). Every key also appears in the key bar at the bottom, where it can be clicked (D-053). The full map is §11.
 

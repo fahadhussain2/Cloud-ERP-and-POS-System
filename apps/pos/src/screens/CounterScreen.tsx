@@ -84,7 +84,7 @@ import type { HeldBill } from '../db/held';
 import type { VoidListBill } from '../db/void';
 import type { DeskCheck } from '../sync/bills';
 import type { PrintJob } from '../print/print-job';
-import type { BillItem, SearchResult, Vehicle } from '../search/search-index';
+import type { BillItem, SearchResult, StockQty, Vehicle } from '../search/search-index';
 import {
   checkApprover,
   checkCreditApprover,
@@ -1339,9 +1339,14 @@ export function CounterScreen({
                   onKeyDown={onSearchKey}
                 />
               </div>
-              <div className="flex justify-between px-3.5 pb-1.5 text-[11.5px] text-muted-foreground">
-                <span>{count}</span>
-                <span>{t('search.priceHead')}</span>
+              <div className="flex gap-2.5 px-3.5 pb-1.5 text-[11.5px] text-muted-foreground">
+                <span className="me-auto">{count}</span>
+                {(results[0]?.stock.length ?? 0) > 0 && (
+                  <span className="min-w-[92px] text-end">
+                    {results[0]!.stock.map((s) => s.name).join(' · ')}
+                  </span>
+                )}
+                <span className="min-w-[76px] text-end">{t('search.priceHead')}</span>
               </div>
               {text.trim() === '' ? (
                 <p className="m-0 px-3.5 py-4 text-muted-foreground">{t('search.hint')}</p>
@@ -1368,7 +1373,7 @@ export function CounterScreen({
                   className="flex-1 px-1.5 pb-2"
                 >
                   {(r) => (
-                    <div className="grid grid-cols-[84px_minmax(0,1fr)_auto] items-center gap-2.5 px-2 py-[7px]">
+                    <div className="grid grid-cols-[84px_minmax(0,1fr)_auto_auto] items-center gap-2.5 px-2 py-[7px]">
                       <span className="font-mono text-[12.5px] font-semibold">{r.code}</span>
                       <span className="flex min-w-0 flex-col">
                         <span className="font-medium wrap-anywhere">
@@ -1390,6 +1395,7 @@ export function CounterScreen({
                             .join(' · ')}
                         </span>
                       </span>
+                      {r.stock.length > 0 ? <StockCell stock={r.stock} locale={money.locale} /> : <span />}
                       <span className="min-w-[76px] text-end font-semibold whitespace-nowrap tabular-nums">
                         {r.price === null ? (
                           <span className="font-normal text-muted-foreground">{t('search.noPrice')}</span>
@@ -1877,5 +1883,30 @@ export function CounterScreen({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * A search result's stock (W1-27, POS-02): the Shop, then the Godown, as `8 · 4`. The Shop's 0 is amber when the
+ * Godown has some (send someone to the godown), below zero is red, none anywhere is grey. Information only (INV-03).
+ */
+function StockCell({ stock, locale }: { stock: StockQty[]; locale: string }) {
+  const none = stock.every((s) => s.qty === 0);
+  const elsewhere = stock.some((s) => s.kind !== 'shop' && s.qty > 0);
+  const tone = (s: StockQty) =>
+    s.qty < 0 ? 'text-destructive' : s.kind === 'shop' && s.qty === 0 && elsewhere ? 'text-warn' : '';
+  return (
+    <span
+      data-testid="stock"
+      aria-label={stock.map((s) => `${s.name} ${formatQty(s.qty, locale)}`).join(', ')}
+      className={`min-w-[92px] text-end whitespace-nowrap tabular-nums ${none ? 'text-muted-foreground' : ''}`}
+    >
+      {stock.map((s, i) => (
+        <span key={s.locationId}>
+          {i > 0 && ' · '}
+          <span className={tone(s)}>{formatQty(s.qty, locale)}</span>
+        </span>
+      ))}
+    </span>
   );
 }

@@ -9,6 +9,8 @@ import {
   CUSTOMER_DATASETS,
   RETURN_COLUMNS,
   RETURN_DATASETS,
+  STOCK_COLUMNS,
+  STOCK_DATASETS,
   uuidv7,
   type CashDeskDataset,
   type CatalogDataset,
@@ -17,6 +19,7 @@ import {
   type ColumnType,
   type ReturnDataset,
   type PullResponse,
+  type StockDataset,
 } from '@erp/contracts';
 import { money, parseQty, type PinState, type RoleGrant, type RoleLimits } from '@erp/domain';
 
@@ -111,7 +114,8 @@ function fromSql(type: ColumnType, v: unknown): unknown {
 
 const catalogColumns = (d: CatalogDataset) => Object.entries(CATALOG_COLUMNS[d]) as [string, ColumnType][];
 
-type TypedDataset = CatalogDataset | CheckoutDataset | CustomerDataset | CashDeskDataset | ReturnDataset;
+type TypedDataset =
+  CatalogDataset | CheckoutDataset | CustomerDataset | CashDeskDataset | ReturnDataset | StockDataset;
 
 /**
  * Pulled datasets stored with exactly their typed columns: the catalog (W1-03), checkout (W1-06), customers (W1-09),
@@ -123,6 +127,7 @@ const TYPED_COLUMNS: Record<TypedDataset, Record<string, ColumnType>> = {
   ...CUSTOMER_COLUMNS,
   ...CASH_DESK_COLUMNS,
   ...RETURN_COLUMNS,
+  ...STOCK_COLUMNS,
 };
 const TYPED_DATASETS: TypedDataset[] = [
   ...CATALOG_DATASETS,
@@ -130,19 +135,26 @@ const TYPED_DATASETS: TypedDataset[] = [
   ...CUSTOMER_DATASETS,
   ...CASH_DESK_DATASETS,
   ...RETURN_DATASETS,
+  ...STOCK_DATASETS,
 ];
-/** Each row's key: `id`, except a customer's or supplier's balance (one per party) and an item's floor (W1-14). */
-const keyOf = (d: TypedDataset) =>
+/**
+ * Each row's key: `id`, except a customer's or supplier's balance (one per party), an item's floor (W1-14) and a stock
+ * balance (one per item and location, W1-27).
+ */
+const keysOf = (d: TypedDataset): string[] =>
   d === 'customer_balances' || d === 'supplier_balances'
-    ? 'party_id'
+    ? ['party_id']
     : d === 'item_floors'
-      ? 'item_id'
-      : 'id';
+      ? ['item_id']
+      : d === 'stock_balances'
+        ? ['item_id', 'location_id']
+        : ['id'];
+const keyOf = (d: TypedDataset) => keysOf(d).join(', ');
 
 const UPSERT = Object.fromEntries(
   TYPED_DATASETS.map((d) => {
     const names = [...Object.keys(TYPED_COLUMNS[d]), 'row_version'];
-    const updates = names.filter((n) => n !== keyOf(d)).map((n) => `${n} = excluded.${n}`);
+    const updates = names.filter((n) => !keysOf(d).includes(n)).map((n) => `${n} = excluded.${n}`);
     return [
       d,
       `INSERT INTO ${d} (${names.join(', ')}) VALUES (${names.map(() => '?').join(', ')})
@@ -157,7 +169,12 @@ function applyTyped(db: SqlDb, changes: PullResponse['changes']): void {
     const columns = Object.entries(TYPED_COLUMNS[d]);
     for (const r of changes[d] ?? []) {
       if (r['deleted_at'] !== null && r['deleted_at'] !== undefined) {
-        db.exec(`DELETE FROM ${d} WHERE ${keyOf(d)} = ?`, [required(r, keyOf(d))]);
+        db.exec(
+          `DELETE FROM ${d} WHERE ${keysOf(d)
+            .map((k) => `${k} = ?`)
+            .join(' AND ')}`,
+          keysOf(d).map((k) => required(r, k)),
+        );
         continue;
       }
       db.exec(UPSERT[d], [

@@ -104,7 +104,12 @@ A party that gets its customer account after its own row was pulled (a supplier 
 
 A voided bill comes once more with its status (a new `txid`, rule 8). Quantities are sent as numeric text (`-1.000`) and kept as whole thousandths on the counter (ColumnType `qty`).
 
-Stock balances are added by their task with the same rules.
+**Stock on the counter (W1-27, POS-02):** pulled by every device of the branch, scoped to **the device's branch and its shop- and storage-kind locations** (Shop, Godown; never Damaged or In transit). Never cost or value.
+
+| Dataset | Table | Columns |
+|---|---|---|
+| `locations` | `locations`, the branch's `shop` and `storage` kinds | `id, code, name, kind, row_version, deleted_at` |
+| `stock_balances` | `stock_balances` of those locations | `item_id, location_id, qty, row_version, deleted_at` (keyed by item and location on the counter; `qty` as numeric text, kept as thousandths). Posting gives every changed balance a new `txid`, so a sale anywhere reaches every online counter with the nudge |
 
 **Bootstrap:** the first pull simply starts from the beginning, in full pages of 1,000 rows (about 125k catalog rows for Delux). An interrupted first load resumes from the last committed page. Measured in W1-03 on the real catalog: **31 seconds** from setup to search, under the 60-second rule, so there is no snapshot download. Revisit if a tenant's catalog is much larger.
 

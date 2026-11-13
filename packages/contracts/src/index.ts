@@ -86,6 +86,8 @@ export {
   PULL_DATASETS,
   PULL_LIMIT_DEFAULT,
   PULL_LIMIT_MAX,
+  STOCK_COLUMNS,
+  STOCK_DATASETS,
   TemporaryPinRequest,
   type CashDeskDataset,
   type ReturnDataset,
@@ -95,6 +97,7 @@ export {
   type ColumnType,
   type PullDataset,
   type PullResponse,
+  type StockDataset,
 } from './sync';
 export type {
   AcknowledgementStatus,
