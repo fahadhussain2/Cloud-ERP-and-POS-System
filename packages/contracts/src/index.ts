@@ -134,6 +134,7 @@ export {
   AddNameRequest,
   CreateItemRequest,
   IdentifierKind,
+  ITEM_LEVEL_FILTERS,
   ItemStatus,
   SetIdentifiersRequest,
   SetPricesRequest,
@@ -143,8 +144,10 @@ export {
   VehicleTag,
   type CatalogLookups,
   type ItemDetail,
+  type ItemLevelFilter,
   type ItemList,
   type ItemRow,
+  type StockLevel,
 } from './catalog';
 export {
   CreateSupplierRequest,

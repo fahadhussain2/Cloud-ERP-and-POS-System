@@ -85,6 +85,12 @@ export type UpdateCategoryRequest = z.infer<typeof UpdateCategoryRequest>;
 /** A brand, origin or vehicle make added while editing an item. */
 export const AddNameRequest = z.strictObject({ name: z.string().trim().min(1).max(60) });
 
+/** An item's stock against its minimum (W1-26): out at 0 or below, low at or below the minimum, else ok. */
+export type StockLevel = 'out' | 'low' | 'ok';
+/** The items list's level filter: `below` is any shown location below zero (INV-03). */
+export const ITEM_LEVEL_FILTERS = ['low', 'out', 'below'] as const;
+export type ItemLevelFilter = (typeof ITEM_LEVEL_FILTERS)[number];
+
 export interface ItemRow {
   id: string;
   code: string;
@@ -93,10 +99,24 @@ export interface ItemRow {
   category: string;
   status: ItemStatus;
   retail: number | null;
+  /** The unit's code (PCS, SET, METER), and whether it allows fractions. */
+  unit: string;
+  fraction: boolean;
+  /** Thousandths per shown location id (`ItemList.locations`); a location with no balance is left out. */
+  stock: Record<string, number>;
+  /** On Shop + Godown (the shown locations) against `items.min_qty`. */
+  level: StockLevel;
+  /** Only with cost.view: the average cost (null = none yet) and the stock value of the shown locations. */
+  avgCost?: number | null;
+  value?: number;
 }
 export interface ItemList {
   items: ItemRow[];
   total: number;
+  /** The shop- and storage-kind locations, the shop first (W1-26): the list's quantity columns. */
+  locations: { id: string; name: string }[];
+  /** Only with cost.view: the stock value of every item the search matches, not only this page. */
+  totalValue?: number;
 }
 
 export interface ItemDetail {
@@ -177,5 +197,12 @@ export interface CatalogLookups {
   /** How the shop writes money (CLAUDE.md rule 10). */
   money: { locale: string; currency: string; minorUnits: number };
   /** printLabels: cat.label.print, a relabel from the items list (W1-17). */
-  can: { editItems: boolean; editPrices: boolean; viewCost: boolean; printLabels: boolean };
+  can: {
+    editItems: boolean;
+    editPrices: boolean;
+    viewCost: boolean;
+    printLabels: boolean;
+    /** Can open the stock card (inv.transfer, inv.adjust or cost.view), so the list links its quantities. */
+    stockCard: boolean;
+  };
 }
