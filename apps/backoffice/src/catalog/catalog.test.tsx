@@ -167,17 +167,17 @@ const show = (ui: React.ReactElement) => render(<I18nextProvider i18n={i18n}>{ui
 afterEach(cleanup);
 
 describe('the item list', () => {
-  it('lists items with their Retail price, searches as you type and warns until go-live', async () => {
+  it('lists items with their Retail price and searches as you type, with no go-live notice (D-113)', async () => {
     const f = fakeApi(lookups());
     show(<ItemsScreen api={f.api} />);
     expect(await screen.findByRole('link', { name: 'ABEA001' })).toBeDefined();
     expect(screen.getByText(/4,000/)).toBeDefined();
-    expect(screen.getByText(en.catalog.notLive.title)).toBeDefined();
+    expect(screen.queryByText(/legacy app/i)).toBeNull();
     fireEvent.change(screen.getByLabelText(en.catalog.items.search), { target: { value: '16620 22010' } });
     await waitFor(() => expect(f.calls.some((c) => c.path.includes('q=16620+22010'))).toBe(true));
   });
 
-  it('shows no notice once the shop is live, and no New item without cat.item.edit', async () => {
+  it('shows no New item without cat.item.edit', async () => {
     const f = fakeApi(
       lookups({
         live: true,
@@ -186,7 +186,6 @@ describe('the item list', () => {
     );
     show(<ItemsScreen api={f.api} />);
     expect(await screen.findByRole('link', { name: 'ABEA001' })).toBeDefined();
-    expect(screen.queryByText(en.catalog.notLive.title)).toBeNull();
     expect(screen.queryByRole('link', { name: en.catalog.items.add })).toBeNull();
     // Nor a relabel without cat.label.print.
     expect(screen.queryByRole('checkbox', { name: 'Label ABEA001' })).toBeNull();

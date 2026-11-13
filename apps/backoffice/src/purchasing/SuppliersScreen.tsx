@@ -26,7 +26,6 @@ import { moneyValue } from '../catalog/data';
 import { href, navigate } from '../router';
 import { purchasingRefusal, today, usePurchasingLookups } from './data';
 import { FormDialog } from '../staff/dialogs';
-import { PurchasingNotice } from './PurchasingNotice';
 
 // Suppliers (W1-16, PUR-01, PUR-09): the list with what the shop owes each, a supplier's details (terms, the label
 // abbreviation for W1-17), the ledger with its running balance, and a payment by bank (owner and accountant, owner
@@ -72,7 +71,6 @@ export function SuppliersScreen({ api }: { api: Api }) {
           )
         }
       />
-      <PurchasingNotice lookups={lookups} />
       {message && (
         <Alert variant={message.error ? 'destructive' : 'default'}>
           <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>

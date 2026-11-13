@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../api';
 import { href } from '../router';
 import { catalogRefusal, moneyText, moneyValue, NONE, useLookups } from './data';
-import { LiveNotice } from './LiveNotice';
 
 // A new item (W1-15, CAT-01): code, name, category and unit; its barcode = its code is added by the server. The owner
 // also prices it, with Mechanic and Wholesale proposed at −5 % and −10 % of Retail (PRD Q1); a manager adds it
@@ -82,7 +81,6 @@ export function NewItemScreen({ api }: { api: Api }) {
   return (
     <>
       <PageHeader eyebrow={back} title={t('catalog.newItem.title')} help={t('catalog.newItem.help')} />
-      <LiveNotice lookups={lookups} />
       <Panel>
         <form className="flex flex-col gap-3.5 p-3.5" onSubmit={(e) => void submit(e)}>
           <div className="grid gap-3.5 md:grid-cols-2">

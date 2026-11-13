@@ -48,7 +48,7 @@ test('the owner records a supplier bill with a bill discount, returns part of it
 
   // The supplier.
   await menu(page, bo.nav.suppliers);
-  await expect(page.getByText(bo.purchasing.notLive.title)).toBeVisible();
+  await expect(page.getByText(/legacy app/i)).toHaveCount(0); // no go-live notice (D-113)
   await page.getByRole('button', { name: bo.purchasing.suppliers.add }).click();
   // Add supplier opens a dialog (owner review, 2026-11-07).
   const form = page.getByRole('dialog');

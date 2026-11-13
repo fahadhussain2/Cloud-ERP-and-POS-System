@@ -57,7 +57,7 @@ test('the manager moves and corrects stock; a large loss waits for the owner', a
 
   // 5 cans from the Shop to the Godown: the route moves at once.
   await menu(page, bo.nav.transfers);
-  await expect(page.getByText(bo.inventory.notLive.title)).toBeVisible();
+  await expect(page.getByText(/legacy app/i)).toHaveCount(0); // no go-live notice (D-113)
   await page.getByRole('link', { name: bo.inventory.transfers.add }).click();
   await page.getByLabel(bo.inventory.fields.from).selectOption({ label: 'Shop' });
   await page.getByLabel(bo.inventory.fields.to).selectOption({ label: 'Godown' });

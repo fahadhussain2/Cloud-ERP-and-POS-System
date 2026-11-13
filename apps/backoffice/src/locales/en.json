@@ -524,10 +524,6 @@
     }
   },
   "catalog": {
-    "notLive": {
-      "title": "Change items in the legacy app until go-live",
-      "text": "Until the shop is live, the final import from the legacy app replaces the catalog. Changes made here before then are overwritten."
-    },
     "items": {
       "title": "Items",
       "help": "Find an item by its code, name, brand, barcode or OEM number, as on the counter. Stock is what has posted: a counter's sales count once it syncs.",
@@ -778,10 +774,6 @@
     "deleteTitle": "Delete {{name}}?",
     "deleteText": "Only for a customer added by mistake and never used.",
     "deleted": "{{name}} deleted.",
-    "notLive": {
-      "title": "Imported from the legacy app",
-      "text": "Until go-live, change this customer in the legacy app or the mapping file: the next import overwrites changes made here. Customers added here are never touched by an import."
-    },
     "ledger": {
       "title": "Ledger",
       "empty": "Nothing on this customer's account yet.",
@@ -820,10 +812,6 @@
     }
   },
   "purchasing": {
-    "notLive": {
-      "title": "Enter purchases in the legacy app until go-live",
-      "text": "Until the shop is live, purchases go into the legacy app. Receipts, returns and payments entered here before then are practice: they are removed before go-live."
-    },
     "cancel": "Cancel",
     "draft": "Draft",
     "posted": "Posted",
@@ -1078,10 +1066,6 @@
     "pick": "Label {{code}}"
   },
   "inventory": {
-    "notLive": {
-      "title": "Move and correct stock in the legacy app until go-live",
-      "text": "Until the shop is live, transfers and adjustments go into the legacy app. The ones entered here before then are practice: they are removed before go-live."
-    },
     "inTransit": "In transit",
     "draft": "Draft",
     "saveDraft": "Save draft",
@@ -1257,10 +1241,6 @@
   },
   "accounting": {
     "cancel": "Cancel",
-    "notLive": {
-      "title": "Until go-live the books stay in the legacy app",
-      "text": "Anything entered here during the pilot is removed by the pilot wipe before go-live."
-    },
     "types": {
       "customer_receipt": "Bank receipt",
       "expense": "Expense",

@@ -21,7 +21,6 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { href } from '../router';
-import { LiveNotice } from './LiveNotice';
 import { NONE, qtyText, useLookups } from './data';
 
 // Items (W1-15, CAT-01, CAT-02): one search over code, name, brand and every barcode or OEM number, as on the counter,
@@ -132,7 +131,6 @@ export function ItemsScreen({ api }: { api: Api }) {
           </span>
         }
       />
-      {lookups && <LiveNotice lookups={lookups} />}
       <Panel className="flex flex-wrap items-end gap-3 p-3.5">
         <div className="flex min-w-64 flex-1 flex-col gap-1">
           <label htmlFor={searchId} className={LABEL_CLASS}>

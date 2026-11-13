@@ -798,7 +798,7 @@ test('the owner changes a price and adds an item in the back office; the counter
   const bop = await office.newPage();
   await signIn(bop, OWNER.username, OWNER_PASSWORD);
   await bop.getByRole('navigation', { name: bo.nav.menu }).getByRole('link', { name: bo.nav.items }).click();
-  await expect(bop.getByText(bo.catalog.notLive.title)).toBeVisible();
+  await expect(bop.getByText(/legacy app/i)).toHaveCount(0); // no go-live notice (D-113)
   await bop.getByLabel(bo.catalog.items.search).fill('enol001');
   await bop.getByRole('link', { name: 'ENOL001' }).click();
   await bop.getByLabel('Retail').fill('7200');
