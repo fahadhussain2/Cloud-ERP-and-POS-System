@@ -40,7 +40,7 @@ const lookups = (over: Partial<CatalogLookups> = {}): CatalogLookups => ({
   suppliers: [],
   live: false,
   money: MONEY,
-  can: { editItems: true, editPrices: true, viewCost: true, printLabels: true },
+  can: { editItems: true, editPrices: true, viewCost: true, printLabels: true, stockCard: true },
   ...over,
 });
 const DETAIL: ItemDetail = {
@@ -91,6 +91,64 @@ const DETAIL: ItemDetail = {
   ],
 };
 
+// Shop 8 and Godown 4 of the bearing at Rs 3,000; a dormant lamp with none; 4.5 m of hose, 2 m below zero in the
+// godown (W1-26).
+const LIST: ItemList = {
+  total: 3,
+  locations: [
+    { id: 'l-shop', name: 'Shop' },
+    { id: 'l-godown', name: 'Godown' },
+  ],
+  totalValue: 3_684_500,
+  items: [
+    {
+      id: 'i1',
+      code: 'ABEA001',
+      name: 'ADJUSTER BEARING SALOON',
+      brand: 'CHINA',
+      category: 'Adjuster bearings',
+      status: 'active',
+      retail: 400000,
+      unit: 'PCS',
+      fraction: false,
+      stock: { 'l-shop': 8000, 'l-godown': 4000 },
+      level: 'ok',
+      avgCost: 300000,
+      value: 3_600_000,
+    },
+    {
+      id: 'i2',
+      code: 'HLMP007',
+      name: 'HEAD LAMP CULTUS',
+      brand: null,
+      category: 'Lamps',
+      status: 'dormant',
+      retail: 950000,
+      unit: 'PCS',
+      fraction: false,
+      stock: {},
+      level: 'out',
+      avgCost: null,
+      value: 0,
+    },
+    {
+      id: 'i3',
+      code: 'HOSE001',
+      name: 'BRAKE HOSE',
+      brand: 'GENUINE',
+      category: 'Hoses',
+      status: 'active',
+      retail: 52000,
+      unit: 'METER',
+      fraction: true,
+      stock: { 'l-shop': 4500, 'l-godown': -2000 },
+      level: 'low',
+      avgCost: 33800,
+      value: 84500,
+    },
+  ],
+};
+
 function fakeApi(l: CatalogLookups, answers: Record<string, { status: number; body: unknown }> = {}) {
   const calls: { method: string; path: string; body: unknown }[] = [];
   const api: Api = (method, path, body) => {
@@ -99,23 +157,7 @@ function fakeApi(l: CatalogLookups, answers: Record<string, { status: number; bo
     if (answers[key]) return Promise.resolve(answers[key]);
     if (key === 'GET /api/catalog/lookups') return Promise.resolve({ status: 200, body: l });
     if (key === 'GET /api/catalog/items/i1') return Promise.resolve({ status: 200, body: DETAIL });
-    if (key === 'GET /api/catalog/items') {
-      const list: ItemList = {
-        total: 1,
-        items: [
-          {
-            id: 'i1',
-            code: 'ABEA001',
-            name: 'ADJUSTER BEARING SALOON',
-            brand: 'CHINA',
-            category: 'Adjuster bearings',
-            status: 'active',
-            retail: 400000,
-          },
-        ],
-      };
-      return Promise.resolve({ status: 200, body: list });
-    }
+    if (key === 'GET /api/catalog/items') return Promise.resolve({ status: 200, body: LIST });
     return Promise.resolve({ status: 200, body: { rowVersion: '42' } });
   };
   return { api, calls };
@@ -139,7 +181,7 @@ describe('the item list', () => {
     const f = fakeApi(
       lookups({
         live: true,
-        can: { editItems: false, editPrices: true, viewCost: true, printLabels: false },
+        can: { editItems: false, editPrices: true, viewCost: true, printLabels: false, stockCard: true },
       }),
     );
     show(<ItemsScreen api={f.api} />);
@@ -157,6 +199,109 @@ describe('the item list', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Label ABEA001' }));
     const ready = screen.getByRole('link', { name: `${en.labels.makeLabels} (1)` });
     expect(ready.getAttribute('href')).toBe('#/catalog/labels/items/i1');
+  });
+});
+
+describe('the item list with its stock (W1-26)', () => {
+  const header = () =>
+    screen
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent ?? '')
+      .filter((x) => x !== '');
+
+  it('shows each item on one line: unit, cost, sale price, Shop, Godown, stock value and level, with a total', async () => {
+    show(<ItemsScreen api={fakeApi(lookups()).api} />);
+    await screen.findByRole('link', { name: 'ABEA001' });
+    expect(header()).toEqual([
+      en.catalog.fields.code,
+      en.catalog.items.item,
+      en.catalog.fields.brand,
+      en.catalog.items.unit,
+      en.catalog.items.cost,
+      en.catalog.items.salePrice,
+      'Shop',
+      'Godown',
+      en.catalog.items.value,
+      en.catalog.items.level,
+    ]);
+    const bearing = screen.getByRole('row', { name: /ABEA001/ });
+    const cells = within(bearing)
+      .getAllByRole('cell')
+      .map((c) => c.textContent);
+    expect(cells).toEqual([
+      '',
+      'ABEA001',
+      'ADJUSTER BEARING SALOON',
+      'CHINA',
+      'PCS',
+      expect.stringMatching(/3,000/),
+      expect.stringMatching(/4,000/),
+      '8',
+      '4',
+      expect.stringMatching(/36,000/),
+      en.catalog.items.levels.ok,
+    ]);
+    // A quantity opens the item's stock card.
+    expect(within(bearing).getByRole('link', { name: '8' }).getAttribute('href')).toBe('#/stock/card/i1');
+    // The total counts every match, not only this page.
+    expect(screen.getByText(en.catalog.items.totalValue).closest('tr')?.textContent).toMatch(/36,845/);
+  });
+
+  it('shows a chip only for an item that is not active, a quantity below zero in red, and decimals for a fractional unit', async () => {
+    show(<ItemsScreen api={fakeApi(lookups()).api} />);
+    await screen.findByRole('link', { name: 'ABEA001' });
+    const table = screen.getByRole('table', { name: en.catalog.items.title });
+    expect(within(table).queryByText(en.catalog.status.active)).toBeNull();
+    const lamp = screen.getByRole('row', { name: /HLMP007/ });
+    expect(within(lamp).getByText(en.catalog.status.dormant)).toBeDefined();
+    expect(within(lamp).getByText(en.catalog.items.levels.out)).toBeDefined();
+    expect(within(lamp).getByText(en.catalog.items.noCost)).toBeDefined();
+    const hose = screen.getByRole('row', { name: /HOSE001/ });
+    expect(within(hose).getByRole('link', { name: '4.5' })).toBeDefined();
+    const below = within(hose).getByRole('link', { name: '-2' });
+    expect(below.className).toMatch(/text-destructive/);
+    expect(within(hose).getByText(en.catalog.items.levels.low)).toBeDefined();
+  });
+
+  it('hides the cost and the value without cost.view, and links no quantity without the stock card', async () => {
+    const plain: ItemList = {
+      total: LIST.total,
+      locations: LIST.locations,
+      items: LIST.items.map((i) => {
+        const r = { ...i };
+        delete r.avgCost;
+        delete r.value;
+        return r;
+      }),
+    };
+    const f = fakeApi(
+      lookups({
+        can: { editItems: true, editPrices: false, viewCost: false, printLabels: false, stockCard: false },
+      }),
+      { 'GET /api/catalog/items': { status: 200, body: plain } },
+    );
+    show(<ItemsScreen api={f.api} />);
+    await screen.findByRole('link', { name: 'ABEA001' });
+    expect(header()).not.toContain(en.catalog.items.cost);
+    expect(header()).not.toContain(en.catalog.items.value);
+    expect(screen.queryByText(en.catalog.items.totalValue)).toBeNull();
+    const bearing = screen.getByRole('row', { name: /ABEA001/ });
+    expect(within(bearing).queryByRole('link', { name: '8' })).toBeNull();
+    expect(within(bearing).getByText('8')).toBeDefined();
+  });
+
+  it('filters by level and sorts by a column, then the other way', async () => {
+    const f = fakeApi(lookups());
+    show(<ItemsScreen api={f.api} />);
+    await screen.findByRole('link', { name: 'ABEA001' });
+    fireEvent.change(screen.getByLabelText(en.catalog.items.level), { target: { value: 'low' } });
+    await waitFor(() => expect(f.calls.some((c) => c.path.includes('level=low'))).toBe(true));
+    fireEvent.click(screen.getByRole('button', { name: en.catalog.items.value }));
+    await waitFor(() => expect(f.calls.some((c) => c.path.includes('sort=value&dir=desc'))).toBe(true));
+    fireEvent.click(screen.getByRole('button', { name: en.catalog.items.value }));
+    await waitFor(() => expect(f.calls.some((c) => c.path.includes('sort=value&dir=asc'))).toBe(true));
+    fireEvent.click(screen.getByRole('button', { name: 'Godown' }));
+    await waitFor(() => expect(f.calls.some((c) => c.path.includes('sort=l-godown&dir=desc'))).toBe(true));
   });
 });
 
@@ -196,7 +341,9 @@ describe('an item', () => {
     const noCost: ItemDetail = { ...DETAIL };
     delete noCost.cost;
     const f = fakeApi(
-      lookups({ can: { editItems: true, editPrices: false, viewCost: false, printLabels: false } }),
+      lookups({
+        can: { editItems: true, editPrices: false, viewCost: false, printLabels: false, stockCard: true },
+      }),
       {
         'GET /api/catalog/items/i1': { status: 200, body: noCost },
       },
@@ -250,7 +397,15 @@ describe('a new item', () => {
       <NewItemScreen
         api={
           fakeApi(
-            lookups({ can: { editItems: true, editPrices: false, viewCost: false, printLabels: false } }),
+            lookups({
+              can: {
+                editItems: true,
+                editPrices: false,
+                viewCost: false,
+                printLabels: false,
+                stockCard: true,
+              },
+            }),
           ).api
         }
       />,

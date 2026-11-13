@@ -530,13 +530,31 @@
     },
     "items": {
       "title": "Items",
-      "help": "Find an item by its code, name, brand, barcode or OEM number, as on the counter.",
+      "help": "Find an item by its code, name, brand, barcode or OEM number, as on the counter. Stock is what has posted: a counter's sales count once it syncs.",
       "add": "New item",
       "search": "Search",
       "searchHint": "Code, name words, barcode or OEM number",
       "all": "All",
       "empty": "No items match.",
       "retail": "Retail",
+      "item": "Item",
+      "unit": "Unit",
+      "cost": "Cost",
+      "salePrice": "Sale price",
+      "value": "Stock value",
+      "noCost": "No cost",
+      "level": "Level",
+      "levels": {
+        "ok": "OK",
+        "low": "Low",
+        "out": "Out"
+      },
+      "levelFilters": {
+        "low": "Low",
+        "out": "Out",
+        "below": "Below zero"
+      },
+      "totalValue": "Stock value of all matches (Shop and Godown)",
       "count": "{{count}} items · page {{page}} of {{pages}}",
       "previous": "Previous",
       "next": "Next"

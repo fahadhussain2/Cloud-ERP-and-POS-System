@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#160](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/160) |
 | **Module** | catalog (reads the inventory module's balances and costs) |
-| **Status** | Draft (2026-11-14), for the owner to accept |
+| **Status** | Built (2026-11-14), in review. Plan accepted by the owner (PR #161, answers 1–3: yes) |
 | **Refs** | CAT-01 (unit, min quantity, status), INV-01 (stock balances), INV-02 (average cost), INV-03 (negative stock), RPT-05 (stock and valuation); D-017 (one average per item); W1-15 (the items list), W1-18 (the stock card) |
 | **Depends on** | W1-15 (the items list), W1-08 (balances and average cost), W1-18 (the stock card) |
 | **Size** | about half a day to a day |
@@ -95,3 +95,10 @@ The back office's items list (Catalog → Items) shows **Code, Name, Brand, Cate
 | Until the pilot opening every item shows *Out* | Expected; noted in Verify 3. The level means something once the opening is loaded |
 | The legacy minimums are stale or 0 for many items | Items without a minimum show only Out/OK; the owner fixes minimums in the item screen, and the review list can flag them later |
 | Cost shows to someone who shouldn't see it | The API leaves it out without `cost.view`, tested |
+
+## Results (2026-11-14)
+
+- **Built** as planned. The list's query reads the balances of the shop- and storage-kind locations in one pass per item, and returns one row even past the last page, so the count and the total value always come back.
+- **Without `cost.view`,** a sort by value falls back to the code order.
+- **Tests first:** `apps/api/src/items-list.int.test.ts` (10 tests), 4 new screen tests in `catalog.test.tsx`, and a new flow in `e2e/stock.spec.ts`. All failed before the build.
+- **Checks:** `pnpm check` (2,261 tests), `pnpm test:integration` (456) and `pnpm e2e` (59) passed.
