@@ -455,6 +455,14 @@ test('F7 changes the price tier, D gives a bill discount, and one below the floo
   await page.keyboard.press('Escape');
   await expect(billPanel(page)).toContainText(pos.bill.billNeedsApproval);
   await expect(total(page)).toHaveText(/Rs\s3,975/);
+
+  // The bill shows each change at once and is saved a moment later. The next flow opens a new page and expects this
+  // bill, so this one ends only once a lock and an unlock have read it back from the counter's database: the database
+  // worker handles one request at a time, so that read comes after every save. Without this, a slow CI machine closed
+  // the page before the last saves and the next flow found Rs 4,062 or Rs 4,500 (CI, 2026-11-13 and 2026-11-14).
+  await page.keyboard.press('Alt+L');
+  await unlockAs(page, SALESMAN.fullName, OWN_PIN);
+  await expect(total(page)).toHaveText(/Rs\s3,975/);
 });
 
 test('F5 does not reload; the bill waits for the same person after a lock, and another person has their own', async ({

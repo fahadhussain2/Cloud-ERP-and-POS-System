@@ -103,6 +103,7 @@ export function App({ api }: { api: Api }) {
   return (
     <Shell
       fullName={me.user.fullName}
+      username={me.user.username}
       permissions={me.permissions}
       route={shown ?? route}
       onSignOut={() => void signOut()}
