@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#168](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/168) |
 | **Module** | platform (the back-office layout from W1-04; touches no other module's screens) |
-| **Status** | Plan accepted by the owner (2026-11-14, PR #169, answers 1–3: yes, as recommended). Not built yet. The look is agreed from the [mockup](https://claude.ai/artifact/EBa8edxXQzJLAxXboErgWU) (expanded and collapsed, 2026-11-14) |
+| **Status** | Built (2026-11-14), in review. Plan accepted by the owner (2026-11-14, PR #169, answers 1–3: yes, as recommended). The look is agreed from the [mockup](https://claude.ai/artifact/EBa8edxXQzJLAxXboErgWU) (expanded and collapsed, 2026-11-14) |
 | **Refs** | W1-04 (the layout and the menu, owner answer 4: only screens that exist and that the person may open), W1-20 owner answer 5 (the Exceptions count in the menu); D-066 (shadcn/ui, Lucide), D-067 and PLT-13 (colour tokens for both themes), D-090 (the back-office design pass); CLAUDE.md rule 10 (i18n keys, logical CSS) |
 | **Depends on** | W1-04 (the layout), W1-20 (the Exceptions count) |
 | **Size** | about 2 days |
