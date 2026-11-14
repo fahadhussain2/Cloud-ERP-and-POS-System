@@ -17,19 +17,22 @@ Production runs on one Hetzner CX33 (`erp-prod-1`, `204.168.217.64`, Helsinki, U
 | User | Who | Can |
 |---|---|---|
 | `admin` | The owner and Claude Code (each with its own key) | sudo without a password (there are no passwords) |
-| `deploy` | GitHub Actions | Only `erp-deploy` (`has`, `load`, `status`, `deploy`, `rollback`): no shell, no other command |
+| `deploy` | GitHub Actions | Only `erp-deploy` (`has`, `load`, `status`, `deploy`, `rollback`; `queue` from W1-29): no shell, no other command |
 | `root` | Nobody | SSH login is off |
 
 Log in with `ssh admin@204.168.217.64`. Claude uses `-i ~/.ssh/zorbix_erp_admin`.
 
-## Deploys (D-063, D-075)
+## Deploys (D-063, D-075, D-115)
+
+> **W1-29 (D-115) is planned, not built yet.** Until its build PR is merged, a release merged in shop hours still waits for GitHub's hourly schedule (20:17 to 03:17 Karachi), which often runs only after midnight: start it by hand (Run workflow → `prod`, no force) after 20:00. The build PR removes this note.
 
 | What | How |
 |---|---|
 | **Staging** | Merge into `staging`. CI checks, then deploys automatically. |
 | **Try a pull request on staging** | Add the label **`deploy:staging`** to the PR. Each new push to it redeploys. The next merge into `staging` puts staging back. |
-| **Production** | Merge `staging` → `main` (the release). It deploys right away outside 10:00–20:00 Karachi; otherwise it is deferred to the next **hourly scheduled run (:17 past each hour, 20:17 to 03:17 Karachi)**. |
-| **Production emergency** | Actions → **Deploy** → Run workflow → `prod`, tick **force**. Works only from `main`. |
+| **Production** | Merge `staging` → `main` (the release). Outside 10:00–20:00 Karachi it deploys right away. In shop hours CI loads the images and **queues** the release on the server (the run is green: *Queued*), and the server's timer **switches it at 20:05 Karachi** (retried hourly to 03:05 if the server was busy or down). A newer release replaces a waiting one. |
+| **Production emergency** | Actions → **Deploy** → Run workflow → `prod`, tick **force**. Works only from `main`. Deploys now and replaces anything waiting. |
+| **Stop a waiting release** | Merge a fix (the newer release replaces it), or `ssh admin@204.168.217.64 sudo -u deploy erp-deploy cancel prod`. |
 | **Roll back** | Revert the merge on the branch, which deploys the previous code. A failed deploy rolls itself back automatically. |
 
 Each deploy, on the server:
@@ -38,7 +41,18 @@ Each deploy, on the server:
 3. Start the new version and check that `/api/health` returns its version, both apps load, and the worker stays up.
 4. If unhealthy, start the previous release again and fail the run.
 
-Then CI checks the public HTTPS addresses as well, and rolls back if they fail.
+Then the public HTTPS addresses are checked as well (`/api/health` returns the new version, `/` loads), and a failure rolls back: by CI for a deploy it started, by the server itself for a queued release at 20:05.
+
+**Did tonight's release go out?** A queued release has no GitHub run of its own:
+- `#erp-critical` (and email) says if it failed or rolled back; `#erp-alerts` says if it is still waiting after 20:30.
+- The **Deploy** workflow's morning check (08:17 Karachi) is red, with GitHub's email, if a release is still waiting or the last one didn't end `ok`. It never deploys.
+- On the server:
+  ```bash
+  ssh admin@204.168.217.64 sudo -u deploy erp-deploy status prod
+  ```
+  ```bash
+  ssh admin@204.168.217.64 systemctl list-timers erp-release.timer
+  ```
 
 **Migrations must work with the previous release too** (`REVIEW.md`): a rollback switches the code, not the database.
 
