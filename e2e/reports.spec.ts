@@ -3,6 +3,7 @@ import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import pos from '../apps/pos/src/locales/en.json' with { type: 'json' };
+import { menu } from './backoffice';
 import { expect, test } from './counter-test';
 import { BACKOFFICE_PORT, MANAGER, OWNER, OWNER_PASSWORD, POS_PORT, SALESMAN, SHOP } from './fixtures';
 
@@ -36,8 +37,6 @@ const signIn = async (page: Page) => {
   await page.getByRole('button', { name: bo.login.submit }).click();
   await expect(page.getByRole('navigation', { name: bo.nav.menu })).toBeVisible();
 };
-const menu = (page: Page, name: string) =>
-  page.getByRole('navigation', { name: bo.nav.menu }).getByRole('link', { name, exact: true }).click();
 
 test('a manager sends the counter’s diagnostics after their PIN', async ({ page }) => {
   await page.goto(POS);

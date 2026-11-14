@@ -15,6 +15,16 @@ export {
   DialogTrigger,
 } from './components/ui/dialog';
 export { Checkbox } from './components/ui/checkbox';
+export {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './components/ui/dropdown-menu';
+export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip';
 export { Input } from './components/ui/input';
 export { Label } from './components/ui/label';
 export {

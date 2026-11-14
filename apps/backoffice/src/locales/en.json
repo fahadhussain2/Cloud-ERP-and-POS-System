@@ -33,20 +33,33 @@
   "nav": {
     "menu": "Menu",
     "groups": {
-      "people": "People",
       "sales": "Sales",
-      "shop": "Shop",
       "reports": "Reports",
       "catalog": "Catalog",
       "purchasing": "Purchasing",
       "stock": "Stock",
-      "accounting": "Accounting"
+      "accounting": "Accounting",
+      "settings": "Settings"
     },
+    "collapse": "Collapse the menu",
+    "expand": "Expand the menu",
+    "search": "Search screens",
+    "searchKey": "Ctrl K",
+    "searchTitle": "Go to a screen",
+    "searchLabel": "Screen name",
+    "searchNone": "No screen by that name.",
+    "account": "Account: {{name}}",
+    "theme": "Theme",
+    "themes": {
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "themeLater": "Comes with the theme switcher",
     "staff": "Staff",
     "counters": "Counters",
     "shopSettings": "Shop and bill",
     "signOut": "Sign out",
-    "signedIn": "Signed in",
     "dayReconciliation": "Day reconciliation",
     "cashVariance": "Cash variance",
     "items": "Items",

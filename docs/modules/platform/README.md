@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-07, W0-09, W0-10, W0-11 done; counter side of PLT-03/PLT-04 built with W1-02; staff and user admin (PLT-04, PLT-05 assign) built with W1-04 (in review) |
+| **Status** | In progress: W0-07, W0-09, W0-10, W0-11 done; counter side of PLT-03/PLT-04 built with W1-02; staff and user admin (PLT-04, PLT-05 assign) built with W1-04 (in review); the back-office frame redesigned with W1-28 (D-114) |
 | **Requirements** | 13 (PLT-01…PLT-13) |
 | **Feature spec needed** | Yes: device enrollment + PIN security |
 
@@ -70,6 +70,16 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 - **Audit:** row changes by the W0-09 triggers; `password.set_by_admin` and `password.removed` by the API.
 - **Leaver routine:** deactivate the person, then check *Counters*: an offline counter only learns at its next sync, and until then the person can still unlock it.
 - **Counter side:** manager unlock offline, lock reset on a new PIN, lock when the person selling is removed (POS spec §5).
+
+## The back-office frame (W1-28, D-114)
+
+- **Where:** `apps/backoffice/src/layout/`. `menu.ts` holds the menu (seven groups with their icons and entries, each entry's address and permissions) and the remembered state; `Sidebar.tsx`, `TopBar.tsx` and `ScreenSearch.tsx` draw it; `Shell.tsx` puts them together.
+- **The menu:** Customers, Catalog, Purchasing, Stock, Accounting, Reports, Settings. It lists only screens that exist and that the person may open (W1-04 owner answer 4). A group opens and closes; the current screen's group opens by itself; a group with one allowed entry is a direct link. A new screen adds its entry to a group in `menu.ts`; a test pins every entry's address and permissions.
+- **The rail:** the collapse button folds the menu into icons with tooltips; a group lists its entries in a flyout. Narrow windows (under 48rem) always show the rail.
+- **Remembered** in the browser only (`localStorage`, `erp.backoffice.menu`): the open groups and the fold. Unreadable state or a group that no longer exists is ignored.
+- **The top bar:** where you are (group / entry, also on a detail screen), the search for screens (Ctrl K; the screens this person may open, by their name or their group's).
+- **The account** (`Account.tsx`) at the foot of the side menu: avatar, name and username; its menu opens beside the side menu with the theme buttons (System only until PLT-13) and Sign out. It shows even with no menu entries, so anyone signed in can sign out.
+- **First screen after sign-in:** the first entry the person may open, in the menu's order (Customers for an owner or manager).
 
 ## The shop's name and bill header (W1-25, D-112)
 

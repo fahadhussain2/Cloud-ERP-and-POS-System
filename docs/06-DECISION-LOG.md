@@ -1044,3 +1044,16 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** the owner runs the back office and knows the rules; the box took space on every screen.
 - **Trade-off:** staff who use the back office during the pilot (1–31 Dec) aren't warned on screen. The owner tells them before the pilot (go-live checklist): items and imported customers still change in the legacy app, and back-office purchases, stock movements and accounting entries are practice until go-live.
 - **Status:** Accepted (owner, 2026-11-15). Amends D-104, D-105, D-107, D-108 and D-109 (the notice parts only).
+
+### D-114 The back-office frame: a side menu in groups that open and close, and a slim top bar (2026-11-14)
+- **Context:** W1-28. Since W1-04 the back office followed the Tijara prototype's frame: a top bar with the brand, the signed-in name and Sign out, and a flat side menu with every group's heading and every entry always showing. One entry per task later, it held 28 links under 8 headings, two of them with one link each, and the setup screens spread over three groups. The owner asked for a minimal, modern frame and agreed the look from a mockup (2026-11-14).
+- **Decision:**
+  - **Seven rows:** Customers, Catalog, Purchasing, Stock, Accounting, Reports and **Settings** (Staff, Counters, Shop and bill, Stock settings; it replaces *People* and *Shop*). A group opens and closes; the current screen's group opens by itself. A group with one entry the person may open is a direct link.
+  - **A full-height sidebar** with the brand on top, which **folds into a rail** of icons with flyouts; narrow windows always show the rail. Open groups and the fold are remembered in the browser only.
+  - **The top bar** holds where you are (the menu's group and entry) and **a search for screens** (Ctrl K; screens only).
+  - **The account sits at the foot of the sidebar** (avatar, name, username). Its menu opens beside the sidebar with **theme buttons** (System · Light · Dark; System only until the switcher, PLT-13) and **Sign out**.
+  - **The first screen after sign-in** is still the first one the person may open, now in the new order: Customers for an owner or manager.
+  - **Colours, fonts and building blocks stay** (D-066, D-067): the prototype's tokens, shadcn/ui on Radix, Lucide icons. Only the frame departs from the prototype.
+- **Why:** the menu reads at a glance and keeps the working group in view; wide tables get room back from the rail; the search reaches any screen by name with groups closed.
+- **Trade-off:** a screen in a closed group is one click further away than before. Each person's open groups and fold are per browser, not per user, and are lost when browser data is cleared. The shop's name is not in the frame yet (the API's `/auth/me` doesn't return it); it comes with the theme switcher (PLT-13), whose buttons are already in the account menu.
+- **Status:** Accepted (owner, with the W1-28 plan, answers 1–3). Amends the W1-04 layout; its menu rule (owner answer 4: only screens that exist and that the person may open) is unchanged.
