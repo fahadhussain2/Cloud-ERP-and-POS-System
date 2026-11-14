@@ -22,7 +22,7 @@ The back-office menu grew one entry per task since W1-04 and is now hard to scan
 
 ## Goal
 
-**The menu shows seven rows; the group you are working in is open, the rest are one click away.** The top bar says where you are, finds any screen by name, and holds the account menu. Every screen stays where a permission puts it today: this task changes the frame, not the screens.
+**The menu shows seven rows; the group you are working in is open, the rest are one click away.** The top bar says where you are and finds any screen by name; the account sits at the foot of the side menu. Every screen stays where a permission puts it today: this task changes the frame, not the screens.
 
 ## Design
 
@@ -36,22 +36,23 @@ The back-office menu grew one entry per task since W1-04 and is now hard to scan
 | **Stock** | Transfers · Adjustments · Stock card · Transfer needed |
 | **Accounting** | Money · Accounts · Periods · Expense categories |
 | **Reports** | Day reconciliation · Cash variance · Sales register · Overrides · Voids and returns · Stock and value · Outstanding and ageing · Exceptions · Trace a bill |
-| **Settings** *(at the foot)* | Staff · Counters · Shop and bill · Stock settings |
+| **Settings** | Staff · Counters · Shop and bill · Stock settings |
 
 | Choice | Why |
 |---|---|
 | **A full-height sidebar** (248px), white, with a hairline on its inner edge; it stays in place while the screen scrolls, and scrolls on its own if a short window can't hold it. Brand (*Tijara · Back office*) on top | Replaces the floating panel under the top bar; the frame reads as one piece |
 | **Each group is one row** with an icon and a chevron; clicking opens or closes it. **The group of the current screen opens by itself.** Open groups and the collapsed state are remembered in this browser (`localStorage`) | 7 rows instead of 36 lines; the working group is always in view |
 | **A group with one entry the person may open shows as a direct link** (the entry's name, the group's icon). Customers today; also a manager who may open only one screen of a group | No group that opens to a single link. One rule, so it also holds when permissions hide entries |
-| **People and Shop merge into Settings, with Stock settings;** it sits at the foot of the menu | Everything set once and rarely changed is in one place, away from daily work |
+| **People and Shop merge into Settings, with Stock settings;** it follows Reports (owner, mockup review; first drawn at the foot of the menu) | Everything set once and rarely changed is in one place, away from daily work |
 | **The current screen** has a neutral fill and bold text; its group's icon is orange. Orange is used nowhere else in the menu | One accent; today's blue selection fill goes from the menu (the `select` token stays for tables and lists) |
 | **Collapsed menu** (a button in the brand row): a 64px rail of icons with tooltips. Clicking an icon opens that group's screens beside it. **Windows narrower than `md` always show the rail** | Wide tables get the room back. Replaces today's menu-folds-into-a-row on narrow windows |
 | **Badges:** on the entry as today; **on its group while the group is closed**; a dot on the icon in the rail | The Exceptions count must not hide inside a closed group |
-| **The top bar** (56px, level with the brand row) holds three things: **where you are** (*Catalog / Items*), **the search**, **the account menu** (name → Sign out). Today's top bar goes | The brand moves to the sidebar, so the bar is free for what helps on every screen |
+| **The top bar** (56px, level with the brand row) holds two things: **where you are** (*Catalog / Items*) and **the search**. Today's top bar goes | The brand moves to the sidebar, so the bar is free for what helps on every screen |
+| **The account at the foot of the sidebar** (owner, mockup review; first drawn in the top bar): avatar, name and username. Its menu opens **beside the sidebar**, touching its edge, with **theme buttons** (System · Light · Dark) and **Sign out**. Until the theme switcher (PLT-13, Wave 2) the buttons show System; Light and Dark can't be chosen yet. In the rail, the avatar alone | As in the apps the owner uses; the switcher's place is ready |
 | **Where you are** comes from the menu itself (group and entry of the current route, also on detail screens: an item shows *Catalog / Items*). `PageHeader` is unchanged: titles, help lines and the back links stay | No per-screen work, and nothing to keep in step by hand |
 | **The search** (**Ctrl K**, or a click): a dialog listing the screens the person may open; typing narrows it, arrows and Enter open one. **Screens only**, built from the menu. Question 1 | With groups closed, a name is the fastest way to a screen. Uses what `packages/ui` already has (`Dialog`, `OptionList`, `useShortcuts`) |
-| **The account menu** shows the person's name and **Sign out**. The mockup's shop name is left out for now. Question 2 | `/auth/me` doesn't return the shop's name; the theme switcher (PLT-13, Wave 2) will live in this menu |
-| **The first screen after sign-in** stays "the first one you may open", now in the new order: **Customers** for an owner or manager (today Staff). Question 3 | The rule doesn't change; Staff is no longer first because Settings is at the foot |
+| **The account** shows the person's name and username; the mockup's shop name is left out for now. Question 2 | `/auth/me` doesn't return the shop's name; the theme switcher (PLT-13, Wave 2) will live in this menu |
+| **The first screen after sign-in** stays "the first one you may open", now in the new order: **Customers** for an owner or manager (today Staff). Question 3 | The rule doesn't change; Staff is no longer first because Settings comes last |
 | **Colours and fonts:** the existing tokens only, checked in both themes. **Icons:** Lucide (D-066). **New building blocks:** shadcn/ui `dropdown-menu` (account menu, rail flyouts) and `tooltip`, added to `packages/ui` | The same look as every other screen; dark needs no extra work when its switcher comes |
 | **Rule 10:** every new string is an i18n key; logical CSS only; chevrons and flyouts follow the reading direction | Works right-to-left |
 | **Accessibility:** the `navigation` landmark keeps its name (*Menu*); group rows are buttons with `aria-expanded`; the current entry keeps `aria-current`; rail icons have names | Keyboard and screen-reader use stays correct; the tests find things the same way |
@@ -59,7 +60,7 @@ The back-office menu grew one entry per task since W1-04 and is now hard to scan
 ## Scope
 
 - **In:**
-  - `apps/backoffice/src/layout/`: the menu's data with the new groups and icons (`MENU` and `allowed` keep their exports for `App.tsx`), the sidebar, the top bar, the screen search, the shell that puts them together.
+  - `apps/backoffice/src/layout/`: the menu's data with the new groups and icons (`MENU` and `allowed` keep their exports for `App.tsx`), the sidebar with the account at its foot, the top bar, the screen search, the shell that puts them together.
   - `packages/ui`: `dropdown-menu` and `tooltip` from the shadcn CLI (`pnpm --filter @erp/ui ui:add`), exported from the index.
   - `apps/backoffice/package.json`: `lucide-react` (the workspace catalog's version).
   - `apps/backoffice/src/locales/en.json`: the Settings group, collapse and expand, the search, the account menu; *People*, *Shop* and *Signed in* go.
@@ -82,7 +83,8 @@ The back-office menu grew one entry per task since W1-04 and is now hard to scan
   - A group with one allowed entry shows as a direct link; a group with none doesn't show; someone with no rights sees no rows (as today's test says).
   - The Exceptions count: on the entry when Reports is open, on Reports when it's closed, nothing at 0.
   - Collapsed: the rail shows, every row still has its name, a click on an icon lists the group's screens, and the choice is remembered.
-  - The top bar: the group and entry of the current route; the account menu shows the name, and Sign out calls `onSignOut`.
+  - The top bar: the group and entry of the current route, and no account.
+  - The account at the sidebar's foot: the name and username; its menu has the theme buttons (System chosen, Light and Dark not yet) and Sign out, which calls `onSignOut`; it is there for someone with no menu entries, and in the rail.
   - The search: Ctrl K opens it; typing narrows the list; Enter goes to the screen; a screen the person may not open is never listed.
 - **Unit** (`App.test.tsx`): the *layout and menu* tests on the new groups; tests that relied on landing on Staff address `#/staff` first.
 - **e2e:** the three local `menu()` helpers and the direct menu clicks in `counter.spec.ts` go through one shared helper. One new flow: collapse the menu, open Stock → Transfers from the rail, then reach Trace a bill by the search.
@@ -120,6 +122,7 @@ The back-office menu grew one entry per task since W1-04 and is now hard to scan
 - **Counts:** a count describes its row (`aria-describedby`) instead of becoming part of its name, so an entry is still found by its name while it has a count.
 - **Tests first:** `layout/Shell.test.tsx` (17 tests, plus a guard pinning all 28 entries' addresses and permissions, which passed before and after) and 2 in `App.test.tsx` failed before the build. e2e: one shared helper (`e2e/backoffice.ts`) for the menu and Sign out; a new flow, `e2e/shell.spec.ts`.
 - **Found by the e2e runs:** flows that relied on landing on Staff now open it from the menu; the Items screen's *Search* field is looked up by its exact label, since the top bar's *Search screens* also starts with it.
-- **Checks:** `pnpm check` (2,292 tests) and `pnpm e2e` (60 flows) passed. `pnpm test:integration` was not run: no API or database change.
-- **Size:** the back office's script grows from 261 kB to 273 kB gzipped (921 kB to 963 kB), for the two Radix components and the icons.
+- **Checks:** `pnpm check` (2,296 tests) and `pnpm e2e` (60 flows) passed, also after the mockup-review change below. `pnpm test:integration` was not run: no API or database change.
+- **Size:** the back office's script grows from 261 kB to 274 kB gzipped (921 kB to 966 kB), for the two Radix components and the icons.
+- **Changed after the owner's mockup review** (same day, before merge): Settings follows Reports instead of sitting at the foot; the account moved from the top bar to the foot of the sidebar, its menu opening beside the sidebar with the theme buttons and Sign out. The theme buttons are plain buttons in the menu, so the keyboard can't reach them inside it; the switcher (PLT-13) makes them proper choices.
 - **Looked at** in the browser on a copy of `erp_dev`: expanded and folded, a flyout, the search, the account menu, dark mode forced, and phone width. In dark mode the Items table's item names don't show: that is the Items screen's own colours, left for the theme switcher (PLT-13, Wave 2).
