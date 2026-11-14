@@ -7,6 +7,7 @@ import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import pos from '../apps/pos/src/locales/en.json' with { type: 'json' };
+import { account, menu, signOut } from './backoffice';
 import { expect, test } from './counter-test';
 import {
   BACKOFFICE_PORT,
@@ -118,14 +119,14 @@ test.afterAll(async () => {
 
 test('the owner adds a cashier with a temporary PIN and creates a cash desk code', async ({ page }) => {
   await page.goto(BACKOFFICE);
-  const signOut = page.getByRole('button', { name: bo.nav.signOut });
-  await expect(signOut.or(page.getByLabel(bo.login.shopCode))).toBeVisible();
-  if (await signOut.isVisible()) await signOut.click();
+  await expect(account(page).or(page.getByLabel(bo.login.shopCode))).toBeVisible();
+  if (await account(page).isVisible()) await signOut(page);
   await page.getByLabel(bo.login.shopCode).fill(SHOP);
   await page.getByLabel(bo.login.username).fill(OWNER.username);
   await page.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
   await page.getByRole('button', { name: bo.login.submit }).click();
 
+  await menu(page, bo.nav.staff);
   await expect(page.getByRole('heading', { name: bo.staff.title })).toBeVisible();
   await page.getByRole('button', { name: bo.staff.add }).click();
   const dialog = page.getByRole('dialog');
@@ -141,10 +142,7 @@ test('the owner adds a cashier with a temporary PIN and creates a cash desk code
   await page.getByRole('dialog').getByRole('button', { name: bo.staff.save }).click();
   await expect(row).toContainText(bo.staff.pin.temporary);
 
-  await page
-    .getByRole('navigation', { name: bo.nav.menu })
-    .getByRole('link', { name: bo.nav.counters })
-    .click();
+  await menu(page, bo.nav.counters);
   await page.getByRole('combobox', { name: bo.counters.kind }).click();
   await page.getByRole('option', { name: bo.counters.kinds.cash_desk }).click();
   await page.getByRole('button', { name: bo.counters.create }).click();
@@ -572,18 +570,14 @@ test('the drawer is counted blind, short, acknowledged later; the owner acknowle
     new Date(Date.now() - 4 * 3_600_000),
   );
   await page.goto(BACKOFFICE);
-  const signOut = page.getByRole('button', { name: bo.nav.signOut });
-  await expect(signOut.or(page.getByLabel(bo.login.shopCode))).toBeVisible();
-  if (!(await signOut.isVisible())) {
+  await expect(account(page).or(page.getByLabel(bo.login.shopCode))).toBeVisible();
+  if (!(await account(page).isVisible())) {
     await page.getByLabel(bo.login.shopCode).fill(SHOP);
     await page.getByLabel(bo.login.username).fill(OWNER.username);
     await page.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
     await page.getByRole('button', { name: bo.login.submit }).click();
   }
-  await page
-    .getByRole('navigation', { name: bo.nav.menu })
-    .getByRole('link', { name: bo.nav.dayReconciliation })
-    .click();
+  await menu(page, bo.nav.dayReconciliation);
   await page.getByLabel(bo.reports.day.date).fill(today);
   await expect(page.getByText(bo.reports.day.provisional)).toBeVisible();
   // The earlier flows left cash bills nobody handed over: they are listed under their salesman.

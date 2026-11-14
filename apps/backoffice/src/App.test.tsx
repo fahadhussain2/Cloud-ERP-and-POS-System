@@ -171,11 +171,10 @@ describe('signing in', () => {
 });
 
 describe('layout and menu', () => {
-  it('an owner sees Staff and Counters in their groups, and who is signed in', async () => {
+  it('an owner sees Staff and Counters under Settings, and who is signed in', async () => {
     show(fakeApi(signedIn()).api);
     const menu = await screen.findByRole('navigation', { name: en.nav.menu });
-    expect(within(menu).getByText(en.nav.groups.people)).toBeDefined();
-    expect(within(menu).getByText(en.nav.groups.shop)).toBeDefined();
+    expect(within(menu).getByRole('button', { name: en.nav.groups.settings })).toBeDefined();
     expect(within(menu).getByRole('link', { name: en.nav.staff }).getAttribute('href')).toBe('#/staff');
     expect(within(menu).getByRole('link', { name: en.nav.counters }).getAttribute('href')).toBe('#/counters');
     expect(screen.getByText('Fahad Hussain')).toBeDefined();
@@ -186,6 +185,14 @@ describe('layout and menu', () => {
     const menu = await screen.findByRole('navigation', { name: en.nav.menu });
     expect(within(menu).getByRole('link', { name: en.nav.staff })).toBeDefined();
     expect(within(menu).getByRole('link', { name: en.nav.counters })).toBeDefined();
+  });
+
+  it('opens the first screen the person may open, in the menu’s order: Customers for a shop’s owner', async () => {
+    show(fakeApi(signedIn({ ...OWNER, permissions: [...OWNER.permissions, 'cust.edit'] })).api);
+    const menu = await screen.findByRole('navigation', { name: en.nav.menu });
+    expect(within(menu).getByRole('link', { name: en.nav.customers }).getAttribute('aria-current')).toBe(
+      'page',
+    );
   });
 
   it('someone with no admin rights sees no menu entries, only a note', async () => {

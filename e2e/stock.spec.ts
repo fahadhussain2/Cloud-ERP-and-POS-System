@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
+import { menu } from './backoffice';
 import { expect, test } from './counter-test';
 import { BACKOFFICE_PORT, MANAGER, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
 
@@ -34,8 +35,6 @@ const signIn = async (page: Page, username: string, password: string) => {
   await page.getByRole('button', { name: bo.login.submit }).click();
   await expect(page.getByRole('navigation', { name: bo.nav.menu })).toBeVisible();
 };
-const menu = (page: Page, name: string) =>
-  page.getByRole('navigation', { name: bo.nav.menu }).getByRole('link', { name }).click();
 const pickItem = async (page: Page, row: number, text: string) => {
   await page.getByRole('button', { name: `Item of line ${row}` }).click();
   await page.getByRole('textbox', { name: `Item of line ${row}` }).fill(text);
@@ -129,7 +128,7 @@ test("the items list shows the item's stock in the Shop and the Godown, and its 
   const op = await owner.newPage();
   await signIn(op, OWNER.username, OWNER_PASSWORD);
   await menu(op, bo.nav.items);
-  await op.getByLabel(bo.catalog.items.search).fill('ENOL001');
+  await op.getByLabel(bo.catalog.items.search, { exact: true }).fill('ENOL001');
   const list = op.getByRole('table', { name: bo.catalog.items.title });
   const row = list.getByRole('row', { name: /ENOL001/ });
   await expect(list.getByRole('row')).toHaveCount(3); // the header, ENOL001 and the total

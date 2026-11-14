@@ -16,6 +16,7 @@
     "@erp/print": "workspace:*",
     "@erp/ui": "workspace:*",
     "i18next": "catalog:",
+    "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-i18next": "catalog:"
