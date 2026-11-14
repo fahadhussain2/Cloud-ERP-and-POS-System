@@ -14,6 +14,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Route } from '../router';
+import { Account } from './Account';
 import {
   menuFor,
   placeOf,
@@ -27,7 +28,7 @@ import {
 // The side menu (W1-28 plan): one row per group with an icon; a click opens or closes it, and the group of the
 // current screen opens by itself. A group with one entry this person may open is a direct link. Folded, it is a rail
 // of icons whose groups list their screens beside it; a narrow window always shows the rail. Open groups and the fold
-// are remembered in this browser.
+// are remembered in this browser. Settings follows Reports; the account sits at the foot (owner, mockup review).
 
 export type Badges = Partial<Record<MenuItem['key'], number>>;
 
@@ -89,13 +90,19 @@ function Hint({ label, side, children }: { label: string; side: 'left' | 'right'
 }
 
 export function Sidebar({
+  fullName,
+  username,
   permissions,
   route,
   badges,
+  onSignOut,
 }: {
+  fullName: string;
+  username: string;
   permissions: readonly string[];
   route: Route;
   badges: Badges;
+  onSignOut: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const narrow = useNarrow();
@@ -163,7 +170,7 @@ export function Sidebar({
         >
           <ul className="m-0 flex flex-1 list-none flex-col gap-0.5 p-0">
             {groups.map((g) => (
-              <li key={g.group} data-slot="menu-row" className={cn(g.group === 'settings' && 'mt-auto pt-3')}>
+              <li key={g.group} data-slot="menu-row">
                 {g.items.length === 1 ? (
                   <Direct
                     group={g}
@@ -198,6 +205,9 @@ export function Sidebar({
           </ul>
         </nav>
       )}
+      {/* Keeps the account at the foot when there is no menu (someone who may open no screen still signs out). */}
+      {groups.length === 0 && <div className="flex-1" />}
+      <Account fullName={fullName} username={username} rail={rail} side={side} onSignOut={onSignOut} />
     </aside>
   );
 }

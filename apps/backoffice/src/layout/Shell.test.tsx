@@ -86,6 +86,7 @@ const shellOf = (p: Props) => (
   <I18nextProvider i18n={i18n}>
     <Shell
       fullName="Fahad Hussain"
+      username="fahad"
       permissions={EVERYTHING}
       route={{ screen: 'items' }}
       onSignOut={() => {}}
@@ -273,16 +274,48 @@ describe('the top bar', () => {
     expect(within(bar()).getByText(en.nav.customers)).toBeDefined();
   });
 
-  it('holds the account menu: the name, and Sign out', () => {
+  it('holds no account: it is at the foot of the side menu', () => {
+    show();
+    expect(within(bar()).queryByRole('button', { name: accountName })).toBeNull();
+    expect(within(bar()).getByRole('button', { name: en.nav.search })).toBeDefined();
+  });
+});
+
+const accountName = en.nav.account.replace('{{name}}', 'Fahad Hussain');
+
+describe('the account', () => {
+  const account = () => within(screen.getByRole('complementary')).getByRole('button', { name: accountName });
+
+  it('sits at the foot of the side menu with the name and username', () => {
+    show();
+    expect(within(account()).getByText('Fahad Hussain')).toBeDefined();
+    expect(within(account()).getByText('fahad')).toBeDefined();
+  });
+
+  it('opens a menu with the theme buttons, System chosen until the switcher comes, and Sign out', () => {
     const onSignOut = vi.fn();
     show({ onSignOut });
-    const account = within(bar()).getByRole('button', {
-      name: en.nav.account.replace('{{name}}', 'Fahad Hussain'),
-    });
-    expect(within(account).getByText('Fahad Hussain')).toBeDefined();
-    openMenu(account);
+    openMenu(account());
+    const theme = screen.getByRole('group', { name: en.nav.theme });
+    const choice = (name: string) => within(theme).getByRole('button', { name });
+    expect(choice(en.nav.themes.system).getAttribute('aria-pressed')).toBe('true');
+    expect((choice(en.nav.themes.light) as HTMLButtonElement).disabled).toBe(true);
+    expect((choice(en.nav.themes.dark) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole('menuitem', { name: en.nav.signOut }));
     expect(onSignOut).toHaveBeenCalledOnce();
+  });
+
+  it('is there for someone who may open no screen, so they can sign out', () => {
+    show({ permissions: ['pos.sale.create'], route: { screen: 'home' } });
+    expect(account()).toBeDefined();
+  });
+
+  it('stays in the rail as the avatar alone, still named', () => {
+    localStorage.setItem('erp.backoffice.menu', JSON.stringify({ open: [], collapsed: true }));
+    show();
+    expect(within(account()).queryByText('Fahad Hussain')).toBeNull();
+    openMenu(account());
+    expect(screen.getByRole('menuitem', { name: en.nav.signOut })).toBeDefined();
   });
 });
 

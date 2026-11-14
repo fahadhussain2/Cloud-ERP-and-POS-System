@@ -19,11 +19,9 @@ export async function menu(page: Page, name: string): Promise<void> {
   await link.click();
 }
 
-/** The account menu's button in the top bar, whoever is signed in. */
+/** The account's button at the foot of the side menu, whoever is signed in. */
 export const account = (page: Page) =>
-  page
-    .getByRole('banner')
-    .getByRole('button', { name: new RegExp(`^${bo.nav.account.replace('{{name}}', '')}`) });
+  page.getByRole('button', { name: new RegExp(`^${bo.nav.account.replace('{{name}}', '')}`) });
 
 export async function signOut(page: Page): Promise<void> {
   await account(page).click();

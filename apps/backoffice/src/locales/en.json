@@ -49,6 +49,13 @@
     "searchLabel": "Screen name",
     "searchNone": "No screen by that name.",
     "account": "Account: {{name}}",
+    "theme": "Theme",
+    "themes": {
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "themeLater": "Comes with the theme switcher",
     "staff": "Staff",
     "counters": "Counters",
     "shopSettings": "Shop and bill",
