@@ -269,6 +269,7 @@ test('the owner deactivates the new salesman in the back office', async ({ brows
   const office = await browser.newContext();
   const page = await office.newPage();
   await signIn(page, OWNER.username, OWNER_PASSWORD);
+  await menu(page, bo.nav.staff);
   await page.getByRole('link', { name: NEWCOMER.fullName }).click();
   await expect(page.getByRole('heading', { name: NEWCOMER.fullName })).toBeVisible();
   await page.getByRole('button', { name: bo.staff.deactivate }).click();
@@ -819,7 +820,7 @@ test('the owner changes a price and adds an item in the back office; the counter
   await signIn(bop, OWNER.username, OWNER_PASSWORD);
   await menu(bop, bo.nav.items);
   await expect(bop.getByText(/legacy app/i)).toHaveCount(0); // no go-live notice (D-113)
-  await bop.getByLabel(bo.catalog.items.search).fill('enol001');
+  await bop.getByLabel(bo.catalog.items.search, { exact: true }).fill('enol001');
   await bop.getByRole('link', { name: 'ENOL001' }).click();
   await bop.getByLabel('Retail').fill('7200');
   await bop.getByRole('button', { name: bo.catalog.item.savePrices }).click();

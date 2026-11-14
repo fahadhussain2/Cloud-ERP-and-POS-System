@@ -128,7 +128,7 @@ test("the items list shows the item's stock in the Shop and the Godown, and its 
   const op = await owner.newPage();
   await signIn(op, OWNER.username, OWNER_PASSWORD);
   await menu(op, bo.nav.items);
-  await op.getByLabel(bo.catalog.items.search).fill('ENOL001');
+  await op.getByLabel(bo.catalog.items.search, { exact: true }).fill('ENOL001');
   const list = op.getByRole('table', { name: bo.catalog.items.title });
   const row = list.getByRole('row', { name: /ENOL001/ });
   await expect(list.getByRole('row')).toHaveCount(3); // the header, ENOL001 and the total

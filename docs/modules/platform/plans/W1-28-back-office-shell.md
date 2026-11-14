@@ -112,3 +112,14 @@ The back-office menu grew one entry per task since W1-04 and is now hard to scan
 | The remembered menu state holds a group that no longer exists | Unknown names are ignored when the state is read; tested |
 | Radix menus and tooltips grow the back-office bundle | Both come from the `radix-ui` package already in `packages/ui`; the build output's size is compared before and after |
 | The frame looks right in light but not in dark | Verify 2 forces dark; only tokens are used, so a miss is one class to change |
+
+## Results (2026-11-14)
+
+- **Built** as planned, in `apps/backoffice/src/layout/`: `menu.ts` (the seven groups, their icons and entries, the remembered state), `Sidebar.tsx`, `TopBar.tsx`, `ScreenSearch.tsx`, and `Shell.tsx` putting them together. `packages/ui` gained `dropdown-menu` and `tooltip` from the shadcn CLI, turned to logical CSS (rule 10).
+- **Accounting's order** follows the mockup: Money, Accounts, Periods, Expense categories.
+- **Counts:** a count describes its row (`aria-describedby`) instead of becoming part of its name, so an entry is still found by its name while it has a count.
+- **Tests first:** `layout/Shell.test.tsx` (17 tests, plus a guard pinning all 28 entries' addresses and permissions, which passed before and after) and 2 in `App.test.tsx` failed before the build. e2e: one shared helper (`e2e/backoffice.ts`) for the menu and Sign out; a new flow, `e2e/shell.spec.ts`.
+- **Found by the e2e runs:** flows that relied on landing on Staff now open it from the menu; the Items screen's *Search* field is looked up by its exact label, since the top bar's *Search screens* also starts with it.
+- **Checks:** `pnpm check` (2,292 tests) and `pnpm e2e` (60 flows) passed. `pnpm test:integration` was not run: no API or database change.
+- **Size:** the back office's script grows from 261 kB to 273 kB gzipped (921 kB to 963 kB), for the two Radix components and the icons.
+- **Looked at** in the browser on a copy of `erp_dev`: expanded and folded, a flyout, the search, the account menu, dark mode forced, and phone width. In dark mode the Items table's item names don't show: that is the Items screen's own colours, left for the theme switcher (PLT-13, Wave 2).
