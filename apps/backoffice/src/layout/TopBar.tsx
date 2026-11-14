@@ -60,7 +60,7 @@ export function TopBar({
       >
         <Search className="size-4.5 shrink-0" aria-hidden="true" />
         <span className="flex-1 truncate">{t('nav.search')}</span>
-        <Kbd className="bg-surface">{t('nav.searchKey')}</Kbd>
+        <Kbd className="bg-surface max-sm:hidden">{t('nav.searchKey')}</Kbd>
       </button>
 
       <DropdownMenu>

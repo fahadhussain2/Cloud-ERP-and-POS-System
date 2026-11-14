@@ -376,7 +376,7 @@ function Flyout({
           </button>
         </DropdownMenuTrigger>
       </Hint>
-      <DropdownMenuContent side={side} align="start" sideOffset={14} className="w-56 p-1.5">
+      <DropdownMenuContent side={side} align="start" sideOffset={20} className="w-56 p-1.5">
         <DropdownMenuLabel className="px-2.5 pt-1.5 pb-1 text-[11.5px] font-semibold tracking-[.06em] text-muted-foreground uppercase">
           {label}
         </DropdownMenuLabel>

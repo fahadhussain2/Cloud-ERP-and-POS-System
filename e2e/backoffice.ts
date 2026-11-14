@@ -13,8 +13,9 @@ export async function menu(page: Page, name: string): Promise<void> {
   const nav = page.getByRole('navigation', { name: bo.nav.menu });
   await expect(nav).toBeVisible();
   const link = nav.getByRole('link', { name, exact: true });
-  if (!(await link.isVisible()))
-    for (const group of await nav.locator('button[aria-expanded="false"]').all()) await group.click();
+  // Opening a group takes it out of this set, so always open the first one left.
+  const closed = nav.locator('button[aria-expanded="false"]');
+  while (!(await link.isVisible()) && (await closed.count()) > 0) await closed.first().click();
   await link.click();
 }
 
