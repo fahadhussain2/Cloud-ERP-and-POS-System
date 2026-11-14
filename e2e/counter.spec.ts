@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import pos from '../apps/pos/src/locales/en.json' with { type: 'json' };
+import { menu } from './backoffice';
 import { expect, test } from './counter-test';
 import {
   BACKOFFICE_PORT,
@@ -84,6 +85,8 @@ test('the owner signs in, adds a manager and a salesman, gives temporary PINs an
   await signIn(page, OWNER.username, OWNER_FIRST_PASSWORD);
   await changePassword(page, OWNER_FIRST_PASSWORD, OWNER_PASSWORD);
 
+  // An owner lands on Customers, the menu's first entry (W1-28); Staff is under Settings.
+  await menu(page, bo.nav.staff);
   await expect(page.getByRole('heading', { name: bo.staff.title })).toBeVisible();
   await addPerson(page, MANAGER, 'Manager');
   await addPerson(page, NEWCOMER, 'Salesman');
@@ -101,10 +104,7 @@ test('the owner signs in, adds a manager and a salesman, gives temporary PINs an
   await giveTemporaryPin(page, MANAGER.fullName, MANAGER.temporaryPin);
   await giveTemporaryPin(page, NEWCOMER.fullName, NEWCOMER.temporaryPin);
 
-  await page
-    .getByRole('navigation', { name: bo.nav.menu })
-    .getByRole('link', { name: bo.nav.counters })
-    .click();
+  await menu(page, bo.nav.counters);
   await page.getByRole('button', { name: bo.counters.create }).click();
   code = (await page.getByRole('status').locator('strong').textContent()) ?? '';
   expect(code).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
@@ -289,10 +289,11 @@ test('the manager signs in to the back office and can only give temporary PINs',
   const page = await office.newPage();
   await signIn(page, MANAGER.username, MANAGER.temporaryPassword);
   await changePassword(page, MANAGER.temporaryPassword, MANAGER.password);
+  await menu(page, bo.nav.staff);
   await expect(page.getByRole('heading', { name: bo.staff.title })).toBeVisible();
-  const menu = page.getByRole('navigation', { name: bo.nav.menu });
-  await expect(menu.getByRole('link', { name: bo.nav.staff })).toBeVisible();
-  await expect(menu.getByRole('link', { name: bo.nav.counters })).toBeVisible();
+  const nav = page.getByRole('navigation', { name: bo.nav.menu });
+  await expect(nav.getByRole('link', { name: bo.nav.staff })).toBeVisible();
+  await expect(nav.getByRole('link', { name: bo.nav.counters })).toBeVisible();
   await expect(page.getByRole('button', { name: bo.staff.add })).toHaveCount(0);
   const row = page.getByRole('row', { name: new RegExp(SALESMAN.fullName) });
   await expect(row.getByRole('button', { name: bo.staff.give })).toBeVisible();
@@ -816,7 +817,7 @@ test('the owner changes a price and adds an item in the back office; the counter
   const office = await browser.newContext();
   const bop = await office.newPage();
   await signIn(bop, OWNER.username, OWNER_PASSWORD);
-  await bop.getByRole('navigation', { name: bo.nav.menu }).getByRole('link', { name: bo.nav.items }).click();
+  await menu(bop, bo.nav.items);
   await expect(bop.getByText(/legacy app/i)).toHaveCount(0); // no go-live notice (D-113)
   await bop.getByLabel(bo.catalog.items.search).fill('enol001');
   await bop.getByRole('link', { name: 'ENOL001' }).click();
@@ -860,10 +861,7 @@ test('a customer added in the back office buys on account at a counter; credit o
   const office = await browser.newContext();
   const bop = await office.newPage();
   await signIn(bop, OWNER.username, OWNER_PASSWORD);
-  await bop
-    .getByRole('navigation', { name: bo.nav.menu })
-    .getByRole('link', { name: bo.nav.customers })
-    .click();
+  await menu(bop, bo.nav.customers);
   await bop.getByRole('button', { name: c.add }).click();
   let form = bop.getByRole('dialog');
   await expect(form.getByLabel(c.fields.code)).toHaveValue(/^C\d{4}$/);

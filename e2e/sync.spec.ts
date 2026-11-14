@@ -3,6 +3,7 @@ import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import pos from '../apps/pos/src/locales/en.json' with { type: 'json' };
+import { account, menu, signOut } from './backoffice';
 import { expect, test } from './counter-test';
 import {
   BACKOFFICE_PORT,
@@ -95,18 +96,14 @@ const sell = async (page: Page, item: string) => {
 /** Signs in as the owner and opens Counters; the shared profile may still be signed in from the counter flows. */
 const signIn = async (page: Page) => {
   await page.goto(BACKOFFICE);
-  const signOut = page.getByRole('button', { name: bo.nav.signOut });
   const shopCode = page.getByLabel(bo.login.shopCode);
-  await expect(signOut.or(shopCode)).toBeVisible();
-  if (await signOut.isVisible()) await signOut.click();
+  await expect(account(page).or(shopCode)).toBeVisible();
+  if (await account(page).isVisible()) await signOut(page);
   await page.getByLabel(bo.login.shopCode).fill(SHOP);
   await page.getByLabel(bo.login.username).fill(OWNER.username);
   await page.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
   await page.getByRole('button', { name: bo.login.submit }).click();
-  await page
-    .getByRole('navigation', { name: bo.nav.menu })
-    .getByRole('link', { name: bo.nav.counters })
-    .click();
+  await menu(page, bo.nav.counters);
 };
 
 test('offline bills wait on the counter; back online they all reach the server, in order', async ({
@@ -196,10 +193,7 @@ test('the owner renames the shop and sets the bill header; the counter shows and
     await bop.getByLabel(bo.login.username).fill(OWNER.username);
     await bop.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
     await bop.getByRole('button', { name: bo.login.submit }).click();
-    await bop
-      .getByRole('navigation', { name: bo.nav.menu })
-      .getByRole('link', { name: bo.nav.shopSettings })
-      .click();
+    await menu(bop, bo.nav.shopSettings);
     await expect(bop.getByRole('textbox', { name: bo.shop.fields.name })).toHaveValue(before!.name);
     await bop.getByRole('textbox', { name: bo.shop.fields.name }).fill('E2E City Auto Corner');
     await bop.getByRole('textbox', { name: bo.shop.fields.phone }).fill('021-1234567');
