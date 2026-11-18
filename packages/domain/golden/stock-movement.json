@@ -1,0 +1,496 @@
+{
+  "description": "Stock movement (RPT-13, W2-02 plan): one item's opening, its movements by bucket and its closing, in quantity (thousandths) and value. Buckets are signed (in +, out −), so opening + every bucket = closing. A sale's line out is a sale and one in is a return; a void undoes its bill (stock back undoes a sale, stock out undoes a return); a transfer is out of one location and into another. An unknown source is refused.",
+  "cases": [
+    {
+      "name": "a month with every kind of movement",
+      "input": {
+        "opening": {
+          "qty": 10000,
+          "value": 100000
+        },
+        "moves": [
+          {
+            "source": "goods_receipt",
+            "qty": 5000,
+            "value": 52500
+          },
+          {
+            "source": "purchase_return",
+            "qty": -1000,
+            "value": -10500
+          },
+          {
+            "source": "sale",
+            "qty": -4000,
+            "value": -40800
+          },
+          {
+            "source": "sale",
+            "qty": 1000,
+            "value": 10200
+          },
+          {
+            "source": "sales_void",
+            "qty": 2000,
+            "value": 20400
+          },
+          {
+            "source": "stock_adjustment",
+            "qty": -500,
+            "value": -5100
+          },
+          {
+            "source": "stock_adjustment",
+            "qty": 250,
+            "value": 2550
+          },
+          {
+            "source": "stock_transfer",
+            "qty": -3000,
+            "value": -30600
+          },
+          {
+            "source": "stock_transfer_receipt",
+            "qty": 3000,
+            "value": 30600
+          }
+        ]
+      },
+      "expected": {
+        "opening": {
+          "qty": 10000,
+          "value": 100000
+        },
+        "buckets": {
+          "openings": {
+            "qty": 0,
+            "value": 0
+          },
+          "purchases": {
+            "qty": 5000,
+            "value": 52500
+          },
+          "purchaseReturns": {
+            "qty": -1000,
+            "value": -10500
+          },
+          "sales": {
+            "qty": -2000,
+            "value": -20400
+          },
+          "salesReturns": {
+            "qty": 1000,
+            "value": 10200
+          },
+          "adjustments": {
+            "qty": -250,
+            "value": -2550
+          },
+          "transfersIn": {
+            "qty": 3000,
+            "value": 30600
+          },
+          "transfersOut": {
+            "qty": -3000,
+            "value": -30600
+          }
+        },
+        "closing": {
+          "qty": 12750,
+          "value": 129250
+        }
+      }
+    },
+    {
+      "name": "an exchange gives a sale and a return",
+      "input": {
+        "opening": {
+          "qty": 2000,
+          "value": 20000
+        },
+        "moves": [
+          {
+            "source": "sale",
+            "qty": -1000,
+            "value": -10000
+          },
+          {
+            "source": "sale",
+            "qty": 1000,
+            "value": 10000
+          }
+        ]
+      },
+      "expected": {
+        "opening": {
+          "qty": 2000,
+          "value": 20000
+        },
+        "buckets": {
+          "openings": {
+            "qty": 0,
+            "value": 0
+          },
+          "purchases": {
+            "qty": 0,
+            "value": 0
+          },
+          "purchaseReturns": {
+            "qty": 0,
+            "value": 0
+          },
+          "sales": {
+            "qty": -1000,
+            "value": -10000
+          },
+          "salesReturns": {
+            "qty": 1000,
+            "value": 10000
+          },
+          "adjustments": {
+            "qty": 0,
+            "value": 0
+          },
+          "transfersIn": {
+            "qty": 0,
+            "value": 0
+          },
+          "transfersOut": {
+            "qty": 0,
+            "value": 0
+          }
+        },
+        "closing": {
+          "qty": 2000,
+          "value": 20000
+        }
+      }
+    },
+    {
+      "name": "a void of a return takes the stock out again: it undoes the return",
+      "input": {
+        "opening": {
+          "qty": 0,
+          "value": 0
+        },
+        "moves": [
+          {
+            "source": "sale",
+            "qty": 1000,
+            "value": 9000
+          },
+          {
+            "source": "sales_void",
+            "qty": -1000,
+            "value": -9000
+          }
+        ]
+      },
+      "expected": {
+        "opening": {
+          "qty": 0,
+          "value": 0
+        },
+        "buckets": {
+          "openings": {
+            "qty": 0,
+            "value": 0
+          },
+          "purchases": {
+            "qty": 0,
+            "value": 0
+          },
+          "purchaseReturns": {
+            "qty": 0,
+            "value": 0
+          },
+          "sales": {
+            "qty": 0,
+            "value": 0
+          },
+          "salesReturns": {
+            "qty": 0,
+            "value": 0
+          },
+          "adjustments": {
+            "qty": 0,
+            "value": 0
+          },
+          "transfersIn": {
+            "qty": 0,
+            "value": 0
+          },
+          "transfersOut": {
+            "qty": 0,
+            "value": 0
+          }
+        },
+        "closing": {
+          "qty": 0,
+          "value": 0
+        }
+      }
+    },
+    {
+      "name": "the opening stock entered inside the period",
+      "input": {
+        "opening": {
+          "qty": 0,
+          "value": 0
+        },
+        "moves": [
+          {
+            "source": "opening",
+            "qty": 12000,
+            "value": 144000
+          },
+          {
+            "source": "sale",
+            "qty": -1500,
+            "value": -18000
+          }
+        ]
+      },
+      "expected": {
+        "opening": {
+          "qty": 0,
+          "value": 0
+        },
+        "buckets": {
+          "openings": {
+            "qty": 12000,
+            "value": 144000
+          },
+          "purchases": {
+            "qty": 0,
+            "value": 0
+          },
+          "purchaseReturns": {
+            "qty": 0,
+            "value": 0
+          },
+          "sales": {
+            "qty": -1500,
+            "value": -18000
+          },
+          "salesReturns": {
+            "qty": 0,
+            "value": 0
+          },
+          "adjustments": {
+            "qty": 0,
+            "value": 0
+          },
+          "transfersIn": {
+            "qty": 0,
+            "value": 0
+          },
+          "transfersOut": {
+            "qty": 0,
+            "value": 0
+          }
+        },
+        "closing": {
+          "qty": 10500,
+          "value": 126000
+        }
+      }
+    },
+    {
+      "name": "a transfer still in transit: out of the Godown, into In transit",
+      "input": {
+        "opening": {
+          "qty": 5000,
+          "value": 50000
+        },
+        "moves": [
+          {
+            "source": "stock_transfer",
+            "qty": -2000,
+            "value": -20000
+          },
+          {
+            "source": "stock_transfer",
+            "qty": 2000,
+            "value": 20000
+          }
+        ]
+      },
+      "expected": {
+        "opening": {
+          "qty": 5000,
+          "value": 50000
+        },
+        "buckets": {
+          "openings": {
+            "qty": 0,
+            "value": 0
+          },
+          "purchases": {
+            "qty": 0,
+            "value": 0
+          },
+          "purchaseReturns": {
+            "qty": 0,
+            "value": 0
+          },
+          "sales": {
+            "qty": 0,
+            "value": 0
+          },
+          "salesReturns": {
+            "qty": 0,
+            "value": 0
+          },
+          "adjustments": {
+            "qty": 0,
+            "value": 0
+          },
+          "transfersIn": {
+            "qty": 2000,
+            "value": 20000
+          },
+          "transfersOut": {
+            "qty": -2000,
+            "value": -20000
+          }
+        },
+        "closing": {
+          "qty": 5000,
+          "value": 50000
+        }
+      }
+    },
+    {
+      "name": "below zero, then a receipt",
+      "input": {
+        "opening": {
+          "qty": -1500,
+          "value": -15000
+        },
+        "moves": [
+          {
+            "source": "goods_receipt",
+            "qty": 3000,
+            "value": 33000
+          }
+        ]
+      },
+      "expected": {
+        "opening": {
+          "qty": -1500,
+          "value": -15000
+        },
+        "buckets": {
+          "openings": {
+            "qty": 0,
+            "value": 0
+          },
+          "purchases": {
+            "qty": 3000,
+            "value": 33000
+          },
+          "purchaseReturns": {
+            "qty": 0,
+            "value": 0
+          },
+          "sales": {
+            "qty": 0,
+            "value": 0
+          },
+          "salesReturns": {
+            "qty": 0,
+            "value": 0
+          },
+          "adjustments": {
+            "qty": 0,
+            "value": 0
+          },
+          "transfersIn": {
+            "qty": 0,
+            "value": 0
+          },
+          "transfersOut": {
+            "qty": 0,
+            "value": 0
+          }
+        },
+        "closing": {
+          "qty": 1500,
+          "value": 18000
+        }
+      }
+    },
+    {
+      "name": "no movements: the closing is the opening",
+      "input": {
+        "opening": {
+          "qty": 7000,
+          "value": 70000
+        },
+        "moves": []
+      },
+      "expected": {
+        "opening": {
+          "qty": 7000,
+          "value": 70000
+        },
+        "buckets": {
+          "openings": {
+            "qty": 0,
+            "value": 0
+          },
+          "purchases": {
+            "qty": 0,
+            "value": 0
+          },
+          "purchaseReturns": {
+            "qty": 0,
+            "value": 0
+          },
+          "sales": {
+            "qty": 0,
+            "value": 0
+          },
+          "salesReturns": {
+            "qty": 0,
+            "value": 0
+          },
+          "adjustments": {
+            "qty": 0,
+            "value": 0
+          },
+          "transfersIn": {
+            "qty": 0,
+            "value": 0
+          },
+          "transfersOut": {
+            "qty": 0,
+            "value": 0
+          }
+        },
+        "closing": {
+          "qty": 7000,
+          "value": 70000
+        }
+      }
+    },
+    {
+      "name": "an unknown source is refused",
+      "input": {
+        "opening": {
+          "qty": 0,
+          "value": 0
+        },
+        "moves": [
+          {
+            "source": "gift",
+            "qty": 1000,
+            "value": 0
+          }
+        ]
+      },
+      "error": "unknown_source"
+    }
+  ]
+}

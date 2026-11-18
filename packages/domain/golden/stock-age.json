@@ -1,0 +1,257 @@
+{
+  "description": "Dead and slow stock (RPT-08, W2-02 owner answers 1 and 5; go-live 1 Jan 2027): dead = on hand and no sale in the last N days; an item never sold since go-live is dead only once N days have passed since go-live, before that it is not sold since go-live. Slow = sold, but at the rate of the last 90 days (or since go-live, if shorter) the stock lasts more than 180 days. Nothing on hand: none.",
+  "cases": [
+    {
+      "name": "never sold, 20 days after go-live",
+      "input": {
+        "onHand": 5000,
+        "lastSale": null,
+        "sold": 0,
+        "today": "2027-01-20",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "notSoldSinceGoLive",
+        "daysSinceSale": null,
+        "daysOfCover": null
+      }
+    },
+    {
+      "name": "never sold, 89 days after go-live",
+      "input": {
+        "onHand": 5000,
+        "lastSale": null,
+        "sold": 0,
+        "today": "2027-03-30",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "notSoldSinceGoLive",
+        "daysSinceSale": null,
+        "daysOfCover": null
+      }
+    },
+    {
+      "name": "never sold, 90 days after go-live: dead",
+      "input": {
+        "onHand": 5000,
+        "lastSale": null,
+        "sold": 0,
+        "today": "2027-03-31",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "dead",
+        "daysSinceSale": null,
+        "daysOfCover": null
+      }
+    },
+    {
+      "name": "never sold, N = 30, 40 days after go-live: dead",
+      "input": {
+        "onHand": 5000,
+        "lastSale": null,
+        "sold": 0,
+        "today": "2027-02-09",
+        "days": 30,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "dead",
+        "daysSinceSale": null,
+        "daysOfCover": null
+      }
+    },
+    {
+      "name": "last sold 91 days ago",
+      "input": {
+        "onHand": 5000,
+        "lastSale": "2027-03-31",
+        "sold": 0,
+        "today": "2027-06-30",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "dead",
+        "daysSinceSale": 91,
+        "daysOfCover": null
+      }
+    },
+    {
+      "name": "last sold 90 days ago: no sale in the last 90 days",
+      "input": {
+        "onHand": 5000,
+        "lastSale": "2027-04-01",
+        "sold": 0,
+        "today": "2027-06-30",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "dead",
+        "daysSinceSale": 90,
+        "daysOfCover": null
+      }
+    },
+    {
+      "name": "last sold 89 days ago, 2 sold in 90 days: 225 days of cover, slow",
+      "input": {
+        "onHand": 5000,
+        "lastSale": "2027-04-02",
+        "sold": 2000,
+        "today": "2027-06-30",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "slow",
+        "daysSinceSale": 89,
+        "daysOfCover": 225
+      }
+    },
+    {
+      "name": "sold yesterday, 300 days of cover: slow",
+      "input": {
+        "onHand": 10000,
+        "lastSale": "2027-06-29",
+        "sold": 3000,
+        "today": "2027-06-30",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "slow",
+        "daysSinceSale": 1,
+        "daysOfCover": 300
+      }
+    },
+    {
+      "name": "exactly 180 days of cover: moving",
+      "input": {
+        "onHand": 6000,
+        "lastSale": "2027-06-29",
+        "sold": 3000,
+        "today": "2027-06-30",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "moving",
+        "daysSinceSale": 1,
+        "daysOfCover": 180
+      }
+    },
+    {
+      "name": "sold today, 100 days of cover: moving",
+      "input": {
+        "onHand": 10000,
+        "lastSale": "2027-06-30",
+        "sold": 9000,
+        "today": "2027-06-30",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "moving",
+        "daysSinceSale": 0,
+        "daysOfCover": 100
+      }
+    },
+    {
+      "name": "sold yesterday, but as much returned: moving, no rate",
+      "input": {
+        "onHand": 4000,
+        "lastSale": "2027-06-29",
+        "sold": 0,
+        "today": "2027-06-30",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "moving",
+        "daysSinceSale": 1,
+        "daysOfCover": null
+      }
+    },
+    {
+      "name": "N = 30, last sold 60 days ago: dead though it sold in 90 days",
+      "input": {
+        "onHand": 10000,
+        "lastSale": "2027-05-01",
+        "sold": 1000,
+        "today": "2027-06-30",
+        "days": 30,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "dead",
+        "daysSinceSale": 60,
+        "daysOfCover": 900
+      }
+    },
+    {
+      "name": "30 days after go-live, 1 sold: the rate is over 30 days, so 300 days of cover",
+      "input": {
+        "onHand": 10000,
+        "lastSale": "2027-01-29",
+        "sold": 1000,
+        "today": "2027-01-30",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "slow",
+        "daysSinceSale": 1,
+        "daysOfCover": 300
+      }
+    },
+    {
+      "name": "sold out",
+      "input": {
+        "onHand": 0,
+        "lastSale": "2027-06-29",
+        "sold": 3000,
+        "today": "2027-06-30",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "none",
+        "daysSinceSale": 1,
+        "daysOfCover": 0
+      }
+    },
+    {
+      "name": "below zero",
+      "input": {
+        "onHand": -1000,
+        "lastSale": null,
+        "sold": 0,
+        "today": "2027-06-30",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "expected": {
+        "kind": "none",
+        "daysSinceSale": null,
+        "daysOfCover": 0
+      }
+    },
+    {
+      "name": "a last sale after today is refused",
+      "input": {
+        "onHand": 5000,
+        "lastSale": "2027-07-01",
+        "sold": 0,
+        "today": "2027-06-30",
+        "days": 90,
+        "since": "2027-01-01"
+      },
+      "error": "invalid_range"
+    }
+  ]
+}

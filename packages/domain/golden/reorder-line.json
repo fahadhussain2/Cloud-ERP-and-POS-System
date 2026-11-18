@@ -1,0 +1,180 @@
+{
+  "description": "The reorder list (PUR-07 list, W2-02 owner answer 4): an item whose stock in the Shop and the Godown is at or below its minimum is ordered up to its maximum (quantities in thousandths). Left out: excluded from reorder, discontinued, no levels, both levels 0, nothing to order. A maximum below the minimum is flagged and ordered up to the minimum.",
+  "cases": [
+    {
+      "name": "below the minimum",
+      "input": {
+        "onHand": 2000,
+        "min": 5000,
+        "max": 20000,
+        "excluded": false,
+        "status": "active"
+      },
+      "expected": {
+        "order": 18000,
+        "levelsNeedFixing": false
+      }
+    },
+    {
+      "name": "at the minimum",
+      "input": {
+        "onHand": 5000,
+        "min": 5000,
+        "max": 20000,
+        "excluded": false,
+        "status": "active"
+      },
+      "expected": {
+        "order": 15000,
+        "levelsNeedFixing": false
+      }
+    },
+    {
+      "name": "just above the minimum",
+      "input": {
+        "onHand": 5001,
+        "min": 5000,
+        "max": 20000,
+        "excluded": false,
+        "status": "active"
+      },
+      "expected": null
+    },
+    {
+      "name": "below zero",
+      "input": {
+        "onHand": -3000,
+        "min": 0,
+        "max": 10000,
+        "excluded": false,
+        "status": "active"
+      },
+      "expected": {
+        "order": 13000,
+        "levelsNeedFixing": false
+      }
+    },
+    {
+      "name": "minimum 0, none left",
+      "input": {
+        "onHand": 0,
+        "min": 0,
+        "max": 10000,
+        "excluded": false,
+        "status": "active"
+      },
+      "expected": {
+        "order": 10000,
+        "levelsNeedFixing": false
+      }
+    },
+    {
+      "name": "both levels 0",
+      "input": {
+        "onHand": -2000,
+        "min": 0,
+        "max": 0,
+        "excluded": false,
+        "status": "active"
+      },
+      "expected": null
+    },
+    {
+      "name": "the maximum below the minimum: up to the minimum, flagged",
+      "input": {
+        "onHand": 1000,
+        "min": 5000,
+        "max": 3000,
+        "excluded": false,
+        "status": "active"
+      },
+      "expected": {
+        "order": 4000,
+        "levelsNeedFixing": true
+      }
+    },
+    {
+      "name": "minimum and maximum equal, at them: nothing to order",
+      "input": {
+        "onHand": 5000,
+        "min": 5000,
+        "max": 5000,
+        "excluded": false,
+        "status": "active"
+      },
+      "expected": null
+    },
+    {
+      "name": "excluded from reorder",
+      "input": {
+        "onHand": 0,
+        "min": 5000,
+        "max": 20000,
+        "excluded": true,
+        "status": "active"
+      },
+      "expected": null
+    },
+    {
+      "name": "discontinued",
+      "input": {
+        "onHand": 0,
+        "min": 5000,
+        "max": 20000,
+        "excluded": false,
+        "status": "discontinued"
+      },
+      "expected": null
+    },
+    {
+      "name": "dormant is still ordered",
+      "input": {
+        "onHand": 0,
+        "min": 5000,
+        "max": 20000,
+        "excluded": false,
+        "status": "dormant"
+      },
+      "expected": {
+        "order": 20000,
+        "levelsNeedFixing": false
+      }
+    },
+    {
+      "name": "no levels set",
+      "input": {
+        "onHand": 0,
+        "min": null,
+        "max": 20000,
+        "excluded": false,
+        "status": "active"
+      },
+      "expected": null
+    },
+    {
+      "name": "no maximum set",
+      "input": {
+        "onHand": 0,
+        "min": 5000,
+        "max": null,
+        "excluded": false,
+        "status": "active"
+      },
+      "expected": null
+    },
+    {
+      "name": "metres of hose: 1.5 on hand, minimum 2, maximum 10.5",
+      "input": {
+        "onHand": 1500,
+        "min": 2000,
+        "max": 10500,
+        "excluded": false,
+        "status": "active"
+      },
+      "expected": {
+        "order": 9000,
+        "levelsNeedFixing": false
+      }
+    }
+  ]
+}
