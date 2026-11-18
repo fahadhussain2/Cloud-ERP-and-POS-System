@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Issue** | To be opened when the plan is accepted |
+| **Issue** | [#176](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176) |
 | **Module** | reports (back-office screens and API, read only), with accounting (ACC-07) and platform (`/auth/me` gains the shop's name) |
-| **Status** | Proposed (2026-11-18) |
-| **Refs** | ACC-07, RPT-11; ACC-01, ACC-06 (fiscal year, lock date); posting rules §2 (system roles); CLAUDE.md rules 1, 4, 5, 10; D-100 (no legacy bills), D-101 (pilot wipe), D-110 (reports read the ledgers), D-114 (the back-office frame), D-116 (reports before go-live, owner answers 1–6) |
+| **Status** | Accepted (owner, 2026-11-18): every recommendation in questions 1–7 |
+| **Refs** | ACC-07, RPT-11; ACC-01, ACC-06 (fiscal year, lock date); posting rules §2 (system roles); CLAUDE.md rules 1, 4, 5, 10; D-100 (no legacy bills), D-101 (pilot wipe), D-110 (reports read the ledgers), D-114 (the back-office frame), D-116 (reports before go-live, owner answers 1–6; this plan's answers 1–7) |
 | **Depends on** | W1-08 (journals), W1-19 (account balances and ledger, periods, the document screen), W1-20 (report API helpers, CSV), W1-28 (the menu and the screen search) |
 | **Size** | about 4 days: domain golden files ¾; API with integration tests 1; the frame 1; the six screens and the ledger on the frame ¾; e2e and docs ½ |
 | **Test-first** | Yes: the statements' arithmetic and the period presets (golden, `packages/domain`); every report under RLS and its permission on a shop with a known month of documents (integration); trial balance → ledger → document, and print (e2e) |
@@ -25,6 +25,18 @@
 ## Owner answers already given (D-116, 2026-11-18)
 
 Four tasks, with this one first (1). Everything by go-live (2). 2026 history stays in the legacy app, read-only (3). Lists of lines up to 92 days, summaries up to a year with a comparison, statements as on any date (4). CSV and a print layout, PDFs from the browser (5). Financial reports for the owner and the accountant (`reports.financial`), as today (6). Modern design; the legacy samples give meaning only.
+
+## Owner answers (2026-11-18)
+
+The owner accepted every recommendation in the questions below (1–7) and the plan:
+
+1. A **Reports home** behind the menu's *Reports* row.
+2. The **multi-step profit and loss** with the *stock and purchases* panel.
+3. Profit and loss against the **previous period**; balance sheet against the **end of last month**.
+4. Trial balance: **every postable account with group subtotals**, empty accounts hidden.
+5. Cash book: **all cash and bank accounts on one screen**.
+6. Filters **in the address and remembered** in the browser; no saved views.
+7. A **cash flow statement as the last item of W2-04**.
 
 ## Questions for the owner (each with a recommendation)
 
@@ -109,7 +121,7 @@ Four tasks, with this one first (1). Everything by go-live (2). 2026 history sta
   - budgets and budget vs actual;
   - multi-branch consolidation (one branch);
   - charts (W2-03's sales over time adds the first);
-  - the cash flow statement (question 7, W2-04);
+  - the cash flow statement (answer 7: the last item of W2-04);
   - saved named views;
   - server-made PDF and Excel files (D-116 answer 5);
   - scheduled or emailed reports;
