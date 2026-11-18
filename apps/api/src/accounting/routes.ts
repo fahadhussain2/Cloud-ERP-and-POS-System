@@ -33,8 +33,11 @@ import {
   checkMoneyDocument,
   fiscalYearOf,
   monthEnd,
+  PERIOD_PRESETS,
+  periodOf,
   validateChartOfAccounts,
   type MoneyDocumentInput,
+  type PeriodPreset,
   type Permission,
   type SystemRole,
   type VoucherAccount,
@@ -1019,14 +1022,22 @@ export function registerAccounting(scope: FastifyInstance, { pool, now, requireA
 
   scope.get('/accounting/accounts/:id/ledger', { preHandler: financial }, async (req, reply) => {
     const id = (req.params as { id: string }).id;
-    const q = req.query as { from?: string; to?: string };
+    const q = req.query as { from?: string; to?: string; preset?: string };
     const valid = (v: string | undefined) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
     return run(req, reply, async (c) => {
       const account = (await accountRows(c)).find((a) => a.id === id);
       if (!account) throw new Refusal(404, { error: 'not_found' });
       const { today } = await shopDay(c, now());
-      const to = valid(q.to) ?? today;
-      const from = valid(q.from) ?? `${to.slice(0, 8)}01`;
+      // A preset (this month, last quarter…) on the shop's fiscal year, as on every report frame (W2-01).
+      const preset = (PERIOD_PRESETS as readonly string[]).includes(q.preset ?? '')
+        ? (q.preset as PeriodPreset)
+        : null;
+      const startMonth = preset
+        ? (await c.query<{ m: number }>('SELECT fiscal_year_start_month AS m FROM erp.tenants')).rows[0]!.m
+        : 1;
+      const p = preset ? periodOf(preset, today, startMonth) : null;
+      const to = p?.to ?? valid(q.to) ?? today;
+      const from = p?.from ?? valid(q.from) ?? `${to.slice(0, 8)}01`;
       const opening = Number(
         (
           await c.query<{ b: string }>(

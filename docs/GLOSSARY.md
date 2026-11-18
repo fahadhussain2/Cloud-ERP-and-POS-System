@@ -19,4 +19,8 @@
 | **Offline daily cap** | Maximum a credit customer can buy on account per day from a counter that is offline |
 | **Exception** | A rule break the server accepted and flagged for review (e.g. below floor without override, missing handover) |
 | **Outbox** | A device's queue of finalized documents waiting to be pushed to the server |
+| **Trial balance** | Every account's opening, movement and closing, debit and credit, for a period; debits equal credits at every level (W2-01) |
+| **Day book** | Every journal voucher posted in a period, in posting order, with its lines (RPT-11) |
+| **Cash book** | Each cash and bank account (drawer, cash in transit, safe, banks and wallets) by day: opening, money in, money out, closing (ACC-07) |
+| **Profit for the year** | Income − expenses from the start of the fiscal year to a date, shown in equity on the balance sheet; worked out from the books, never posted (no closing entry until the first year end) |
 | **Wave** | A build-order block of the MVP (Wave 0 foundations, Wave 1 critical path, Wave 2 rest of MVP) |

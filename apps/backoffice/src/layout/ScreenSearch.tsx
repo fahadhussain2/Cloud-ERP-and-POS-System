@@ -3,19 +3,24 @@ import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { navigate } from '../router';
+import type { ReportEntry } from '../reports/catalog';
 import type { MenuGroup } from './menu';
 
 // Go to a screen by its name (W1-28 plan, owner answer 1): Ctrl K or the top bar's search opens it; typing narrows the
 // screens this person may open, by their name or their group's; ↑ ↓ choose and Enter or a click opens one. Screens
-// only: finding items, customers or bills from here is a later task.
+// only: finding items, customers or bills from here is a later task. Each report is found by its own name too, though
+// the menu shows only the Reports home (W2-01, owner answer 1).
 
 export function ScreenSearch({
   groups,
+  reports = [],
   open,
   onOpenChange,
 }: {
   /** The menu as this person may open it. */
   groups: readonly MenuGroup[];
+  /** The reports this person may open. */
+  reports?: readonly ReportEntry[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -25,11 +30,22 @@ export function ScreenSearch({
   const listId = useId();
 
   const q = text.trim().toLocaleLowerCase();
-  const screens = groups
-    .flatMap((g) =>
-      g.items.map((i) => ({ ...i, label: t(`nav.${i.key}`), group: t(`nav.groups.${g.group}`) })),
-    )
-    .filter((s) => q === '' || `${s.label}\n${s.group}`.toLocaleLowerCase().includes(q));
+  const screens = [
+    ...groups.flatMap((g) =>
+      g.items.map((i) => ({
+        key: i.key,
+        href: i.href,
+        label: t(`nav.${i.key}`),
+        group: t(`nav.groups.${g.group}`),
+      })),
+    ),
+    ...reports.map((r) => ({
+      key: r.key,
+      href: r.href,
+      label: t(`nav.${r.key}`),
+      group: t('nav.groups.reports'),
+    })),
+  ].filter((s) => q === '' || `${s.label}\n${s.group}`.toLocaleLowerCase().includes(q));
   const at = Math.min(selected, Math.max(0, screens.length - 1));
 
   const close = (next: boolean) => {

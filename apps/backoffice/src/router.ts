@@ -5,6 +5,13 @@ import { useEffect, useState } from 'react';
 
 export type Route =
   | { screen: 'home' }
+  | { screen: 'reportsHome' }
+  | { screen: 'trialBalance' }
+  | { screen: 'profitLoss' }
+  | { screen: 'balanceSheet' }
+  | { screen: 'cashBook' }
+  | { screen: 'dayBook' }
+  | { screen: 'expensesReport' }
   | { screen: 'staff' }
   | { screen: 'person'; id: string }
   | { screen: 'counters' }
@@ -53,6 +60,14 @@ export const href = {
   shopSettings: '#/shop',
   dayReconciliation: '#/reports/day',
   cashVariance: '#/reports/variance',
+  // The Reports home and the financial statements (W2-01, D-116); their filters follow a `?` (reportHref).
+  reports: '#/reports',
+  trialBalance: '#/reports/trial-balance',
+  profitLoss: '#/reports/profit-loss',
+  balanceSheet: '#/reports/balance-sheet',
+  cashBook: '#/reports/cash-book',
+  dayBook: '#/reports/day-book',
+  expensesReport: '#/reports/expenses',
   // The W1-20 reports and support (D-110).
   salesRegister: '#/reports/sales',
   overridesReport: '#/reports/overrides',
@@ -101,12 +116,33 @@ export const href = {
   expenseCategories: '#/accounting/categories',
 } as const;
 
+/** A screen's address with its filters (W2-01 plan, owner answer 6), e.g. a report's period. */
+export function withQuery(base: string, query: Record<string, string | null | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) if (v) q.set(k, v);
+  const text = q.toString();
+  return text ? `${base}?${text}` : base;
+}
+
+/** The filters after the `?` of an address (the hash), if any. */
+export function queryOf(hash: string): URLSearchParams {
+  const at = hash.indexOf('?');
+  return new URLSearchParams(at < 0 ? '' : hash.slice(at + 1));
+}
+
 export function parseHash(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+  const parts = hash.replace(/^#\/?/, '').split('?')[0]!.split('/').filter(Boolean);
   if (parts[0] === 'staff' && parts[1]) return { screen: 'person', id: decodeURIComponent(parts[1]) };
   if (parts[0] === 'staff') return { screen: 'staff' };
   if (parts[0] === 'counters') return { screen: 'counters' };
   if (parts[0] === 'shop' && parts.length === 1) return { screen: 'shopSettings' };
+  if (parts[0] === 'reports' && parts.length === 1) return { screen: 'reportsHome' };
+  if (parts[0] === 'reports' && parts[1] === 'trial-balance') return { screen: 'trialBalance' };
+  if (parts[0] === 'reports' && parts[1] === 'profit-loss') return { screen: 'profitLoss' };
+  if (parts[0] === 'reports' && parts[1] === 'balance-sheet') return { screen: 'balanceSheet' };
+  if (parts[0] === 'reports' && parts[1] === 'cash-book') return { screen: 'cashBook' };
+  if (parts[0] === 'reports' && parts[1] === 'day-book') return { screen: 'dayBook' };
+  if (parts[0] === 'reports' && parts[1] === 'expenses') return { screen: 'expensesReport' };
   if (parts[0] === 'reports' && parts[1] === 'day') return { screen: 'dayReconciliation' };
   if (parts[0] === 'reports' && parts[1] === 'variance') return { screen: 'cashVariance' };
   if (parts[0] === 'reports' && parts[1] === 'sales') return { screen: 'salesRegister' };

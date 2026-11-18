@@ -17,6 +17,18 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { apiQuery, useFilters } from '../reports/frame/filters';
+import { documentHref } from '../reports/frame/links';
+import {
+  ListTable,
+  moneyText,
+  PeriodFilter,
+  periodOf,
+  periodQuery,
+  periodWords,
+  ReportPage,
+  useReport,
+} from '../reports/frame/ReportFrame';
 import { href } from '../router';
 import { FormDialog } from '../staff/dialogs';
 import { accountingRefusal, AccountSelect, ErrorText, useAccountingLookups } from './data';
@@ -24,17 +36,6 @@ import { accountingRefusal, AccountSelect, ErrorText, useAccountingLookups } fro
 // The chart with each account's balance at a date, an account's ledger with its running balance (part of ACC-07, owner
 // answer 3 to W1-19), and the accountant's new accounts and expense categories (owner answer 4). Banks, wallets and
 // roles stay a setup job.
-
-/** Where a ledger line's document opens in the back office, when it is one of its own. */
-function sourceHref(type: string, id: string): string | null {
-  if (['customer_receipt', 'expense', 'fund_transfer', 'supplier_payment', 'journal_voucher'].includes(type))
-    return href.accountingDocument(type, id);
-  if (type === 'goods_receipt') return href.receipt(id);
-  if (type === 'purchase_return') return href.purchaseReturn(id);
-  if (type === 'stock_transfer' || type === 'stock_transfer_receipt') return href.transfer(id);
-  if (type === 'stock_adjustment') return href.adjustment(id);
-  return null;
-}
 
 export function AccountsScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
@@ -211,112 +212,100 @@ function NewAccountDialog({
   );
 }
 
+/** One account's lines in a period, with its opening and running balance (W1-19), on the report frame (W2-01). */
 export function LedgerScreen({ api, id }: { api: Api; id: string }) {
   const { t } = useTranslation();
+  const [filters, setFilters] = useFilters('ledger');
+  const period = periodOf(filters, 'thisMonth');
+  const url = `/api/accounting/accounts/${encodeURIComponent(id)}/ledger?${apiQuery(periodQuery(period))}`;
+  const { report: ledger, error } = useReport<LedgerView>(api, url);
   const lookups = useAccountingLookups(api);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [ledger, setLedger] = useState<LedgerView | null | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    const q = new URLSearchParams();
-    if (from) q.set('from', from);
-    if (to) q.set('to', to);
-    void api('GET', `/api/accounting/accounts/${encodeURIComponent(id)}/ledger?${q.toString()}`).then(
-      (r) => live && setLedger(r.status === 200 ? (r.body as LedgerView) : null),
-    );
-    return () => {
-      live = false;
-    };
-  }, [api, id, from, to]);
-  if (lookups === null || ledger === undefined)
-    return <p className="text-muted-foreground">{t('app.loading')}</p>;
-  if (ledger === null) return <PageHeader title={t('accounting.document.notFound')} />;
-  const m = lookups.money;
+  const m = lookups?.money ?? null;
+  const title = ledger ? `${ledger.account.code} ${ledger.account.name}` : t('nav.accountLedger');
+  type Line = LedgerView['lines'][number] & { i: number };
+  const lines: Line[] = ledger?.lines.map((l, i) => ({ ...l, i })) ?? [];
   return (
-    <>
-      <PageHeader
-        eyebrow={
-          <a href={href.accounts} className="underline-offset-4 hover:underline">
-            {t('accounting.accounts.title')}
-          </a>
-        }
-        title={`${ledger.account.code} ${ledger.account.name}`}
-        help={t('accounting.ledger.help')}
-      />
-      <Panel className="flex flex-wrap items-end gap-3 p-3.5">
-        <TextField
-          label={t('accounting.ledger.from')}
-          type="date"
-          value={from || ledger.from}
-          onChange={(e) => setFrom(e.target.value)}
-          wrapperClassName="w-48"
-        />
-        <TextField
-          label={t('accounting.ledger.to')}
-          type="date"
-          value={to || ledger.to}
-          onChange={(e) => setTo(e.target.value)}
-          wrapperClassName="w-48"
-        />
-      </Panel>
-      <Panel className="px-1.5 pb-2.5">
-        <Table aria-label={t('accounting.ledger.lines')}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('accounting.fields.date')}</TableHead>
-              <TableHead>{t('accounting.ledger.journal')}</TableHead>
-              <TableHead>{t('accounting.ledger.memo')}</TableHead>
-              <TableHead>{t('accounting.fields.party')}</TableHead>
-              <TableHead className="text-end">{t('accounting.fields.debit')}</TableHead>
-              <TableHead className="text-end">{t('accounting.fields.credit')}</TableHead>
-              <TableHead className="text-end">{t('accounting.accounts.balance')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow>
-              <TableCell colSpan={6}>{t('accounting.ledger.opening')}</TableCell>
-              <TableCell className="text-end tabular-nums">{formatMoney(ledger.opening, m)}</TableCell>
-            </TableRow>
-            {ledger.lines.map((l, i) => {
-              const link = sourceHref(l.sourceType, l.sourceId);
-              return (
-                <TableRow key={i}>
-                  <TableCell>{l.date}</TableCell>
-                  <TableCell>
-                    {link ? (
-                      <a href={link} className="font-mono underline-offset-4 hover:underline">
-                        {l.journalNumber}
-                      </a>
-                    ) : (
-                      <span className="font-mono">{l.journalNumber}</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{l.memo ?? ''}</TableCell>
-                  <TableCell>{l.partyName ?? ''}</TableCell>
-                  <TableCell className="text-end tabular-nums">
-                    {l.debit ? formatMoney(l.debit, m) : ''}
-                  </TableCell>
-                  <TableCell className="text-end tabular-nums">
-                    {l.credit ? formatMoney(l.credit, m) : ''}
-                  </TableCell>
-                  <TableCell className="text-end tabular-nums">{formatMoney(l.balance, m)}</TableCell>
-                </TableRow>
-              );
-            })}
-            <TableRow>
-              <TableCell colSpan={6} className="font-semibold">
-                {t('accounting.ledger.closing')}
-              </TableCell>
-              <TableCell className="text-end font-semibold tabular-nums">
-                {formatMoney(ledger.closing, m)}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-        {ledger.truncated && <p className="m-0 px-2 text-sm text-warn">{t('accounting.ledger.truncated')}</p>}
-      </Panel>
-    </>
+    <ReportPage
+      eyebrow={
+        <a href={href.accounts} className="underline-offset-4 hover:underline print:hidden">
+          {t('accounting.accounts.title')}
+        </a>
+      }
+      title={title}
+      help={t('accounting.ledger.help')}
+      filters={<PeriodFilter value={period} shown={ledger} onChange={(p) => setFilters(periodQuery(p))} />}
+      printFilters={periodWords(ledger)}
+      csv={ledger && `${url}&format=csv`}
+      error={error}
+      loading={ledger === null || m === null}
+      figures={
+        ledger && m
+          ? [
+              { key: 'opening', label: t('accounting.ledger.opening'), value: moneyText(ledger.opening, m) },
+              { key: 'closing', label: t('accounting.ledger.closing'), value: moneyText(ledger.closing, m) },
+            ]
+          : []
+      }
+    >
+      {ledger && m && (
+        <>
+          <ListTable<Line>
+            label={t('accounting.ledger.lines')}
+            rows={lines}
+            rowKey={(l) => String(l.i)}
+            text={(l) => `${l.journalNumber} ${l.number ?? ''} ${l.memo ?? ''} ${l.partyName ?? ''}`}
+            columns={[
+              {
+                key: 'date',
+                label: t('accounting.fields.date'),
+                sort: (l) => `${l.date} ${l.i}`,
+                cell: (l) => l.date,
+              },
+              {
+                key: 'journal',
+                label: t('accounting.ledger.journal'),
+                cell: (l) => {
+                  const link = documentHref(l.sourceType, l.sourceId, l.number);
+                  return link ? (
+                    <a href={link} className="font-mono underline-offset-4 hover:underline">
+                      {l.journalNumber}
+                    </a>
+                  ) : (
+                    <span className="font-mono">{l.journalNumber}</span>
+                  );
+                },
+              },
+              { key: 'memo', label: t('accounting.ledger.memo'), cell: (l) => l.memo ?? '' },
+              { key: 'party', label: t('accounting.fields.party'), cell: (l) => l.partyName ?? '' },
+              {
+                key: 'debit',
+                label: t('accounting.fields.debit'),
+                end: true,
+                sort: (l) => l.debit,
+                cell: (l) => moneyText(l.debit, m, true),
+              },
+              {
+                key: 'credit',
+                label: t('accounting.fields.credit'),
+                end: true,
+                sort: (l) => l.credit,
+                cell: (l) => moneyText(l.credit, m, true),
+              },
+              {
+                key: 'balance',
+                label: t('accounting.accounts.balance'),
+                end: true,
+                cell: (l) => moneyText(l.balance, m),
+              },
+            ]}
+            footer={[t('accounting.ledger.closing'), '', '', '', '', '', moneyText(ledger.closing, m)]}
+          />
+          {ledger.truncated && (
+            <p className="m-0 px-2 text-sm text-warn">{t('accounting.ledger.truncated')}</p>
+          )}
+        </>
+      )}
+    </ReportPage>
   );
 }
 

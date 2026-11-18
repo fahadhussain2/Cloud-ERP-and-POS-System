@@ -1,13 +1,14 @@
-import type {
-  BalanceSheetView,
-  CashBookAccount,
-  CashBookView,
-  DayBookEntry,
-  DayBookView,
-  ExpensesView,
-  ProfitLossView,
-  StatementSectionView,
-  TrialBalanceView,
+import {
+  JOURNAL_SOURCES,
+  type BalanceSheetView,
+  type CashBookAccount,
+  type CashBookView,
+  type DayBookEntry,
+  type DayBookView,
+  type ExpensesView,
+  type ProfitLossView,
+  type StatementSectionView,
+  type TrialBalanceView,
 } from '@erp/contracts';
 import { withTenant } from '@erp/db';
 import {
@@ -19,12 +20,14 @@ import {
   lastYearPeriod,
   monthEnd,
   monthsOf,
+  PERIOD_PRESETS,
   periodOf,
   previousPeriod,
   profitAndLoss,
   stockAndPurchases,
   trialBalance,
   type Period,
+  type PeriodPreset,
   type StatementAccount,
 } from '@erp/domain';
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
@@ -55,26 +58,6 @@ export const LIST_DAYS = 92;
 export const SUMMARY_DAYS = 366;
 /** One page of a cash book account's lines, or of the day book's entries; totals still count them all. */
 const PAGE = 1000;
-/** Every source a journal entry can have (postings_source_type_check, migration 0019). */
-export const SOURCE_TYPES = [
-  'opening',
-  'sale',
-  'sales_void',
-  'cash_handover',
-  'payment',
-  'cash_movement',
-  'cash_session',
-  'goods_receipt',
-  'purchase_return',
-  'supplier_payment',
-  'stock_transfer',
-  'stock_transfer_receipt',
-  'stock_adjustment',
-  'customer_receipt',
-  'expense',
-  'fund_transfer',
-  'journal_voucher',
-] as const;
 
 class BadRequest extends Error {
   constructor(readonly error: string) {
@@ -152,9 +135,21 @@ async function balancesAt(c: Client, at: string, since: string | null) {
   return rows.map((r) => ({ accountId: r.account_id, balance: num(r.balance) }));
 }
 
-/** from/to, defaulting to `fallback`; at most `maxDays` (range_too_long), real dates the right way round. */
-function rangeOf(q: Query, fallback: Period, maxDays: number): Period {
-  const p = { from: q['from'] || fallback.from, to: q['to'] || fallback.to };
+/**
+ * The period: a preset (`thisMonth`…, on the shop's today and fiscal year), else from/to, else `fallback`; at most
+ * `maxDays` (range_too_long), real dates the right way round. A preset keeps a saved link relative ("this month").
+ */
+function rangeOf(
+  q: Query,
+  fallback: Period,
+  maxDays: number,
+  s: { today: string; startMonth: number },
+): Period {
+  const preset = q['preset'];
+  if (preset && !(PERIOD_PRESETS as readonly string[]).includes(preset)) throw new BadRequest('bad_request');
+  const p = preset
+    ? periodOf(preset as PeriodPreset, s.today, s.startMonth)
+    : { from: q['from'] || fallback.from, to: q['to'] || fallback.to };
   try {
     checkRange(p, maxDays);
   } catch (err) {
@@ -215,7 +210,7 @@ export function registerFinancialReports(scope: FastifyInstance, { pool, now, re
   scope.get('/reports/trial-balance', { preHandler: financial }, async (req, reply) =>
     run(req, reply, async (c, s) => {
       const q = query(req);
-      const p = rangeOf(q, periodOf('thisMonth', s.today, s.startMonth), SUMMARY_DAYS);
+      const p = rangeOf(q, periodOf('thisMonth', s.today, s.startMonth), SUMMARY_DAYS, s);
       const level = q['level'] === 'groups' ? 'groups' : 'accounts';
       const showEmpty = q['empty'] === 'show';
       const tb = trialBalance({ accounts: await chart(c), sums: await periodSums(c, p), level, showEmpty });
@@ -264,7 +259,7 @@ export function registerFinancialReports(scope: FastifyInstance, { pool, now, re
   scope.get('/reports/profit-loss', { preHandler: financial }, async (req, reply) =>
     run(req, reply, async (c, s) => {
       const q = query(req);
-      const p = rangeOf(q, periodOf('thisMonth', s.today, s.startMonth), SUMMARY_DAYS);
+      const p = rangeOf(q, periodOf('thisMonth', s.today, s.startMonth), SUMMARY_DAYS, s);
       const compare =
         (['previous', 'last-year', 'none', 'months'] as const).find((v) => v === q['compare']) ?? 'previous';
       const periods: Period[] =
@@ -392,7 +387,7 @@ export function registerFinancialReports(scope: FastifyInstance, { pool, now, re
   scope.get('/reports/cash-book', { preHandler: financial }, async (req, reply) =>
     run(req, reply, async (c, s) => {
       const q = query(req);
-      const p = rangeOf(q, { from: s.today, to: s.today }, LIST_DAYS);
+      const p = rangeOf(q, { from: s.today, to: s.today }, LIST_DAYS, s);
       const accountId = q['accountId'] || null;
       if (accountId !== null && !UUID.test(accountId)) throw new BadRequest('bad_request');
       // One definition of cash and bank with the Money screen: the drawer, cash in transit, the safe, and every
@@ -481,7 +476,13 @@ export function registerFinancialReports(scope: FastifyInstance, { pool, now, re
         })),
         truncated: a.lines.length > PAGE,
       }));
-      const result: CashBookView = { money: await moneyOf(c), ...p, accountId, accounts: out };
+      const result: CashBookView = {
+        money: await moneyOf(c),
+        ...p,
+        accountId,
+        choices: accounts.map((a) => ({ id: a.id, code: a.code, name: a.name })),
+        accounts: out,
+      };
       if (!wantsCsv(req)) return result;
       return sendCsv(
         reply,
@@ -526,9 +527,9 @@ export function registerFinancialReports(scope: FastifyInstance, { pool, now, re
   scope.get('/reports/day-book', { preHandler: financial }, async (req, reply) =>
     run(req, reply, async (c, s) => {
       const q = query(req);
-      const p = rangeOf(q, { from: s.today, to: s.today }, LIST_DAYS);
+      const p = rangeOf(q, { from: s.today, to: s.today }, LIST_DAYS, s);
       const type = q['type'] || null;
-      if (type !== null && !(SOURCE_TYPES as readonly string[]).includes(type))
+      if (type !== null && !(JOURNAL_SOURCES as readonly string[]).includes(type))
         throw new BadRequest('bad_request');
       const entries = await c.query<{
         id: string;
@@ -662,6 +663,7 @@ export function registerFinancialReports(scope: FastifyInstance, { pool, now, re
         q,
         { from: year.start, to: periodOf('thisMonth', s.today, s.startMonth).to },
         SUMMARY_DAYS,
+        s,
       );
       const months = monthsOf(p);
       const accounts = await chart(c);

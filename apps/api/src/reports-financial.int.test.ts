@@ -665,6 +665,10 @@ describe('who sees what, and the limits', () => {
     });
     expect((await at('2027-07-02', '2027-07-01', 'cash-book')).json()).toEqual({ error: 'bad_request' });
     expect((await send('GET', '/api/reports/day-book?type=nonsense', 'fahad')).statusCode).toBe(400);
+    expect((await send('GET', '/api/reports/trial-balance?preset=fortnight', 'fahad')).statusCode).toBe(400);
+    // A preset is worked out on the shop's today: a saved link to "this month" stays this month.
+    const month = await view<TrialBalanceView>('/api/reports/trial-balance?preset=thisMonth');
+    expect(month.from).toBe(monthStart());
     expect((await send('GET', '/api/reports/balance-sheet?at=2027-02-30', 'fahad')).statusCode).toBe(400);
   });
 
@@ -683,6 +687,10 @@ describe('who sees what, and the limits', () => {
       'fahad',
     );
     expect(ledger.body.split('\r\n')[0]).toBe('date,journal,document,source,memo,party,debit,credit,balance');
+    const month = await view<{ from: string }>(
+      `/api/accounting/accounts/${account['1300']}/ledger?preset=thisMonth`,
+    );
+    expect(month.from).toBe(monthStart());
     expect((await view<{ shopName: string }>('/api/auth/me')).shopName).toBe(`${SHOP} shop`);
   });
 });

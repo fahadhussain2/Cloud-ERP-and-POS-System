@@ -4,6 +4,28 @@ import type { ReportMoney } from './reports';
 // the journal by @erp/domain's statements.ts. Money in whole minor units (rule 1); a percentage is basis points.
 // Every one needs reports.financial (owner, accountant).
 
+/** Every source a journal entry can have (postings_source_type_check, migration 0019): the day book's filter. */
+export const JOURNAL_SOURCES = [
+  'opening',
+  'sale',
+  'sales_void',
+  'cash_handover',
+  'payment',
+  'cash_movement',
+  'cash_session',
+  'goods_receipt',
+  'purchase_return',
+  'supplier_payment',
+  'stock_transfer',
+  'stock_transfer_receipt',
+  'stock_adjustment',
+  'customer_receipt',
+  'expense',
+  'fund_transfer',
+  'journal_voucher',
+] as const;
+export type JournalSource = (typeof JOURNAL_SOURCES)[number];
+
 export interface Sides {
   debit: number;
   credit: number;
@@ -138,6 +160,8 @@ export interface CashBookAccount {
 export interface CashBookView extends Period {
   money: ReportMoney;
   accountId: string | null;
+  /** Every cash and bank account, for the filter. */
+  choices: { id: string; code: string; name: string }[];
   accounts: CashBookAccount[];
 }
 

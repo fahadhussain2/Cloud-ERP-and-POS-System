@@ -90,3 +90,26 @@ body,
     break-after: page;
   }
 }
+
+/*
+ * The reports on paper (W2-01 plan, D-116 answer 5): the browser's print or Save as PDF. The menu, the top bar and the
+ * filters carry `print:hidden`; the page is A4 and white, a long table repeats its column headers on every page and
+ * keeps each row whole. Label printing sets its own page size while it prints (LabelsScreen).
+ */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  html,
+  body {
+    background: #fff;
+    color: #000;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    break-inside: avoid;
+  }
+}

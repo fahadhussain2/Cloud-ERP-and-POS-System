@@ -133,6 +133,7 @@ export {
   type VoidRow,
   type VoidsReturnsView,
 } from './report-views';
+export { JOURNAL_SOURCES, type JournalSource } from './financial-reports';
 export type {
   BalanceSheetView,
   CashBookAccount,

@@ -3,7 +3,7 @@ import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import pos from '../apps/pos/src/locales/en.json' with { type: 'json' };
-import { menu } from './backoffice';
+import { menu, report } from './backoffice';
 import { expect, test } from './counter-test';
 import { BACKOFFICE_PORT, MANAGER, OWNER, OWNER_PASSWORD, POS_PORT, SALESMAN, SHOP } from './fixtures';
 
@@ -65,13 +65,13 @@ test('the owner finds a counter bill in the register, traces it, reviews an exce
   await signIn(page);
 
   // The sales register on the bill's day lists it.
-  await menu(page, bo.nav.salesRegister);
+  await report(page, bo.nav.salesRegister);
   await page.getByLabel(r.range.from).fill(bill!.day);
   await page.getByLabel(r.range.to).fill(bill!.day);
   await expect(page.getByRole('table', { name: r.register.list })).toContainText(bill!.number);
 
   // Its trace: made on the counter, accepted by the server, posted.
-  await menu(page, bo.nav.trace);
+  await report(page, bo.nav.trace);
   await page.getByLabel(bo.support.trace.number).fill(bill!.number);
   await page.getByRole('button', { name: bo.support.trace.find }).click();
   await expect(page.getByText(/^Made on /)).toBeVisible();
@@ -85,7 +85,7 @@ test('the owner finds a counter bill in the register, traces it, reviews an exce
      FROM erp.sales_documents WHERE id = $1 RETURNING id`,
     [bill!.id],
   );
-  await menu(page, bo.nav.exceptions);
+  await report(page, bo.nav.exceptions);
   await page.getByLabel(r.range.from).fill(bill!.day);
   await page.getByLabel(r.range.to).fill(bill!.day);
   const row = page.getByRole('row', { name: new RegExp(r.exc.kinds.clock_skew) });
