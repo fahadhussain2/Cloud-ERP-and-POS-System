@@ -58,19 +58,25 @@ test('stock at today is the stock on hand; a sold part opens its stock ledger an
   await report(page, bo.nav.stockAt);
   const table = page.getByRole('table', { name: bo.nav.stockAt });
   await expect(table).toBeVisible();
+  // Stock as on the shop's business date (04:00 cut-off): between midnight and 04:00 a document dated by the calendar
+  // is tomorrow's, and not in stock "as on today" yet.
   const [{ q }] = (await sql<{ q: string }>(
-    'SELECT (coalesce(sum(qty), 0) * 1000)::bigint::text AS q FROM erp.stock_balances',
+    `SELECT (coalesce(sum(m.qty_delta), 0) * 1000)::bigint::text AS q FROM erp.stock_movements m
+     JOIN erp.tenants t ON t.id = m.tenant_id JOIN erp.tenant_directory d ON d.tenant_id = t.id
+     WHERE d.code = $1
+       AND m.business_date <= ((now() AT TIME ZONE t.timezone) - make_interval(hours => t.day_cutoff_hour))::date`,
+    [SHOP],
   )) as [{ q: string }];
   await expect(page.getByLabel(bo.reports.frame.figures)).toContainText(qtyText(Number(q)));
 
-  // BRPD001, sold on the counter: its ledger for the year, and a bill line opens the trace.
+  // BRPD001, sold on the counter: its ledger, and a bill line opens the trace.
   await report(page, bo.nav.stockLedger);
   await expect(page.getByText(r.ledger.pick)).toBeVisible();
   await page.getByRole('button', { name: r.item, exact: true }).click();
   await page.getByRole('textbox', { name: r.item, exact: true }).fill('BRPD001');
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('BRPD001');
   await page.getByRole('textbox', { name: r.item, exact: true }).press('Enter');
-  await page.getByLabel(bo.reports.frame.period).selectOption('thisYear');
+  // This month, the default: the ledger takes up to 92 days.
   await expect(page.getByRole('heading', { level: 1 })).toContainText('BRPD001');
   const lines = page.getByRole('table', { name: r.ledger.lines });
   await expect(lines.getByRole('row').filter({ hasText: r.kinds.sale }).first()).toBeVisible();

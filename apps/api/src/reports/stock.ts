@@ -194,10 +194,13 @@ async function sinceOf(c: Client, today: string): Promise<string> {
   return d !== null && d < today ? d : today;
 }
 
-/** Per item (and location, if `perLocation`): Σ quantity and value of the movements on or before `at`. */
+/**
+ * Per item (and location, if `perLocation`): Σ quantity and value of the movements on or before `at`, or of every one
+ * (`at` null: what is on hand now, a document dated by the calendar after midnight included).
+ */
 async function stockAt(
   c: Client,
-  at: string,
+  at: string | null,
   locationId: string | null,
   perLocation: boolean,
   kinds?: string[],
@@ -206,7 +209,7 @@ async function stockAt(
     `SELECT m.item_id, ${perLocation ? 'm.location_id' : 'NULL::uuid'} AS location_id,
        (sum(m.qty_delta) * 1000)::bigint::text AS qty, sum(m.value_delta)::text AS value
      FROM erp.stock_movements m
-     WHERE m.business_date <= $1 AND ($2::uuid IS NULL OR m.location_id = $2)
+     WHERE ($1::date IS NULL OR m.business_date <= $1) AND ($2::uuid IS NULL OR m.location_id = $2)
        AND ($3::text[] IS NULL OR m.location_id IN (SELECT id FROM erp.locations WHERE kind = ANY($3::text[])))
      GROUP BY 1, 2 HAVING sum(m.qty_delta) <> 0 OR sum(m.value_delta) <> 0`,
     [at, locationId, kinds ?? null],
@@ -737,7 +740,7 @@ export function registerStockReports(scope: FastifyInstance, { pool, now, requir
       const values = allowed(req, 'cost.view');
       const since = await sinceOf(c, s.today);
       const onHand = new Map(
-        (await stockAt(c, s.today, null, false, ON_HAND_KINDS)).map((x) => [x.itemId, x.qty]),
+        (await stockAt(c, null, null, false, ON_HAND_KINDS)).map((x) => [x.itemId, x.qty]),
       );
       const facts = await factsOf(c, null, q);
       const listed = facts.flatMap((f) => {
@@ -860,7 +863,7 @@ export function registerStockReports(scope: FastifyInstance, { pool, now, requir
       if (!(DEAD_DAYS as readonly number[]).includes(days)) throw new BadRequest('bad_request');
       const values = allowed(req, 'cost.view');
       const since = await sinceOf(c, s.today);
-      const stock = (await stockAt(c, s.today, null, false, ON_HAND_KINDS)).filter((x) => x.qty > 0);
+      const stock = (await stockAt(c, null, null, false, ON_HAND_KINDS)).filter((x) => x.qty > 0);
       const facts = await factsOf(
         c,
         stock.map((x) => x.itemId),
