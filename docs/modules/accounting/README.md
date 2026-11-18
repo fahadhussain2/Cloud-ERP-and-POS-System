@@ -22,7 +22,7 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 | ACC-04 | Back-office receipts and payments (bank), expenses, bank-to-bank transfers. | 1 |
 | ACC-05 | Journal vouchers (accountant), with reversal. | 1 |
 | ACC-06 | Fiscal years and periods from the tenant setting. | 1 |
-| ACC-07 | Reports: account ledger, cash book, trial balance, profit & loss, balance sheet (any date range). | 2 |
+| ACC-07 | Reports: account ledger, cash book, trial balance, profit & loss, balance sheet (any date range). Built before go-live with the reports (D-116, [W2-01](../reports/plans/W2-01-report-frame-financial-statements.md)). | 2 (D-116: go-live) |
 | ACC-08 | Payment-method → GL account mapping (e.g. | 1 |
 | ACC-09 | Tax code on items (all 0% in the MVP) and tax lines on documents, so VAT/sales tax can be switched on later without schema changes. | 1 |
 
