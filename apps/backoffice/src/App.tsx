@@ -43,6 +43,14 @@ import {
   ReportsHomeScreen,
   TrialBalanceScreen,
 } from './reports/FinancialScreens';
+import {
+  DeadStockScreen,
+  InventoryAnalysisScreen,
+  ReorderScreen,
+  StockAtScreen,
+  StockLedgerScreen,
+  StockMovementScreen,
+} from './reports/StockReportScreens';
 import { PrintProvider } from './reports/frame/ReportFrame';
 import { CashVarianceScreen, DayReconciliationScreen } from './screens/ReportsScreens';
 import { PersonScreen } from './staff/PersonScreen';
@@ -157,6 +165,18 @@ export function App({ api }: { api: Api }) {
           <VoidsReturnsScreen api={api} />
         ) : shown.screen === 'stockReport' ? (
           <StockReportScreen api={api} />
+        ) : shown.screen === 'stockAt' ? (
+          <StockAtScreen api={api} />
+        ) : shown.screen === 'stockMovement' ? (
+          <StockMovementScreen api={api} />
+        ) : shown.screen === 'stockLedger' ? (
+          <StockLedgerScreen api={api} />
+        ) : shown.screen === 'reorder' ? (
+          <ReorderScreen api={api} />
+        ) : shown.screen === 'deadStock' ? (
+          <DeadStockScreen api={api} />
+        ) : shown.screen === 'inventoryAnalysis' ? (
+          <InventoryAnalysisScreen api={api} />
         ) : shown.screen === 'ageing' ? (
           <AgeingScreen api={api} />
         ) : shown.screen === 'exceptions' ? (

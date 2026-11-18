@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../api';
 import { moneyText, moneyValue, qtyText } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
-import { href, navigate } from '../router';
+import { href, navigate, withQuery } from '../router';
 import { inventoryRefusal, locationName, useInventoryLookups } from './data';
 
 // Reading and setting up the stock (W1-18): an item's stock card (INV-07), Transfer needed (PRD W13) and the owner's
@@ -72,6 +72,14 @@ export function StockCardScreen({ api, itemId }: { api: Api; itemId: string | nu
       <PageHeader
         title={card ? `${card.item.code} ${card.item.name}` : t('inventory.card.title')}
         help={t('inventory.card.help')}
+        actions={
+          card && (
+            // The same documents over any period, with the opening and the value (W2-02, owner answer 6).
+            <Button asChild variant="outline">
+              <a href={withQuery(href.stockLedger, { itemId: card.item.id })}>{t('inventory.card.ledger')}</a>
+            </Button>
+          )
+        }
       />
       <Panel className="flex flex-wrap items-end gap-3 p-3.5">
         <div className="w-96 max-w-full">

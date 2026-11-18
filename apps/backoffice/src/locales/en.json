@@ -82,6 +82,12 @@
     "overridesReport": "Overrides",
     "voidsReturns": "Voids and returns",
     "stockReport": "Stock and value",
+    "stockLedger": "Stock ledger",
+    "stockAt": "Stock at a date",
+    "stockMovement": "Stock movement",
+    "reorder": "Reorder list",
+    "deadStock": "Dead and slow stock",
+    "inventoryAnalysis": "Inventory analysis",
     "ageing": "Outstanding and ageing",
     "exceptions": "Exceptions",
     "trace": "Trace a bill",
@@ -568,6 +574,12 @@
         "overridesReport": "Prices below the list or the floor, and every other approval: who asked and who approved.",
         "voidsReturns": "Voided and reissued bills; returns by reason, condition, salesman and item.",
         "stockReport": "Stock on hand by location, and its value at average cost.",
+        "stockLedger": "One item's documents in a period: the opening, each one in or out, the running balance and its value.",
+        "stockAt": "On hand and its value on any date, by category and vehicle make.",
+        "stockMovement": "Per item: opening, purchases, returns, sales, adjustments, transfers and closing, for a period.",
+        "reorder": "Items at or below their minimum, with the quantity to order up to the maximum, by supplier.",
+        "deadStock": "Stock that hasn't sold in a number of days, or would take more than 180 days to sell.",
+        "inventoryAnalysis": "ABC by sales and by profit, stock turnover and days of cover.",
         "ageing": "What each customer owes and each supplier is owed, by how overdue it is.",
         "dayReconciliation": "One business day's cash: how each session closed and every bill not handed over.",
         "cashVariance": "Each cash session's variance over a range of days.",
@@ -709,6 +721,128 @@
     "expenses": {
       "help": "Each expense account month by month. An account opens its ledger for the whole period.",
       "total": "Total"
+    },
+    "stockReports": {
+      "all": "All",
+      "groupBy": "Group by",
+      "group": {
+        "category": "Category, then make",
+        "brand": "Brand",
+        "location": "Location",
+        "supplier": "Supplier",
+        "none": "No groups"
+      },
+      "filter": {
+        "categoryId": "Category",
+        "makeId": "Vehicle make",
+        "brandId": "Brand",
+        "locationId": "Location",
+        "supplierId": "Supplier"
+      },
+      "noGroup": {
+        "category": "No category",
+        "make": "No make",
+        "brand": "No brand",
+        "location": "No location",
+        "supplier": "No supplier"
+      },
+      "truncated": "Only the first 2,000 items are shown, but every subtotal and total counts them all, and the CSV has every row. Narrow the filters to see the rest.",
+      "items": "Items",
+      "qty": "Quantity",
+      "value": "Value",
+      "total": "Total",
+      "item": "Item",
+      "code": "Code",
+      "name": "Name",
+      "location": "Location",
+      "lastReceipt": "Last received",
+      "daysOfCover": "Days of cover",
+      "since": "Sales counted since {{date}}",
+      "at": {
+        "help": "How much of each item the shop had on a date and what it was worth in the books, grouped the way the shop counts. An item opens its stock ledger.",
+        "date": "As on",
+        "negative": "Only items below zero"
+      },
+      "movement": {
+        "help": "What moved each item over a period: in is positive, out negative, so the opening plus every column is the closing. An item opens its stock ledger for the same period.",
+        "show": "Show",
+        "cols": {
+          "opening": "Opening",
+          "openings": "Opening stock entered",
+          "purchases": "Purchases",
+          "purchaseReturns": "Purchase returns",
+          "sales": "Sales",
+          "salesReturns": "Sales returns",
+          "adjustments": "Adjustments and counts",
+          "transfersIn": "Transfers in",
+          "transfersOut": "Transfers out",
+          "closing": "Closing"
+        }
+      },
+      "ledger": {
+        "help": "Every document that moved one item in a period, after its opening, with the running balance. A line opens its document.",
+        "date": "Date",
+        "kind": "Document type",
+        "in": "In",
+        "out": "Out",
+        "balance": "Balance",
+        "balanceValue": "Balance value",
+        "opening": "Opening",
+        "closing": "Closing",
+        "closingValue": "Closing value",
+        "pick": "Pick an item by its code, name, OEM number or a scan.",
+        "lines": "Movements"
+      },
+      "kinds": {
+        "opening": "Opening stock",
+        "sale": "Bill or return",
+        "sales_void": "Voided bill",
+        "goods_receipt": "Goods receipt",
+        "purchase_return": "Purchase return",
+        "stock_transfer": "Transfer",
+        "stock_transfer_receipt": "Transfer received",
+        "stock_adjustment": "Adjustment"
+      },
+      "reorder": {
+        "help": "Items whose stock in the Shop and the Godown is at or below their minimum, with the quantity that brings them up to the maximum, by supplier. Filter one supplier to print their list.",
+        "fixLevels": "Levels need fixing",
+        "onHand": "On hand",
+        "min": "Minimum",
+        "max": "Maximum",
+        "order": "To order",
+        "lastCost": "Last cost",
+        "orderValue": "Order value",
+        "sold30": "Sold in 30 days",
+        "sold90": "Sold in 90 days",
+        "items": "Items to order",
+        "suppliers": "Suppliers"
+      },
+      "dead": {
+        "help": "Dead: in stock and not sold in the days chosen. Slow: sold, but at the last 90 days' rate it would take more than 180 days to sell. Items never sold since go-live count as dead only once those days have passed.",
+        "kind": "Show",
+        "kinds": {
+          "dead": "Dead",
+          "notSoldSinceGoLive": "Not sold since go-live",
+          "slow": "Slow"
+        },
+        "lastSale": "Last sold",
+        "never": "Never",
+        "days": "No sale in",
+        "daysN_one": "{{count}} day",
+        "daysN_other": "{{count}} days"
+      },
+      "analysis": {
+        "help": "Class A items make the first 80% of sales (or of gross profit), B the next 15%, C the last 5%. Turnover is the cost of sales over the average stock value; days of cover is how long the stock lasts at the period's rate.",
+        "qtySold": "Sold",
+        "sales": "Sales",
+        "salesClass": "Class by sales",
+        "profit": "Gross profit",
+        "profitClass": "Class by profit",
+        "class": "Class {{name}}",
+        "unsold": "In stock, not sold",
+        "turnover": "Stock turnover",
+        "costOfSales": "Cost of sales"
+      }
     }
   },
   "catalog": {
@@ -1403,7 +1537,8 @@
         "sale": "Sale",
         "sales_void": "Void",
         "opening": "Opening"
-      }
+      },
+      "ledger": "Stock ledger"
     },
     "needed": {
       "title": "Transfer needed",

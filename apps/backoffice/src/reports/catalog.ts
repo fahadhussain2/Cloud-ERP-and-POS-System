@@ -30,6 +30,12 @@ export interface ReportEntry {
     | 'overridesReport'
     | 'voidsReturns'
     | 'stockReport'
+    | 'stockAt'
+    | 'stockMovement'
+    | 'stockLedger'
+    | 'reorder'
+    | 'deadStock'
+    | 'inventoryAnalysis'
     | 'ageing'
     | 'dayReconciliation'
     | 'cashVariance'
@@ -95,6 +101,19 @@ export const REPORTS: readonly ReportEntry[] = [
   },
   { key: 'voidsReturns', section: 'sales', href: href.voidsReturns, needs: VIEW, screens: ['voidsReturns'] },
   { key: 'stockReport', section: 'stock', href: href.stockReport, needs: VIEW, screens: ['stockReport'] },
+  // The stock reports (W2-02): the ones the shop uses today first, the analysis last.
+  { key: 'stockLedger', section: 'stock', href: href.stockLedger, needs: VIEW, screens: ['stockLedger'] },
+  { key: 'stockAt', section: 'stock', href: href.stockAt, needs: VIEW, screens: ['stockAt'] },
+  { key: 'stockMovement', section: 'stock', href: href.stockMovement, needs: VIEW, screens: ['stockMovement'] },
+  { key: 'reorder', section: 'stock', href: href.reorder, needs: VIEW, screens: ['reorder'] },
+  { key: 'deadStock', section: 'stock', href: href.deadStock, needs: VIEW, screens: ['deadStock'] },
+  {
+    key: 'inventoryAnalysis',
+    section: 'stock',
+    href: href.inventoryAnalysis,
+    needs: VIEW,
+    screens: ['inventoryAnalysis'],
+  },
   { key: 'ageing', section: 'parties', href: href.ageing, needs: VIEW, screens: ['ageing'] },
   {
     key: 'dayReconciliation',
