@@ -23,4 +23,11 @@
 | **Day book** | Every journal voucher posted in a period, in posting order, with its lines (RPT-11) |
 | **Cash book** | Each cash and bank account (drawer, cash in transit, safe, banks and wallets) by day: opening, money in, money out, closing (ACC-07) |
 | **Profit for the year** | Income − expenses from the start of the fiscal year to a date, shown in equity on the balance sheet; worked out from the books, never posted (no closing entry until the first year end) |
+| **Stock at a date** | On hand and its value on any date: the stock ledger's quantities and values up to that business date, so its value equals Inventory on the balance sheet for the same date (W2-02) |
+| **Reorder level** | An item's minimum and maximum: at or below the minimum (Shop + Godown), order up to the maximum (PUR-07) |
+| **Dead stock** | In stock, and no sale in the last N days (90 by default); an item never sold since go-live counts only once N days have passed (RPT-08) |
+| **Slow stock** | Sold, but at the last 90 days' rate the stock on hand lasts more than 180 days (RPT-08) |
+| **ABC class** | A for the items making the first 80% of sales (or gross profit), B the next 15%, C the last 5% (RPT-14) |
+| **Days of cover** | How many days the stock on hand lasts at the rate it sold over a period |
+| **Stock turnover** | Cost of sales ÷ the average stock value (opening and closing) over a period: how many times the stock was sold through |
 | **Wave** | A build-order block of the MVP (Wave 0 foundations, Wave 1 critical path, Wave 2 rest of MVP) |
