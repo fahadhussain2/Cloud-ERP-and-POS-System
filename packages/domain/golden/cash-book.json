@@ -1,0 +1,117 @@
+{
+  "description": "The cash book (ACC-07, W2-01 plan, owner answer 5): each cash and bank account in the order given, with its opening, money in (debits), money out (credits) and closing; a line's balance runs from the opening in the order the lines come (posting order); each day with lines shows its opening, in, out and closing. A line for an account not listed is refused.",
+  "cases": [
+    {
+      "name": "the drawer over two days; a bank account with no lines",
+      "input": {
+        "accounts": [
+          {
+            "id": "drawer",
+            "opening": 1000
+          },
+          {
+            "id": "bank",
+            "opening": 0
+          }
+        ],
+        "lines": [
+          {
+            "accountId": "drawer",
+            "date": "2027-11-01",
+            "debit": 500,
+            "credit": 0
+          },
+          {
+            "accountId": "drawer",
+            "date": "2027-11-01",
+            "debit": 0,
+            "credit": 200
+          },
+          {
+            "accountId": "drawer",
+            "date": "2027-11-03",
+            "debit": 0,
+            "credit": 100
+          }
+        ]
+      },
+      "expected": [
+        {
+          "id": "drawer",
+          "opening": 1000,
+          "in": 500,
+          "out": 300,
+          "closing": 1200,
+          "days": [
+            {
+              "date": "2027-11-01",
+              "opening": 1000,
+              "in": 500,
+              "out": 200,
+              "closing": 1300
+            },
+            {
+              "date": "2027-11-03",
+              "opening": 1300,
+              "in": 0,
+              "out": 100,
+              "closing": 1200
+            }
+          ],
+          "lines": [
+            {
+              "accountId": "drawer",
+              "date": "2027-11-01",
+              "debit": 500,
+              "credit": 0,
+              "balance": 1500
+            },
+            {
+              "accountId": "drawer",
+              "date": "2027-11-01",
+              "debit": 0,
+              "credit": 200,
+              "balance": 1300
+            },
+            {
+              "accountId": "drawer",
+              "date": "2027-11-03",
+              "debit": 0,
+              "credit": 100,
+              "balance": 1200
+            }
+          ]
+        },
+        {
+          "id": "bank",
+          "opening": 0,
+          "in": 0,
+          "out": 0,
+          "closing": 0,
+          "days": [],
+          "lines": []
+        }
+      ]
+    },
+    {
+      "name": "a line for an account not in the book",
+      "input": {
+        "accounts": [
+          {
+            "id": "drawer",
+            "opening": 0
+          }
+        ],
+        "lines": [
+          {
+            "accountId": "safe",
+            "date": "2027-11-01",
+            "debit": 1,
+            "credit": 0
+          }
+        ]
+      },
+      "error": "unknown_account"
+    }
+  ]
+}

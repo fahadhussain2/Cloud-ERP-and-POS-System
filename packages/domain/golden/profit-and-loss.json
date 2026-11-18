@@ -1,0 +1,1301 @@
+{
+  "description": "The profit and loss (ACC-07, W2-01 plan, owner answers 2 and 3): one column per period. Income accounts count credits − debits (so returns and discounts are negatives inside revenue), expense accounts debits − credits. The top-level income groups are revenue; the top-level expense group holding the COGS account is the cost of sales, the other expense groups are expenses; asset, liability and equity accounts are left out. A section with one top-level group lists that group's children; with several, the groups themselves and their children. A group's amount is the sum of its children; an account at zero in every period is left out. Gross profit = revenue − cost of sales; net profit = gross profit − expenses. Margins are basis points of revenue, rounded half away from zero, and null when there is no revenue.",
+  "cases": [
+    {
+      "name": "November against October: returns inside revenue, the reversed voucher left out, a loss in October",
+      "input": {
+        "accounts": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "type": "asset",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1100",
+            "code": "1100",
+            "name": "Cash and bank",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1110",
+            "code": "1110",
+            "name": "Cash drawer",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": true,
+            "role": "CASH_DRAWER"
+          },
+          {
+            "id": "1150",
+            "code": "1150",
+            "name": "Bank accounts",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1151",
+            "code": "1151",
+            "name": "Meezan current",
+            "type": "asset",
+            "parentId": "1150",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "1200",
+            "code": "1200",
+            "name": "Customers",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "AR_CONTROL"
+          },
+          {
+            "id": "1300",
+            "code": "1300",
+            "name": "Inventory",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "INVENTORY"
+          },
+          {
+            "id": "1400",
+            "code": "1400",
+            "name": "Other assets",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1410",
+            "code": "1410",
+            "name": "Deposits",
+            "type": "asset",
+            "parentId": "1400",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "2000",
+            "code": "2000",
+            "name": "Liabilities",
+            "type": "liability",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "2100",
+            "code": "2100",
+            "name": "Suppliers",
+            "type": "liability",
+            "parentId": "2000",
+            "postable": true,
+            "role": "AP_CONTROL"
+          },
+          {
+            "id": "3000",
+            "code": "3000",
+            "name": "Equity",
+            "type": "equity",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "3200",
+            "code": "3200",
+            "name": "Retained earnings",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "RETAINED_EARNINGS"
+          },
+          {
+            "id": "3300",
+            "code": "3300",
+            "name": "Opening balance equity",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "OPENING_BALANCE_EQUITY"
+          },
+          {
+            "id": "4000",
+            "code": "4000",
+            "name": "Income",
+            "type": "income",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "4100",
+            "code": "4100",
+            "name": "Sales",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES"
+          },
+          {
+            "id": "4110",
+            "code": "4110",
+            "name": "Sales returns",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES_RETURNS"
+          },
+          {
+            "id": "5000",
+            "code": "5000",
+            "name": "Cost of sales",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "5100",
+            "code": "5100",
+            "name": "Cost of goods sold",
+            "type": "expense",
+            "parentId": "5000",
+            "postable": true,
+            "role": "COGS"
+          },
+          {
+            "id": "6000",
+            "code": "6000",
+            "name": "Operating expenses",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "6100",
+            "code": "6100",
+            "name": "Salaries",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6200",
+            "code": "6200",
+            "name": "Utilities",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6300",
+            "code": "6300",
+            "name": "General",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          }
+        ],
+        "periods": [
+          {
+            "from": "2027-11-01",
+            "to": "2027-11-30",
+            "sums": [
+              {
+                "accountId": "1110",
+                "debit": 120000,
+                "credit": 10000
+              },
+              {
+                "accountId": "1151",
+                "debit": 5000,
+                "credit": 135000
+              },
+              {
+                "accountId": "1200",
+                "debit": 60000,
+                "credit": 0
+              },
+              {
+                "accountId": "1300",
+                "debit": 6000,
+                "credit": 120000
+              },
+              {
+                "accountId": "2100",
+                "debit": 100000,
+                "credit": 0
+              },
+              {
+                "accountId": "3300",
+                "debit": 0,
+                "credit": 0
+              },
+              {
+                "accountId": "4100",
+                "debit": 0,
+                "credit": 180000
+              },
+              {
+                "accountId": "4110",
+                "debit": 10000,
+                "credit": 0
+              },
+              {
+                "accountId": "5100",
+                "debit": 120000,
+                "credit": 6000
+              },
+              {
+                "accountId": "6100",
+                "debit": 30000,
+                "credit": 0
+              },
+              {
+                "accountId": "6200",
+                "debit": 5000,
+                "credit": 5000
+              }
+            ]
+          },
+          {
+            "from": "2027-10-01",
+            "to": "2027-10-31",
+            "sums": [
+              {
+                "accountId": "1110",
+                "debit": 100000,
+                "credit": 0
+              },
+              {
+                "accountId": "4100",
+                "debit": 0,
+                "credit": 100000
+              },
+              {
+                "accountId": "5100",
+                "debit": 70000,
+                "credit": 0
+              },
+              {
+                "accountId": "6100",
+                "debit": 30000,
+                "credit": 0
+              },
+              {
+                "accountId": "6300",
+                "debit": 2000,
+                "credit": 0
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "periods": [
+          {
+            "from": "2027-11-01",
+            "to": "2027-11-30"
+          },
+          {
+            "from": "2027-10-01",
+            "to": "2027-10-31"
+          }
+        ],
+        "revenue": {
+          "rows": [
+            {
+              "id": "4100",
+              "code": "4100",
+              "name": "Sales",
+              "depth": 0,
+              "group": false,
+              "role": "SALES",
+              "amounts": [180000, 100000]
+            },
+            {
+              "id": "4110",
+              "code": "4110",
+              "name": "Sales returns",
+              "depth": 0,
+              "group": false,
+              "role": "SALES_RETURNS",
+              "amounts": [-10000, 0]
+            }
+          ],
+          "total": [170000, 100000]
+        },
+        "costOfSales": {
+          "rows": [
+            {
+              "id": "5100",
+              "code": "5100",
+              "name": "Cost of goods sold",
+              "depth": 0,
+              "group": false,
+              "role": "COGS",
+              "amounts": [114000, 70000]
+            }
+          ],
+          "total": [114000, 70000]
+        },
+        "grossProfit": [56000, 30000],
+        "grossMargin": [3294, 3000],
+        "expenses": {
+          "rows": [
+            {
+              "id": "6100",
+              "code": "6100",
+              "name": "Salaries",
+              "depth": 0,
+              "group": false,
+              "role": null,
+              "amounts": [30000, 30000]
+            },
+            {
+              "id": "6300",
+              "code": "6300",
+              "name": "General",
+              "depth": 0,
+              "group": false,
+              "role": null,
+              "amounts": [0, 2000]
+            }
+          ],
+          "total": [30000, 32000]
+        },
+        "netProfit": [26000, -2000],
+        "netMargin": [1529, -200]
+      }
+    },
+    {
+      "name": "a month with expenses and no sales has no margin",
+      "input": {
+        "accounts": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "type": "asset",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1100",
+            "code": "1100",
+            "name": "Cash and bank",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1110",
+            "code": "1110",
+            "name": "Cash drawer",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": true,
+            "role": "CASH_DRAWER"
+          },
+          {
+            "id": "1150",
+            "code": "1150",
+            "name": "Bank accounts",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1151",
+            "code": "1151",
+            "name": "Meezan current",
+            "type": "asset",
+            "parentId": "1150",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "1200",
+            "code": "1200",
+            "name": "Customers",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "AR_CONTROL"
+          },
+          {
+            "id": "1300",
+            "code": "1300",
+            "name": "Inventory",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "INVENTORY"
+          },
+          {
+            "id": "1400",
+            "code": "1400",
+            "name": "Other assets",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1410",
+            "code": "1410",
+            "name": "Deposits",
+            "type": "asset",
+            "parentId": "1400",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "2000",
+            "code": "2000",
+            "name": "Liabilities",
+            "type": "liability",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "2100",
+            "code": "2100",
+            "name": "Suppliers",
+            "type": "liability",
+            "parentId": "2000",
+            "postable": true,
+            "role": "AP_CONTROL"
+          },
+          {
+            "id": "3000",
+            "code": "3000",
+            "name": "Equity",
+            "type": "equity",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "3200",
+            "code": "3200",
+            "name": "Retained earnings",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "RETAINED_EARNINGS"
+          },
+          {
+            "id": "3300",
+            "code": "3300",
+            "name": "Opening balance equity",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "OPENING_BALANCE_EQUITY"
+          },
+          {
+            "id": "4000",
+            "code": "4000",
+            "name": "Income",
+            "type": "income",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "4100",
+            "code": "4100",
+            "name": "Sales",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES"
+          },
+          {
+            "id": "4110",
+            "code": "4110",
+            "name": "Sales returns",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES_RETURNS"
+          },
+          {
+            "id": "5000",
+            "code": "5000",
+            "name": "Cost of sales",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "5100",
+            "code": "5100",
+            "name": "Cost of goods sold",
+            "type": "expense",
+            "parentId": "5000",
+            "postable": true,
+            "role": "COGS"
+          },
+          {
+            "id": "6000",
+            "code": "6000",
+            "name": "Operating expenses",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "6100",
+            "code": "6100",
+            "name": "Salaries",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6200",
+            "code": "6200",
+            "name": "Utilities",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6300",
+            "code": "6300",
+            "name": "General",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          }
+        ],
+        "periods": [
+          {
+            "from": "2027-11-01",
+            "to": "2027-11-30",
+            "sums": [
+              {
+                "accountId": "6100",
+                "debit": 1000,
+                "credit": 0
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "periods": [
+          {
+            "from": "2027-11-01",
+            "to": "2027-11-30"
+          }
+        ],
+        "revenue": {
+          "rows": [],
+          "total": [0]
+        },
+        "costOfSales": {
+          "rows": [],
+          "total": [0]
+        },
+        "grossProfit": [0],
+        "grossMargin": [null],
+        "expenses": {
+          "rows": [
+            {
+              "id": "6100",
+              "code": "6100",
+              "name": "Salaries",
+              "depth": 0,
+              "group": false,
+              "role": null,
+              "amounts": [1000]
+            }
+          ],
+          "total": [1000]
+        },
+        "netProfit": [-1000],
+        "netMargin": [null]
+      }
+    },
+    {
+      "name": "a month with no postings",
+      "input": {
+        "accounts": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "type": "asset",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1100",
+            "code": "1100",
+            "name": "Cash and bank",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1110",
+            "code": "1110",
+            "name": "Cash drawer",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": true,
+            "role": "CASH_DRAWER"
+          },
+          {
+            "id": "1150",
+            "code": "1150",
+            "name": "Bank accounts",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1151",
+            "code": "1151",
+            "name": "Meezan current",
+            "type": "asset",
+            "parentId": "1150",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "1200",
+            "code": "1200",
+            "name": "Customers",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "AR_CONTROL"
+          },
+          {
+            "id": "1300",
+            "code": "1300",
+            "name": "Inventory",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "INVENTORY"
+          },
+          {
+            "id": "1400",
+            "code": "1400",
+            "name": "Other assets",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1410",
+            "code": "1410",
+            "name": "Deposits",
+            "type": "asset",
+            "parentId": "1400",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "2000",
+            "code": "2000",
+            "name": "Liabilities",
+            "type": "liability",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "2100",
+            "code": "2100",
+            "name": "Suppliers",
+            "type": "liability",
+            "parentId": "2000",
+            "postable": true,
+            "role": "AP_CONTROL"
+          },
+          {
+            "id": "3000",
+            "code": "3000",
+            "name": "Equity",
+            "type": "equity",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "3200",
+            "code": "3200",
+            "name": "Retained earnings",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "RETAINED_EARNINGS"
+          },
+          {
+            "id": "3300",
+            "code": "3300",
+            "name": "Opening balance equity",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "OPENING_BALANCE_EQUITY"
+          },
+          {
+            "id": "4000",
+            "code": "4000",
+            "name": "Income",
+            "type": "income",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "4100",
+            "code": "4100",
+            "name": "Sales",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES"
+          },
+          {
+            "id": "4110",
+            "code": "4110",
+            "name": "Sales returns",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES_RETURNS"
+          },
+          {
+            "id": "5000",
+            "code": "5000",
+            "name": "Cost of sales",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "5100",
+            "code": "5100",
+            "name": "Cost of goods sold",
+            "type": "expense",
+            "parentId": "5000",
+            "postable": true,
+            "role": "COGS"
+          },
+          {
+            "id": "6000",
+            "code": "6000",
+            "name": "Operating expenses",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "6100",
+            "code": "6100",
+            "name": "Salaries",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6200",
+            "code": "6200",
+            "name": "Utilities",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6300",
+            "code": "6300",
+            "name": "General",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          }
+        ],
+        "periods": [
+          {
+            "from": "2027-11-01",
+            "to": "2027-11-30",
+            "sums": []
+          }
+        ]
+      },
+      "expected": {
+        "periods": [
+          {
+            "from": "2027-11-01",
+            "to": "2027-11-30"
+          }
+        ],
+        "revenue": {
+          "rows": [],
+          "total": [0]
+        },
+        "costOfSales": {
+          "rows": [],
+          "total": [0]
+        },
+        "grossProfit": [0],
+        "grossMargin": [null],
+        "expenses": {
+          "rows": [],
+          "total": [0]
+        },
+        "netProfit": [0],
+        "netMargin": [null]
+      }
+    },
+    {
+      "name": "two income groups are listed with their subtotals; without a COGS account every expense group is an expense",
+      "input": {
+        "accounts": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "type": "asset",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1110",
+            "code": "1110",
+            "name": "Cash",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "4000",
+            "code": "4000",
+            "name": "Income",
+            "type": "income",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "4100",
+            "code": "4100",
+            "name": "Sales",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES"
+          },
+          {
+            "id": "4900",
+            "code": "4900",
+            "name": "Other income",
+            "type": "income",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "4910",
+            "code": "4910",
+            "name": "Discounts received",
+            "type": "income",
+            "parentId": "4900",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6000",
+            "code": "6000",
+            "name": "Operating expenses",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "6900",
+            "code": "6900",
+            "name": "Rent",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          }
+        ],
+        "periods": [
+          {
+            "from": "2027-11-01",
+            "to": "2027-11-30",
+            "sums": [
+              {
+                "accountId": "1110",
+                "debit": 4500,
+                "credit": 0
+              },
+              {
+                "accountId": "4100",
+                "debit": 0,
+                "credit": 5000
+              },
+              {
+                "accountId": "4910",
+                "debit": 0,
+                "credit": 500
+              },
+              {
+                "accountId": "6900",
+                "debit": 1000,
+                "credit": 0
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "periods": [
+          {
+            "from": "2027-11-01",
+            "to": "2027-11-30"
+          }
+        ],
+        "revenue": {
+          "rows": [
+            {
+              "id": "4000",
+              "code": "4000",
+              "name": "Income",
+              "depth": 0,
+              "group": true,
+              "role": null,
+              "amounts": [5000]
+            },
+            {
+              "id": "4100",
+              "code": "4100",
+              "name": "Sales",
+              "depth": 1,
+              "group": false,
+              "role": "SALES",
+              "amounts": [5000]
+            },
+            {
+              "id": "4900",
+              "code": "4900",
+              "name": "Other income",
+              "depth": 0,
+              "group": true,
+              "role": null,
+              "amounts": [500]
+            },
+            {
+              "id": "4910",
+              "code": "4910",
+              "name": "Discounts received",
+              "depth": 1,
+              "group": false,
+              "role": null,
+              "amounts": [500]
+            }
+          ],
+          "total": [5500]
+        },
+        "costOfSales": {
+          "rows": [],
+          "total": [0]
+        },
+        "grossProfit": [5500],
+        "grossMargin": [10000],
+        "expenses": {
+          "rows": [
+            {
+              "id": "6900",
+              "code": "6900",
+              "name": "Rent",
+              "depth": 0,
+              "group": false,
+              "role": null,
+              "amounts": [1000]
+            }
+          ],
+          "total": [1000]
+        },
+        "netProfit": [4500],
+        "netMargin": [8182]
+      }
+    },
+    {
+      "name": "a sum for an account the chart does not have",
+      "input": {
+        "accounts": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "type": "asset",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1100",
+            "code": "1100",
+            "name": "Cash and bank",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1110",
+            "code": "1110",
+            "name": "Cash drawer",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": true,
+            "role": "CASH_DRAWER"
+          },
+          {
+            "id": "1150",
+            "code": "1150",
+            "name": "Bank accounts",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1151",
+            "code": "1151",
+            "name": "Meezan current",
+            "type": "asset",
+            "parentId": "1150",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "1200",
+            "code": "1200",
+            "name": "Customers",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "AR_CONTROL"
+          },
+          {
+            "id": "1300",
+            "code": "1300",
+            "name": "Inventory",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "INVENTORY"
+          },
+          {
+            "id": "1400",
+            "code": "1400",
+            "name": "Other assets",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1410",
+            "code": "1410",
+            "name": "Deposits",
+            "type": "asset",
+            "parentId": "1400",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "2000",
+            "code": "2000",
+            "name": "Liabilities",
+            "type": "liability",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "2100",
+            "code": "2100",
+            "name": "Suppliers",
+            "type": "liability",
+            "parentId": "2000",
+            "postable": true,
+            "role": "AP_CONTROL"
+          },
+          {
+            "id": "3000",
+            "code": "3000",
+            "name": "Equity",
+            "type": "equity",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "3200",
+            "code": "3200",
+            "name": "Retained earnings",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "RETAINED_EARNINGS"
+          },
+          {
+            "id": "3300",
+            "code": "3300",
+            "name": "Opening balance equity",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "OPENING_BALANCE_EQUITY"
+          },
+          {
+            "id": "4000",
+            "code": "4000",
+            "name": "Income",
+            "type": "income",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "4100",
+            "code": "4100",
+            "name": "Sales",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES"
+          },
+          {
+            "id": "4110",
+            "code": "4110",
+            "name": "Sales returns",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES_RETURNS"
+          },
+          {
+            "id": "5000",
+            "code": "5000",
+            "name": "Cost of sales",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "5100",
+            "code": "5100",
+            "name": "Cost of goods sold",
+            "type": "expense",
+            "parentId": "5000",
+            "postable": true,
+            "role": "COGS"
+          },
+          {
+            "id": "6000",
+            "code": "6000",
+            "name": "Operating expenses",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "6100",
+            "code": "6100",
+            "name": "Salaries",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6200",
+            "code": "6200",
+            "name": "Utilities",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6300",
+            "code": "6300",
+            "name": "General",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          }
+        ],
+        "periods": [
+          {
+            "from": "2027-11-01",
+            "to": "2027-11-30",
+            "sums": [
+              {
+                "accountId": "nope",
+                "debit": 1,
+                "credit": 0
+              }
+            ]
+          }
+        ]
+      },
+      "error": "unknown_account"
+    }
+  ]
+}
