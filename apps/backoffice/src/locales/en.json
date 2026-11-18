@@ -85,7 +85,15 @@
     "ageing": "Outstanding and ageing",
     "exceptions": "Exceptions",
     "trace": "Trace a bill",
-    "badge": "{{count}} open, high"
+    "badge": "{{count}} open, high",
+    "reports": "Reports",
+    "trialBalance": "Trial balance",
+    "profitLoss": "Profit and loss",
+    "balanceSheet": "Balance sheet",
+    "accountLedger": "Account ledger",
+    "cashBook": "Cash book",
+    "dayBook": "Day book",
+    "expensesReport": "Expenses by month"
   },
   "home": {
     "nothing": "There is nothing here for your role yet."
@@ -534,6 +542,173 @@
         "void_cash_without_handover": "Cash given back the desk never took",
         "void_cash_amount_mismatch": "Cash given back doesn’t match what was taken"
       }
+    },
+    "home": {
+      "title": "Reports",
+      "help": "Every report you may open. Each one filters by date, downloads as CSV and prints; a figure opens the lines behind it.",
+      "search": "Find a report",
+      "none": "No report by that name.",
+      "sections": {
+        "accounts": "Accounts",
+        "sales": "Sales and purchases",
+        "stock": "Stock",
+        "parties": "Customers and suppliers",
+        "cash": "Cash",
+        "support": "Support"
+      },
+      "about": {
+        "trialBalance": "Every account's opening, movement and closing, debit and credit; it always balances.",
+        "profitLoss": "Revenue, cost of goods sold, gross profit, expenses and net profit, against another period or month by month.",
+        "balanceSheet": "What the shop owns and owes on a date, with this year's profit, against another date.",
+        "accountLedger": "Every line of one account, with its opening and running balance: pick the account on Accounts.",
+        "cashBook": "Each cash and bank account by day: opening, money in, money out, closing, and the documents.",
+        "dayBook": "Every voucher posted in a period, with its lines.",
+        "expensesReport": "Each expense account month by month, for up to a year.",
+        "salesRegister": "Every bill of a day or range, with totals by salesman, counter and tender.",
+        "overridesReport": "Prices below the list or the floor, and every other approval: who asked and who approved.",
+        "voidsReturns": "Voided and reissued bills; returns by reason, condition, salesman and item.",
+        "stockReport": "Stock on hand by location, and its value at average cost.",
+        "ageing": "What each customer owes and each supplier is owed, by how overdue it is.",
+        "dayReconciliation": "One business day's cash: how each session closed and every bill not handed over.",
+        "cashVariance": "Each cash session's variance over a range of days.",
+        "exceptions": "What the counters and the server flagged for review.",
+        "trace": "One bill from the counter to the books."
+      }
+    },
+    "frame": {
+      "tooLong": "That range is too long for this report. Lists take up to 92 days and summaries up to a year: narrow the dates.",
+      "printedBy": "Printed by {{name}} on {{at}}",
+      "print": "Print",
+      "filters": "Filters",
+      "figures": "Key figures",
+      "period": "Period",
+      "from": "From",
+      "to": "To",
+      "presets": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "thisWeek": "This week",
+        "thisMonth": "This month",
+        "lastMonth": "Last month",
+        "thisQuarter": "This quarter",
+        "lastQuarter": "Last quarter",
+        "thisYear": "This year",
+        "lastYear": "Last year",
+        "custom": "Dates…"
+      },
+      "search": "Search the list",
+      "account": "Account",
+      "document": "Document",
+      "truncated": "Only the first 1,000 lines are shown, but every total counts them all. Narrow the dates to see the rest."
+    },
+    "tb": {
+      "help": "Each account's opening, movement and closing in the period. A group's row adds up the rows beneath it, so debits equal credits at every level. An account opens its ledger.",
+      "show": "Show",
+      "accounts": "Accounts and groups",
+      "groups": "Groups only",
+      "empty": "Accounts with nothing in them",
+      "openingDebit": "Opening debit",
+      "openingCredit": "Opening credit",
+      "debit": "Debit",
+      "credit": "Credit",
+      "closingDebit": "Closing debit",
+      "closingCredit": "Closing credit",
+      "check": "Check",
+      "balanced": "Balanced",
+      "unbalanced": "Does not balance",
+      "total": "Total"
+    },
+    "pl": {
+      "help": "What the shop earned and spent in the period. Cost of goods sold is at average cost; the panel below shows it from the stock and purchases. An account opens its ledger.",
+      "revenue": "Revenue",
+      "totalRevenue": "Total revenue",
+      "costOfSales": "Cost of sales",
+      "totalCostOfSales": "Total cost of sales",
+      "grossProfit": "Gross profit",
+      "grossMargin": "Gross margin",
+      "expenses": "Expenses",
+      "totalExpenses": "Total expenses",
+      "netProfit": "Net profit",
+      "netMargin": "Net margin",
+      "compare": "Compare with",
+      "compareTo": {
+        "previous": "The period before",
+        "last-year": "The same period last year",
+        "months": "Month by month",
+        "none": "Nothing"
+      },
+      "change": "Change",
+      "changePct": "Change %",
+      "stock": {
+        "title": "Stock and purchases",
+        "opening": "Opening stock",
+        "purchases": "Purchases",
+        "purchaseReturns": "Purchase returns",
+        "adjustments": "Adjustments and counts",
+        "other": "Other stock movements",
+        "closing": "Closing stock",
+        "used": "Stock used (cost of goods sold)",
+        "books": "Cost of goods sold in the books",
+        "difference": "Difference to look into"
+      }
+    },
+    "bs": {
+      "help": "What the shop owns and owes on a date. This year's profit is worked out from the books, not posted; profit of earlier years is in retained earnings. An amount opens its ledger.",
+      "at": "On",
+      "compareAt": "Against",
+      "assets": "Assets",
+      "totalAssets": "Total assets",
+      "liabilities": "Liabilities",
+      "totalLiabilities": "Total liabilities",
+      "equity": "Equity",
+      "totalEquity": "Total equity",
+      "profitForYear": "Profit for the year",
+      "earlierProfit": "Profit of earlier years",
+      "liabilitiesAndEquity": "Total liabilities and equity",
+      "difference": "Difference to look into"
+    },
+    "cash": {
+      "help": "Every cash and bank account: the drawer, cash in transit, the safe, and the banks and wallets on Money. Money moved between two of them shows in both, marked as a transfer.",
+      "account": "Account",
+      "all": "All cash and bank accounts",
+      "opening": "Opening",
+      "in": "Money in",
+      "out": "Money out",
+      "closing": "Closing",
+      "summary": "Opening {{opening}} · in {{in}} · out {{out}} · closing {{closing}}",
+      "transfer": "Transfer",
+      "days": "{{account}} by day"
+    },
+    "dayBook": {
+      "help": "Every voucher posted in the period, in the order it was posted, with its lines. A document number opens the document.",
+      "type": "Document type",
+      "all": "Every type",
+      "entries": "Vouchers",
+      "reversal": "Reversal",
+      "amount": "Amount"
+    },
+    "sources": {
+      "opening": "Opening balances",
+      "sale": "Counter bill",
+      "sales_void": "Void",
+      "cash_handover": "Cash handover",
+      "payment": "Collection",
+      "cash_movement": "Cash movement",
+      "cash_session": "Cash session",
+      "goods_receipt": "Goods receipt",
+      "purchase_return": "Purchase return",
+      "supplier_payment": "Supplier payment",
+      "stock_transfer": "Stock transfer",
+      "stock_transfer_receipt": "Transfer received",
+      "stock_adjustment": "Stock adjustment",
+      "customer_receipt": "Bank receipt",
+      "expense": "Expense",
+      "fund_transfer": "Money transfer",
+      "journal_voucher": "Journal voucher"
+    },
+    "expenses": {
+      "help": "Each expense account month by month. An account opens its ledger for the whole period.",
+      "total": "Total"
     }
   },
   "catalog": {

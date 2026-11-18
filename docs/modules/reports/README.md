@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Done and verified on staging: [W1-20](plans/W1-20-reports-and-support.md) (sales register, overrides, voids and returns, stock and valuation, ageing, exceptions, Trace a bill); RPT-02 built in W1-11. **Every remaining report is pulled forward before go-live** (D-116) in four tasks, W2-01 to W2-04 ([catalog](#report-catalog-d-116)); W2-01's [plan](plans/W2-01-report-frame-financial-statements.md) is accepted ([#176](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176)) |
+| **Status** | Done and verified on staging: [W1-20](plans/W1-20-reports-and-support.md) (sales register, overrides, voids and returns, stock and valuation, ageing, exceptions, Trace a bill); RPT-02 built in W1-11. **Every remaining report is pulled forward before go-live** (D-116) in four tasks, W2-01 to W2-04 ([catalog](#report-catalog-d-116)); W2-01 is built ([plan](plans/W2-01-report-frame-financial-statements.md), [#176](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176)): the report frame, the Reports home and the financial statements, waiting for review |
 | **Requirements** | 17 (RPT-01…RPT-17), plus ACC-07 (financial statements) and the list part of PUR-07 (reorder list) |
 | **Feature spec needed** | No: the catalog below and each task's plan are enough |
 
@@ -43,13 +43,13 @@ The reports are designed the modern way: one frame for all of them (filters at t
 | Report | What it answers | Legacy equivalent | IDs | Task | State |
 |---|---|---|---|---|---|
 | **Accounts** | | | | | |
-| Trial balance | Opening, movement and closing of every account, debit and credit, with group subtotals; always balances | Trial Balance | ACC-07 | W2-01 | Planned |
-| Profit and loss | Revenue, cost of goods sold, gross profit, expenses by group, net profit; compared with another period or month by month | Income Statement | ACC-07 | W2-01 | Planned |
-| Balance sheet | Assets, liabilities and equity on a date, with this year's profit; compared with another date | none | ACC-07 | W2-01 | Planned |
-| Account ledger | Every line of one account in a range, with its opening and running balance | Account Ledger | ACC-07 | W1-19, frame in W2-01 | Built; moves to the frame |
-| Cash book | Each cash and bank account by day: opening, in, out, closing, and the documents | none | ACC-07 | W2-01 | Planned |
-| Day book | Every voucher posted in a range with its lines, by document type | none | RPT-11 | W2-01 | Planned |
-| Expenses | Expense accounts by month for up to a year | part of Income Statement | RPT-11 | W2-01 | Planned |
+| Trial balance | Opening, movement and closing of every account, debit and credit, with group subtotals; always balances | Trial Balance | ACC-07 | W2-01 | Built |
+| Profit and loss | Revenue, cost of goods sold, gross profit, expenses by group, net profit; compared with another period or month by month | Income Statement | ACC-07 | W2-01 | Built |
+| Balance sheet | Assets, liabilities and equity on a date, with this year's profit; compared with another date | none | ACC-07 | W2-01 | Built |
+| Account ledger | Every line of one account in a range, with its opening and running balance | Account Ledger | ACC-07 | W1-19, frame in W2-01 | Built, on the frame |
+| Cash book | Each cash and bank account by day: opening, in, out, closing, and the documents | none | ACC-07 | W2-01 | Built |
+| Day book | Every voucher posted in a range with its lines, by document type | none | RPT-11 | W2-01 | Built |
+| Expenses | Expense accounts by month for up to a year | part of Income Statement | RPT-11 | W2-01 | Built |
 | Cash flow | Money in and out of cash and bank by what it was for, transfers left out | none | ACC-07 | W2-04 (last) | Planned (W2-01 answer 7) |
 | **Stock** | | | | | |
 | Stock now and its value | On hand by location, value at average cost | Item Wise Closing Stock (today) | RPT-05 | W1-20 | Built |

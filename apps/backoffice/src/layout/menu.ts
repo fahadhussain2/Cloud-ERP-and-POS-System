@@ -9,6 +9,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import { ANY_REPORT, REPORT_SCREENS, reportOf } from '../reports/catalog';
 import { href, type Route } from '../router';
 
 // The back office's menu (W1-04, regrouped by W1-28): seven groups, the setup screens together under Settings at the
@@ -20,15 +21,7 @@ export interface MenuItem {
     | 'staff'
     | 'counters'
     | 'shopSettings'
-    | 'dayReconciliation'
-    | 'cashVariance'
-    | 'salesRegister'
-    | 'overridesReport'
-    | 'voidsReturns'
-    | 'stockReport'
-    | 'ageing'
-    | 'exceptions'
-    | 'trace'
+    | 'reports'
     | 'items'
     | 'categories'
     | 'labels'
@@ -180,30 +173,11 @@ export const MENU: readonly MenuGroup[] = [
     ],
   },
   {
-    // The cash reports (W1-11, CSH-08, RPT-02), the W1-20 reports and support (D-110).
+    // Every report on one page, the Reports home (W2-01, owner answer 1; D-116): the cash reports (W1-11), the W1-20
+    // reports and support (D-110) and the financial statements. Each report keeps its own permission (catalog.ts).
     group: 'reports',
     icon: ChartColumn,
-    items: [
-      {
-        key: 'dayReconciliation',
-        href: href.dayReconciliation,
-        needs: ['reports.view'],
-        screens: ['dayReconciliation'],
-      },
-      { key: 'cashVariance', href: href.cashVariance, needs: ['reports.view'], screens: ['cashVariance'] },
-      { key: 'salesRegister', href: href.salesRegister, needs: ['reports.view'], screens: ['salesRegister'] },
-      {
-        key: 'overridesReport',
-        href: href.overridesReport,
-        needs: ['reports.view'],
-        screens: ['overridesReport'],
-      },
-      { key: 'voidsReturns', href: href.voidsReturns, needs: ['reports.view'], screens: ['voidsReturns'] },
-      { key: 'stockReport', href: href.stockReport, needs: ['reports.view'], screens: ['stockReport'] },
-      { key: 'ageing', href: href.ageing, needs: ['reports.view'], screens: ['ageing'] },
-      { key: 'exceptions', href: href.exceptions, needs: ['reports.view'], screens: ['exceptions'] },
-      { key: 'trace', href: href.trace(), needs: ['support.trace'], screens: ['trace'] },
-    ],
+    items: [{ key: 'reports', href: href.reports, needs: ANY_REPORT, screens: REPORT_SCREENS }],
   },
   {
     // Set once and rarely changed: the people (W1-04), the counters, the shop's name and bill header (W1-25, D-112)
@@ -233,6 +207,17 @@ const GROUPS = new Set<string>(MENU.map((g) => g.group));
 
 export const allowed = (item: MenuItem, permissions: readonly string[]) =>
   item.needs.some((p) => permissions.includes(p));
+
+/** The permissions a screen needs: a report's own (the Reports home lists them all), else its menu entry's. */
+export function needsOf(screen: Route['screen']): readonly string[] | null {
+  const report = reportOf(screen);
+  if (report) return report.needs;
+  for (const g of MENU) {
+    const item = g.items.find((i) => i.screens.includes(screen));
+    if (item) return item.needs;
+  }
+  return null;
+}
 
 /** The groups with the entries this person may open; a group with none left out. */
 export const menuFor = (permissions: readonly string[]): MenuGroup[] =>

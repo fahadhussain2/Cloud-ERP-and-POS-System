@@ -128,7 +128,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        'sticky top-0 flex h-svh shrink-0 flex-col self-start border-e border-line bg-surface',
+        'sticky top-0 flex h-svh shrink-0 flex-col self-start border-e border-line bg-surface print:hidden',
         rail ? 'w-16' : 'w-62',
       )}
     >

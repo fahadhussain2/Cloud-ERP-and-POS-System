@@ -96,7 +96,12 @@ export type DomainErrorCode =
   | 'already_given_back'
   | 'approver_required'
   | 'approver_is_cashier'
-  | 'approver_not_permitted';
+  | 'approver_not_permitted'
+  // The financial statements and report periods (W2-01, D-116)
+  | 'unknown_account'
+  | 'invalid_preset'
+  | 'invalid_range'
+  | 'range_too_long';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

@@ -19,6 +19,16 @@ export async function menu(page: Page, name: string): Promise<void> {
   await link.click();
 }
 
+/** Opens a report from the Reports home, the menu's Reports row (W2-01, owner answer 1), by its name. */
+export async function report(page: Page, name: string): Promise<void> {
+  await menu(page, bo.nav.reports);
+  await expect(page.getByRole('heading', { name: bo.reports.home.title, level: 1 })).toBeVisible();
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: new RegExp(`^${name}`) })
+    .click();
+}
+
 /** The account's button at the foot of the side menu, whoever is signed in. */
 export const account = (page: Page) =>
   page.getByRole('button', { name: new RegExp(`^${bo.nav.account.replace('{{name}}', '')}`) });

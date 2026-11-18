@@ -1,0 +1,311 @@
+{
+  "description": "The date presets of every report (W2-01 plan, D-116 answer 4). Weeks run Monday to Sunday; months, quarters and years are whole, so a period can end after today (nothing is posted there yet). Quarters and years follow the shop's fiscal year (ACC-06): with a July year the first quarter is July to September.",
+  "cases": [
+    {
+      "name": "today on 2027-01-01, year from month 1",
+      "input": {
+        "preset": "today",
+        "today": "2027-01-01",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2027-01-01",
+        "to": "2027-01-01"
+      }
+    },
+    {
+      "name": "yesterday on 2027-01-01, year from month 1",
+      "input": {
+        "preset": "yesterday",
+        "today": "2027-01-01",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2026-12-31",
+        "to": "2026-12-31"
+      }
+    },
+    {
+      "name": "thisWeek on 2027-01-01, year from month 1",
+      "input": {
+        "preset": "thisWeek",
+        "today": "2027-01-01",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2026-12-28",
+        "to": "2027-01-03"
+      }
+    },
+    {
+      "name": "thisMonth on 2027-01-01, year from month 1",
+      "input": {
+        "preset": "thisMonth",
+        "today": "2027-01-01",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2027-01-01",
+        "to": "2027-01-31"
+      }
+    },
+    {
+      "name": "lastMonth on 2027-01-01, year from month 1",
+      "input": {
+        "preset": "lastMonth",
+        "today": "2027-01-01",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2026-12-01",
+        "to": "2026-12-31"
+      }
+    },
+    {
+      "name": "thisQuarter on 2027-01-01, year from month 1",
+      "input": {
+        "preset": "thisQuarter",
+        "today": "2027-01-01",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2027-01-01",
+        "to": "2027-03-31"
+      }
+    },
+    {
+      "name": "lastQuarter on 2027-01-01, year from month 1",
+      "input": {
+        "preset": "lastQuarter",
+        "today": "2027-01-01",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2026-10-01",
+        "to": "2026-12-31"
+      }
+    },
+    {
+      "name": "thisYear on 2027-01-01, year from month 1",
+      "input": {
+        "preset": "thisYear",
+        "today": "2027-01-01",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2027-01-01",
+        "to": "2027-12-31"
+      }
+    },
+    {
+      "name": "lastYear on 2027-01-01, year from month 1",
+      "input": {
+        "preset": "lastYear",
+        "today": "2027-01-01",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2026-01-01",
+        "to": "2026-12-31"
+      }
+    },
+    {
+      "name": "thisWeek on 2027-03-31, year from month 7",
+      "input": {
+        "preset": "thisWeek",
+        "today": "2027-03-31",
+        "fiscalYearStartMonth": 7
+      },
+      "expected": {
+        "from": "2027-03-29",
+        "to": "2027-04-04"
+      }
+    },
+    {
+      "name": "thisMonth on 2027-03-31, year from month 7",
+      "input": {
+        "preset": "thisMonth",
+        "today": "2027-03-31",
+        "fiscalYearStartMonth": 7
+      },
+      "expected": {
+        "from": "2027-03-01",
+        "to": "2027-03-31"
+      }
+    },
+    {
+      "name": "lastMonth on 2027-03-31, year from month 7",
+      "input": {
+        "preset": "lastMonth",
+        "today": "2027-03-31",
+        "fiscalYearStartMonth": 7
+      },
+      "expected": {
+        "from": "2027-02-01",
+        "to": "2027-02-28"
+      }
+    },
+    {
+      "name": "thisQuarter on 2027-03-31, year from month 7",
+      "input": {
+        "preset": "thisQuarter",
+        "today": "2027-03-31",
+        "fiscalYearStartMonth": 7
+      },
+      "expected": {
+        "from": "2027-01-01",
+        "to": "2027-03-31"
+      }
+    },
+    {
+      "name": "lastQuarter on 2027-03-31, year from month 7",
+      "input": {
+        "preset": "lastQuarter",
+        "today": "2027-03-31",
+        "fiscalYearStartMonth": 7
+      },
+      "expected": {
+        "from": "2026-10-01",
+        "to": "2026-12-31"
+      }
+    },
+    {
+      "name": "thisYear on 2027-03-31, year from month 7",
+      "input": {
+        "preset": "thisYear",
+        "today": "2027-03-31",
+        "fiscalYearStartMonth": 7
+      },
+      "expected": {
+        "from": "2026-07-01",
+        "to": "2027-06-30"
+      }
+    },
+    {
+      "name": "lastYear on 2027-03-31, year from month 7",
+      "input": {
+        "preset": "lastYear",
+        "today": "2027-03-31",
+        "fiscalYearStartMonth": 7
+      },
+      "expected": {
+        "from": "2025-07-01",
+        "to": "2026-06-30"
+      }
+    },
+    {
+      "name": "thisQuarter on 2027-08-15, year from month 7",
+      "input": {
+        "preset": "thisQuarter",
+        "today": "2027-08-15",
+        "fiscalYearStartMonth": 7
+      },
+      "expected": {
+        "from": "2027-07-01",
+        "to": "2027-09-30"
+      }
+    },
+    {
+      "name": "lastQuarter on 2027-08-15, year from month 7",
+      "input": {
+        "preset": "lastQuarter",
+        "today": "2027-08-15",
+        "fiscalYearStartMonth": 7
+      },
+      "expected": {
+        "from": "2027-04-01",
+        "to": "2027-06-30"
+      }
+    },
+    {
+      "name": "yesterday on 2028-02-29, year from month 1",
+      "input": {
+        "preset": "yesterday",
+        "today": "2028-02-29",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2028-02-28",
+        "to": "2028-02-28"
+      }
+    },
+    {
+      "name": "thisWeek on 2028-02-29, year from month 1",
+      "input": {
+        "preset": "thisWeek",
+        "today": "2028-02-29",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2028-02-28",
+        "to": "2028-03-05"
+      }
+    },
+    {
+      "name": "thisMonth on 2028-02-29, year from month 1",
+      "input": {
+        "preset": "thisMonth",
+        "today": "2028-02-29",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2028-02-01",
+        "to": "2028-02-29"
+      }
+    },
+    {
+      "name": "lastMonth on 2028-02-29, year from month 1",
+      "input": {
+        "preset": "lastMonth",
+        "today": "2028-02-29",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2028-01-01",
+        "to": "2028-01-31"
+      }
+    },
+    {
+      "name": "yesterday on 2027-11-21, year from month 1",
+      "input": {
+        "preset": "yesterday",
+        "today": "2027-11-21",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2027-11-20",
+        "to": "2027-11-20"
+      }
+    },
+    {
+      "name": "thisWeek on 2027-11-21, year from month 1",
+      "input": {
+        "preset": "thisWeek",
+        "today": "2027-11-21",
+        "fiscalYearStartMonth": 1
+      },
+      "expected": {
+        "from": "2027-11-15",
+        "to": "2027-11-21"
+      }
+    },
+    {
+      "name": "a preset that does not exist",
+      "input": {
+        "preset": "fortnight",
+        "today": "2027-01-01",
+        "fiscalYearStartMonth": 1
+      },
+      "error": "invalid_preset"
+    },
+    {
+      "name": "a day that is not a date",
+      "input": {
+        "preset": "today",
+        "today": "2027-02-30",
+        "fiscalYearStartMonth": 1
+      },
+      "error": "invalid_date"
+    }
+  ]
+}

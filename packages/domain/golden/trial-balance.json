@@ -1,0 +1,2196 @@
+{
+  "description": "The trial balance (ACC-07, W2-01 plan, owner answer 4). Each account's opening is its debits − credits before the period, its movement the period's debits and credits, its closing the opening plus the movement; a balance sits on its debit or credit side. A group's row is the sum of each column of the rows beneath it, so debits equal credits at every level. Rows run down the chart's tree, each group's children by code. Hidden unless asked for: an account with no opening and no movement, and a group with nothing beneath it. `groups` shows the groups only (and any postable account without a parent). A sum for an account not in the chart is refused.",
+  "cases": [
+    {
+      "name": "a month on a chart with a group three levels deep: opening, sales, a return, salaries, a reversed voucher, a supplier payment",
+      "input": {
+        "accounts": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "type": "asset",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1100",
+            "code": "1100",
+            "name": "Cash and bank",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1110",
+            "code": "1110",
+            "name": "Cash drawer",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": true,
+            "role": "CASH_DRAWER"
+          },
+          {
+            "id": "1150",
+            "code": "1150",
+            "name": "Bank accounts",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1151",
+            "code": "1151",
+            "name": "Meezan current",
+            "type": "asset",
+            "parentId": "1150",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "1200",
+            "code": "1200",
+            "name": "Customers",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "AR_CONTROL"
+          },
+          {
+            "id": "1300",
+            "code": "1300",
+            "name": "Inventory",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "INVENTORY"
+          },
+          {
+            "id": "1400",
+            "code": "1400",
+            "name": "Other assets",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1410",
+            "code": "1410",
+            "name": "Deposits",
+            "type": "asset",
+            "parentId": "1400",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "2000",
+            "code": "2000",
+            "name": "Liabilities",
+            "type": "liability",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "2100",
+            "code": "2100",
+            "name": "Suppliers",
+            "type": "liability",
+            "parentId": "2000",
+            "postable": true,
+            "role": "AP_CONTROL"
+          },
+          {
+            "id": "3000",
+            "code": "3000",
+            "name": "Equity",
+            "type": "equity",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "3200",
+            "code": "3200",
+            "name": "Retained earnings",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "RETAINED_EARNINGS"
+          },
+          {
+            "id": "3300",
+            "code": "3300",
+            "name": "Opening balance equity",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "OPENING_BALANCE_EQUITY"
+          },
+          {
+            "id": "4000",
+            "code": "4000",
+            "name": "Income",
+            "type": "income",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "4100",
+            "code": "4100",
+            "name": "Sales",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES"
+          },
+          {
+            "id": "4110",
+            "code": "4110",
+            "name": "Sales returns",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES_RETURNS"
+          },
+          {
+            "id": "5000",
+            "code": "5000",
+            "name": "Cost of sales",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "5100",
+            "code": "5100",
+            "name": "Cost of goods sold",
+            "type": "expense",
+            "parentId": "5000",
+            "postable": true,
+            "role": "COGS"
+          },
+          {
+            "id": "6000",
+            "code": "6000",
+            "name": "Operating expenses",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "6100",
+            "code": "6100",
+            "name": "Salaries",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6200",
+            "code": "6200",
+            "name": "Utilities",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6300",
+            "code": "6300",
+            "name": "General",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          }
+        ],
+        "sums": [
+          {
+            "accountId": "1110",
+            "opening": 50000,
+            "debit": 120000,
+            "credit": 10000
+          },
+          {
+            "accountId": "1151",
+            "opening": 200000,
+            "debit": 5000,
+            "credit": 135000
+          },
+          {
+            "accountId": "1200",
+            "opening": 0,
+            "debit": 60000,
+            "credit": 0
+          },
+          {
+            "accountId": "1300",
+            "opening": 300000,
+            "debit": 6000,
+            "credit": 120000
+          },
+          {
+            "accountId": "2100",
+            "opening": -150000,
+            "debit": 100000,
+            "credit": 0
+          },
+          {
+            "accountId": "3300",
+            "opening": -400000,
+            "debit": 0,
+            "credit": 0
+          },
+          {
+            "accountId": "4100",
+            "opening": 0,
+            "debit": 0,
+            "credit": 180000
+          },
+          {
+            "accountId": "4110",
+            "opening": 0,
+            "debit": 10000,
+            "credit": 0
+          },
+          {
+            "accountId": "5100",
+            "opening": 0,
+            "debit": 120000,
+            "credit": 6000
+          },
+          {
+            "accountId": "6100",
+            "opening": 0,
+            "debit": 30000,
+            "credit": 0
+          },
+          {
+            "accountId": "6200",
+            "opening": 0,
+            "debit": 5000,
+            "credit": 5000
+          }
+        ],
+        "level": "accounts",
+        "showEmpty": false
+      },
+      "expected": {
+        "rows": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 550000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 191000,
+              "credit": 265000
+            },
+            "closing": {
+              "debit": 476000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1100",
+            "code": "1100",
+            "name": "Cash and bank",
+            "depth": 1,
+            "group": true,
+            "opening": {
+              "debit": 250000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 125000,
+              "credit": 145000
+            },
+            "closing": {
+              "debit": 230000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1110",
+            "code": "1110",
+            "name": "Cash drawer",
+            "depth": 2,
+            "group": false,
+            "opening": {
+              "debit": 50000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 120000,
+              "credit": 10000
+            },
+            "closing": {
+              "debit": 160000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1150",
+            "code": "1150",
+            "name": "Bank accounts",
+            "depth": 2,
+            "group": true,
+            "opening": {
+              "debit": 200000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 5000,
+              "credit": 135000
+            },
+            "closing": {
+              "debit": 70000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1151",
+            "code": "1151",
+            "name": "Meezan current",
+            "depth": 3,
+            "group": false,
+            "opening": {
+              "debit": 200000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 5000,
+              "credit": 135000
+            },
+            "closing": {
+              "debit": 70000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1200",
+            "code": "1200",
+            "name": "Customers",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 60000,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 60000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1300",
+            "code": "1300",
+            "name": "Inventory",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 300000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 6000,
+              "credit": 120000
+            },
+            "closing": {
+              "debit": 186000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "2000",
+            "code": "2000",
+            "name": "Liabilities",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 150000
+            },
+            "movement": {
+              "debit": 100000,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 50000
+            }
+          },
+          {
+            "id": "2100",
+            "code": "2100",
+            "name": "Suppliers",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 150000
+            },
+            "movement": {
+              "debit": 100000,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 50000
+            }
+          },
+          {
+            "id": "3000",
+            "code": "3000",
+            "name": "Equity",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 400000
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 400000
+            }
+          },
+          {
+            "id": "3300",
+            "code": "3300",
+            "name": "Opening balance equity",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 400000
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 400000
+            }
+          },
+          {
+            "id": "4000",
+            "code": "4000",
+            "name": "Income",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 10000,
+              "credit": 180000
+            },
+            "closing": {
+              "debit": 10000,
+              "credit": 180000
+            }
+          },
+          {
+            "id": "4100",
+            "code": "4100",
+            "name": "Sales",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 180000
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 180000
+            }
+          },
+          {
+            "id": "4110",
+            "code": "4110",
+            "name": "Sales returns",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 10000,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 10000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "5000",
+            "code": "5000",
+            "name": "Cost of sales",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 120000,
+              "credit": 6000
+            },
+            "closing": {
+              "debit": 114000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "5100",
+            "code": "5100",
+            "name": "Cost of goods sold",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 120000,
+              "credit": 6000
+            },
+            "closing": {
+              "debit": 114000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "6000",
+            "code": "6000",
+            "name": "Operating expenses",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 35000,
+              "credit": 5000
+            },
+            "closing": {
+              "debit": 30000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "6100",
+            "code": "6100",
+            "name": "Salaries",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 30000,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 30000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "6200",
+            "code": "6200",
+            "name": "Utilities",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 5000,
+              "credit": 5000
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 0
+            }
+          }
+        ],
+        "totals": {
+          "opening": {
+            "debit": 550000,
+            "credit": 550000
+          },
+          "movement": {
+            "debit": 456000,
+            "credit": 456000
+          },
+          "closing": {
+            "debit": 630000,
+            "credit": 630000
+          }
+        },
+        "balanced": true
+      }
+    },
+    {
+      "name": "groups only: the same month, one row per group",
+      "input": {
+        "accounts": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "type": "asset",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1100",
+            "code": "1100",
+            "name": "Cash and bank",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1110",
+            "code": "1110",
+            "name": "Cash drawer",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": true,
+            "role": "CASH_DRAWER"
+          },
+          {
+            "id": "1150",
+            "code": "1150",
+            "name": "Bank accounts",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1151",
+            "code": "1151",
+            "name": "Meezan current",
+            "type": "asset",
+            "parentId": "1150",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "1200",
+            "code": "1200",
+            "name": "Customers",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "AR_CONTROL"
+          },
+          {
+            "id": "1300",
+            "code": "1300",
+            "name": "Inventory",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "INVENTORY"
+          },
+          {
+            "id": "1400",
+            "code": "1400",
+            "name": "Other assets",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1410",
+            "code": "1410",
+            "name": "Deposits",
+            "type": "asset",
+            "parentId": "1400",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "2000",
+            "code": "2000",
+            "name": "Liabilities",
+            "type": "liability",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "2100",
+            "code": "2100",
+            "name": "Suppliers",
+            "type": "liability",
+            "parentId": "2000",
+            "postable": true,
+            "role": "AP_CONTROL"
+          },
+          {
+            "id": "3000",
+            "code": "3000",
+            "name": "Equity",
+            "type": "equity",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "3200",
+            "code": "3200",
+            "name": "Retained earnings",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "RETAINED_EARNINGS"
+          },
+          {
+            "id": "3300",
+            "code": "3300",
+            "name": "Opening balance equity",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "OPENING_BALANCE_EQUITY"
+          },
+          {
+            "id": "4000",
+            "code": "4000",
+            "name": "Income",
+            "type": "income",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "4100",
+            "code": "4100",
+            "name": "Sales",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES"
+          },
+          {
+            "id": "4110",
+            "code": "4110",
+            "name": "Sales returns",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES_RETURNS"
+          },
+          {
+            "id": "5000",
+            "code": "5000",
+            "name": "Cost of sales",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "5100",
+            "code": "5100",
+            "name": "Cost of goods sold",
+            "type": "expense",
+            "parentId": "5000",
+            "postable": true,
+            "role": "COGS"
+          },
+          {
+            "id": "6000",
+            "code": "6000",
+            "name": "Operating expenses",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "6100",
+            "code": "6100",
+            "name": "Salaries",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6200",
+            "code": "6200",
+            "name": "Utilities",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6300",
+            "code": "6300",
+            "name": "General",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          }
+        ],
+        "sums": [
+          {
+            "accountId": "1110",
+            "opening": 50000,
+            "debit": 120000,
+            "credit": 10000
+          },
+          {
+            "accountId": "1151",
+            "opening": 200000,
+            "debit": 5000,
+            "credit": 135000
+          },
+          {
+            "accountId": "1200",
+            "opening": 0,
+            "debit": 60000,
+            "credit": 0
+          },
+          {
+            "accountId": "1300",
+            "opening": 300000,
+            "debit": 6000,
+            "credit": 120000
+          },
+          {
+            "accountId": "2100",
+            "opening": -150000,
+            "debit": 100000,
+            "credit": 0
+          },
+          {
+            "accountId": "3300",
+            "opening": -400000,
+            "debit": 0,
+            "credit": 0
+          },
+          {
+            "accountId": "4100",
+            "opening": 0,
+            "debit": 0,
+            "credit": 180000
+          },
+          {
+            "accountId": "4110",
+            "opening": 0,
+            "debit": 10000,
+            "credit": 0
+          },
+          {
+            "accountId": "5100",
+            "opening": 0,
+            "debit": 120000,
+            "credit": 6000
+          },
+          {
+            "accountId": "6100",
+            "opening": 0,
+            "debit": 30000,
+            "credit": 0
+          },
+          {
+            "accountId": "6200",
+            "opening": 0,
+            "debit": 5000,
+            "credit": 5000
+          }
+        ],
+        "level": "groups",
+        "showEmpty": false
+      },
+      "expected": {
+        "rows": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 550000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 191000,
+              "credit": 265000
+            },
+            "closing": {
+              "debit": 476000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1100",
+            "code": "1100",
+            "name": "Cash and bank",
+            "depth": 1,
+            "group": true,
+            "opening": {
+              "debit": 250000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 125000,
+              "credit": 145000
+            },
+            "closing": {
+              "debit": 230000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1150",
+            "code": "1150",
+            "name": "Bank accounts",
+            "depth": 2,
+            "group": true,
+            "opening": {
+              "debit": 200000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 5000,
+              "credit": 135000
+            },
+            "closing": {
+              "debit": 70000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "2000",
+            "code": "2000",
+            "name": "Liabilities",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 150000
+            },
+            "movement": {
+              "debit": 100000,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 50000
+            }
+          },
+          {
+            "id": "3000",
+            "code": "3000",
+            "name": "Equity",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 400000
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 400000
+            }
+          },
+          {
+            "id": "4000",
+            "code": "4000",
+            "name": "Income",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 10000,
+              "credit": 180000
+            },
+            "closing": {
+              "debit": 10000,
+              "credit": 180000
+            }
+          },
+          {
+            "id": "5000",
+            "code": "5000",
+            "name": "Cost of sales",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 120000,
+              "credit": 6000
+            },
+            "closing": {
+              "debit": 114000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "6000",
+            "code": "6000",
+            "name": "Operating expenses",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 35000,
+              "credit": 5000
+            },
+            "closing": {
+              "debit": 30000,
+              "credit": 0
+            }
+          }
+        ],
+        "totals": {
+          "opening": {
+            "debit": 550000,
+            "credit": 550000
+          },
+          "movement": {
+            "debit": 456000,
+            "credit": 456000
+          },
+          "closing": {
+            "debit": 630000,
+            "credit": 630000
+          }
+        },
+        "balanced": true
+      }
+    },
+    {
+      "name": "with the empty accounts shown: an empty group and its account, retained earnings and General at zero",
+      "input": {
+        "accounts": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "type": "asset",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1100",
+            "code": "1100",
+            "name": "Cash and bank",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1110",
+            "code": "1110",
+            "name": "Cash drawer",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": true,
+            "role": "CASH_DRAWER"
+          },
+          {
+            "id": "1150",
+            "code": "1150",
+            "name": "Bank accounts",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1151",
+            "code": "1151",
+            "name": "Meezan current",
+            "type": "asset",
+            "parentId": "1150",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "1200",
+            "code": "1200",
+            "name": "Customers",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "AR_CONTROL"
+          },
+          {
+            "id": "1300",
+            "code": "1300",
+            "name": "Inventory",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "INVENTORY"
+          },
+          {
+            "id": "1400",
+            "code": "1400",
+            "name": "Other assets",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1410",
+            "code": "1410",
+            "name": "Deposits",
+            "type": "asset",
+            "parentId": "1400",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "2000",
+            "code": "2000",
+            "name": "Liabilities",
+            "type": "liability",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "2100",
+            "code": "2100",
+            "name": "Suppliers",
+            "type": "liability",
+            "parentId": "2000",
+            "postable": true,
+            "role": "AP_CONTROL"
+          },
+          {
+            "id": "3000",
+            "code": "3000",
+            "name": "Equity",
+            "type": "equity",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "3200",
+            "code": "3200",
+            "name": "Retained earnings",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "RETAINED_EARNINGS"
+          },
+          {
+            "id": "3300",
+            "code": "3300",
+            "name": "Opening balance equity",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "OPENING_BALANCE_EQUITY"
+          },
+          {
+            "id": "4000",
+            "code": "4000",
+            "name": "Income",
+            "type": "income",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "4100",
+            "code": "4100",
+            "name": "Sales",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES"
+          },
+          {
+            "id": "4110",
+            "code": "4110",
+            "name": "Sales returns",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES_RETURNS"
+          },
+          {
+            "id": "5000",
+            "code": "5000",
+            "name": "Cost of sales",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "5100",
+            "code": "5100",
+            "name": "Cost of goods sold",
+            "type": "expense",
+            "parentId": "5000",
+            "postable": true,
+            "role": "COGS"
+          },
+          {
+            "id": "6000",
+            "code": "6000",
+            "name": "Operating expenses",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "6100",
+            "code": "6100",
+            "name": "Salaries",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6200",
+            "code": "6200",
+            "name": "Utilities",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6300",
+            "code": "6300",
+            "name": "General",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          }
+        ],
+        "sums": [
+          {
+            "accountId": "1110",
+            "opening": 50000,
+            "debit": 120000,
+            "credit": 10000
+          },
+          {
+            "accountId": "1151",
+            "opening": 200000,
+            "debit": 5000,
+            "credit": 135000
+          },
+          {
+            "accountId": "1200",
+            "opening": 0,
+            "debit": 60000,
+            "credit": 0
+          },
+          {
+            "accountId": "1300",
+            "opening": 300000,
+            "debit": 6000,
+            "credit": 120000
+          },
+          {
+            "accountId": "2100",
+            "opening": -150000,
+            "debit": 100000,
+            "credit": 0
+          },
+          {
+            "accountId": "3300",
+            "opening": -400000,
+            "debit": 0,
+            "credit": 0
+          },
+          {
+            "accountId": "4100",
+            "opening": 0,
+            "debit": 0,
+            "credit": 180000
+          },
+          {
+            "accountId": "4110",
+            "opening": 0,
+            "debit": 10000,
+            "credit": 0
+          },
+          {
+            "accountId": "5100",
+            "opening": 0,
+            "debit": 120000,
+            "credit": 6000
+          },
+          {
+            "accountId": "6100",
+            "opening": 0,
+            "debit": 30000,
+            "credit": 0
+          },
+          {
+            "accountId": "6200",
+            "opening": 0,
+            "debit": 5000,
+            "credit": 5000
+          }
+        ],
+        "level": "accounts",
+        "showEmpty": true
+      },
+      "expected": {
+        "rows": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 550000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 191000,
+              "credit": 265000
+            },
+            "closing": {
+              "debit": 476000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1100",
+            "code": "1100",
+            "name": "Cash and bank",
+            "depth": 1,
+            "group": true,
+            "opening": {
+              "debit": 250000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 125000,
+              "credit": 145000
+            },
+            "closing": {
+              "debit": 230000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1110",
+            "code": "1110",
+            "name": "Cash drawer",
+            "depth": 2,
+            "group": false,
+            "opening": {
+              "debit": 50000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 120000,
+              "credit": 10000
+            },
+            "closing": {
+              "debit": 160000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1150",
+            "code": "1150",
+            "name": "Bank accounts",
+            "depth": 2,
+            "group": true,
+            "opening": {
+              "debit": 200000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 5000,
+              "credit": 135000
+            },
+            "closing": {
+              "debit": 70000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1151",
+            "code": "1151",
+            "name": "Meezan current",
+            "depth": 3,
+            "group": false,
+            "opening": {
+              "debit": 200000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 5000,
+              "credit": 135000
+            },
+            "closing": {
+              "debit": 70000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1200",
+            "code": "1200",
+            "name": "Customers",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 60000,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 60000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1300",
+            "code": "1300",
+            "name": "Inventory",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 300000,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 6000,
+              "credit": 120000
+            },
+            "closing": {
+              "debit": 186000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1400",
+            "code": "1400",
+            "name": "Other assets",
+            "depth": 1,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 0
+            }
+          },
+          {
+            "id": "1410",
+            "code": "1410",
+            "name": "Deposits",
+            "depth": 2,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 0
+            }
+          },
+          {
+            "id": "2000",
+            "code": "2000",
+            "name": "Liabilities",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 150000
+            },
+            "movement": {
+              "debit": 100000,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 50000
+            }
+          },
+          {
+            "id": "2100",
+            "code": "2100",
+            "name": "Suppliers",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 150000
+            },
+            "movement": {
+              "debit": 100000,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 50000
+            }
+          },
+          {
+            "id": "3000",
+            "code": "3000",
+            "name": "Equity",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 400000
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 400000
+            }
+          },
+          {
+            "id": "3200",
+            "code": "3200",
+            "name": "Retained earnings",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 0
+            }
+          },
+          {
+            "id": "3300",
+            "code": "3300",
+            "name": "Opening balance equity",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 400000
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 400000
+            }
+          },
+          {
+            "id": "4000",
+            "code": "4000",
+            "name": "Income",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 10000,
+              "credit": 180000
+            },
+            "closing": {
+              "debit": 10000,
+              "credit": 180000
+            }
+          },
+          {
+            "id": "4100",
+            "code": "4100",
+            "name": "Sales",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 180000
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 180000
+            }
+          },
+          {
+            "id": "4110",
+            "code": "4110",
+            "name": "Sales returns",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 10000,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 10000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "5000",
+            "code": "5000",
+            "name": "Cost of sales",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 120000,
+              "credit": 6000
+            },
+            "closing": {
+              "debit": 114000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "5100",
+            "code": "5100",
+            "name": "Cost of goods sold",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 120000,
+              "credit": 6000
+            },
+            "closing": {
+              "debit": 114000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "6000",
+            "code": "6000",
+            "name": "Operating expenses",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 35000,
+              "credit": 5000
+            },
+            "closing": {
+              "debit": 30000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "6100",
+            "code": "6100",
+            "name": "Salaries",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 30000,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 30000,
+              "credit": 0
+            }
+          },
+          {
+            "id": "6200",
+            "code": "6200",
+            "name": "Utilities",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 5000,
+              "credit": 5000
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 0
+            }
+          },
+          {
+            "id": "6300",
+            "code": "6300",
+            "name": "General",
+            "depth": 1,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 0
+            }
+          }
+        ],
+        "totals": {
+          "opening": {
+            "debit": 550000,
+            "credit": 550000
+          },
+          "movement": {
+            "debit": 456000,
+            "credit": 456000
+          },
+          "closing": {
+            "debit": 630000,
+            "credit": 630000
+          }
+        },
+        "balanced": true
+      }
+    },
+    {
+      "name": "a postable account at the top of the chart stays in groups only; books that do not balance say so",
+      "input": {
+        "accounts": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "type": "asset",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1110",
+            "code": "1110",
+            "name": "Cash",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "9000",
+            "code": "9000",
+            "name": "Suspense",
+            "type": "asset",
+            "parentId": null,
+            "postable": true,
+            "role": null
+          }
+        ],
+        "sums": [
+          {
+            "accountId": "1110",
+            "opening": 100,
+            "debit": 0,
+            "credit": 0
+          },
+          {
+            "accountId": "9000",
+            "opening": 0,
+            "debit": 0,
+            "credit": 30
+          }
+        ],
+        "level": "groups",
+        "showEmpty": false
+      },
+      "expected": {
+        "rows": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "depth": 0,
+            "group": true,
+            "opening": {
+              "debit": 100,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 0
+            },
+            "closing": {
+              "debit": 100,
+              "credit": 0
+            }
+          },
+          {
+            "id": "9000",
+            "code": "9000",
+            "name": "Suspense",
+            "depth": 0,
+            "group": false,
+            "opening": {
+              "debit": 0,
+              "credit": 0
+            },
+            "movement": {
+              "debit": 0,
+              "credit": 30
+            },
+            "closing": {
+              "debit": 0,
+              "credit": 30
+            }
+          }
+        ],
+        "totals": {
+          "opening": {
+            "debit": 100,
+            "credit": 0
+          },
+          "movement": {
+            "debit": 0,
+            "credit": 30
+          },
+          "closing": {
+            "debit": 100,
+            "credit": 30
+          }
+        },
+        "balanced": false
+      }
+    },
+    {
+      "name": "a sum for an account the chart does not have",
+      "input": {
+        "accounts": [
+          {
+            "id": "1000",
+            "code": "1000",
+            "name": "Assets",
+            "type": "asset",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1100",
+            "code": "1100",
+            "name": "Cash and bank",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1110",
+            "code": "1110",
+            "name": "Cash drawer",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": true,
+            "role": "CASH_DRAWER"
+          },
+          {
+            "id": "1150",
+            "code": "1150",
+            "name": "Bank accounts",
+            "type": "asset",
+            "parentId": "1100",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1151",
+            "code": "1151",
+            "name": "Meezan current",
+            "type": "asset",
+            "parentId": "1150",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "1200",
+            "code": "1200",
+            "name": "Customers",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "AR_CONTROL"
+          },
+          {
+            "id": "1300",
+            "code": "1300",
+            "name": "Inventory",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": true,
+            "role": "INVENTORY"
+          },
+          {
+            "id": "1400",
+            "code": "1400",
+            "name": "Other assets",
+            "type": "asset",
+            "parentId": "1000",
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "1410",
+            "code": "1410",
+            "name": "Deposits",
+            "type": "asset",
+            "parentId": "1400",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "2000",
+            "code": "2000",
+            "name": "Liabilities",
+            "type": "liability",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "2100",
+            "code": "2100",
+            "name": "Suppliers",
+            "type": "liability",
+            "parentId": "2000",
+            "postable": true,
+            "role": "AP_CONTROL"
+          },
+          {
+            "id": "3000",
+            "code": "3000",
+            "name": "Equity",
+            "type": "equity",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "3200",
+            "code": "3200",
+            "name": "Retained earnings",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "RETAINED_EARNINGS"
+          },
+          {
+            "id": "3300",
+            "code": "3300",
+            "name": "Opening balance equity",
+            "type": "equity",
+            "parentId": "3000",
+            "postable": true,
+            "role": "OPENING_BALANCE_EQUITY"
+          },
+          {
+            "id": "4000",
+            "code": "4000",
+            "name": "Income",
+            "type": "income",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "4100",
+            "code": "4100",
+            "name": "Sales",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES"
+          },
+          {
+            "id": "4110",
+            "code": "4110",
+            "name": "Sales returns",
+            "type": "income",
+            "parentId": "4000",
+            "postable": true,
+            "role": "SALES_RETURNS"
+          },
+          {
+            "id": "5000",
+            "code": "5000",
+            "name": "Cost of sales",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "5100",
+            "code": "5100",
+            "name": "Cost of goods sold",
+            "type": "expense",
+            "parentId": "5000",
+            "postable": true,
+            "role": "COGS"
+          },
+          {
+            "id": "6000",
+            "code": "6000",
+            "name": "Operating expenses",
+            "type": "expense",
+            "parentId": null,
+            "postable": false,
+            "role": null
+          },
+          {
+            "id": "6100",
+            "code": "6100",
+            "name": "Salaries",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6200",
+            "code": "6200",
+            "name": "Utilities",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          },
+          {
+            "id": "6300",
+            "code": "6300",
+            "name": "General",
+            "type": "expense",
+            "parentId": "6000",
+            "postable": true,
+            "role": null
+          }
+        ],
+        "sums": [
+          {
+            "accountId": "nope",
+            "opening": 1,
+            "debit": 0,
+            "credit": 0
+          }
+        ],
+        "level": "accounts",
+        "showEmpty": false
+      },
+      "error": "unknown_account"
+    }
+  ]
+}

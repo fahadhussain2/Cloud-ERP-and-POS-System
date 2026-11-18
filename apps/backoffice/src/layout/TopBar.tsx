@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { Route } from '../router';
+import { reportOf } from '../reports/catalog';
 import { placeOf } from './menu';
 
 // The top bar (W1-28 plan): where you are (the menu's group and entry, also on a detail screen) and the search for
@@ -11,8 +12,10 @@ import { placeOf } from './menu';
 export function TopBar({ route, onSearch }: { route: Route; onSearch: () => void }) {
   const { t } = useTranslation();
   const place = placeOf(route.screen);
+  // On a report, its own name rather than the Reports home's (W2-01).
+  const name = reportOf(route.screen)?.key ?? place?.item.key;
   return (
-    <header className="sticky top-0 z-10 flex min-h-14 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface px-4 py-2.5 md:px-7">
+    <header className="sticky top-0 z-10 flex print:hidden min-h-14 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface px-4 py-2.5 md:px-7">
       <div className="flex min-w-0 items-center gap-2 text-[13.5px]">
         {place && (
           <>
@@ -20,7 +23,7 @@ export function TopBar({ route, onSearch }: { route: Route; onSearch: () => void
             <span aria-hidden="true" className="text-muted-foreground">
               /
             </span>
-            <span className="truncate font-semibold">{t(`nav.${place.item.key}`)}</span>
+            <span className="truncate font-semibold">{t(`nav.${name}`)}</span>
           </>
         )}
       </div>

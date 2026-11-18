@@ -172,6 +172,19 @@ The owner accepted every recommendation in the questions below (1–7) and the p
   - Inventory equals the stock report's value, and AR and AP equal the ageing totals;
   - each report prints on A4 and downloads as CSV.
 
+## Changes during the build
+
+| Change | Why |
+|---|---|
+| Every report (and the account ledger) also takes `preset=` (`thisMonth`, `lastQuarter`…); the API works its dates out on the shop's today and fiscal year | A link saved as *this month* stays this month; the screen needs no fiscal-year setting of its own |
+| The menu's *Reports* row is one link to the Reports home; the nine built reports left the menu for the home, each with its address and permission (guarded by `Shell.test.tsx`), and the screen search still finds every report by name. The open-exceptions count moved to *Reports* and to Exceptions on the home | Owner answer 1; a report's own permission still decides whether its screen opens (`needsOf`) |
+| The top bar names the report you are on, not the Reports home | So the location reads *Reports · Trial balance* |
+| The cash book sends every cash and bank account as `choices` for its filter | The filter lists them even while it shows one |
+| The journal's sources (`JOURNAL_SOURCES`) live in `@erp/contracts`, shared by the API's check and the day book's filter | One list |
+| The stock and purchases panel covers the whole from–to, also month by month | One panel under the statement; per month it would repeat the opening and closing |
+| **Inventory is checked against the stock ledger** (Σ `stock_movements.value_delta`, to the paisa), and against the stock report within a paisa a unit | The stock report (W1-20) values each item at quantity × its average cost, kept to the paisa; the books keep each movement's own value. On the test shop they differ by 6 paisa. The balance sheet shows the books |
+| The year of generated postings is 100 bills a day (36,500 entries, 146,000 lines), analysed as autovacuum would after a load | The per-line balance check at commit makes 300 a day slow to write in a test; without statistics the planner chose nested loops (4 minutes for the stock panel), with them it answers in well under 2 s |
+
 ## Order
 
 1. Domain golden files, then `statements.ts`.

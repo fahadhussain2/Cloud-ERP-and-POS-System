@@ -7,7 +7,7 @@ import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import pos from '../apps/pos/src/locales/en.json' with { type: 'json' };
-import { account, menu, signOut } from './backoffice';
+import { account, menu, report, signOut } from './backoffice';
 import { expect, test } from './counter-test';
 import {
   BACKOFFICE_PORT,
@@ -577,7 +577,7 @@ test('the drawer is counted blind, short, acknowledged later; the owner acknowle
     await page.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
     await page.getByRole('button', { name: bo.login.submit }).click();
   }
-  await menu(page, bo.nav.dayReconciliation);
+  await report(page, bo.nav.dayReconciliation);
   await page.getByLabel(bo.reports.day.date).fill(today);
   await expect(page.getByText(bo.reports.day.provisional)).toBeVisible();
   // The earlier flows left cash bills nobody handed over: they are listed under their salesman.
