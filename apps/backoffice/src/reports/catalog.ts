@@ -104,7 +104,13 @@ export const REPORTS: readonly ReportEntry[] = [
   // The stock reports (W2-02): the ones the shop uses today first, the analysis last.
   { key: 'stockLedger', section: 'stock', href: href.stockLedger, needs: VIEW, screens: ['stockLedger'] },
   { key: 'stockAt', section: 'stock', href: href.stockAt, needs: VIEW, screens: ['stockAt'] },
-  { key: 'stockMovement', section: 'stock', href: href.stockMovement, needs: VIEW, screens: ['stockMovement'] },
+  {
+    key: 'stockMovement',
+    section: 'stock',
+    href: href.stockMovement,
+    needs: VIEW,
+    screens: ['stockMovement'],
+  },
   { key: 'reorder', section: 'stock', href: href.reorder, needs: VIEW, screens: ['reorder'] },
   { key: 'deadStock', section: 'stock', href: href.deadStock, needs: VIEW, screens: ['deadStock'] },
   {
