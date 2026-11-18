@@ -11,7 +11,7 @@ One folder per module ([delivery process](../07-DELIVERY-PROCESS.md) §2).
 | [Inventory](inventory/README.md) | `INV` | 7 |
 | [Purchasing](purchasing/README.md) | `PUR` | 9 |
 | [Accounting](accounting/README.md) | `ACC` | 9 |
-| [Reports](reports/README.md) | `RPT` | 10 |
+| [Reports](reports/README.md) | `RPT` | 17 |
 | [Sync and offline](sync/README.md) | `SYN` | 6 |
 | [Legacy migration](migration/README.md) | `MIG` | 4 |
 | [DevOps, hosting and observability](devops/README.md) | — | non-functional |

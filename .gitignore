@@ -2,6 +2,8 @@
 sql_dump/
 # Importer reports and output (counts only, but kept local with the dump; D-084)
 tools/legacy-import/out/
+# The owner's legacy report printouts (customer and supplier names, balances, salaries, bank accounts; D-116). Never commit.
+legacy_reports/
 
 # Claude Code local state
 .claude/settings.local.json
