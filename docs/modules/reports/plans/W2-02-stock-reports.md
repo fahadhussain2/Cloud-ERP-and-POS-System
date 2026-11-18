@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#177](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/177) |
 | **Module** | reports (back-office screens and API, read only), with inventory (the stock ledger behind the item's stock card) |
-| **Status** | Answered (owner, 2026-11-18): question 1 *start from go-live*, questions 2–8 as recommended; waiting for the plan's acceptance |
+| **Status** | Accepted (owner, 2026-11-18): question 1 *start from go-live* (against recommendation), questions 2–8 as recommended |
 | **Refs** | RPT-08, RPT-12, RPT-13, RPT-14, PUR-07 (the list only); INV-07 (stock card); CLAUDE.md rules 1, 4, 5, 10; D-017 (one average cost per item), D-100 (no legacy bills), D-101 (pilot wipe), D-102 (opening stock), D-110 (reports read the ledgers), D-116 (reports before go-live; this plan's answers 1–8) |
 | **Depends on** | W2-01 (the report frame, periods, the Reports home), W1-18 (stock moves and the stock card), W1-20 (the stock report), W1-14 (opening stock) |
 | **Size** | about 3 days: domain golden files ½; API with integration tests 1; item picker and six screens 1; e2e and docs ½ |
