@@ -132,7 +132,10 @@ export function groupRows(input: GroupedInput): Grouped {
     const groups = new Map<string, GroupedInput['rows']>();
     for (const r of rows) {
       const name = r.group[level] ?? '';
-      groups.set(name, [...(groups.get(name) ?? []), r]);
+      // Added to in place: copying the group for each row is quadratic on 19,500 items in one group.
+      const inside = groups.get(name);
+      if (inside) inside.push(r);
+      else groups.set(name, [r]);
     }
     for (const name of [...groups.keys()].sort(byName)) {
       const inside = groups.get(name)!;
