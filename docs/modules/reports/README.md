@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Done and verified on staging: [W1-20](plans/W1-20-reports-and-support.md) (sales register, overrides, voids and returns, stock and valuation, ageing, exceptions, Trace a bill); RPT-02 built in W1-11. **Every remaining report is pulled forward before go-live** (D-116) in four tasks, W2-01 to W2-04 ([catalog](#report-catalog-d-116)); W2-01's [plan](plans/W2-01-report-frame-financial-statements.md) is proposed |
+| **Status** | Done and verified on staging: [W1-20](plans/W1-20-reports-and-support.md) (sales register, overrides, voids and returns, stock and valuation, ageing, exceptions, Trace a bill); RPT-02 built in W1-11. **Every remaining report is pulled forward before go-live** (D-116) in four tasks, W2-01 to W2-04 ([catalog](#report-catalog-d-116)); W2-01's [plan](plans/W2-01-report-frame-financial-statements.md) is accepted ([#176](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176)) |
 | **Requirements** | 17 (RPT-01…RPT-17), plus ACC-07 (financial statements) and the list part of PUR-07 (reorder list) |
 | **Feature spec needed** | No: the catalog below and each task's plan are enough |
 
@@ -50,7 +50,7 @@ The reports are designed the modern way: one frame for all of them (filters at t
 | Cash book | Each cash and bank account by day: opening, in, out, closing, and the documents | none | ACC-07 | W2-01 | Planned |
 | Day book | Every voucher posted in a range with its lines, by document type | none | RPT-11 | W2-01 | Planned |
 | Expenses | Expense accounts by month for up to a year | part of Income Statement | RPT-11 | W2-01 | Planned |
-| Cash flow | Money in and out of cash and bank by what it was for, transfers left out | none | ACC-07 | W2-04 (last) | Proposed (W2-01 question 7) |
+| Cash flow | Money in and out of cash and bank by what it was for, transfers left out | none | ACC-07 | W2-04 (last) | Planned (W2-01 answer 7) |
 | **Stock** | | | | | |
 | Stock now and its value | On hand by location, value at average cost | Item Wise Closing Stock (today) | RPT-05 | W1-20 | Built |
 | Stock ledger | One item's documents in a range: opening, in, out, balance, value | Stock Ledger | RPT-12 | W2-02 | Stock card built (W1-18); W2-02 adds the range, opening line and value |
@@ -79,10 +79,10 @@ The reports are designed the modern way: one frame for all of them (filters at t
 
 | Task | What | Requirements | Depends on | Size |
 |---|---|---|---|---|
-| W2-01 | The report frame (filters, presets, key figures, sortable list, drill-down, CSV, print) and the financial statements: trial balance, profit and loss, balance sheet, cash book, day book, expenses; the account ledger moves to the frame ([plan](plans/W2-01-report-frame-financial-statements.md)) | ACC-07, RPT-11 | W1-08, W1-19, W1-20 | 4 |
-| W2-02 | Stock reports: stock ledger, stock at a date, stock movement, reorder list, dead stock, inventory analysis | RPT-08, RPT-12, RPT-13, RPT-14, PUR-07 (list) | W2-01 | 3 |
-| W2-03 | Sales and purchase analysis: sales and gross profit, purchase register, purchase and sale rates, sales over time | RPT-07, RPT-09, RPT-15 | W2-01 | 3 |
-| W2-04 | Customers and suppliers: partner ledger and statement, balance trend, control reports; the built reports onto the frame | RPT-16, RPT-17 | W2-01 | 2 |
+| [W2-01](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176) | The report frame (filters, presets, key figures, sortable list, drill-down, CSV, print) and the financial statements: trial balance, profit and loss, balance sheet, cash book, day book, expenses; the account ledger moves to the frame ([plan](plans/W2-01-report-frame-financial-statements.md)) | ACC-07, RPT-11 | W1-08, W1-19, W1-20 | 4 |
+| [W2-02](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/177) | Stock reports: stock ledger, stock at a date, stock movement, reorder list, dead stock, inventory analysis | RPT-08, RPT-12, RPT-13, RPT-14, PUR-07 (list) | W2-01 | 3 |
+| [W2-03](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178) | Sales and purchase analysis: sales and gross profit, purchase register, purchase and sale rates, sales over time | RPT-07, RPT-09, RPT-15 | W2-01 | 3 |
+| [W2-04](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/179) | Customers and suppliers: partner ledger and statement, balance trend, control reports; the built reports onto the frame; the cash flow statement last | RPT-16, RPT-17, ACC-07 (cash flow) | W2-01 | 2 |
 
 **Total ≈ 12 days**, from 23 Nov; go/no-go is 18 Dec. W2-02 to W2-04 each start with their own plan, after W2-01's frame exists.
 

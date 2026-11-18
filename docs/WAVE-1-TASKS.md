@@ -43,6 +43,17 @@ Sizes are rough working days for one developer. **P** = in the pilot from 1 Dec;
 
 **Total ≈ 56 days** (W1-02 done). P tasks ≈ 34 days.
 
+### Reports pulled forward from Wave 2 (D-116)
+
+Every remaining report is built before go-live, in four tasks after W1-28. Their catalog and sizes are in [the reports module](modules/reports/README.md).
+
+| Task | What | Requirements | Depends on | Size | Need |
+|---|---|---|---|---|---|
+| [W2-01](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176) | The report frame and the Reports home; trial balance, profit and loss, balance sheet, cash book, day book, expenses; the account ledger on the frame ([plan](modules/reports/plans/W2-01-report-frame-financial-statements.md), accepted) | ACC-07, RPT-11 | W1-08, W1-19, W1-20, W1-28 | 4 | G |
+| [W2-02](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/177) | Stock reports: stock ledger, stock at a date, movement, reorder list, dead stock; inventory analysis last | RPT-08, RPT-12, RPT-13, RPT-14, PUR-07 (list) | W2-01 | 3 | G |
+| [W2-03](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178) | Sales and gross profit, purchase register, purchase and sale rates; sales over time last | RPT-07, RPT-09, RPT-15 | W2-01 | 3 | G |
+| [W2-04](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/179) | Partner ledger and statement, balance trend, control reports; the cash flow statement last | RPT-16, RPT-17, ACC-07 (cash flow) | W2-01 | 2 | G |
+
 ## Look and feel
 
 No separate design task: the design pass is part of W1-03 (counter) and W1-04 (back office). The look comes from the owner's Tijara POS prototype, read only. The components are shadcn/ui on Radix + Tailwind CSS, themed with the prototype's colour tokens (D-066). Every later screen uses the same building blocks, and dark mode (PLT-13, Wave 2) is a second set of token values. The back office's frame (side menu and top bar) was redesigned by W1-28 (D-114); its screens keep the prototype's look.
