@@ -63,6 +63,15 @@
         "maxDays": 92
       },
       "error": "invalid_date"
+    },
+    {
+      "name": "not even shaped like a date",
+      "input": {
+        "from": "tomorrow",
+        "to": "2027-07-01",
+        "maxDays": 92
+      },
+      "error": "invalid_date"
     }
   ]
 }
