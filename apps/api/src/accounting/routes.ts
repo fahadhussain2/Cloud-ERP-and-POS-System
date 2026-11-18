@@ -46,7 +46,7 @@ import type pg from 'pg';
 
 import { requireAnyPermission, requirePermission } from '../auth/routes';
 import { lockedOn, shopDay } from '../lock';
-import { moneyOf } from '../reports/routes';
+import { csv, moneyOf, sendCsv, type Cell } from '../reports/routes';
 
 // Back-office accounting (W1-19 plan; ACC-04, ACC-05, ACC-06, part of ACC-07; owner answers 1–6; D-108).
 // - Customer receipts by bank (acc.receipt.create), expenses (acc.expense.create) and transfers between banks, wallets,
@@ -1075,7 +1075,30 @@ export function registerAccounting(scope: FastifyInstance, { pool, now, requireA
         closing: balance,
         truncated: rows.length > LIMIT,
       };
-      return out;
+      if ((req.query as { format?: string }).format !== 'csv') return out;
+      // The ledger on the report frame downloads as CSV too (W2-01, D-116 answer 5).
+      return sendCsv(
+        reply,
+        `ledger-${plain.code}-${from}-${to}.csv`,
+        csv(
+          ['date', 'journal', 'document', 'source', 'memo', 'party', 'debit', 'credit', 'balance'],
+          [
+            [from, '', '', 'opening', '', '', '', '', opening],
+            ...lines.map((l): Cell[] => [
+              l.date,
+              l.journalNumber,
+              l.number,
+              l.sourceType,
+              l.memo,
+              l.partyName,
+              l.debit,
+              l.credit,
+              l.balance,
+            ]),
+            [to, '', '', 'closing', '', '', '', '', balance],
+          ],
+        ),
+      );
     });
   });
 

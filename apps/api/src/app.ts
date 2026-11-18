@@ -15,6 +15,7 @@ import { registerCustomers } from './customers/routes';
 import { registerPurchasing } from './purchasing/routes';
 import { registerDevices } from './devices/routes';
 import { registerEvents } from './sync/events';
+import { registerFinancialReports } from './reports/financial';
 import { registerReports } from './reports/routes';
 import { registerReportViews } from './reports/views';
 import { registerPush } from './sync/push';
@@ -95,6 +96,7 @@ export function buildApp({
         registerUsers(api, { pool, now, requireAuth });
         registerReports(api, { pool, now, requireAuth });
         registerReportViews(api, { pool, now, requireAuth });
+        registerFinancialReports(api, { pool, now, requireAuth });
         registerSupport(api, { pool, now, requireAuth, requireDevice });
         registerCatalog(api, { pool, now, requireAuth });
         registerLabels(api, { pool, requireAuth });

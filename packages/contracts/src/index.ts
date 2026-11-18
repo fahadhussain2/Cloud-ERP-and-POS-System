@@ -133,6 +133,24 @@ export {
   type VoidRow,
   type VoidsReturnsView,
 } from './report-views';
+export type {
+  BalanceSheetView,
+  CashBookAccount,
+  CashBookLine,
+  CashBookView,
+  DayBookEntry,
+  DayBookView,
+  ExpensesView,
+  Period as ReportPeriod,
+  ProfitLossCompare,
+  ProfitLossView,
+  Sides,
+  StatementRow as StatementRowView,
+  StatementSection as StatementSectionView,
+  StockPanel,
+  TrialBalanceRow,
+  TrialBalanceView,
+} from './financial-reports';
 export {
   AddNameRequest,
   CreateItemRequest,

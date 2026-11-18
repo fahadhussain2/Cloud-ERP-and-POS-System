@@ -20,6 +20,8 @@ export const MeResponse = z.object({
   }),
   /** When true, the API allows only me, logout and the password change until it is changed (D-083). */
   mustChangePassword: z.boolean(),
+  /** The shop's name (W1-25), for the reports' print header (W2-01). */
+  shopName: z.string(),
 });
 export type MeResponse = z.infer<typeof MeResponse>;
 
