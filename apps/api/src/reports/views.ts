@@ -14,7 +14,7 @@ import {
   type VoidsReturnsView,
 } from '@erp/contracts';
 import { withTenant } from '@erp/db';
-import { ageBalances, can, money, mulQty, qty, registerTotals, type Permission } from '@erp/domain';
+import { ageBalances, can, registerTotals, type Permission } from '@erp/domain';
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
 import type pg from 'pg';
 
@@ -496,9 +496,14 @@ export function registerReportViews(scope: FastifyInstance, { pool, now, require
         location_name: string;
         qty: string;
         avg_cost: string | null;
+        value: string;
       }>(
+        // The value is the books' (Σ the stock ledger's values, W2-02 owner answer 2), so it equals Inventory to the
+        // paisa; quantity × the rounded average cost could differ by a few paisa.
         `SELECT i.id AS item_id, i.code AS item_code, i.name AS item_name, cat.name AS category,
-           l.code AS location_code, l.name AS location_name, (b.qty * 1000)::bigint::text AS qty, k.avg_cost
+           l.code AS location_code, l.name AS location_name, (b.qty * 1000)::bigint::text AS qty, k.avg_cost,
+           coalesce((SELECT sum(m.value_delta) FROM erp.stock_movements m
+                     WHERE m.item_id = b.item_id AND m.location_id = b.location_id), 0)::text AS value
          FROM erp.stock_balances b
          JOIN erp.items i ON i.id = b.item_id
          JOIN erp.locations l ON l.id = b.location_id
@@ -521,8 +526,7 @@ export function registerReportViews(scope: FastifyInstance, { pool, now, require
           locationCode: x.location_code,
           qty: q,
           avgCost: values ? cost : null,
-          // An item without a cost counts 0, as posting does (no_cost).
-          value: values ? (cost === null ? 0 : mulQty(qty(q), money(cost))) : null,
+          value: values ? Number(x.value) : null,
         };
       });
       const group = <K>(key: (x: StockRow) => K) => {
