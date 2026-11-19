@@ -2,7 +2,7 @@ import type { AdjustmentView, InventoryLookups, StockCardView, TransferView } fr
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Api } from '../api';
 import { i18n } from '../i18n';
@@ -17,6 +17,8 @@ import { TransferScreen } from './TransferScreen';
 // balances, and Transfer needed.
 
 const MONEY = { locale: 'en-PK', currency: 'PKR', minorUnits: 2 };
+/** The shop's business date, from the API (W2-05). */
+const TODAY = '2026-11-19';
 const CAN = {
   transfer: true,
   postTransfer: true,
@@ -38,6 +40,7 @@ const lookups = (over: Partial<InventoryLookups> = {}): InventoryLookups => ({
   money: MONEY,
   can: CAN,
   lockDate: null,
+  today: TODAY,
   ...over,
 });
 
@@ -364,5 +367,61 @@ describe('reading the stock', () => {
     expect(screen.getByRole('link', { name: en.inventory.needed.transfer }).getAttribute('href')).toBe(
       href.transfer('needed'),
     );
+  });
+});
+
+// W2-05: every stock form is dated by the shop's business date from the API (04:00 cut-off), never by this browser's
+// calendar, and Post waits on a date after it. The browser's clock is set days away from the shop's day, so the test
+// holds in any time zone.
+describe("the shop's business date (W2-05)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-21T12:00:00.000Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+  const onToday = (input: HTMLInputElement) => {
+    expect(input.value).toBe(TODAY);
+    expect(input.max).toBe(TODAY);
+  };
+  const ahead = "The date can't be after 2026-11-19, the shop's business date.";
+
+  it('a new transfer is moved on it; a later date greys out Post and says why', async () => {
+    show(<TransferScreen api={fakeApi(lookups()).api} id="new" />);
+    onToday(await screen.findByLabelText<HTMLInputElement>(en.inventory.fields.movedOn));
+    cleanup();
+    show(<TransferScreen api={fakeApi(lookups()).api} id="t1" />);
+    fireEvent.change(await screen.findByLabelText(en.inventory.fields.movedOn), {
+      target: { value: '2026-11-20' },
+    });
+    expect(screen.getByText(ahead)).toBeDefined();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.inventory.post }).disabled).toBe(true);
+  });
+
+  it('a transfer on the way is received on it, and not on a later date', async () => {
+    const sent = { ...TRANSFER, transfer: { ...TRANSFER.transfer, status: 'in_transit' as const } };
+    const f = fakeApi(lookups(), { 'GET /api/inventory/transfers/t1': { status: 200, body: sent } });
+    show(<TransferScreen api={f.api} id="t1" />);
+    const received = await screen.findByLabelText<HTMLInputElement>(en.inventory.fields.receivedOn);
+    onToday(received);
+    fireEvent.change(received, { target: { value: '2026-11-20' } });
+    expect(screen.getByText(ahead)).toBeDefined();
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: en.inventory.transfers.receive }).disabled,
+    ).toBe(true);
+  });
+
+  it('a new adjustment is dated on it, and says why when Post is refused for a later date', async () => {
+    show(<AdjustmentScreen api={fakeApi(lookups()).api} id="new" />);
+    onToday(await screen.findByLabelText<HTMLInputElement>(en.inventory.fields.adjustedOn));
+    cleanup();
+    const f = fakeApi(lookups(), {
+      'POST /api/inventory/adjustments/a1/post': {
+        status: 400,
+        body: { error: 'date_in_future', today: TODAY },
+      },
+    });
+    show(<AdjustmentScreen api={f.api} id="a1" />);
+    fireEvent.click(await screen.findByRole('button', { name: en.inventory.adjustments.sendForApproval }));
+    expect(await screen.findByText(ahead)).toBeDefined();
   });
 });

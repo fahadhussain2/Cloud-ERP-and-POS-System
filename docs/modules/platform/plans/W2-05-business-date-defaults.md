@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Issue** | none yet: opened when the owner accepts this plan (W2-05 is the next free number on 2026-11-19) |
+| **Issue** | [#185](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/185) |
 | **Module** | platform (the shop's day), touching purchasing, inventory and accounting screens and their API |
-| **Status** | Proposed (2026-11-19): waiting for the owner's answers 1–4 |
+| **Status** | Accepted (owner, 2026-11-19, PR #184): answers 1–4 as recommended ("let's do it now") |
 | **Refs** | GLOSSARY *Business date*; data model §tenants (`timezone`, `day_cutoff_hour`, `lock_date`); ACC-06; PUR-01, PUR-02, PUR-09; INV-04, INV-05; CLAUDE.md rules 2, 7, 10; D-108 (dates and the lock date); found during W2-02 (#183) |
 | **Depends on** | W1-16 (purchasing), W1-18 (stock operations), W1-19 (back-office accounting, `shopDay`, `checkDocumentDate`) |
 | **Size** | about 1 day: API and contracts ¼, six forms ¼, tests ½ |
