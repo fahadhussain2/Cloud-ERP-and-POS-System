@@ -186,26 +186,55 @@ async function enroll(shop: Shop): Promise<Counter> {
   return { shop, token, deviceId: enrolled.deviceId, code: enrolled.code, keys, seq: 0 };
 }
 
-/** The counter's next sale (W1-06), at list price; paid in cash unless `payments` says otherwise. */
-function sale(counter: Counter, lines: Line[], payments?: [PaymentMethodCode, number][]): SaleDocument {
+/** A bill discount and who approved it (it takes the lines below their floor, POS spec §10). */
+interface Discount {
+  amount: number;
+  approvedBy: string;
+}
+
+/**
+ * The counter's next sale (W1-06), at list price less any bill discount; paid in cash unless `payments` says
+ * otherwise.
+ */
+function sale(
+  counter: Counter,
+  lines: Line[],
+  payments?: [PaymentMethodCode, number][],
+  discount?: Discount,
+): SaleDocument {
+  const billLines: Bill['lines'] = lines.map((l, i) => ({
+    id: `l${i + 1}`,
+    itemId: counter.shop.items[l.item]!,
+    qty: l.qty as Qty,
+    allowsFraction: false,
+    list: money(l.price),
+    floor: null,
+    unitPrice: money(l.price),
+    approval: null,
+  }));
   const bill: Bill = {
     version: 1,
     sellerId: counter.shop.seller,
     tierId: counter.shop.retail,
-    lines: lines.map((l, i) => ({
-      id: `l${i + 1}`,
-      itemId: counter.shop.items[l.item]!,
-      qty: l.qty as Qty,
-      allowsFraction: false,
-      list: money(l.price),
-      floor: null,
-      unitPrice: money(l.price),
-      approval: null,
-    })),
-    billDiscount: money(0),
-    billApproval: null,
+    lines: billLines,
+    billDiscount: money(discount?.amount ?? 0),
+    billApproval:
+      discount === undefined
+        ? null
+        : {
+            kind: 'below_floor',
+            requestedBy: counter.shop.seller,
+            approvedBy: discount.approvedBy,
+            reason: 'customer_bargain',
+            note: null,
+            at: new Date().toISOString(),
+            values: {
+              billDiscount: money(discount.amount),
+              lines: billLines.map(({ id, qty, unitPrice }) => ({ id, qty, unitPrice })),
+            },
+          },
   };
-  const total = lines.reduce((t, l) => t + (l.qty / 1000) * l.price, 0);
+  const total = lines.reduce((t, l) => t + (l.qty / 1000) * l.price, 0) - (discount?.amount ?? 0);
   counter.seq += 1;
   return buildSaleDocument({
     bill,
@@ -550,6 +579,35 @@ describe('posting inside push (ACC-02, INV-01, INV-03)', () => {
         "SELECT column_name FROM information_schema.columns WHERE table_schema = 'erp' AND table_name = 'sales_lines' AND column_name = 'unit_cost'",
       ),
     ).toEqual([]);
+  });
+
+  it('credits Sales before the bill discount and debits the discount, with nothing on Suspense (posting rules §4.1)', async () => {
+    // The counter stores each line after its share of the bill discount (line_total = amount − bill_share).
+    const fahad = (await q<{ id: string }>(post, "SELECT id FROM erp.users WHERE username = 'fahad'"))[0]!.id;
+    const doc = sale(
+      c,
+      [
+        { item: 'BRPD001', qty: 2000, price: 450000 },
+        { item: 'OIL001', qty: 1000, price: 120000 },
+      ],
+      undefined,
+      { amount: 20000, approvedBy: fahad },
+    );
+    expect(doc.lines.map((l) => l.lineTotal + l.billShare)).toEqual([900000, 120000]);
+    const r = await push(c, [doc]);
+    expect(r.results[0]!.status).toBe('accepted');
+
+    const lines = (await journalOf(post, doc.id)).map(({ code, debit, credit }) => ({ code, debit, credit }));
+    expect(lines).toEqual([
+      { code: '1120', debit: 1000000, credit: 0 },
+      { code: '4100', debit: 0, credit: 1020000 },
+      { code: '4120', debit: 20000, credit: 0 },
+      { code: '5100', debit: 700000, credit: 0 },
+      { code: '1300', debit: 0, credit: 700000 },
+    ]);
+    // Net sales = what the customer paid.
+    const net = lines.filter((l) => l.code.startsWith('41')).reduce((n, l) => n + l.credit - l.debit, 0);
+    expect(net).toBe(1000000);
   });
 
   it('keeps another tenant’s ledgers out (rule 5)', async () => {
