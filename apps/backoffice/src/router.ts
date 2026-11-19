@@ -22,6 +22,12 @@ export type Route =
   | { screen: 'overridesReport' }
   | { screen: 'voidsReturns' }
   | { screen: 'stockReport' }
+  | { screen: 'stockAt' }
+  | { screen: 'stockMovement' }
+  | { screen: 'stockLedger' }
+  | { screen: 'reorder' }
+  | { screen: 'deadStock' }
+  | { screen: 'inventoryAnalysis' }
   | { screen: 'ageing' }
   | { screen: 'exceptions' }
   | { screen: 'trace'; number: string | null }
@@ -73,6 +79,13 @@ export const href = {
   overridesReport: '#/reports/overrides',
   voidsReturns: '#/reports/voids',
   stockReport: '#/reports/stock',
+  // The stock reports (W2-02).
+  stockAt: '#/reports/stock-at',
+  stockMovement: '#/reports/stock-movement',
+  stockLedger: '#/reports/stock-ledger',
+  reorder: '#/reports/reorder',
+  deadStock: '#/reports/dead-stock',
+  inventoryAnalysis: '#/reports/inventory-analysis',
   ageing: '#/reports/ageing',
   exceptions: '#/reports/exceptions',
   trace: (number?: string) => (number ? `#/support/trace/${encodeURIComponent(number)}` : '#/support/trace'),
@@ -149,6 +162,12 @@ export function parseHash(hash: string): Route {
   if (parts[0] === 'reports' && parts[1] === 'overrides') return { screen: 'overridesReport' };
   if (parts[0] === 'reports' && parts[1] === 'voids') return { screen: 'voidsReturns' };
   if (parts[0] === 'reports' && parts[1] === 'stock') return { screen: 'stockReport' };
+  if (parts[0] === 'reports' && parts[1] === 'stock-at') return { screen: 'stockAt' };
+  if (parts[0] === 'reports' && parts[1] === 'stock-movement') return { screen: 'stockMovement' };
+  if (parts[0] === 'reports' && parts[1] === 'stock-ledger') return { screen: 'stockLedger' };
+  if (parts[0] === 'reports' && parts[1] === 'reorder') return { screen: 'reorder' };
+  if (parts[0] === 'reports' && parts[1] === 'dead-stock') return { screen: 'deadStock' };
+  if (parts[0] === 'reports' && parts[1] === 'inventory-analysis') return { screen: 'inventoryAnalysis' };
   if (parts[0] === 'reports' && parts[1] === 'ageing') return { screen: 'ageing' };
   if (parts[0] === 'reports' && parts[1] === 'exceptions') return { screen: 'exceptions' };
   if (parts[0] === 'support' && parts[1] === 'trace')

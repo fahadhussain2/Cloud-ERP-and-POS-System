@@ -338,12 +338,15 @@ export interface StatementLine {
  */
 export function StatementTable({
   label,
+  first,
   columns,
   lines,
   money,
   blankZero = false,
 }: {
   label: string;
+  /** The first column's heading: Account unless said (Item for the stock lists, W2-02). */
+  first?: string;
   columns: string[];
   lines: StatementLine[];
   money: MoneyFormat;
@@ -376,7 +379,7 @@ export function StatementTable({
       <Table aria-label={label}>
         <TableHeader className="sticky top-0 bg-surface print:static">
           <TableRow>
-            <TableHead>{t('reports.frame.account')}</TableHead>
+            <TableHead>{first ?? t('reports.frame.account')}</TableHead>
             {columns.map((c, i) => (
               <TableHead key={i} className="text-end">
                 {c}

@@ -1,0 +1,68 @@
+{
+  "description": "Stock turnover (RPT-14, W2-02 owner answer 7): cost of sales ÷ the average of the opening and closing stock value, in hundredths, rounded half away from zero; none when there was no stock.",
+  "cases": [
+    {
+      "name": "twice",
+      "input": {
+        "costOfSales": 120000,
+        "opening": 50000,
+        "closing": 70000
+      },
+      "expected": 200
+    },
+    {
+      "name": "a third, rounded",
+      "input": {
+        "costOfSales": 100000,
+        "opening": 30000,
+        "closing": 30000
+      },
+      "expected": 333
+    },
+    {
+      "name": "nothing sold",
+      "input": {
+        "costOfSales": 0,
+        "opening": 100,
+        "closing": 100
+      },
+      "expected": 0
+    },
+    {
+      "name": "half a hundredth rounds up",
+      "input": {
+        "costOfSales": 1,
+        "opening": 400,
+        "closing": 0
+      },
+      "expected": 1
+    },
+    {
+      "name": "more returned than sold: negative, half rounds away from zero",
+      "input": {
+        "costOfSales": -1,
+        "opening": 400,
+        "closing": 0
+      },
+      "expected": -1
+    },
+    {
+      "name": "no stock",
+      "input": {
+        "costOfSales": 1000,
+        "opening": 0,
+        "closing": 0
+      },
+      "expected": null
+    },
+    {
+      "name": "stock below zero on average",
+      "input": {
+        "costOfSales": 1000,
+        "opening": -500,
+        "closing": 200
+      },
+      "expected": null
+    }
+  ]
+}

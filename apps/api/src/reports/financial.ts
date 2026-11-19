@@ -59,7 +59,7 @@ export const SUMMARY_DAYS = 366;
 /** One page of a cash book account's lines, or of the day book's entries; totals still count them all. */
 const PAGE = 1000;
 
-class BadRequest extends Error {
+export class BadRequest extends Error {
   constructor(readonly error: string) {
     super(error);
   }
@@ -70,7 +70,7 @@ const num = (v: string | number) => Number(v);
 const numberOf = (memo: string | null) => memo?.split(' ')[0] ?? null;
 
 /** The shop's business date now, and its fiscal year's first month. */
-async function shop(c: Client, now: Date): Promise<{ today: string; startMonth: number }> {
+export async function shop(c: Client, now: Date): Promise<{ today: string; startMonth: number }> {
   const { rows } = await c.query<{ d: string; m: number }>(
     `SELECT (($1::timestamptz AT TIME ZONE timezone) - make_interval(hours => day_cutoff_hour))::date::text AS d,
        fiscal_year_start_month AS m FROM erp.tenants`,
@@ -139,7 +139,7 @@ async function balancesAt(c: Client, at: string, since: string | null) {
  * The period: a preset (`thisMonth`…, on the shop's today and fiscal year), else from/to, else `fallback`; at most
  * `maxDays` (range_too_long), real dates the right way round. A preset keeps a saved link relative ("this month").
  */
-function rangeOf(
+export function rangeOf(
   q: Query,
   fallback: Period,
   maxDays: number,
@@ -159,7 +159,7 @@ function rangeOf(
   return p;
 }
 
-const dateOr = (v: string | undefined, fallback: string) => {
+export const dateOr = (v: string | undefined, fallback: string) => {
   const d = v || fallback;
   if (!DATE.test(d)) throw new BadRequest('bad_request');
   try {
@@ -171,7 +171,7 @@ const dateOr = (v: string | undefined, fallback: string) => {
 };
 
 /** The day before a date. */
-const dayBefore = (date: string) =>
+export const dayBefore = (date: string) =>
   new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 
 const periodLabel = (p: Period) => (p.from === p.to ? p.from : `${p.from} to ${p.to}`);

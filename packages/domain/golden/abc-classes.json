@@ -1,0 +1,243 @@
+{
+  "description": "ABC (RPT-14, W2-02 owner answer 7): items by sales or profit, largest first, ties by id; share and cumulative share in basis points of the total of the positive amounts; A while the share before the item is under 80%, B under 95%, else C, so the largest item is always A; no class for nothing or a loss.",
+  "cases": [
+    {
+      "name": "ten items",
+      "input": [
+        {
+          "id": "j",
+          "amount": 0
+        },
+        {
+          "id": "i",
+          "amount": 100
+        },
+        {
+          "id": "h",
+          "amount": 100
+        },
+        {
+          "id": "g",
+          "amount": 300
+        },
+        {
+          "id": "f",
+          "amount": 400
+        },
+        {
+          "id": "e",
+          "amount": 500
+        },
+        {
+          "id": "d",
+          "amount": 600
+        },
+        {
+          "id": "c",
+          "amount": 1000
+        },
+        {
+          "id": "b",
+          "amount": 2000
+        },
+        {
+          "id": "a",
+          "amount": 5000
+        }
+      ],
+      "expected": [
+        {
+          "id": "a",
+          "amount": 5000,
+          "share": 5000,
+          "cumulative": 5000,
+          "class": "A"
+        },
+        {
+          "id": "b",
+          "amount": 2000,
+          "share": 2000,
+          "cumulative": 7000,
+          "class": "A"
+        },
+        {
+          "id": "c",
+          "amount": 1000,
+          "share": 1000,
+          "cumulative": 8000,
+          "class": "A"
+        },
+        {
+          "id": "d",
+          "amount": 600,
+          "share": 600,
+          "cumulative": 8600,
+          "class": "B"
+        },
+        {
+          "id": "e",
+          "amount": 500,
+          "share": 500,
+          "cumulative": 9100,
+          "class": "B"
+        },
+        {
+          "id": "f",
+          "amount": 400,
+          "share": 400,
+          "cumulative": 9500,
+          "class": "B"
+        },
+        {
+          "id": "g",
+          "amount": 300,
+          "share": 300,
+          "cumulative": 9800,
+          "class": "C"
+        },
+        {
+          "id": "h",
+          "amount": 100,
+          "share": 100,
+          "cumulative": 9900,
+          "class": "C"
+        },
+        {
+          "id": "i",
+          "amount": 100,
+          "share": 100,
+          "cumulative": 10000,
+          "class": "C"
+        },
+        {
+          "id": "j",
+          "amount": 0,
+          "share": 0,
+          "cumulative": 0,
+          "class": null
+        }
+      ]
+    },
+    {
+      "name": "by profit, with a loss: the loss has no class and is not in the total",
+      "input": [
+        {
+          "id": "x",
+          "amount": 300
+        },
+        {
+          "id": "y",
+          "amount": -100
+        },
+        {
+          "id": "z",
+          "amount": 100
+        }
+      ],
+      "expected": [
+        {
+          "id": "x",
+          "amount": 300,
+          "share": 7500,
+          "cumulative": 7500,
+          "class": "A"
+        },
+        {
+          "id": "z",
+          "amount": 100,
+          "share": 2500,
+          "cumulative": 10000,
+          "class": "A"
+        },
+        {
+          "id": "y",
+          "amount": -100,
+          "share": 0,
+          "cumulative": 0,
+          "class": null
+        }
+      ]
+    },
+    {
+      "name": "thirds round half away from zero",
+      "input": [
+        {
+          "id": "p",
+          "amount": 1
+        },
+        {
+          "id": "q",
+          "amount": 1
+        },
+        {
+          "id": "r",
+          "amount": 1
+        }
+      ],
+      "expected": [
+        {
+          "id": "p",
+          "amount": 1,
+          "share": 3333,
+          "cumulative": 3333,
+          "class": "A"
+        },
+        {
+          "id": "q",
+          "amount": 1,
+          "share": 3333,
+          "cumulative": 6667,
+          "class": "A"
+        },
+        {
+          "id": "r",
+          "amount": 1,
+          "share": 3333,
+          "cumulative": 10000,
+          "class": "A"
+        }
+      ]
+    },
+    {
+      "name": "one item",
+      "input": [
+        {
+          "id": "only",
+          "amount": 42
+        }
+      ],
+      "expected": [
+        {
+          "id": "only",
+          "amount": 42,
+          "share": 10000,
+          "cumulative": 10000,
+          "class": "A"
+        }
+      ]
+    },
+    {
+      "name": "nothing sold",
+      "input": [
+        {
+          "id": "n",
+          "amount": 0
+        }
+      ],
+      "expected": [
+        {
+          "id": "n",
+          "amount": 0,
+          "share": 0,
+          "cumulative": 0,
+          "class": null
+        }
+      ]
+    },
+    {
+      "name": "no items",
+      "input": [],
+      "expected": []
+    }
+  ]
+}

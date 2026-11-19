@@ -152,6 +152,28 @@ export type {
   TrialBalanceRow,
   TrialBalanceView,
 } from './financial-reports';
+export { DEAD_DAYS, STOCK_GROUPS } from './stock-reports';
+export type {
+  AbcClassView,
+  AnalysisRow,
+  AnalysisView,
+  DeadStockRow,
+  DeadStockView,
+  ReorderRow,
+  ReorderView,
+  StockAgeKindView,
+  StockAtCells,
+  StockAtView,
+  StockChoicesView,
+  StockGroup,
+  StockItemCells,
+  StockLedgerLine,
+  StockLedgerView,
+  StockLine,
+  StockMovementCells,
+  StockMovementView,
+  StockQtyValue,
+} from './stock-reports';
 export {
   AddNameRequest,
   CreateItemRequest,

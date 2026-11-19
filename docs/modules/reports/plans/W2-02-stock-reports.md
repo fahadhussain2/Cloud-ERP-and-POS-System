@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#177](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/177) |
 | **Module** | reports (back-office screens and API, read only), with inventory (the stock ledger behind the item's stock card) |
-| **Status** | Accepted (owner, 2026-11-18): question 1 *start from go-live* (against recommendation), questions 2–8 as recommended |
+| **Status** | Accepted (owner, 2026-11-18): question 1 *start from go-live* (against recommendation), questions 2–8 as recommended. Built, waiting for review |
 | **Refs** | RPT-08, RPT-12, RPT-13, RPT-14, PUR-07 (the list only); INV-07 (stock card); CLAUDE.md rules 1, 4, 5, 10; D-017 (one average cost per item), D-100 (no legacy bills), D-101 (pilot wipe), D-102 (opening stock), D-110 (reports read the ledgers), D-116 (reports before go-live; this plan's answers 1–8) |
 | **Depends on** | W2-01 (the report frame, periods, the Reports home), W1-18 (stock moves and the stock card), W1-20 (the stock report), W1-14 (opening stock) |
 | **Size** | about 3 days: domain golden files ½; API with integration tests 1; item picker and six screens 1; e2e and docs ½ |
@@ -156,6 +156,23 @@ Four tasks; this is the second (1). Everything by go-live, the new analysis last
   - stock at today's value equals the balance sheet's Inventory and the stock report's value;
   - the reorder list for one supplier, compared by the purchaser with the legacy *Item Order Register* on the same day (the legacy app is still in use until go-live);
   - each report prints on A4 and downloads as CSV.
+
+## Changes during the build
+
+| Change | Why |
+|---|---|
+| **Stock movement shows quantity or value**, with a switch for those with `cost.view`; stock at a date shows both side by side (answer 8) | Ten columns of quantity and value side by side are twenty: too wide for the screen or A4. The CSV has both |
+| Two small read endpoints: **`/api/reports/stock-choices`** (categories, makes, brands, locations, suppliers for the filters) and **`/api/reports/items`** (the item picker's search), both with `reports.view` | The catalog's and purchasing's own searches need permissions an accountant or a manager may not have |
+| Stock at a date and stock movement are **per location** when grouped by location or filtered to one; otherwise one row per item | A transfer only shows where it happened |
+| The movement's **transfer columns are hidden over all locations** unless they don't cancel out; *Opening stock entered* only shows when the period holds the opening | They are zero there; fewer columns to read |
+| **Last received** is the date of the item's last goods receipt since go-live; dead stock counts the **Shop and the Godown**, as the reorder list | One meaning of "on hand" for both lists; damaged stock is not stock waiting to sell |
+| **Inventory analysis:** sales are the bills' line totals net of returns (voided bills left out), cost their stock movements' values; turnover uses the books' stock value before and at the end of the period; days of cover count from go-live when the period starts earlier | The same figures as the stock ledger and the books; no rate over days the system didn't see (answer 1) |
+| **Grouping fixed during the timing test:** `groupRows` copied each group for every row added, quadratic on 19,500 items in one category (2.3 s). Adding in place: 0.37 s | Found by the year-of-stock test before review |
+| **The year of stock** (19,500 items, 300 lines sold a day): stock at a date 0.37 s, stock movement 0.56 s, the reorder list 0.57 s. **No new index** was needed | The plan's risk said an index on (tenant, business date) only if 2 s was missed |
+| **The reorder list and dead stock count what is on hand now** (every movement), not stock as on the business date | Found by the e2e run after midnight: the back office dates a receipt by the calendar, so between 00:00 and 04:00 it is dated tomorrow's business day. Those goods are on the shelf, so the lists count them; stock *as on today* rightly leaves them out |
+| A filter change builds the next address from the **current address**, so two quick changes keep both | Found by the component test; a screen's filters catch up with the address a moment later |
+| The frame's `StatementTable` takes the first column's heading (*Item* for the stock lists) | It said *Account* for every statement |
+| W2-01's integration test now checks the stock report **equal to Inventory**, not within a paisa a unit | Answer 2 |
 
 ## Order
 

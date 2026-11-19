@@ -101,7 +101,9 @@ export type DomainErrorCode =
   | 'unknown_account'
   | 'invalid_preset'
   | 'invalid_range'
-  | 'range_too_long';
+  | 'range_too_long'
+  // The stock reports (W2-02)
+  | 'unknown_source';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

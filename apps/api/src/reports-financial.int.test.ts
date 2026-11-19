@@ -578,14 +578,14 @@ describe('the profit and loss and the balance sheet (ACC-07)', () => {
     expect(bs.columns).toHaveLength(2);
     const amount = (role: string) =>
       [...bs.assets.rows, ...bs.liabilities.rows].find((r) => r.role === role)?.amounts[0] ?? 0;
-    // Inventory is the stock ledger's value to the paisa (rule 4). The stock report values each item at its average
-    // cost, kept to the paisa, so it may differ from the books by that rounding: a paisa a unit at most here.
+    // Inventory is the stock ledger's value to the paisa (rule 4), and so is the stock report since W2-02 (owner
+    // answer 2): it no longer values each item at its rounded average cost.
     const [{ value }] = (await q<{ value: string }>(
       'SELECT sum(value_delta)::text AS value FROM erp.stock_movements',
     )) as [{ value: string }];
     expect(amount('INVENTORY')).toBe(Number(value));
     const stock = await view<StockView>('/api/reports/stock');
-    expect(Math.abs(amount('INVENTORY') - stock.total.value!)).toBeLessThanOrEqual(stock.total.qty / 1000);
+    expect(stock.total.value).toBe(amount('INVENTORY'));
     const customers = await view<AgeingView>('/api/reports/ageing?side=customers');
     const suppliers = await view<AgeingView>('/api/reports/ageing?side=suppliers');
     expect(amount('AR_CONTROL')).toBe(customers.totals.balance);

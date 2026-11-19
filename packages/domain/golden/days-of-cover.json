@@ -1,0 +1,68 @@
+{
+  "description": "Days of cover (RPT-14, W2-02 owner answer 7): how many days the stock on hand lasts at the quantity sold over a number of days, rounded down; 0 with nothing on hand, none when nothing sold.",
+  "cases": [
+    {
+      "name": "nothing on hand",
+      "input": {
+        "onHand": 0,
+        "sold": 5000,
+        "days": 90
+      },
+      "expected": 0
+    },
+    {
+      "name": "below zero",
+      "input": {
+        "onHand": -2000,
+        "sold": 5000,
+        "days": 90
+      },
+      "expected": 0
+    },
+    {
+      "name": "nothing sold",
+      "input": {
+        "onHand": 10000,
+        "sold": 0,
+        "days": 90
+      },
+      "expected": null
+    },
+    {
+      "name": "more returned than sold",
+      "input": {
+        "onHand": 10000,
+        "sold": -1000,
+        "days": 90
+      },
+      "expected": null
+    },
+    {
+      "name": "no days",
+      "input": {
+        "onHand": 10000,
+        "sold": 3000,
+        "days": 0
+      },
+      "expected": null
+    },
+    {
+      "name": "10 on hand, 3 sold in 90 days",
+      "input": {
+        "onHand": 10000,
+        "sold": 3000,
+        "days": 90
+      },
+      "expected": 300
+    },
+    {
+      "name": "1 on hand, 7 sold in 90 days: rounded down",
+      "input": {
+        "onHand": 1000,
+        "sold": 7000,
+        "days": 90
+      },
+      "expected": 12
+    }
+  ]
+}

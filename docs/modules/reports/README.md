@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Done and verified on staging: [W1-20](plans/W1-20-reports-and-support.md) (sales register, overrides, voids and returns, stock and valuation, ageing, exceptions, Trace a bill); RPT-02 built in W1-11. **Every remaining report is pulled forward before go-live** (D-116) in four tasks, W2-01 to W2-04 ([catalog](#report-catalog-d-116)); W2-01 is built ([plan](plans/W2-01-report-frame-financial-statements.md), [#176](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176)): the report frame, the Reports home and the financial statements, waiting for review. W2-02's [plan](plans/W2-02-stock-reports.md) is accepted |
+| **Status** | Done and verified on staging: [W1-20](plans/W1-20-reports-and-support.md) (sales register, overrides, voids and returns, stock and valuation, ageing, exceptions, Trace a bill); RPT-02 built in W1-11. **Every remaining report is pulled forward before go-live** (D-116) in four tasks, W2-01 to W2-04 ([catalog](#report-catalog-d-116)); W2-01 is built ([plan](plans/W2-01-report-frame-financial-statements.md), [#176](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176)): the report frame, the Reports home and the financial statements, waiting for review. W2-02 is built ([plan](plans/W2-02-stock-reports.md), [#177](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/177)): the six stock reports, waiting for review |
 | **Requirements** | 17 (RPT-01…RPT-17), plus ACC-07 (financial statements) and the list part of PUR-07 (reorder list) |
 | **Feature spec needed** | No: the catalog below and each task's plan are enough |
 
@@ -52,13 +52,13 @@ The reports are designed the modern way: one frame for all of them (filters at t
 | Expenses | Expense accounts by month for up to a year | part of Income Statement | RPT-11 | W2-01 | Built |
 | Cash flow | Money in and out of cash and bank by what it was for, transfers left out | none | ACC-07 | W2-04 (last) | Planned (W2-01 answer 7) |
 | **Stock** | | | | | |
-| Stock now and its value | On hand by location, value at average cost | Item Wise Closing Stock (today) | RPT-05 | W1-20 | Built |
-| Stock ledger | One item's documents in a range: opening, in, out, balance, value | Stock Ledger | RPT-12 | W2-02 | Stock card built (W1-18); W2-02 adds the range, opening line and value |
-| Stock at a date | On hand and value on any past date, by category and vehicle make | Item Wise Closing Stock | RPT-13 | W2-02 | Planned |
-| Stock movement | Per item: opening, purchases, purchase returns, sales, sales returns, adjustments and counts, transfers, closing | Stock Summary | RPT-13 | W2-02 | Planned |
-| Reorder list | Items at or below their minimum, the quantity to order up to the maximum, last supplier and cost, 30/90-day sales | Item Order Register | PUR-07 (list) | W2-02 | Planned; turning it into POs stays with POs (Wave 2) |
-| Dead and slow stock | Items with no sale in N days and their value | none | RPT-08 | W2-02 | Planned |
-| Inventory analysis | ABC by sales and by profit, turnover, days of cover | none | RPT-14 | W2-02 (last) | Planned |
+| Stock now and its value | On hand by location, and its value in the books | Item Wise Closing Stock (today) | RPT-05 | W1-20 | Built; since W2-02 valued from the stock ledger, equal to Inventory (W2-02 answer 2) |
+| Stock ledger | One item's documents in a range: opening, in, out, balance, value | Stock Ledger | RPT-12 | W2-02 | Built; the stock card links to it |
+| Stock at a date | On hand and value on any past date, by category and vehicle make | Item Wise Closing Stock | RPT-13 | W2-02 | Built |
+| Stock movement | Per item: opening, purchases, purchase returns, sales, sales returns, adjustments and counts, transfers, closing | Stock Summary | RPT-13 | W2-02 | Built |
+| Reorder list | Items at or below their minimum, the quantity to order up to the maximum, last supplier and cost, 30/90-day sales | Item Order Register | PUR-07 (list) | W2-02 | Built; turning it into POs stays with POs (Wave 2) |
+| Dead and slow stock | Items with no sale in N days and their value | none | RPT-08 | W2-02 | Built |
+| Inventory analysis | ABC by sales and by profit, turnover, days of cover | none | RPT-14 | W2-02 (last) | Built |
 | **Sales and purchases** | | | | | |
 | Sales register | Every bill of a day or range, totals by salesman, counter and tender | Daily Sales Register (bill-wise) | RPT-01 | W1-20 | Built |
 | Sales and gross profit | Sales, cost and profit by item, category, brand, salesman, customer or period | Daily Sales Register (item list, bill-wise P&L) | RPT-07 | W2-03 | Planned |
