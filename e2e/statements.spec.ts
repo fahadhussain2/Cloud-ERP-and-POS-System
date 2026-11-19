@@ -1,33 +1,15 @@
-import type { Page } from '@playwright/test';
-
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { report, signOut } from './backoffice';
+import { report, signInAsOwner as signIn } from './backoffice';
 import { expect, test } from './counter-test';
-import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
 
 // W2-01 plan (ACC-07, RPT-11, D-116): the owner reads the books on the report frame. After the counter's sales
 // (counter.spec) and the electricity bill (ledger.spec), this year's trial balance balances; Sales opens its ledger and
 // a line opens the bill's trace; the profit and loss month by month; the balance sheet balances; the trial balance
 // downloads as CSV; and on paper the menu and filters go while a header names the shop. Back office only, read only.
 
-const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
 const r = bo.reports;
 
 test.describe.configure({ mode: 'serial' });
-
-/** As the owner, whoever the shared browser profile left signed in. */
-const signIn = async (page: Page) => {
-  await page.goto(BACKOFFICE);
-  const form = page.getByLabel(bo.login.shopCode);
-  const nav = page.getByRole('navigation', { name: bo.nav.menu });
-  await expect(form.or(nav)).toBeVisible();
-  if (await nav.isVisible()) await signOut(page);
-  await form.fill(SHOP);
-  await page.getByLabel(bo.login.username).fill(OWNER.username);
-  await page.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
-  await page.getByRole('button', { name: bo.login.submit }).click();
-  await expect(page.getByRole('navigation', { name: bo.nav.menu })).toBeVisible();
-};
 
 test('the trial balance balances; Sales opens its ledger and a line opens the bill', async ({ page }) => {
   await signIn(page);
