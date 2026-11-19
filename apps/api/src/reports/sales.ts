@@ -844,7 +844,12 @@ export function registerSalesReports(scope: FastifyInstance, { pool, now, requir
         trendSeries({
           period,
           step,
-          days: o.days.map((x) => ({ date: x.key, bills: x.bills, sales: x.sales, profit: x.sales - x.cost })),
+          days: o.days.map((x) => ({
+            date: x.key,
+            bills: x.bills,
+            sales: x.sales,
+            profit: x.sales - x.cost,
+          })),
         }).map((t) => ({ ...t, profit: values ? t.profit : null }));
       const trend = series(p, now_);
       const beforeTrend = before === null ? null : series(before, await overTime(c, before, q));
