@@ -149,6 +149,9 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
     .getByLabel(bo.purchasing.fields.supplier, { exact: true })
     .selectOption({ label: 'Late Bill Traders (S900)' });
   await page.getByLabel(bo.purchasing.fields.billNo).fill('LATE-1');
+  // The shop's business date, the form's default (W2-05): not this machine's calendar, which is a day ahead after
+  // midnight in Karachi and could be refused as a future date.
+  const today = await page.getByLabel(bo.purchasing.fields.receivedOn).inputValue();
   await page.getByLabel(bo.purchasing.fields.receivedOn).fill(lockDate);
   await page.getByRole('button', { name: 'Item of line 1' }).click();
   await page.getByRole('textbox', { name: 'Item of line 1' }).fill('enol001');
@@ -170,7 +173,7 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
     await sql(`SELECT 1 FROM erp.goods_receipts WHERE supplier_bill_no = 'LATE-1' AND status = 'draft'`),
   ).toHaveLength(1);
   // A later date opens Post again (not posted here: the purchasing flow numbers the first receipt).
-  await page.getByLabel(bo.purchasing.fields.receivedOn).fill(new Date().toISOString().slice(0, 10));
+  await page.getByLabel(bo.purchasing.fields.receivedOn).fill(today);
   await expect(page.getByText(locked)).toHaveCount(0);
   await expect(page.getByRole('button', { name: bo.purchasing.post })).toBeEnabled();
   await office.close();

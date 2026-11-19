@@ -1,13 +1,5 @@
 import type { DocumentRow, PurchasingLookups, ReceiptView, ReturnView } from '@erp/contracts';
-import {
-  checkReturn,
-  isDateLocked,
-  isEmptyDraft,
-  money,
-  mulQty,
-  PURCHASE_RETURN_REASONS,
-  qty as qtyOf,
-} from '@erp/domain';
+import { checkReturn, isEmptyDraft, money, mulQty, PURCHASE_RETURN_REASONS, qty as qtyOf } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -34,7 +26,7 @@ import { moneyText, moneyValue, qtyText, qtyValue } from '../catalog/data';
 import { carry, href, navigate, takeCarried } from '../router';
 import { ItemPicker } from './ItemPicker';
 import { DocumentList } from './ReceiptScreen';
-import { problemText, purchasingRefusal, today, usePurchasingLookups, type PickedItem } from './data';
+import { dateProblem, problemText, purchasingRefusal, usePurchasingLookups, type PickedItem } from './data';
 
 // Purchase returns / debit notes (W1-16, PUR-03): goods back to the supplier, from a goods receipt where possible
 // (its lines and net costs offered, no more than it still has), with a reason (owner answer 3). Posting takes the
@@ -158,7 +150,7 @@ function ReturnForm({
     supplierId: r?.supplierId ?? receipt?.receipt.supplierId ?? '',
     goodsReceiptId: r?.goodsReceiptId ?? receipt?.receipt.id ?? null,
     locationId: r?.locationId ?? receipt?.receipt.locationId ?? shop,
-    returnedOn: r?.returnedOn ?? today(),
+    returnedOn: r?.returnedOn ?? lookups.today,
     reason: r?.reason ?? '',
     note: r?.note ?? '',
   });
@@ -208,9 +200,7 @@ function ReturnForm({
       : l.item.id !== null || l.qty.trim() !== '' || l.unitCost.trim() !== '',
   );
   // A date on or before the lock date can't post (D-108): Post waits, and the date says why. Save draft still works.
-  const locked = isDateLocked(h.returnedOn, lookups.lockDate)
-    ? t('purchasing.errors.date_locked', { date: lookups.lockDate })
-    : null;
+  const locked = dateProblem(t, h.returnedOn, lookups);
   const check = checkReturn({
     supplierId: h.supplierId || null,
     locationId: h.locationId || null,
@@ -335,6 +325,7 @@ function ReturnForm({
             label={t('purchasing.fields.returnedOn')}
             type="date"
             error={locked}
+            max={lookups.today}
             value={h.returnedOn}
             onChange={(e) => set('returnedOn', e.target.value)}
           />

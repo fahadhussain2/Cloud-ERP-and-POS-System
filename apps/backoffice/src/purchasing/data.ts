@@ -1,4 +1,5 @@
 import type { PurchasingLookups } from '@erp/contracts';
+import { checkDocumentDate } from '@erp/domain';
 import { formatMoney } from '@erp/ui';
 import type { TFunction } from 'i18next';
 import { useCallback, useEffect, useState } from 'react';
@@ -48,6 +49,7 @@ export function purchasingRefusal(
     by?: string | null;
     code?: string;
     lockDate?: string;
+    today?: string;
     balance?: number;
   } | null;
   if (b?.error === 'invalid' && b.problems?.length)
@@ -58,15 +60,26 @@ export function purchasingRefusal(
     return t('purchasing.errors.balance_open', { amount: formatMoney(b.balance, money) });
   if (b?.error === 'posting_failed') return t('purchasing.errors.posting_failed', { code: b.code ?? '' });
   if (b?.error === 'date_locked') return t('purchasing.errors.date_locked', { date: b.lockDate ?? '' });
+  if (b?.error === 'date_in_future') return t('purchasing.errors.date_in_future', { today: b.today ?? '' });
   if (b?.error && exists(`purchasing.errors.${b.error}`)) return t(`purchasing.errors.${b.error}`);
   return t('app.error');
 }
 
-/** Today in the shop's calendar, as YYYY-MM-DD (the back office runs in the shop). */
-export const today = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
+/**
+ * Why a document dated `date` can't post, or null: the server's check as you type. Not after the shop's business date
+ * (`lookups.today`, W2-05: the forms' default too, never this browser's calendar), not on or before the lock date
+ * (D-108).
+ */
+export function dateProblem(
+  t: TFunction,
+  date: string,
+  lookups: Pick<PurchasingLookups, 'today' | 'lockDate'>,
+): string | null {
+  const problem = checkDocumentDate(date, lookups.today, lookups.lockDate);
+  if (problem === 'date_in_future') return t('purchasing.errors.date_in_future', { today: lookups.today });
+  if (problem === 'date_locked') return t('purchasing.errors.date_locked', { date: lookups.lockDate });
+  return null;
+}
 
 export interface PickedItem {
   id: string;

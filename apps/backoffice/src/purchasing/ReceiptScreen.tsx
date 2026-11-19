@@ -1,5 +1,5 @@
 import type { DocumentRow, PurchasingLookups, ReceiptView } from '@erp/contracts';
-import { checkReceipt, isDateLocked, isEmptyDraft, receiptTotals } from '@erp/domain';
+import { checkReceipt, isEmptyDraft, receiptTotals } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -25,7 +25,7 @@ import type { Api } from '../api';
 import { moneyText, moneyValue, qtyText, qtyValue } from '../catalog/data';
 import { carry, href, navigate, takeCarried } from '../router';
 import { ItemPicker } from './ItemPicker';
-import { problemText, purchasingRefusal, today, usePurchasingLookups, type PickedItem } from './data';
+import { dateProblem, problemText, purchasingRefusal, usePurchasingLookups, type PickedItem } from './data';
 
 // Goods receipts (W1-16, PUR-02): the list, and one receipt typed from the supplier's bill. As you type, the screen
 // checks it with the same rules as the server: the difference from the bill total as printed (posting waits until
@@ -219,8 +219,8 @@ function ReceiptForm({
   const [h, setH] = useState({
     supplierId: r?.supplierId ?? '',
     billNo: r?.billNo ?? '',
-    billDate: r?.billDate ?? today(),
-    receivedOn: r?.receivedOn ?? today(),
+    billDate: r?.billDate ?? lookups.today,
+    receivedOn: r?.receivedOn ?? lookups.today,
     locationId: r?.locationId ?? shop,
     paidFrom: r?.paidFrom ?? '',
     billTotal: moneyText(r?.billTotal ?? null, m.minorUnits),
@@ -275,10 +275,9 @@ function ReceiptForm({
       retail: l.item.retail,
     }));
   const billTotal = moneyValue(h.billTotal, m.minorUnits);
-  // A date on or before the lock date can't post (D-108): Post waits, and the date says why. Save draft still works.
-  const locked = isDateLocked(h.receivedOn, lookups.lockDate)
-    ? t('purchasing.errors.date_locked', { date: lookups.lockDate })
-    : null;
+  // A date after the shop's business date (W2-05) or on or before the lock date (D-108) can't post: Post waits, and
+  // the date says why. Save draft still works.
+  const locked = dateProblem(t, h.receivedOn, lookups);
   const check = checkReceipt({
     supplierId: h.supplierId || null,
     billNo: h.billNo,
@@ -448,6 +447,7 @@ function ReceiptForm({
             label={t('purchasing.fields.receivedOn')}
             type="date"
             error={locked}
+            max={lookups.today}
             value={h.receivedOn}
             onChange={(e) => set('receivedOn', e.target.value)}
           />

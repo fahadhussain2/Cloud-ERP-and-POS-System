@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-07, W0-09, W0-10, W0-11 done; counter side of PLT-03/PLT-04 built with W1-02; staff and user admin (PLT-04, PLT-05 assign) built with W1-04 (in review); the back-office frame redesigned with W1-28 (D-114) |
+| **Status** | In progress: W0-07, W0-09, W0-10, W0-11 done; counter side of PLT-03/PLT-04 built with W1-02; staff and user admin (PLT-04, PLT-05 assign) built with W1-04 (in review); the back-office frame redesigned with W1-28 (D-114); back-office documents on the shop's business date with W2-05 (D-117) |
 | **Requirements** | 13 (PLT-01…PLT-13) |
 | **Feature spec needed** | Yes: device enrollment + PIN security |
 
@@ -86,6 +86,12 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 - **Back office → Shop → *Shop and bill*** (owner only, `admin.settings`): the shop name, the branch's address, phone and up to 3 extra lines, and the bill's policy line; each line up to 60 characters; a preview in the bill's order.
 - **API:** `GET` and `PUT /api/settings/shop` (`apps/api/src/admin/shop-settings.ts`); one audited transaction on `tenants`, `branches` and the default `print_profiles`. Counters pull the changed rows (they're already in the pull and nudged).
 - **The header's order:** `billHeaderLines` in `packages/print`, used by the counter, the cash desk and the preview.
+
+## The shop's day in the back office (W2-05, D-117)
+
+- **One business date** (`businessDate` in `@erp/domain`: the tenant's `timezone` and `day_cutoff_hour`, 04:00 at Delux) for the counters and the back office. The API works it out in `shopDay` (`apps/api/src/lock.ts`) and sends it as `today` in the purchasing, inventory and accounting lookups.
+- **Every back-office document form** defaults to it and goes no later than it; none reads the browser's calendar.
+- **On post**, `dateRefusal` (`apps/api/src/lock.ts`) refuses a purchasing or stock document dated after it (`date_in_future`) or on or before the lock date (`date_locked`, D-108); accounting documents check the same with `checkDocumentDate`.
 
 ## Related
 

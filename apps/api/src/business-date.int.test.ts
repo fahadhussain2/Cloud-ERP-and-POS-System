@@ -44,6 +44,17 @@ const send = (method: 'GET' | 'POST' | 'PUT', url: string, payload?: unknown) =>
     cookies: { erp_session: cookie },
   });
 
+/** Signs the owner in at the clock's time (a session idles out after 2 hours). */
+async function login() {
+  const res = await app().inject({
+    method: 'POST',
+    url: '/api/auth/login',
+    headers: { origin: ORIGIN, host: HOST },
+    payload: { tenantCode: SHOP, username: 'owner', password: PASSWORD },
+  });
+  cookie = res.cookies.find((x) => x.name === 'erp_session')!.value;
+}
+
 type Made = { id: string; rowVersion: string };
 const future = { error: 'date_in_future', today: TODAY };
 
@@ -92,13 +103,7 @@ beforeAll(async () => {
     ]);
     return ids['ABEA001']!;
   });
-  const login = await app().inject({
-    method: 'POST',
-    url: '/api/auth/login',
-    headers: { origin: ORIGIN, host: HOST },
-    payload: { tenantCode: SHOP, username: 'owner', password: PASSWORD },
-  });
-  cookie = login.cookies.find((x) => x.name === 'erp_session')!.value;
+  await login();
   supplier = (await send('POST', '/api/purchasing/suppliers', { code: '0210', name: 'Naveed Glass' })).json<{
     id: string;
   }>().id;
@@ -245,6 +250,7 @@ describe('at 00:30 Karachi the shop is still on the day before', () => {
 describe('at 04:00 Karachi the next day opens', () => {
   it('the screens get the new day and a document dated on it posts', async () => {
     clock = CUT_OFF;
+    await login();
     for (const url of ['/api/purchasing/lookups', '/api/inventory/lookups', '/api/accounting/lookups'])
       expect((await send('GET', url)).json<{ today: string }>().today, url).toBe(TOMORROW);
     const draft = (await send('POST', '/api/purchasing/receipts', receipt(TOMORROW, 'INV-2'))).json<Made>();

@@ -5,7 +5,7 @@ import type {
   TransferNeededRow,
   TransferView,
 } from '@erp/contracts';
-import { checkTransfer, isDateLocked, isEmptyDraft } from '@erp/domain';
+import { checkTransfer, isEmptyDraft } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -31,7 +31,7 @@ import type { Api } from '../api';
 import { qtyText, qtyValue } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
 import { carry, href, navigate, takeCarried } from '../router';
-import { inventoryRefusal, locationName, problemText, today, useInventoryLookups } from './data';
+import { dateProblem, inventoryRefusal, locationName, problemText, useInventoryLookups } from './data';
 
 // Stock transfers (W1-18, INV-04; owner answers 2 and 4): the storekeeper types one, the owner or the manager posts
 // it. On a route that moves at once posting moves the stock; on one that needs receiving it is sent, on the way until
@@ -217,7 +217,7 @@ function TransferForm({
   const [h, setH] = useState({
     fromLocationId: x?.fromLocationId ?? byKind('storage'),
     toLocationId: x?.toLocationId ?? byKind('shop'),
-    movedOn: x?.movedOn ?? today(),
+    movedOn: x?.movedOn ?? lookups.today,
     note: x?.note ?? '',
   });
   const [lines, setLines] = useState<Line[]>(
@@ -236,7 +236,7 @@ function TransferForm({
         : [blank()],
   );
   const [received, setReceived] = useState<string[]>(view ? view.lines.map((l) => qtyText(l.qty)) : []);
-  const [receivedOn, setReceivedOn] = useState(today());
+  const [receivedOn, setReceivedOn] = useState(lookups.today);
   // A refusal from just before this form opened (a new draft at its own address, or a reload): see `carry`.
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(() => {
     const text = takeCarried(href.transfer(x?.id ?? 'new'));
@@ -250,13 +250,10 @@ function TransferForm({
   const nan = (v: number | null | undefined) => (v === undefined ? Number.NaN : (v ?? 0));
   const kind = (id: string) => lookups.locations.find((l) => l.id === id)?.kind ?? null;
   const used = lines.filter((l) => l.item.id !== null || l.qty.trim() !== '');
-  const receiveLocked = isDateLocked(receivedOn, lookups.lockDate)
-    ? t('inventory.errors.date_locked', { date: lookups.lockDate })
-    : null;
-  // A date on or before the lock date can't post (D-108): Post waits, and the date says why. Save draft still works.
-  const locked = isDateLocked(h.movedOn, lookups.lockDate)
-    ? t('inventory.errors.date_locked', { date: lookups.lockDate })
-    : null;
+  const receiveLocked = dateProblem(t, receivedOn, lookups);
+  // A date after the shop's business date (W2-05) or on or before the lock date (D-108) can't post: Post waits, and
+  // the date says why. Save draft still works.
+  const locked = dateProblem(t, h.movedOn, lookups);
   const check = checkTransfer({
     fromLocationId: h.fromLocationId || null,
     toLocationId: h.toLocationId || null,
@@ -380,6 +377,7 @@ function TransferForm({
             label={t('inventory.fields.movedOn')}
             type="date"
             error={locked}
+            max={lookups.today}
             value={h.movedOn}
             onChange={(e) => set('movedOn', e.target.value)}
           />
@@ -514,6 +512,7 @@ function TransferForm({
             label={t('inventory.fields.receivedOn')}
             type="date"
             error={receiveLocked}
+            max={lookups.today}
             value={receivedOn}
             onChange={(e) => setReceivedOn(e.target.value)}
           />
