@@ -1,0 +1,86 @@
+{
+  "description": "Overdue by more than N days (W2-04 owner answer 4, RPT-17): payments settle the oldest bills first, as the ageing (W1-20); what is unpaid of a bill more than N days past due is overdue.",
+  "cases": [
+    {
+      "name": "N = 30: the part-paid bill 39 days past due is overdue, the bill 6 days past due isn't",
+      "input": {
+        "asOf": "2027-03-31",
+        "days": 30,
+        "entries": [
+          { "entryDate": "2027-01-10", "dueDate": "2027-01-10", "amount": 100000 },
+          { "entryDate": "2027-02-20", "dueDate": "2027-02-20", "amount": 50000 },
+          { "entryDate": "2027-03-25", "dueDate": "2027-03-25", "amount": 30000 },
+          { "entryDate": "2027-03-01", "dueDate": "2027-03-01", "amount": -120000 }
+        ]
+      },
+      "expected": { "balance": 60000, "overdue": 30000, "oldestDate": "2027-02-20", "oldestLate": 39 }
+    },
+    {
+      "name": "N = 0: everything past its due date",
+      "input": {
+        "asOf": "2027-03-31",
+        "days": 0,
+        "entries": [
+          { "entryDate": "2027-01-10", "dueDate": "2027-01-10", "amount": 100000 },
+          { "entryDate": "2027-02-20", "dueDate": "2027-02-20", "amount": 50000 },
+          { "entryDate": "2027-03-25", "dueDate": "2027-03-25", "amount": 30000 },
+          { "entryDate": "2027-03-01", "dueDate": "2027-03-01", "amount": -120000 }
+        ]
+      },
+      "expected": { "balance": 60000, "overdue": 60000, "oldestDate": "2027-02-20", "oldestLate": 39 }
+    },
+    {
+      "name": "N = 90: nothing that old is unpaid",
+      "input": {
+        "asOf": "2027-03-31",
+        "days": 90,
+        "entries": [
+          { "entryDate": "2027-01-10", "dueDate": "2027-01-10", "amount": 100000 },
+          { "entryDate": "2027-02-20", "dueDate": "2027-02-20", "amount": 50000 },
+          { "entryDate": "2027-03-01", "dueDate": "2027-03-01", "amount": -120000 }
+        ]
+      },
+      "expected": { "balance": 30000, "overdue": 0, "oldestDate": null, "oldestLate": null }
+    },
+    {
+      "name": "Exactly N days past due: not yet overdue",
+      "input": {
+        "asOf": "2027-03-31",
+        "days": 30,
+        "entries": [{ "entryDate": "2027-02-01", "dueDate": "2027-03-01", "amount": 25000 }]
+      },
+      "expected": { "balance": 25000, "overdue": 0, "oldestDate": null, "oldestLate": null }
+    },
+    {
+      "name": "N + 1 days past due: overdue; the date is the bill's, the days are past its due date",
+      "input": {
+        "asOf": "2027-04-01",
+        "days": 30,
+        "entries": [{ "entryDate": "2027-02-01", "dueDate": "2027-03-01", "amount": 25000 }]
+      },
+      "expected": { "balance": 25000, "overdue": 25000, "oldestDate": "2027-02-01", "oldestLate": 31 }
+    },
+    {
+      "name": "An advance: nothing overdue, a balance below zero",
+      "input": {
+        "asOf": "2027-04-01",
+        "days": 0,
+        "entries": [
+          { "entryDate": "2027-01-01", "dueDate": "2027-01-01", "amount": 10000 },
+          { "entryDate": "2027-01-05", "dueDate": "2027-01-05", "amount": -50000 }
+        ]
+      },
+      "expected": { "balance": -40000, "overdue": 0, "oldestDate": null, "oldestLate": null }
+    },
+    {
+      "name": "Days below zero are refused",
+      "input": { "asOf": "2027-04-01", "days": -1, "entries": [] },
+      "error": "out_of_range"
+    },
+    {
+      "name": "Days that aren't whole are refused",
+      "input": { "asOf": "2027-04-01", "days": 1.5, "entries": [] },
+      "error": "out_of_range"
+    }
+  ]
+}

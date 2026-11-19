@@ -31,6 +31,14 @@ export interface ReportEntry {
     | 'purchaseRegister'
     | 'rates'
     | 'salesOverTime'
+    | 'partnerLedger'
+    | 'statements'
+    | 'balanceTrend'
+    | 'overdue'
+    | 'overLimit'
+    | 'collections'
+    | 'userActivity'
+    | 'cashFlow'
     | 'overridesReport'
     | 'voidsReturns'
     | 'stockReport'
@@ -82,6 +90,7 @@ export const REPORTS: readonly ReportEntry[] = [
   { key: 'accountLedger', section: 'accounts', href: href.accounts, needs: FINANCIAL, screens: [] },
   { key: 'cashBook', section: 'accounts', href: href.cashBook, needs: FINANCIAL, screens: ['cashBook'] },
   { key: 'dayBook', section: 'accounts', href: href.dayBook, needs: FINANCIAL, screens: ['dayBook'] },
+  { key: 'cashFlow', section: 'accounts', href: href.cashFlow, needs: FINANCIAL, screens: ['cashFlow'] },
   {
     key: 'expensesReport',
     section: 'accounts',
@@ -143,6 +152,24 @@ export const REPORTS: readonly ReportEntry[] = [
   },
   { key: 'ageing', section: 'parties', href: href.ageing, needs: VIEW, screens: ['ageing'] },
   {
+    key: 'partnerLedger',
+    section: 'parties',
+    href: href.partnerLedger,
+    needs: VIEW,
+    screens: ['partnerLedger'],
+  },
+  { key: 'statements', section: 'parties', href: href.statements, needs: VIEW, screens: ['statements'] },
+  {
+    key: 'balanceTrend',
+    section: 'parties',
+    href: href.balanceTrend,
+    needs: VIEW,
+    screens: ['balanceTrend'],
+  },
+  { key: 'overdue', section: 'parties', href: href.overdue, needs: VIEW, screens: ['overdue'] },
+  { key: 'overLimit', section: 'parties', href: href.overLimit, needs: VIEW, screens: ['overLimit'] },
+  { key: 'collections', section: 'cash', href: href.collections, needs: VIEW, screens: ['collections'] },
+  {
     key: 'dayReconciliation',
     section: 'cash',
     href: href.dayReconciliation,
@@ -151,6 +178,13 @@ export const REPORTS: readonly ReportEntry[] = [
   },
   { key: 'cashVariance', section: 'cash', href: href.cashVariance, needs: VIEW, screens: ['cashVariance'] },
   { key: 'exceptions', section: 'support', href: href.exceptions, needs: VIEW, screens: ['exceptions'] },
+  {
+    key: 'userActivity',
+    section: 'support',
+    href: href.userActivity,
+    needs: ['admin.users'],
+    screens: ['userActivity'],
+  },
   { key: 'trace', section: 'support', href: href.trace(), needs: ['support.trace'], screens: ['trace'] },
 ];
 

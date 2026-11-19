@@ -1,0 +1,161 @@
+{
+  "description": "What a journal entry's cash change was for (W2-04 owner answer 7, ACC-07): a bill, a void, a goods receipt or a purchase return is one class; anything else is split by the accounts on its other lines; moves between cash and bank accounts change nothing.",
+  "cases": [
+    {
+      "name": "A bill paid partly in cash, partly by card, partly on account: the cash and card are sales",
+      "input": {
+        "sourceType": "sale",
+        "cash": 900000,
+        "others": [
+          { "accountId": "ar", "role": "AR_CONTROL", "type": "asset", "amount": 100000 },
+          { "accountId": "sales", "role": "SALES", "type": "income", "amount": -1000000 },
+          { "accountId": "cogs", "role": "COGS", "type": "expense", "amount": 400000 },
+          { "accountId": "inv", "role": "INVENTORY", "type": "asset", "amount": -400000 }
+        ]
+      },
+      "expected": [{ "cls": "sales", "accountId": null, "amount": 900000 }]
+    },
+    {
+      "name": "A void: the sale's cash back",
+      "input": { "sourceType": "sales_void", "cash": -900000, "others": [] },
+      "expected": [{ "cls": "sales", "accountId": null, "amount": -900000 }]
+    },
+    {
+      "name": "A collection at the counter: from customers",
+      "input": {
+        "sourceType": "payment",
+        "cash": 50000,
+        "others": [{ "accountId": "ar", "role": "AR_CONTROL", "type": "asset", "amount": -50000 }]
+      },
+      "expected": [{ "cls": "customers", "accountId": null, "amount": 50000 }]
+    },
+    {
+      "name": "A supplier paid from the bank: to suppliers",
+      "input": {
+        "sourceType": "supplier_payment",
+        "cash": -200000,
+        "others": [{ "accountId": "ap", "role": "AP_CONTROL", "type": "liability", "amount": 200000 }]
+      },
+      "expected": [{ "cls": "suppliers", "accountId": null, "amount": -200000 }]
+    },
+    {
+      "name": "A goods receipt paid from the bank at once: to suppliers, though its other line is Inventory",
+      "input": {
+        "sourceType": "goods_receipt",
+        "cash": -300000,
+        "others": [{ "accountId": "inv", "role": "INVENTORY", "type": "asset", "amount": 300000 }]
+      },
+      "expected": [{ "cls": "suppliers", "accountId": null, "amount": -300000 }]
+    },
+    {
+      "name": "A purchase return refunded into the bank: from suppliers",
+      "input": {
+        "sourceType": "purchase_return",
+        "cash": 40000,
+        "others": [{ "accountId": "inv", "role": "INVENTORY", "type": "asset", "amount": -40000 }]
+      },
+      "expected": [{ "cls": "suppliers", "accountId": null, "amount": 40000 }]
+    },
+    {
+      "name": "An expense paid from the drawer: by its account",
+      "input": {
+        "sourceType": "cash_movement",
+        "cash": -20000,
+        "others": [{ "accountId": "exp-rent", "role": null, "type": "expense", "amount": 20000 }]
+      },
+      "expected": [{ "cls": "expenses", "accountId": "exp-rent", "amount": -20000 }]
+    },
+    {
+      "name": "A handover (drawer and cash in transit): nothing",
+      "input": { "sourceType": "cash_handover", "cash": 0, "others": [] },
+      "expected": []
+    },
+    {
+      "name": "A transfer between banks with charges: only the charges, as an expense",
+      "input": {
+        "sourceType": "fund_transfer",
+        "cash": -500,
+        "others": [{ "accountId": "exp-bank", "role": null, "type": "expense", "amount": 500 }]
+      },
+      "expected": [{ "cls": "expenses", "accountId": "exp-bank", "amount": -500 }]
+    },
+    {
+      "name": "The drawer short at the close",
+      "input": {
+        "sourceType": "cash_session",
+        "cash": -1500,
+        "others": [{ "accountId": "so", "role": "CASH_SHORT_OVER", "type": "expense", "amount": 1500 }]
+      },
+      "expected": [{ "cls": "shortOver", "accountId": null, "amount": -1500 }]
+    },
+    {
+      "name": "A voucher for drawings: owner",
+      "input": {
+        "sourceType": "journal_voucher",
+        "cash": -100000,
+        "others": [{ "accountId": "drawings", "role": null, "type": "equity", "amount": 100000 }]
+      },
+      "expected": [{ "cls": "owner", "accountId": null, "amount": -100000 }]
+    },
+    {
+      "name": "A voucher: a customer's payment and other income into the bank",
+      "input": {
+        "sourceType": "journal_voucher",
+        "cash": 70000,
+        "others": [
+          { "accountId": "ar", "role": "AR_CONTROL", "type": "asset", "amount": -50000 },
+          { "accountId": "misc", "role": null, "type": "income", "amount": -20000 }
+        ]
+      },
+      "expected": [
+        { "cls": "customers", "accountId": null, "amount": 50000 },
+        { "cls": "other", "accountId": null, "amount": 20000 }
+      ]
+    },
+    {
+      "name": "A voucher for two expenses, one in two lines",
+      "input": {
+        "sourceType": "journal_voucher",
+        "cash": -18000,
+        "others": [
+          { "accountId": "exp-rent", "role": null, "type": "expense", "amount": 10000 },
+          { "accountId": "exp-rent", "role": null, "type": "expense", "amount": 5000 },
+          { "accountId": "exp-power", "role": null, "type": "expense", "amount": 3000 }
+        ]
+      },
+      "expected": [
+        { "cls": "expenses", "accountId": "exp-rent", "amount": -15000 },
+        { "cls": "expenses", "accountId": "exp-power", "amount": -3000 }
+      ]
+    },
+    {
+      "name": "A voucher whose lines cancel out beside the cash: only what is left",
+      "input": {
+        "sourceType": "journal_voucher",
+        "cash": -5000,
+        "others": [
+          { "accountId": "ap", "role": "AP_CONTROL", "type": "liability", "amount": 5000 },
+          { "accountId": "ar", "role": "AR_CONTROL", "type": "asset", "amount": 2000 },
+          { "accountId": "ar", "role": "AR_CONTROL", "type": "asset", "amount": -2000 }
+        ]
+      },
+      "expected": [{ "cls": "suppliers", "accountId": null, "amount": -5000 }]
+    },
+    {
+      "name": "The opening balances at go-live",
+      "input": {
+        "sourceType": "opening",
+        "cash": 2500000,
+        "others": [
+          { "accountId": "obe", "role": "OPENING_BALANCE_EQUITY", "type": "equity", "amount": -2500000 }
+        ]
+      },
+      "expected": [{ "cls": "opening", "accountId": null, "amount": 2500000 }]
+    },
+    {
+      "name": "A cash change with no other line: other",
+      "input": { "sourceType": "journal_voucher", "cash": 100, "others": [] },
+      "expected": [{ "cls": "other", "accountId": null, "amount": 100 }]
+    }
+  ]
+}

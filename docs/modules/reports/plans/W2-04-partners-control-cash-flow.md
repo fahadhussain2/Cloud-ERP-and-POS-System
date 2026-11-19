@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#179](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/179) |
 | **Module** | reports (back-office screens and API, read only; one index migration) |
-| **Status** | Accepted (owner, 2026-11-19): questions 1–7 as recommended, **question 8 against the recommendation** (the built reports move onto the frame in W2-04 if time allows) |
+| **Status** | Accepted (owner, 2026-11-19): questions 1–7 as recommended, **question 8 against the recommendation** (the built reports move onto the frame in W2-04 if time allows). Built, waiting for review; the move of the built reports (answer 8) follows in its own PR |
 | **Refs** | RPT-16, RPT-17, ACC-07 (cash flow); CLAUDE.md rules 1, 3, 4, 5, 10; D-085 (no limit = null), D-100 (no legacy bills), D-110 (reports read the ledgers), D-116 (reports before go-live), D-117 (the business date); PLT-08 (the audit log) |
 | **Depends on** | W2-01 (the frame, periods, the Reports home, the cash book), W1-20 (ageing and its FIFO rule, `ageBalances`), W1-22 and W1-16 (the customer and supplier screens with their ledgers), W1-11 (counter collections and cash-outs), W1-19 (bank receipts, payments, expenses, transfers, vouchers) |
 | **Size** | about 3 days: domain golden files ½; API with integration tests 1; screens and the statement's print 1; e2e and docs ½. **Plus about 1 day if time allows** to move the built reports onto the frame (answer 8) |
@@ -159,6 +159,23 @@ Four tasks; this is the fourth (1). Everything by go-live, the new analysis last
   - the cash flow for the pilot's days against the cash book;
   - user activity for one pilot day, read with the owner;
   - each report prints on A4 and downloads as CSV.
+
+## Changes during the build
+
+| Change | Why |
+|---|---|
+| **The ageing let a void settle the customer's oldest bill.** A voided bill's void is a credit, and credits settle the oldest debits first, so the void paid an older bill and the voided bill looked owed. Now a voided bill and its void are taken out together before settling (they net to nothing on the bill's day), in **the ageing report (W1-20)**, the statement's ageing and the overdue list. Failing test first | Found by the integration test: Butt Autos' 45-day bill showed as paid and today's voided bill as owed |
+| **User activity reads two sources.** The audit log holds sign-ins, users and settings, the catalog and parties (each change with its before and after) and named events (voids, reviews, locks); **documents are not in it**: each keeps who made it on its own row. So each document of the shop's days counts as its maker's *Created* (bills by their salesman, desk documents by their cashier, back-office documents by who saved them, approvals by the approver) | Without them, the report would miss most of what people do |
+| User activity is classified, filtered, counted and cut to the newest 2,000 **in the database**, with @erp/domain's kind tables (`ACTIVITY_TABLES`, `ACTIVITY_EVENTS`) as the one rule; only the page's rows read their before and after. The log's trigger never writes an update that changed only bookkeeping columns, so none is filtered | 2.9 s on 126,000 rows when every row went to the API; 0.23 s now |
+| **The cash flow's months are cut to the range**, so a rolling year is 13 part-months (the profit and loss's 12-month cap refused it); each entry's class comes from **the journal entry's own source** | A year to today never starts on the 1st |
+| A cash flow **month's heading opens the cash book** for that month, rather than each cell its lines | The cash book already lists every movement by account and day |
+| Two picker endpoints: **`/api/reports/customers`** and **`/api/reports/suppliers`** (as `/api/reports/parties`, one role) | The ledger picks a customer or a supplier, not both |
+| **The supplier side is refused without `cost.view`** (403: ledger, statements, trend, payments), not shown blank | A supplier ledger without its amounts says nothing |
+| *Last approved past it* on the over-limit list is the latest business date of a `credit_limit` approval on the customer's bills | The counter's over-limit approvals (W1-09) |
+| The customer and supplier pages link to the ledger as a statement when the person may open it (`reports.view`; suppliers also `cost.view`) | One ledger, with the period, print and CSV |
+| **A person with `admin.users` now sees the Reports row** (user activity). The App tests' owner holds only admin rights, so they now start on Staff; a real owner holds every permission | Menu order puts Reports before Settings |
+| **A year of a busy shop** (300 bills a day, 131 customers with 100 bills a day on account, 500,000 audit rows): ledger 0.12 s, trend 0.17 s, overdue 0.34 s, over-limit 0.04 s, user activity 0.23 s, cash flow 1.02 s, the 131 statements 0.46 s; only the planned index | The plan's 2 s and 5 s |
+| **Answer 8 (the built reports onto the frame) is not in this PR**: it follows as its own PR, one report per commit, with no figure changed | It touches eight working screens the owner tested; reviewed apart, it can stop at any report |
 
 ## Order
 

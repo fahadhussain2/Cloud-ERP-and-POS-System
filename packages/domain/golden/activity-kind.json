@@ -1,0 +1,197 @@
+{
+  "description": "User activity's kinds (W2-04 owner answer 6, RPT-17): a named event by its first word, a row change by its table; a bill's lines and payments are part of the bill's row (null).",
+  "cases": [
+    {
+      "name": "A failed sign-in",
+      "input": {
+        "entity": "users",
+        "action": "login.failed"
+      },
+      "expected": "sign_in"
+    },
+    {
+      "name": "A password set by the owner",
+      "input": {
+        "entity": "users",
+        "action": "password.set_by_admin"
+      },
+      "expected": "sign_in"
+    },
+    {
+      "name": "A PIN locked",
+      "input": {
+        "entity": "users",
+        "action": "pin.locked"
+      },
+      "expected": "sign_in"
+    },
+    {
+      "name": "A void",
+      "input": {
+        "entity": "sales_documents",
+        "action": "sale.voided"
+      },
+      "expected": "sales"
+    },
+    {
+      "name": "A bill reprinted",
+      "input": {
+        "entity": "sales_documents",
+        "action": "bill.reprinted"
+      },
+      "expected": "sales"
+    },
+    {
+      "name": "An exception reviewed",
+      "input": {
+        "entity": "exceptions",
+        "action": "exception.reviewed"
+      },
+      "expected": "approvals"
+    },
+    {
+      "name": "A device enrolled",
+      "input": {
+        "entity": "devices",
+        "action": "device.enrolled"
+      },
+      "expected": "settings"
+    },
+    {
+      "name": "A period locked",
+      "input": {
+        "entity": "tenants",
+        "action": "period.lock"
+      },
+      "expected": "books"
+    },
+    {
+      "name": "A posting rebuild",
+      "input": {
+        "entity": "tenants",
+        "action": "posting.rebuild"
+      },
+      "expected": "books"
+    },
+    {
+      "name": "The pilot wipe",
+      "input": {
+        "entity": "tenants",
+        "action": "pilot.wipe"
+      },
+      "expected": "books"
+    },
+    {
+      "name": "Diagnostics sent",
+      "input": {
+        "entity": "devices",
+        "action": "diagnostics.sent"
+      },
+      "expected": "other"
+    },
+    {
+      "name": "A bill",
+      "input": {
+        "entity": "sales_documents",
+        "action": "create"
+      },
+      "expected": "sales"
+    },
+    {
+      "name": "A bill's line: part of the bill",
+      "input": {
+        "entity": "sales_lines",
+        "action": "create"
+      },
+      "expected": null
+    },
+    {
+      "name": "A bill's payment: part of the bill",
+      "input": {
+        "entity": "sales_payments",
+        "action": "create"
+      },
+      "expected": null
+    },
+    {
+      "name": "A price change",
+      "input": {
+        "entity": "item_prices",
+        "action": "update"
+      },
+      "expected": "items"
+    },
+    {
+      "name": "A customer's limit",
+      "input": {
+        "entity": "customer_accounts",
+        "action": "update"
+      },
+      "expected": "parties"
+    },
+    {
+      "name": "An override",
+      "input": {
+        "entity": "overrides",
+        "action": "create"
+      },
+      "expected": "approvals"
+    },
+    {
+      "name": "A collection",
+      "input": {
+        "entity": "payments",
+        "action": "create"
+      },
+      "expected": "money"
+    },
+    {
+      "name": "A voucher",
+      "input": {
+        "entity": "journal_vouchers",
+        "action": "update"
+      },
+      "expected": "money"
+    },
+    {
+      "name": "A goods receipt",
+      "input": {
+        "entity": "goods_receipts",
+        "action": "create"
+      },
+      "expected": "stock"
+    },
+    {
+      "name": "A user deleted",
+      "input": {
+        "entity": "users",
+        "action": "delete"
+      },
+      "expected": "settings"
+    },
+    {
+      "name": "The opening",
+      "input": {
+        "entity": "opening_balances",
+        "action": "create"
+      },
+      "expected": "books"
+    },
+    {
+      "name": "A table not in the list",
+      "input": {
+        "entity": "something_new",
+        "action": "create"
+      },
+      "expected": "other"
+    },
+    {
+      "name": "A unit of measure",
+      "input": {
+        "entity": "units",
+        "action": "update"
+      },
+      "expected": "items"
+    }
+  ]
+}

@@ -103,7 +103,16 @@
     "accountLedger": "Account ledger",
     "cashBook": "Cash book",
     "dayBook": "Day book",
-    "expensesReport": "Expenses by month"
+    "expensesReport": "Expenses by month",
+    "partnerLedger": "Customer and supplier ledger",
+    "statement": "Statement",
+    "statements": "Statements for every customer",
+    "balanceTrend": "Balance trend",
+    "overdue": "Overdue customers",
+    "overLimit": "Customers near their limit",
+    "collections": "Collections and payments",
+    "userActivity": "User activity",
+    "cashFlow": "Cash flow"
   },
   "home": {
     "nothing": "There is nothing here for your role yet."
@@ -592,7 +601,15 @@
         "dayReconciliation": "One business day's cash: how each session closed and every bill not handed over.",
         "cashVariance": "Each cash session's variance over a range of days.",
         "exceptions": "What the counters and the server flagged for review.",
-        "trace": "One bill from the counter to the books."
+        "trace": "One bill from the counter to the books.",
+        "partnerLedger": "One customer's or supplier's documents in a period, with the opening and running balance; print it as a statement.",
+        "statements": "A statement for every customer with a balance or a document in the period, one to a page.",
+        "balanceTrend": "Each customer's or supplier's balance today and 15 days, 1, 2, 3 and 6 months before.",
+        "overdue": "Customers with bills unpaid more than a number of days past their due date.",
+        "overLimit": "Customers over their credit limit or within 10% of it.",
+        "collections": "Money received from customers and paid to suppliers, by how and by whom.",
+        "userActivity": "Who did what: sign-ins, documents, edits and approvals.",
+        "cashFlow": "Money in and out of cash and bank by what it was for, month by month."
       }
     },
     "frame": {
@@ -985,6 +1002,285 @@
         "discountShare": "Of list",
         "approvals": "Approvals"
       }
+    },
+    "partnerReports": {
+      "help": {
+        "partnerLedger": "Pick a customer or a supplier and a period: the balance before it, every document in it with its debit or credit and the running balance, the closing, and the closing balance by how overdue it is. 'As a statement' adds your shop's header and the customer's details for printing, and leaves out a voided bill and its void; 'With items' lists each bill's items.",
+        "statements": "A statement for every customer with a balance at the end of the period or a document in it, one to a page: print them or save them as a PDF to send.",
+        "balanceTrend": "Each party's balance as on a date and 15 days, 1, 2, 3 and 6 months before it, with the change in a month. A name opens the ledger.",
+        "overdue": "Customers with bills unpaid more than the chosen number of days past their due date. Payments settle the oldest bills first, as in the ageing. A customer without terms owes each bill on its own day.",
+        "overLimit": "Customers whose balance is over their credit limit, or within 10% of it. Customers without a limit are never listed.",
+        "collections": "Every payment received from a customer (at a desk or into a bank) or paid to a supplier (from a bank, at a desk, or with the goods), with totals by how and by whom. Cash sales are in the sales register.",
+        "userActivity": "Who did what in the period: sign-ins, the documents each person made, changes to items, prices, parties, users and settings with what changed, approvals, voids and locks. Passwords and PINs are never shown.",
+        "cashFlow": "Cash and bank at the start, what came in and went out by what it was for, and cash and bank at the end; each month ends where the cash book does."
+      },
+      "role": "Show",
+      "roles": {
+        "customer": "Customer",
+        "supplier": "Supplier"
+      },
+      "rolesMany": {
+        "customer": "Customers",
+        "supplier": "Suppliers"
+      },
+      "kinds": {
+        "sale": "Bill",
+        "sales_void": "Void",
+        "payment": "Payment at the desk",
+        "customer_receipt": "Bank receipt",
+        "journal_voucher": "Voucher",
+        "opening": "Opening balance",
+        "goods_receipt": "Goods receipt",
+        "purchase_return": "Purchase return",
+        "supplier_payment": "Bank payment",
+        "cash_movement": "Paid at the desk"
+      },
+      "balance": {
+        "label": "Balance",
+        "settled": "settled",
+        "customer": {
+          "owed": "owes you",
+          "advance": "paid in advance"
+        },
+        "supplier": {
+          "owed": "you owe",
+          "advance": "paid in advance"
+        }
+      },
+      "date": "Date",
+      "memo": "Description",
+      "due": "Due",
+      "debit": "Debit",
+      "credit": "Credit",
+      "kind": "Kind",
+      "opening": "Opening balance",
+      "closing": "Closing balance",
+      "voided": "Voided",
+      "count": "Count",
+      "amount": "Amount",
+      "total": "Total",
+      "byKind": "Totals by kind of document",
+      "ledger": {
+        "statement": "As a statement",
+        "items": "With items",
+        "pick": {
+          "customer": "Pick a customer to see their ledger.",
+          "supplier": "Pick a supplier to see their ledger."
+        }
+      },
+      "statement": {
+        "for": "Statement for {{from}} to {{to}}",
+        "ageing": "The closing balance by how overdue it is",
+        "lines": "{{name}}'s documents",
+        "count": "Statements",
+        "owed": "Their closing balances"
+      },
+      "buckets": {
+        "notDue": "Not yet due",
+        "days1to30": "1–30 days overdue",
+        "days31to60": "31–60 days",
+        "days61to90": "61–90 days",
+        "over90": "Over 90 days"
+      },
+      "points": {
+        "asOn": "As on",
+        "days15": "15 days before",
+        "month1": "1 month before",
+        "months2": "2 months before",
+        "months3": "3 months before",
+        "months6": "6 months before"
+      },
+      "changeMonth": "Change in a month",
+      "beforeGoLive": "before go-live",
+      "asOf": "As on",
+      "asOfDate": "As on {{date}}",
+      "trendChart": "{{role}}: total balance",
+      "phone": "Phone",
+      "limit": "Limit",
+      "noLimit": "No limit",
+      "terms": "Terms",
+      "noTerms": "None",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "backOffice": "Back office",
+      "overdue": {
+        "amount": "Overdue",
+        "by": "Overdue by",
+        "more_zero": "Any time past due",
+        "more_one": "More than {{count}} day",
+        "more_other": "More than {{count}} days",
+        "oldest": "Oldest unpaid bill",
+        "late": "Days past due",
+        "lastPayment": "Last payment",
+        "never": "None yet",
+        "total": "Overdue"
+      },
+      "limits": {
+        "state": "State",
+        "over": "Over the limit",
+        "near": "Near the limit",
+        "left": "Left",
+        "lastApproval": "Last approved past it",
+        "withLimit": "Customers with a limit",
+        "noneSet": "No customer has a credit limit yet. Set one on"
+      },
+      "register": {
+        "side": "Show",
+        "received": "Received from customers",
+        "paid": "Paid to suppliers",
+        "title": {
+          "received": "Money received from customers",
+          "paid": "Money paid to suppliers"
+        },
+        "how": "How",
+        "where": "Where",
+        "by": "By",
+        "reference": "Reference",
+        "byMethod": "By how",
+        "byPerson": "By whom"
+      },
+      "activity": {
+        "at": "When",
+        "who": "Who",
+        "what": "What",
+        "record": "Record",
+        "changes": "What changed",
+        "everyone": "Everyone",
+        "everything": "Everything",
+        "count": "Entries",
+        "newest": "Showing the newest {{shown}} of {{count}}; the CSV has every one.",
+        "kinds": {
+          "sign_in": "Sign-ins",
+          "sales": "Sales and voids",
+          "approvals": "Approvals",
+          "items": "Items and prices",
+          "parties": "Customers and suppliers",
+          "money": "Money",
+          "stock": "Stock and purchasing",
+          "settings": "Users and settings",
+          "books": "The books",
+          "other": "Other"
+        },
+        "actions": {
+          "create": "Created",
+          "update": "Changed",
+          "delete": "Removed",
+          "login": {
+            "success": "Signed in",
+            "failed": "Sign-in failed",
+            "locked": "Locked out",
+            "refused_locked": "Sign-in refused: locked out"
+          },
+          "password": {
+            "changed": "Changed their password",
+            "set_by_admin": "Was given a temporary password",
+            "removed": "Password removed"
+          },
+          "pin": {
+            "changed": "Changed their PIN",
+            "locked": "PIN locked",
+            "temporary_set": "Was given a temporary PIN",
+            "unlocked_by_manager": "PIN unlocked by a manager",
+            "cashier": "PIN used at a desk"
+          },
+          "sale": {
+            "voided": "Voided a bill"
+          },
+          "bill": {
+            "reprinted": "Reprinted a bill"
+          },
+          "device": {
+            "enrolled": "Enrolled a device",
+            "enroll_failed": "Device enrolment failed",
+            "code_created": "Made an enrolment code"
+          },
+          "exception": {
+            "reviewed": "Reviewed an exception",
+            "reopened": "Reopened an exception",
+            "settled": "Settled an exception"
+          },
+          "exceptions": {
+            "review": "Reviewed exceptions"
+          },
+          "period": {
+            "lock": "Moved the lock date",
+            "reopen": "Reopened a period"
+          },
+          "posting": {
+            "rebuild": "Rebuilt the ledgers",
+            "failed": "A posting failed"
+          },
+          "pilot": {
+            "wipe": "Wiped the pilot"
+          },
+          "diagnostics": {
+            "sent": "Sent diagnostics"
+          }
+        },
+        "records": {
+          "sales_documents": "Bill",
+          "payments": "Collection",
+          "cash_movements": "Cash-out",
+          "cash_handovers": "Handover",
+          "cash_sessions": "Cash session",
+          "customer_receipts": "Bank receipt",
+          "supplier_payments": "Supplier payment",
+          "expenses": "Expense",
+          "fund_transfers": "Transfer",
+          "journal_vouchers": "Voucher",
+          "goods_receipts": "Goods receipt",
+          "purchase_returns": "Purchase return",
+          "stock_adjustments": "Stock adjustment",
+          "stock_transfers": "Stock transfer",
+          "overrides": "Approval",
+          "items": "Item",
+          "item_prices": "Price",
+          "item_identifiers": "Barcode",
+          "item_compatibility": "Vehicle fit",
+          "categories": "Category",
+          "brands": "Brand",
+          "vehicle_makes": "Vehicle make",
+          "origins": "Origin",
+          "units": "Unit",
+          "price_tiers": "Price tier",
+          "parties": "Party",
+          "customer_accounts": "Customer account",
+          "supplier_accounts": "Supplier account",
+          "users": "User",
+          "roles": "Role",
+          "user_roles": "Role given",
+          "devices": "Device",
+          "tenants": "Shop",
+          "branches": "Branch",
+          "locations": "Location",
+          "payment_methods": "Payment method",
+          "print_profiles": "Print profile",
+          "tax_codes": "Tax code",
+          "transfer_routes": "Transfer route",
+          "bank_accounts": "Bank account",
+          "expense_categories": "Expense category",
+          "accounts": "Account",
+          "opening_balances": "Opening balances",
+          "exceptions": "Exception",
+          "session": "Sign-in"
+        }
+      },
+      "flow": {
+        "opening": "Cash and bank at the start",
+        "net": "Net change",
+        "closing": "Cash and bank at the end",
+        "classes": {
+          "opening": "Opening balances entered",
+          "sales": "Sales, less refunds",
+          "customers": "From customers",
+          "suppliers": "To suppliers",
+          "expenses": "Expenses",
+          "owner": "Owner's capital and drawings",
+          "shortOver": "Cash short and over",
+          "other": "Other"
+        },
+        "note": "Money moved between the shop's own cash and bank accounts (handovers, deposits, the safe, transfers) is left out; a transfer's charges are an expense. A month's heading opens the cash book for it."
+      }
     }
   },
   "catalog": {
@@ -1252,7 +1548,8 @@
       "customer_receipt": "Bank receipt",
       "journal_voucher": "Journal voucher",
       "opening": "Opening balance",
-      "other": "Entry"
+      "other": "Entry",
+      "report": "Ledger and statement"
     },
     "problems": {
       "limit": "Type the credit limit, or tick No limit.",
@@ -1353,7 +1650,8 @@
       "supplier_payment": "Paid by bank",
       "cash_movement": "Paid at the desk",
       "opening": "Opening balance",
-      "other": "Entry"
+      "other": "Entry",
+      "report": "Ledger and statement"
     },
     "pay": {
       "action": "Pay by bank",

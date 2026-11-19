@@ -411,7 +411,8 @@ export function registerSalesReports(scope: FastifyInstance, { pool, now, requir
   );
 
   // ---- Suppliers and customers for the rates' party picker: code or name words ----
-  scope.get('/reports/parties', { preHandler: view }, async (req, reply) => {
+  // The pickers: any party (the rates), or customers or suppliers only (the partner ledger, W2-04).
+  const findParties = (req: FastifyRequest, reply: FastifyReply, role: 'customer' | 'supplier' | null) => {
     const text = (query(req)['q'] ?? '').trim();
     if (text === '') return { items: [] };
     return run(req, reply, async (c) => {
@@ -419,15 +420,24 @@ export function registerSalesReports(scope: FastifyInstance, { pool, now, requir
       const { rows } = await c.query<{ id: string; code: string; name: string }>(
         `SELECT p.id, p.code, p.name FROM erp.parties p
          WHERE p.deleted_at IS NULL
-           AND (EXISTS (SELECT 1 FROM erp.customer_accounts a WHERE a.party_id = p.id AND a.deleted_at IS NULL)
-             OR EXISTS (SELECT 1 FROM erp.supplier_accounts a WHERE a.party_id = p.id AND a.deleted_at IS NULL))
+           AND (($2::text IS DISTINCT FROM 'supplier' AND EXISTS (
+                 SELECT 1 FROM erp.customer_accounts a WHERE a.party_id = p.id AND a.deleted_at IS NULL))
+             OR ($2::text IS DISTINCT FROM 'customer' AND EXISTS (
+                 SELECT 1 FROM erp.supplier_accounts a WHERE a.party_id = p.id AND a.deleted_at IS NULL)))
            AND NOT EXISTS (SELECT 1 FROM unnest($1::text[]) w WHERE NOT (p.code ILIKE w OR p.name ILIKE w))
          ORDER BY lower(p.name), p.code LIMIT 20`,
-        [words],
+        [words, role],
       );
       return { items: rows };
     });
-  });
+  };
+  scope.get('/reports/parties', { preHandler: view }, async (req, reply) => findParties(req, reply, null));
+  scope.get('/reports/customers', { preHandler: view }, async (req, reply) =>
+    findParties(req, reply, 'customer'),
+  );
+  scope.get('/reports/suppliers', { preHandler: view }, async (req, reply) =>
+    findParties(req, reply, 'supplier'),
+  );
 
   // ---- Sales and gross profit (RPT-07, owner answers 1-3) ----
   scope.get('/reports/sales-profit', { preHandler: view }, async (req, reply) =>

@@ -1,0 +1,44 @@
+{
+  "description": "The statement's entries (W2-04 owner answer 1): a voided bill and its void are left out when they net to nothing, so the closing doesn't change; anything else stays.",
+  "cases": [
+    {
+      "name": "A voided bill and its void go; the other bill and the payment stay",
+      "input": [
+        { "kind": "sale", "sourceId": "b1", "voidOf": null, "amount": 120000 },
+        { "kind": "sale", "sourceId": "b2", "voidOf": null, "amount": 80000 },
+        { "kind": "sales_void", "sourceId": "v2", "voidOf": "b2", "amount": -80000 },
+        { "kind": "payment", "sourceId": "p1", "voidOf": null, "amount": -50000 }
+      ],
+      "expected": [
+        { "kind": "sale", "sourceId": "b1", "voidOf": null, "amount": 120000 },
+        { "kind": "payment", "sourceId": "p1", "voidOf": null, "amount": -50000 }
+      ]
+    },
+    {
+      "name": "A void whose bill isn't in the entries stays (its bill was before the range)",
+      "input": [{ "kind": "sales_void", "sourceId": "v9", "voidOf": "b9", "amount": -30000 }],
+      "expected": [{ "kind": "sales_void", "sourceId": "v9", "voidOf": "b9", "amount": -30000 }]
+    },
+    {
+      "name": "A bill and a void that don't net to nothing both stay",
+      "input": [
+        { "kind": "sale", "sourceId": "b3", "voidOf": null, "amount": 50000 },
+        { "kind": "sales_void", "sourceId": "v3", "voidOf": "b3", "amount": -40000 }
+      ],
+      "expected": [
+        { "kind": "sale", "sourceId": "b3", "voidOf": null, "amount": 50000 },
+        { "kind": "sales_void", "sourceId": "v3", "voidOf": "b3", "amount": -40000 }
+      ]
+    },
+    {
+      "name": "A void with no bill named stays",
+      "input": [{ "kind": "sales_void", "sourceId": "v4", "voidOf": null, "amount": -10000 }],
+      "expected": [{ "kind": "sales_void", "sourceId": "v4", "voidOf": null, "amount": -10000 }]
+    },
+    {
+      "name": "Nothing to leave out",
+      "input": [],
+      "expected": []
+    }
+  ]
+}

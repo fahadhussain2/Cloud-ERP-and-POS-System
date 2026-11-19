@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { moneyValue } from '../catalog/data';
-import { href, navigate } from '../router';
+import { href, navigate, withQuery } from '../router';
 import { dateProblem, purchasingRefusal, usePurchasingLookups } from './data';
 import { FormDialog } from '../staff/dialogs';
 
@@ -439,7 +439,8 @@ const KIND_KEYS: Record<string, string> = {
   opening: 'purchasing.ledger.opening',
 };
 
-export function SupplierScreen({ api, id }: { api: Api; id: string }) {
+/** `reports`: whether this person may open the supplier ledger report (reports.view and cost.view, W2-04). */
+export function SupplierScreen({ api, id, reports = false }: { api: Api; id: string; reports?: boolean }) {
   const { t } = useTranslation();
   const lookups = usePurchasingLookups(api);
   const [detail, setDetail] = useState<SupplierDetail | null | undefined>(undefined);
@@ -535,7 +536,14 @@ export function SupplierScreen({ api, id }: { api: Api; id: string }) {
         </span>
       </Panel>
       <Panel className="px-1.5 pb-2.5">
-        <h2 className="m-0 px-2 pt-3 font-display text-lg font-semibold">{t('purchasing.ledger.title')}</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2 px-2 pt-3">
+          <h2 className="m-0 font-display text-lg font-semibold">{t('purchasing.ledger.title')}</h2>
+          {reports && (
+            <a href={withQuery(href.partnerLedger, { role: 'supplier', partyId: s.id, statement: '1' })}>
+              {t('purchasing.ledger.report')}
+            </a>
+          )}
+        </div>
         {detail.ledger.length === 0 ? (
           <p className="p-2 text-muted-foreground">{t('purchasing.ledger.empty')}</p>
         ) : (

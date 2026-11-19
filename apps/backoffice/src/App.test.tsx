@@ -112,8 +112,10 @@ const goTo = (hash: string) =>
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   });
 
+// Most tests start on Staff. The fixture's owner holds only admin rights, and user activity (admin.users, W2-04) puts
+// the Reports row first in the menu's order for them; a real owner holds every permission and opens on Customers.
 beforeEach(() => {
-  window.location.hash = '';
+  window.location.hash = '#/staff';
 });
 afterEach(cleanup);
 
@@ -188,6 +190,7 @@ describe('layout and menu', () => {
   });
 
   it('opens the first screen the person may open, in the menu’s order: Customers for a shop’s owner', async () => {
+    window.location.hash = '';
     show(fakeApi(signedIn({ ...OWNER, permissions: [...OWNER.permissions, 'cust.edit'] })).api);
     const menu = await screen.findByRole('navigation', { name: en.nav.menu });
     expect(within(menu).getByRole('link', { name: en.nav.customers }).getAttribute('aria-current')).toBe(

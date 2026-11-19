@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Done and verified on staging: [W1-20](plans/W1-20-reports-and-support.md) (sales register, overrides, voids and returns, stock and valuation, ageing, exceptions, Trace a bill); RPT-02 built in W1-11. **Every remaining report is pulled forward before go-live** (D-116) in four tasks, W2-01 to W2-04 ([catalog](#report-catalog-d-116)); W2-01 is built ([plan](plans/W2-01-report-frame-financial-statements.md), [#176](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176)): the report frame, the Reports home and the financial statements, waiting for review. W2-02 is built ([plan](plans/W2-02-stock-reports.md), [#177](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/177)): the six stock reports, waiting for review. W2-03 is built ([plan](plans/W2-03-sales-purchase-analysis.md), [#178](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178)): sales and gross profit, the purchase register, purchase and sale rates, sales over time, waiting for review. W2-04's plan is accepted ([plan](plans/W2-04-partners-control-cash-flow.md), [#179](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/179)): the partner ledger and statement, the balance trend, overdue and over-limit, collections and payments, user activity, the cash flow |
+| **Status** | Done and verified on staging: [W1-20](plans/W1-20-reports-and-support.md) (sales register, overrides, voids and returns, stock and valuation, ageing, exceptions, Trace a bill); RPT-02 built in W1-11. **Every remaining report is pulled forward before go-live** (D-116) in four tasks, W2-01 to W2-04 ([catalog](#report-catalog-d-116)); W2-01 is built ([plan](plans/W2-01-report-frame-financial-statements.md), [#176](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176)): the report frame, the Reports home and the financial statements, waiting for review. W2-02 is built ([plan](plans/W2-02-stock-reports.md), [#177](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/177)): the six stock reports, waiting for review. W2-03 is built ([plan](plans/W2-03-sales-purchase-analysis.md), [#178](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178)): sales and gross profit, the purchase register, purchase and sale rates, sales over time, waiting for review. W2-04 is built ([plan](plans/W2-04-partners-control-cash-flow.md), [#179](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/179)): the partner ledger and statement, the balance trend, overdue and over-limit, collections and payments, user activity, the cash flow, waiting for review; moving the built reports onto the frame (its answer 8) follows in its own PR |
 | **Requirements** | 17 (RPT-01…RPT-17), plus ACC-07 (financial statements) and the list part of PUR-07 (reorder list) |
 | **Feature spec needed** | No: the catalog below and each task's plan are enough |
 
@@ -50,7 +50,7 @@ The reports are designed the modern way: one frame for all of them (filters at t
 | Cash book | Each cash and bank account by day: opening, in, out, closing, and the documents | none | ACC-07 | W2-01 | Built |
 | Day book | Every voucher posted in a range with its lines, by document type | none | RPT-11 | W2-01 | Built |
 | Expenses | Expense accounts by month for up to a year | part of Income Statement | RPT-11 | W2-01 | Built |
-| Cash flow | Money in and out of cash and bank by what it was for, transfers left out | none | ACC-07 | W2-04 (last) | Planned (W2-01 answer 7) |
+| Cash flow | Money in and out of cash and bank by what it was for, transfers left out | none | ACC-07 | W2-04 (last) | Built; direct, month by month, each month equal to the cash book |
 | **Stock** | | | | | |
 | Stock now and its value | On hand by location, and its value in the books | Item Wise Closing Stock (today) | RPT-05 | W1-20 | Built; since W2-02 valued from the stock ledger, equal to Inventory (W2-02 answer 2) |
 | Stock ledger | One item's documents in a range: opening, in, out, balance, value | Stock Ledger | RPT-12 | W2-02 | Built; the stock card links to it |
@@ -69,11 +69,11 @@ The reports are designed the modern way: one frame for all of them (filters at t
 | Day reconciliation, cash variance | The day's cash, by session and cashier | none | RPT-02 | W1-11 | Built |
 | **Customers and suppliers** | | | | | |
 | Outstanding and ageing | Each party's balance by how overdue it is (due-date buckets) | Business Partner Outstanding | RPT-06 | W1-20 | Built |
-| Partner ledger and statement | One customer's or supplier's documents in a range with opening and running balance; a statement to print or send | Business Partner Ledger, Business Partner Activity | RPT-16 | W2-04 | Customer ledger built (W1-22); W2-04 adds suppliers, the opening line and the statement |
-| Balance trend | Each party's balance today and 15 days, 1, 2, 3 and 6 months ago | Business Partner Ageing (which shows balances at past dates, not overdue buckets) | RPT-16 | W2-04 | Planned |
-| Control | Overdue and over-limit customers, collections register, user activity | none | RPT-17 | W2-04 (last) | Planned |
+| Partner ledger and statement | One customer's or supplier's documents in a range with opening and running balance; a statement to print or send | Business Partner Ledger, Business Partner Activity | RPT-16 | W2-04 | Built: customers and suppliers, up to a year, the statement one at a time or for every customer |
+| Balance trend | Each party's balance today and 15 days, 1, 2, 3 and 6 months ago | Business Partner Ageing (which shows balances at past dates, not overdue buckets) | RPT-16 | W2-04 | Built |
+| Control | Overdue and over-limit customers, collections register, user activity | none | RPT-17 | W2-04 (last) | Built; user activity for the owner only |
 
-**Order inside each task:** the reports the shop uses today first, the new analysis last (marked *last*), so anything that slips before 18 Dec is an extra, never the trial balance or the reorder list. **The built reports** (W1-11, W1-20) move onto the new frame in W2-04 if time allows; they work as they are.
+**Order inside each task:** the reports the shop uses today first, the new analysis last (marked *last*), so anything that slips before 18 Dec is an extra, never the trial balance or the reorder list. **The built reports** (W1-11, W1-20) move onto the new frame in their own PR after W2-04 (its answer 8); they work as they are.
 
 ## Tasks
 
@@ -82,7 +82,7 @@ The reports are designed the modern way: one frame for all of them (filters at t
 | [W2-01](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176) | The report frame (filters, presets, key figures, sortable list, drill-down, CSV, print) and the financial statements: trial balance, profit and loss, balance sheet, cash book, day book, expenses; the account ledger moves to the frame ([plan](plans/W2-01-report-frame-financial-statements.md)) | ACC-07, RPT-11 | W1-08, W1-19, W1-20 | 4 |
 | [W2-02](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/177) | Stock reports: stock ledger, stock at a date, stock movement, reorder list, dead stock, inventory analysis ([plan](plans/W2-02-stock-reports.md), accepted) | RPT-08, RPT-12, RPT-13, RPT-14, PUR-07 (list) | W2-01 | 3 |
 | [W2-03](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178) | Sales and purchase analysis: sales and gross profit, purchase register, purchase and sale rates, sales over time ([plan](plans/W2-03-sales-purchase-analysis.md), built) | RPT-07, RPT-09, RPT-15 | W2-01 | 3 |
-| [W2-04](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/179) | Customers and suppliers: partner ledger and statement, balance trend, control reports; the cash flow statement last; the built reports onto the frame if time allows ([plan](plans/W2-04-partners-control-cash-flow.md), accepted) | RPT-16, RPT-17, ACC-07 (cash flow) | W2-01 | 3 (+1 if time) |
+| [W2-04](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/179) | Customers and suppliers: partner ledger and statement, balance trend, control reports; the cash flow statement last; the built reports onto the frame if time allows ([plan](plans/W2-04-partners-control-cash-flow.md), built; the move of the built reports follows) | RPT-16, RPT-17, ACC-07 (cash flow) | W2-01 | 3 (+1 if time) |
 
 **Total ≈ 12 days**, from 23 Nov; go/no-go is 18 Dec. W2-02 to W2-04 each start with their own plan, after W2-01's frame exists.
 

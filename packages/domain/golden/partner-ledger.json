@@ -1,0 +1,101 @@
+{
+  "description": "The partner ledger (W2-04 owner answer 1, RPT-16): the opening, each entry with its debit or credit and the running balance, the totals by kind, the closing. A customer's bill is a debit; a supplier's bill is a credit.",
+  "cases": [
+    {
+      "name": "A customer: opening, two bills, a return, a collection, a bank receipt and a voucher",
+      "input": {
+        "role": "customer",
+        "opening": 500000,
+        "entries": [
+          { "kind": "sale", "amount": 120000 },
+          { "kind": "sale", "amount": 80000 },
+          { "kind": "sale", "amount": -20000 },
+          { "kind": "payment", "amount": -300000 },
+          { "kind": "customer_receipt", "amount": -250000 },
+          { "kind": "journal_voucher", "amount": 5000 }
+        ]
+      },
+      "expected": {
+        "opening": 500000,
+        "lines": [
+          { "kind": "sale", "amount": 120000, "debit": 120000, "credit": 0, "balance": 620000 },
+          { "kind": "sale", "amount": 80000, "debit": 80000, "credit": 0, "balance": 700000 },
+          { "kind": "sale", "amount": -20000, "debit": 0, "credit": 20000, "balance": 680000 },
+          { "kind": "payment", "amount": -300000, "debit": 0, "credit": 300000, "balance": 380000 },
+          { "kind": "customer_receipt", "amount": -250000, "debit": 0, "credit": 250000, "balance": 130000 },
+          { "kind": "journal_voucher", "amount": 5000, "debit": 5000, "credit": 0, "balance": 135000 }
+        ],
+        "byKind": [
+          { "kind": "customer_receipt", "count": 1, "debit": 0, "credit": 250000 },
+          { "kind": "journal_voucher", "count": 1, "debit": 5000, "credit": 0 },
+          { "kind": "payment", "count": 1, "debit": 0, "credit": 300000 },
+          { "kind": "sale", "count": 3, "debit": 200000, "credit": 20000 }
+        ],
+        "debit": 205000,
+        "credit": 570000,
+        "closing": 135000
+      }
+    },
+    {
+      "name": "A supplier: a receipt is a credit, a return and payments are debits",
+      "input": {
+        "role": "supplier",
+        "opening": 1000000,
+        "entries": [
+          { "kind": "goods_receipt", "amount": 450000 },
+          { "kind": "purchase_return", "amount": -50000 },
+          { "kind": "supplier_payment", "amount": -600000 },
+          { "kind": "cash_movement", "amount": -100000 }
+        ]
+      },
+      "expected": {
+        "opening": 1000000,
+        "lines": [
+          { "kind": "goods_receipt", "amount": 450000, "debit": 0, "credit": 450000, "balance": 1450000 },
+          { "kind": "purchase_return", "amount": -50000, "debit": 50000, "credit": 0, "balance": 1400000 },
+          { "kind": "supplier_payment", "amount": -600000, "debit": 600000, "credit": 0, "balance": 800000 },
+          { "kind": "cash_movement", "amount": -100000, "debit": 100000, "credit": 0, "balance": 700000 }
+        ],
+        "byKind": [
+          { "kind": "cash_movement", "count": 1, "debit": 100000, "credit": 0 },
+          { "kind": "goods_receipt", "count": 1, "debit": 0, "credit": 450000 },
+          { "kind": "purchase_return", "count": 1, "debit": 50000, "credit": 0 },
+          { "kind": "supplier_payment", "count": 1, "debit": 600000, "credit": 0 }
+        ],
+        "debit": 750000,
+        "credit": 450000,
+        "closing": 700000
+      }
+    },
+    {
+      "name": "Nothing in the range: the closing is the opening",
+      "input": { "role": "customer", "opening": -15000, "entries": [] },
+      "expected": { "opening": -15000, "lines": [], "byKind": [], "debit": 0, "credit": 0, "closing": -15000 }
+    },
+    {
+      "name": "A customer paying in advance: the balance goes below zero",
+      "input": {
+        "role": "customer",
+        "opening": 0,
+        "entries": [
+          { "kind": "payment", "amount": -100000 },
+          { "kind": "sale", "amount": 40000 }
+        ]
+      },
+      "expected": {
+        "opening": 0,
+        "lines": [
+          { "kind": "payment", "amount": -100000, "debit": 0, "credit": 100000, "balance": -100000 },
+          { "kind": "sale", "amount": 40000, "debit": 40000, "credit": 0, "balance": -60000 }
+        ],
+        "byKind": [
+          { "kind": "payment", "count": 1, "debit": 0, "credit": 100000 },
+          { "kind": "sale", "count": 1, "debit": 40000, "credit": 0 }
+        ],
+        "debit": 40000,
+        "credit": 100000,
+        "closing": -60000
+      }
+    }
+  ]
+}
