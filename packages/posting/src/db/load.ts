@@ -1,4 +1,4 @@
-import { money, qty, type CashMovementKind, type Money, type PaymentMethodCode, type Qty } from '@erp/domain';
+import { add, money, qty, type CashMovementKind, type Money, type PaymentMethodCode, type Qty } from '@erp/domain';
 import type pg from 'pg';
 
 import type {
@@ -69,10 +69,12 @@ export async function loadSale(
     location_id: string;
     qty: string;
     line_total: string;
+    bill_share: string;
     tax_amount: string;
     original_line_id: string | null;
   }>(
-    `SELECT id, line_no, item_id, location_id, (qty * 1000)::bigint AS qty, line_total, tax_amount, original_line_id
+    `SELECT id, line_no, item_id, location_id, (qty * 1000)::bigint AS qty, line_total, bill_share, tax_amount,
+       original_line_id
      FROM erp.sales_lines WHERE document_id = $1 ORDER BY line_no`,
     [id],
   );
@@ -101,7 +103,9 @@ export async function loadSale(
         itemId: l.item_id,
         locationId: l.location_id,
         qty: toQty(l.qty),
-        lineTotal: toMoney(l.line_total),
+        // The counter stores a line after its share of the bill discount; posting takes it before, and debits the
+        // bill discount on its own (posting rules §4.1). A returned line has no share, so its refund is unchanged.
+        lineTotal: add(toMoney(l.line_total), toMoney(l.bill_share)),
         taxAmount: toMoney(l.tax_amount),
         ...(toQty(l.qty) < 0 ? { returnUnitCost: null } : {}),
       })),
