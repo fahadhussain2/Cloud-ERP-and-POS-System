@@ -35,4 +35,9 @@
 | **Discount given** | List price × quantity − what the customer paid: a line's own discount and its share of the bill discount together; a price above the list is a negative discount (W2-03) |
 | **Net rate** | A purchase's or sale's value after the line and bill discounts, per unit; an average rate is the total value ÷ the total quantity (RPT-09) |
 | **Spread** | An item's average net sale rate − its average net purchase rate, and as a share of the sale rate (RPT-09) |
+| **Statement** | A customer's or supplier's ledger for a period, printed with the shop's heading: the opening, each document, the closing and the closing by how overdue it is; a voided bill and its void are left out (RPT-16) |
+| **Balance trend** | Each party's balance as on a date and 15 days, 1, 2, 3 and 6 months before it: the legacy app's *ageing* (RPT-16) |
+| **Overdue** | What is unpaid of a bill more than a number of days past its due date, payments settling the oldest bills first; a customer without terms owes each bill on its own day (RPT-17) |
+| **Cash flow** | Money into and out of cash and bank by what it was for (sales, customers, suppliers, expenses, the owner), month by month; moves between the shop's own cash and bank accounts are left out (ACC-07) |
+| **User activity** | Who did what: the audit log's sign-ins, edits and events, and the documents each person made (RPT-17) |
 | **Wave** | A build-order block of the MVP (Wave 0 foundations, Wave 1 critical path, Wave 2 rest of MVP) |
