@@ -40,7 +40,6 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../api';
 import { qtyText } from '../catalog/data';
 import { href, navigate, queryOf } from '../router';
-import { DateField } from '../screens/ReportsScreens';
 import { useShopToday } from '../shopDay';
 import { FormDialog } from '../staff/dialogs';
 import { apiQuery, useFilters, type Filters } from './frame/filters';
@@ -60,76 +59,12 @@ import {
   type PeriodValue,
 } from './frame/ReportFrame';
 
-// The W1-20 reports and support screens (RPT-01, RPT-03, RPT-04, RPT-05, RPT-06, RPT-10, PLT-12, D-110): filters at
-// the top, totals, then the list, and Download CSV (owner answer 2). Read only, except an exception's review. Values
-// and costs come only when the API sends them (cost.view, owner answer 1).
+// The W1-20 reports and support screens (RPT-01, RPT-03, RPT-04, RPT-05, RPT-06, RPT-10, PLT-12, D-110), the reports
+// on the report frame since W2-04 (answer 8; D-116): filters in the address, key figures, sortable and searchable lists,
+// Download CSV (owner answer 2) and the print layout. Read only, except an exception's review. Every figure is the
+// API's, as before; values and costs come only when the API sends them (cost.view, owner answer 1).
 
 type Money = SalesRegisterView['money'];
-
-/** Fetches a report whenever its address changes; null while loading or after a refusal (with the words for it). */
-function useOldReport<T>(
-  api: Api,
-  url: string | null,
-  version = 0,
-): { report: T | null; error: string | null } {
-  const { t } = useTranslation();
-  const [state, setState] = useState<{ url: string | null; report: T | null; error: string | null }>({
-    url: null,
-    report: null,
-    error: null,
-  });
-  useEffect(() => {
-    if (url === null) return;
-    let live = true;
-    void api('GET', url).then((r) => {
-      if (!live) return;
-      const error = (r.body as { error?: string } | null)?.error;
-      setState(
-        r.status === 200
-          ? { url, report: r.body as T, error: null }
-          : {
-              url,
-              report: null,
-              error: error === 'range_too_long' ? t('reports.range.tooLong') : t('reports.failed'),
-            },
-      );
-    });
-    return () => {
-      live = false;
-    };
-  }, [api, url, version, t]);
-  return state.url === url ? { report: state.report, error: state.error } : { report: null, error: null };
-}
-
-function Range({
-  from,
-  to,
-  onFrom,
-  onTo,
-  csv,
-  children,
-}: {
-  from: string;
-  to: string;
-  onFrom: (v: string) => void;
-  onTo: (v: string) => void;
-  csv: string | null;
-  children?: ReactNode;
-}) {
-  const { t } = useTranslation();
-  return (
-    <Panel className="flex flex-wrap items-end gap-4 p-3.5">
-      <DateField label={t('reports.range.from')} value={from} onChange={onFrom} />
-      <DateField label={t('reports.range.to')} value={to} onChange={onTo} />
-      {children}
-      {csv && (
-        <Button asChild variant="outline">
-          <a href={csv}>{t('reports.csv')}</a>
-        </Button>
-      )}
-    </Panel>
-  );
-}
 
 function Failed({ text }: { text: string | null }) {
   return text === null ? null : (
@@ -145,17 +80,7 @@ const Num = ({ children }: { children: ReactNode }) => (
 const money = (v: number | null, m: Money) => (v === null ? '—' : formatMoney(v, m));
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-/** From and to: the shop's business date (W2-05) until other dates are picked. */
-const useRange = (api: Api) => {
-  const today = useShopToday(api) ?? '';
-  const [pickedFrom, setFrom] = useState<string | null>(null);
-  const [pickedTo, setTo] = useState<string | null>(null);
-  const from = pickedFrom ?? today;
-  const to = pickedTo ?? today;
-  return { from, to, setFrom, setTo, query: `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` };
-};
-
-/// ---- On the report frame (W2-04 answer 8): the dates on the shop's business date, the totals, a bill's link ----
+// ---- On the report frame (W2-04 answer 8): the dates on the shop's business date, the totals, a bill's link ----
 
 /** The filters now: the address's (two quick changes), else the ones the screen was drawn with. */
 function current(filters: Filters): Filters {
@@ -438,8 +363,6 @@ export function SalesRegisterScreen({
 
 // ---- Overrides (RPT-03) ----
 
-const moneyOrDash = (v: number | null, m: Money) => (v === null ? '—' : formatMoney(v, m));
-
 export function OverridesScreen({ api, permissions = [] }: { api: Api; permissions?: readonly string[] }) {
   const { t } = useTranslation();
   const days = useDays(api, 'overridesReport', []);
@@ -499,21 +422,21 @@ export function OverridesScreen({ api, permissions = [] }: { api: Api; permissio
           label: t('reports.ovr.list_'),
           end: true,
           sort: (o) => o.listPrice ?? -Infinity,
-          cell: (o) => moneyOrDash(o.listPrice, m),
+          cell: (o) => money(o.listPrice, m),
         },
         {
           key: 'price',
           label: t('reports.ovr.price'),
           end: true,
           sort: (o) => o.unitPrice ?? -Infinity,
-          cell: (o) => moneyOrDash(o.unitPrice, m),
+          cell: (o) => money(o.unitPrice, m),
         },
         {
           key: 'floor',
           label: t('reports.ovr.floor'),
           end: true,
           sort: (o) => o.floorPrice ?? -Infinity,
-          cell: (o) => moneyOrDash(o.floorPrice, m),
+          cell: (o) => money(o.floorPrice, m),
         },
       ]
     : [];
@@ -630,7 +553,7 @@ export function VoidsReturnsScreen({ api, permissions = [] }: { api: Api; permis
           label: t('reports.col.total'),
           end: true,
           sort: (v) => v.saleTotal ?? -Infinity,
-          cell: (v) => moneyOrDash(v.saleTotal, m),
+          cell: (v) => money(v.saleTotal, m),
         },
       ]
     : [];
@@ -1086,91 +1009,123 @@ export function AgeingScreen({ api }: { api: Api }) {
 // ---- Exceptions (RPT-10, owner answer 5) ----
 
 const SEVERITY_TONE = { high: 'bad', medium: 'warn', low: 'neutral' } as const;
+const SEVERITY_ORDER = { high: 0, medium: 1, low: 2 } as const;
 
 export function ExceptionsScreen({ api, permissions }: { api: Api; permissions: readonly string[] }) {
   const { t } = useTranslation();
-  const r = useRange(api);
-  const [status, setStatus] = useState<'open' | 'all'>('open');
+  const days = useDays(api, 'exceptions', ['status']);
+  const all = days.filters['status'] === 'all';
   const [version, setVersion] = useState(0);
   const [reviewing, setReviewing] = useState<ExceptionRow | null>(null);
-  const url =
-    r.from && r.to ? `/api/reports/exceptions?${r.query}${status === 'open' ? '&status=open' : ''}` : null;
-  const { report, error } = useOldReport<ExceptionsView>(api, url, version);
+  const url = days.dates
+    ? `/api/reports/exceptions?${apiQuery({ ...days.dates, ...(all ? {} : { status: 'open' }) })}`
+    : null;
+  const { report, error } = useReport<ExceptionsView>(api, url, version);
   const canReview = permissions.includes('exceptions.review');
-  return (
-    <>
-      <PageHeader title={t('reports.exc.title')} help={t('reports.exc.help')} />
-      <Range from={r.from} to={r.to} onFrom={r.setFrom} onTo={r.setTo} csv={report && `${url}&format=csv`}>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={status === 'all'}
-            onChange={(e) => setStatus(e.target.checked ? 'all' : 'open')}
-          />
-          {t('reports.exc.showReviewed')}
-        </label>
-      </Range>
-      <Failed text={error} />
-      {report && (
-        <Panel title={t('reports.exc.list')} className="overflow-x-auto">
-          <Table aria-label={t('reports.exc.list')}>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('reports.col.date')}</TableHead>
-                <TableHead>{t('reports.exc.kind')}</TableHead>
-                <TableHead>{t('reports.exc.severity')}</TableHead>
-                <TableHead>{t('reports.col.counter')}</TableHead>
-                <TableHead>{t('reports.exc.document')}</TableHead>
-                <TableHead>{t('reports.exc.status')}</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {report.exceptions.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell>
-                    {e.businessDate} {time(e.createdAt)}
-                  </TableCell>
-                  <TableCell>{t(`reports.exc.kinds.${e.kind}`, { defaultValue: e.kind })}</TableCell>
-                  <TableCell>
-                    <StatusChip tone={SEVERITY_TONE[e.severity]}>
-                      {t(`reports.exc.severities.${e.severity}`)}
-                    </StatusChip>
-                  </TableCell>
-                  <TableCell>{e.deviceCode ?? '—'}</TableCell>
-                  <TableCell className="font-mono">
-                    {e.documentNumber && permissions.includes('support.trace') ? (
-                      <a href={href.trace(e.documentNumber)} className="underline-offset-4 hover:underline">
-                        {e.documentNumber}
-                      </a>
-                    ) : (
-                      (e.documentNumber ?? '—')
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {t(`reports.exc.statuses.${e.status}`)}
-                    {e.reviewedByName && (
-                      <span className="block text-sm text-muted-foreground">
-                        {e.reviewedByName}
-                        {e.reviewNote ? `: ${e.reviewNote}` : ''}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {canReview && (
-                      <Button size="sm" variant="outline" onClick={() => setReviewing(e)}>
-                        {t('reports.exc.review')}
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {report.exceptions.length === 0 && (
-            <p className="m-0 p-3.5 text-muted-foreground">{t('reports.exc.none')}</p>
+  const kindOf = (e: ExceptionRow) => t(`reports.exc.kinds.${e.kind}`, { defaultValue: e.kind });
+  const columns: ListColumn<ExceptionRow>[] = [
+    {
+      key: 'date',
+      label: t('reports.col.date'),
+      sort: (e) => e.createdAt,
+      cell: (e) => `${e.businessDate} ${time(e.createdAt)}`,
+    },
+    { key: 'kind', label: t('reports.exc.kind'), sort: kindOf, cell: kindOf },
+    {
+      key: 'severity',
+      label: t('reports.exc.severity'),
+      sort: (e) => SEVERITY_ORDER[e.severity],
+      cell: (e) => (
+        <StatusChip tone={SEVERITY_TONE[e.severity]}>{t(`reports.exc.severities.${e.severity}`)}</StatusChip>
+      ),
+    },
+    {
+      key: 'counter',
+      label: t('reports.col.counter'),
+      sort: (e) => e.deviceCode ?? '',
+      cell: (e) => e.deviceCode ?? '—',
+    },
+    {
+      key: 'document',
+      label: t('reports.exc.document'),
+      sort: (e) => e.documentNumber ?? '',
+      cell: (e) => (
+        <span className="font-mono">
+          {e.documentNumber ? <BillNumber number={e.documentNumber} permissions={permissions} /> : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: t('reports.exc.status'),
+      sort: (e) => e.status,
+      cell: (e) => (
+        <>
+          {t(`reports.exc.statuses.${e.status}`)}
+          {e.reviewedByName && (
+            <span className="block text-sm text-muted-foreground">
+              {e.reviewedByName}
+              {e.reviewNote ? `: ${e.reviewNote}` : ''}
+            </span>
           )}
-        </Panel>
+        </>
+      ),
+    },
+    {
+      key: 'review',
+      label: '',
+      cell: (e) =>
+        canReview && (
+          <Button size="sm" variant="outline" className="print:hidden" onClick={() => setReviewing(e)}>
+            {t('reports.exc.review')}
+          </Button>
+        ),
+    },
+  ];
+  return (
+    <ReportPage
+      title={t('reports.exc.title')}
+      help={t('reports.exc.help')}
+      filters={
+        <>
+          <DaysFilter days={days} />
+          <div className="flex h-9 items-center gap-2">
+            <Checkbox
+              id="exceptions-all"
+              checked={all}
+              onCheckedChange={(c) => days.set({ status: c === true ? 'all' : '' })}
+            />
+            <Label htmlFor="exceptions-all">{t('reports.exc.showReviewed')}</Label>
+          </div>
+        </>
+      }
+      printFilters={[periodWords(days.dates), all ? t('reports.exc.showReviewed') : '']
+        .filter(Boolean)
+        .join(' · ')}
+      csv={report && `${url}&format=csv`}
+      error={error}
+      loading={report === null && error === null}
+      figures={
+        report ? [{ key: 'count', label: t('reports.exc.list'), value: report.exceptions.length }] : []
+      }
+    >
+      {report && (
+        <ListTable
+          label={t('reports.exc.list')}
+          columns={columns}
+          rows={report.exceptions}
+          rowKey={(e) => e.id}
+          text={(e) =>
+            [
+              kindOf(e),
+              e.deviceCode ?? '',
+              e.documentNumber ?? '',
+              e.reviewedByName ?? '',
+              e.reviewNote ?? '',
+            ].join(' ')
+          }
+          empty={t('reports.exc.none')}
+        />
       )}
       {reviewing && (
         <ReviewDialog
@@ -1183,7 +1138,7 @@ export function ExceptionsScreen({ api, permissions }: { api: Api; permissions: 
           }}
         />
       )}
-    </>
+    </ReportPage>
   );
 }
 

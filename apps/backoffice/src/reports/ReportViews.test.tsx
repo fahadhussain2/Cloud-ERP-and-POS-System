@@ -53,8 +53,9 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 const r = en.reports;
-const calledWith = (calls: { path: string }[], prefix: string) =>
-  calls.map((c) => c.path).filter((p) => p.startsWith(prefix));
+/** The reports read (GET) at an address. */
+const calledWith = (calls: { method: string; path: string }[], prefix: string) =>
+  calls.filter((c) => c.method === 'GET' && c.path.startsWith(prefix)).map((c) => c.path);
 
 describe('the report addresses', () => {
   it('open the report and support screens', () => {
@@ -405,6 +406,27 @@ describe('exceptions', () => {
         status: 'reviewed',
         note: 'Counted: 8 on the shelf',
       }),
+    );
+    // The list is read again, open ones only, so the reviewed one leaves it.
+    await waitFor(() =>
+      expect(calledWith(f.calls, '/api/reports/exceptions')).toEqual([
+        '/api/reports/exceptions?from=2026-11-19&to=2026-11-19&status=open',
+        '/api/reports/exceptions?from=2026-11-19&to=2026-11-19&status=open',
+      ]),
+    );
+  });
+
+  it('shows the reviewed and dismissed ones too when asked, and keeps that in the address', async () => {
+    window.location.hash = href.exceptions;
+    const f = fakeApi({ 'GET /api/reports/exceptions': view });
+    show(<ExceptionsScreen api={f.api} permissions={['reports.view']} />);
+    expect(await screen.findByText(r.exc.kinds.negative_stock)).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: r.exc.showReviewed }));
+    expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({ preset: 'today', status: 'all' });
+    await waitFor(() =>
+      expect(calledWith(f.calls, '/api/reports/exceptions')).toContain(
+        '/api/reports/exceptions?from=2026-11-19&to=2026-11-19',
+      ),
     );
   });
 
