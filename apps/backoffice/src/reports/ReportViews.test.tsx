@@ -1,4 +1,11 @@
-import type { AgeingView, BillTraceView, ExceptionsView, SalesRegisterView, StockView } from '@erp/contracts';
+import type {
+  AgeingView,
+  BillTraceView,
+  ExceptionsView,
+  OverridesView,
+  SalesRegisterView,
+  StockView,
+} from '@erp/contracts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
@@ -11,6 +18,7 @@ import { href, parseHash, queryOf } from '../router';
 import {
   AgeingScreen,
   ExceptionsScreen,
+  OverridesScreen,
   SalesRegisterScreen,
   StockReportScreen,
   TraceScreen,
@@ -151,6 +159,48 @@ describe('the sales register', () => {
     fireEvent.change(screen.getByLabelText(r.frame.search), { target: { value: 'bilal' } });
     expect(within(list).queryByText('S-C1-000001')).toBeNull();
     expect(within(list).getByText('S-C2-000009')).toBeTruthy();
+  });
+});
+
+describe('overrides', () => {
+  it('lists each approval with its prices, a dash for the floor without cost, and the counts by kind', async () => {
+    const view: OverridesView = {
+      money: MONEY,
+      from: '2026-11-19',
+      to: '2026-11-19',
+      overrides: [
+        {
+          id: 'o1',
+          kind: 'below_list',
+          billNumber: 'S-C1-000003',
+          businessDate: '2026-11-19',
+          at: '2026-11-19T07:00:00.000Z',
+          itemCode: 'OIL001',
+          itemName: 'ENGINE OIL 4L',
+          requestedByName: 'Sara',
+          approvedByName: 'Imran',
+          reasonCode: 'regular',
+          note: 'old customer',
+          listPrice: 300000,
+          unitPrice: 280000,
+          floorPrice: null,
+        },
+      ],
+      byRequester: [{ name: 'Sara', count: 1 }],
+      byApprover: [{ name: 'Imran', count: 1 }],
+      byKind: [{ kind: 'below_list', count: 1 }],
+    };
+    const f = fakeApi({ 'GET /api/reports/overrides': view });
+    show(<OverridesScreen api={f.api} />);
+    const list = await screen.findByRole('table', { name: r.ovr.list });
+    expect(calledWith(f.calls, '/api/reports/overrides')).toEqual([
+      '/api/reports/overrides?from=2026-11-19&to=2026-11-19',
+    ]);
+    const row = within(list).getAllByRole('row')[1]!;
+    expect(plain(row.textContent ?? '')).toContain('regular: old customer');
+    expect(plain(row.textContent ?? '')).toMatch(/Rs 3,000.*Rs 2,800.*—$/);
+    const byKind = screen.getByRole('table', { name: r.ovr.byKind });
+    expect(plain(byKind.textContent ?? '')).toContain(`${r.ovr.kinds.below_list}1`);
   });
 });
 

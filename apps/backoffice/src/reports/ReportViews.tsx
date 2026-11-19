@@ -3,6 +3,7 @@ import type {
   BillTraceView,
   ExceptionRow,
   ExceptionsView,
+  OverrideRow,
   OverridesView,
   RegisterRow,
   SalesRegisterView,
@@ -464,92 +465,136 @@ export function SalesRegisterScreen({
 
 // ---- Overrides (RPT-03) ----
 
-export function OverridesScreen({ api }: { api: Api }) {
+const moneyOrDash = (v: number | null, m: Money) => (v === null ? '—' : formatMoney(v, m));
+
+export function OverridesScreen({ api, permissions = [] }: { api: Api; permissions?: readonly string[] }) {
   const { t } = useTranslation();
-  const r = useRange(api);
-  const url = r.from && r.to ? `/api/reports/overrides?${r.query}` : null;
-  const { report, error } = useOldReport<OverridesView>(api, url);
+  const days = useDays(api, 'overridesReport', []);
+  const url = days.dates ? `/api/reports/overrides?${apiQuery(days.dates)}` : null;
+  const { report, error } = useReport<OverridesView>(api, url);
+  const m = report?.money;
+  const columns: ListColumn<OverrideRow>[] = m
+    ? [
+        {
+          key: 'time',
+          label: t('reports.col.time'),
+          sort: (o) => o.at,
+          cell: (o) => `${o.businessDate} ${time(o.at)}`,
+        },
+        {
+          key: 'kind',
+          label: t('reports.col.kind'),
+          sort: (o) => kindName(t, o.kind),
+          cell: (o) => kindName(t, o.kind),
+        },
+        {
+          key: 'number',
+          label: t('reports.col.number'),
+          sort: (o) => o.billNumber,
+          cell: (o) => (
+            <span className="font-mono">
+              <BillNumber number={o.billNumber} permissions={permissions} />
+            </span>
+          ),
+        },
+        {
+          key: 'item',
+          label: t('reports.col.item'),
+          sort: (o) => o.itemCode ?? '',
+          cell: (o) => (o.itemCode ? `${o.itemCode} ${o.itemName ?? ''}` : '—'),
+        },
+        {
+          key: 'askedBy',
+          label: t('reports.ovr.askedBy'),
+          sort: (o) => o.requestedByName,
+          cell: (o) => o.requestedByName,
+        },
+        {
+          key: 'approvedBy',
+          label: t('reports.ovr.approvedBy'),
+          sort: (o) => o.approvedByName,
+          cell: (o) => o.approvedByName,
+        },
+        {
+          key: 'reason',
+          label: t('reports.col.reason'),
+          sort: (o) => o.reasonCode,
+          cell: (o) => (o.note ? `${o.reasonCode}: ${o.note}` : o.reasonCode),
+        },
+        {
+          key: 'list',
+          label: t('reports.ovr.list_'),
+          end: true,
+          sort: (o) => o.listPrice ?? -Infinity,
+          cell: (o) => moneyOrDash(o.listPrice, m),
+        },
+        {
+          key: 'price',
+          label: t('reports.ovr.price'),
+          end: true,
+          sort: (o) => o.unitPrice ?? -Infinity,
+          cell: (o) => moneyOrDash(o.unitPrice, m),
+        },
+        {
+          key: 'floor',
+          label: t('reports.ovr.floor'),
+          end: true,
+          sort: (o) => o.floorPrice ?? -Infinity,
+          cell: (o) => moneyOrDash(o.floorPrice, m),
+        },
+      ]
+    : [];
   return (
-    <>
-      <PageHeader title={t('reports.ovr.title')} help={t('reports.ovr.help')} />
-      <Range from={r.from} to={r.to} onFrom={r.setFrom} onTo={r.setTo} csv={report && `${url}&format=csv`} />
-      <Failed text={error} />
-      {report && (
+    <ReportPage
+      title={t('reports.ovr.title')}
+      help={t('reports.ovr.help')}
+      filters={<DaysFilter days={days} />}
+      printFilters={periodWords(days.dates)}
+      csv={report && `${url}&format=csv`}
+      error={error}
+      loading={report === null && error === null}
+      figures={report ? [{ key: 'count', label: t('reports.ovr.list'), value: report.overrides.length }] : []}
+    >
+      {report && m && (
         <>
-          <div className="grid gap-2.5 lg:grid-cols-3">
-            {(
+          <ListTable
+            label={t('reports.ovr.list')}
+            columns={columns}
+            rows={report.overrides}
+            rowKey={(o) => o.id}
+            text={(o) =>
               [
-                [
-                  'byRequester',
-                  report.byRequester.map((x) => ({ key: x.name, label: x.name, count: x.count })),
-                ],
-                [
-                  'byApprover',
-                  report.byApprover.map((x) => ({ key: x.name, label: x.name, count: x.count })),
-                ],
-                [
-                  'byKind',
-                  report.byKind.map((x) => ({ key: x.kind, label: kindName(t, x.kind), count: x.count })),
-                ],
-              ] as const
-            ).map(([key, rows]) => (
-              <Panel key={key} title={t(`reports.ovr.${key}`)} className="pb-2">
-                {rows.length === 0 ? (
-                  <p className="m-0 px-3.5 text-muted-foreground">{t('reports.none')}</p>
-                ) : (
-                  <ul className="m-0 ps-8">
-                    {rows.map((x) => (
-                      <li key={x.key}>
-                        {x.label} · <span className="tabular-nums">{x.count}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Panel>
-            ))}
+                o.billNumber,
+                kindName(t, o.kind),
+                o.itemCode ?? '',
+                o.itemName ?? '',
+                o.requestedByName,
+                o.approvedByName,
+                o.reasonCode,
+                o.note ?? '',
+              ].join(' ')
+            }
+          />
+          <div className="flex flex-wrap gap-3">
+            <Totals
+              title={t('reports.ovr.byRequester')}
+              count={t('reports.ovr.list')}
+              rows={report.byRequester.map((x) => ({ key: x.name, label: x.name, count: x.count }))}
+            />
+            <Totals
+              title={t('reports.ovr.byApprover')}
+              count={t('reports.ovr.list')}
+              rows={report.byApprover.map((x) => ({ key: x.name, label: x.name, count: x.count }))}
+            />
+            <Totals
+              title={t('reports.ovr.byKind')}
+              count={t('reports.ovr.list')}
+              rows={report.byKind.map((x) => ({ key: x.kind, label: kindName(t, x.kind), count: x.count }))}
+            />
           </div>
-          <Panel title={t('reports.ovr.list')} className="overflow-x-auto">
-            <Table aria-label={t('reports.ovr.list')}>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('reports.col.time')}</TableHead>
-                  <TableHead>{t('reports.col.kind')}</TableHead>
-                  <TableHead>{t('reports.col.number')}</TableHead>
-                  <TableHead>{t('reports.col.item')}</TableHead>
-                  <TableHead>{t('reports.ovr.askedBy')}</TableHead>
-                  <TableHead>{t('reports.ovr.approvedBy')}</TableHead>
-                  <TableHead>{t('reports.col.reason')}</TableHead>
-                  <TableHead className="text-end">{t('reports.ovr.list_')}</TableHead>
-                  <TableHead className="text-end">{t('reports.ovr.price')}</TableHead>
-                  <TableHead className="text-end">{t('reports.ovr.floor')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {report.overrides.map((o) => (
-                  <TableRow key={o.id}>
-                    <TableCell>
-                      {o.businessDate} {time(o.at)}
-                    </TableCell>
-                    <TableCell>{kindName(t, o.kind)}</TableCell>
-                    <TableCell className="font-mono">{o.billNumber}</TableCell>
-                    <TableCell>{o.itemCode ? `${o.itemCode} ${o.itemName ?? ''}` : '—'}</TableCell>
-                    <TableCell>{o.requestedByName}</TableCell>
-                    <TableCell>{o.approvedByName}</TableCell>
-                    <TableCell>{o.note ? `${o.reasonCode}: ${o.note}` : o.reasonCode}</TableCell>
-                    <Num>{money(o.listPrice, report.money)}</Num>
-                    <Num>{money(o.unitPrice, report.money)}</Num>
-                    <Num>{money(o.floorPrice, report.money)}</Num>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {report.overrides.length === 0 && (
-              <p className="m-0 p-3.5 text-muted-foreground">{t('reports.none')}</p>
-            )}
-          </Panel>
         </>
       )}
-    </>
+    </ReportPage>
   );
 }
 
