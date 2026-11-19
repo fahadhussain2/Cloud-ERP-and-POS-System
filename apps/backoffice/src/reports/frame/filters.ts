@@ -69,6 +69,9 @@ export function useFilters(
       );
       remember(report, withQuery('', kept).slice(1));
       window.location.hash = withQuery(baseOf(window.location.hash), next);
+      // Drawn from the new address at once: the browser's hashchange comes later, and a box or a choice must not look
+      // unchanged until it does.
+      setHash(window.location.hash);
     },
     [report, forgotten],
   );
