@@ -286,32 +286,51 @@ describe('ageing', () => {
 });
 
 describe('stock', () => {
+  const view: StockView = {
+    money: MONEY,
+    values: false,
+    rows: [
+      {
+        itemId: 'i1',
+        itemCode: 'OIL001',
+        itemName: 'ENGINE OIL 4L',
+        categoryName: 'Oil',
+        locationCode: 'SHOP',
+        qty: 8000,
+        avgCost: null,
+        value: null,
+      },
+    ],
+    truncated: false,
+    byLocation: [{ code: 'SHOP', name: 'Shop', qty: 8000, value: null }],
+    byCategory: [{ name: 'Oil', qty: 8000, value: null }],
+    total: { qty: 8000, value: null },
+    noCost: 0,
+  };
   it('shows quantities only when the server sends no values (no cost.view)', async () => {
-    const view: StockView = {
-      money: MONEY,
-      values: false,
-      rows: [
-        {
-          itemId: 'i1',
-          itemCode: 'OIL001',
-          itemName: 'ENGINE OIL 4L',
-          categoryName: 'Oil',
-          locationCode: 'SHOP',
-          qty: 8000,
-          avgCost: null,
-          value: null,
-        },
-      ],
-      truncated: false,
-      byLocation: [{ code: 'SHOP', name: 'Shop', qty: 8000, value: null }],
-      byCategory: [{ name: 'Oil', qty: 8000, value: null }],
-      total: { qty: 8000, value: null },
-      noCost: 0,
-    };
     show(<StockReportScreen api={fakeApi({ 'GET /api/reports/stock': view }).api} />);
     const list = await screen.findByRole('table', { name: r.stock.list });
     expect(within(list).queryByText(r.stock.value)).toBeNull();
     expect(within(list).getByText('8')).toBeTruthy();
+  });
+
+  it('searches the server once typing stops and keeps the search and "below zero" in the address', async () => {
+    window.location.hash = href.stockReport;
+    const f = fakeApi({ 'GET /api/reports/stock': view });
+    show(<StockReportScreen api={f.api} />);
+    await screen.findByRole('table', { name: r.stock.list });
+    expect(calledWith(f.calls, '/api/reports/stock')).toEqual(['/api/reports/stock?q=']);
+    fireEvent.change(screen.getByLabelText(r.stock.search), { target: { value: 'oil 4l ' } });
+    await waitFor(() =>
+      expect(calledWith(f.calls, '/api/reports/stock')).toContain('/api/reports/stock?q=oil+4l'),
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: r.stock.below }));
+    await waitFor(() =>
+      expect(calledWith(f.calls, '/api/reports/stock')).toContain('/api/reports/stock?q=oil+4l&below=1'),
+    );
+    expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({ q: 'oil 4l', below: '1' });
+    // Typing that stops before the wait sends nothing in between.
+    expect(calledWith(f.calls, '/api/reports/stock')).toHaveLength(3);
   });
 });
 

@@ -8,6 +8,7 @@ import type {
   RegisterRow,
   ReturnLineRow,
   SalesRegisterView,
+  StockRow,
   StockView,
   VoidRow,
   VoidsReturnsView,
@@ -16,7 +17,9 @@ import {
   Alert,
   AlertDescription,
   Button,
+  Checkbox,
   formatMoney,
+  Label,
   LABEL_CLASS,
   PageHeader,
   Panel,
@@ -30,7 +33,7 @@ import {
   TextField,
 } from '@erp/ui';
 import type { TFunction } from 'i18next';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
@@ -201,19 +204,16 @@ function DaysFilter({ days }: { days: Days }) {
   );
 }
 
-/** A small table of totals: a name, and a count and an amount when it has them. */
+/** A small table of totals: a name and its figures (a count, an amount, a quantity). */
 function Totals({
   title,
+  columns,
   rows,
-  count,
-  amount,
 }: {
   title: string;
-  rows: { key: string; label: string; count?: number; amount?: ReactNode }[];
-  /** The count column's heading. */
-  count?: string;
-  /** The amount column's heading. */
-  amount?: string;
+  /** The figures' headings. */
+  columns: string[];
+  rows: { key: string; label: string; cells: ReactNode[] }[];
 }) {
   const { t } = useTranslation();
   return (
@@ -222,21 +222,25 @@ function Totals({
         <TableHeader>
           <TableRow>
             <TableHead>{title}</TableHead>
-            {count && <TableHead className="text-end">{count}</TableHead>}
-            {amount && <TableHead className="text-end">{amount}</TableHead>}
+            {columns.map((c) => (
+              <TableHead key={c} className="text-end">
+                {c}
+              </TableHead>
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((r) => (
             <TableRow key={r.key}>
               <TableCell>{r.label}</TableCell>
-              {count && <Num>{r.count}</Num>}
-              {amount && <Num>{r.amount}</Num>}
+              {r.cells.map((c, i) => (
+                <Num key={i}>{c}</Num>
+              ))}
             </TableRow>
           ))}
           {rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={3} className="text-muted-foreground">
+              <TableCell colSpan={columns.length + 1} className="text-muted-foreground">
                 {t('reports.none')}
               </TableCell>
             </TableRow>
@@ -396,34 +400,30 @@ export function SalesRegisterScreen({
           />
           <div className="flex flex-wrap gap-3">
             <Totals
+              columns={[t('reports.register.bills'), t('reports.col.total')]}
               title={t('reports.register.bySalesman')}
-              count={t('reports.register.bills')}
-              amount={t('reports.col.total')}
               rows={report.totals.bySalesperson.map((x) => ({
                 key: x.id,
                 label: x.name,
-                count: x.bills,
-                amount: formatMoney(x.total, m),
+                cells: [x.bills, formatMoney(x.total, m)],
               }))}
             />
             <Totals
+              columns={[t('reports.register.bills'), t('reports.col.total')]}
               title={t('reports.register.byCounter')}
-              count={t('reports.register.bills')}
-              amount={t('reports.col.total')}
               rows={report.totals.byCounter.map((x) => ({
                 key: x.code,
                 label: x.code,
-                count: x.bills,
-                amount: formatMoney(x.total, m),
+                cells: [x.bills, formatMoney(x.total, m)],
               }))}
             />
             <Totals
+              columns={[t('reports.col.amount')]}
               title={t('reports.register.byTender')}
-              amount={t('reports.col.amount')}
               rows={report.totals.byTender.map((x) => ({
                 key: x.code,
                 label: x.name,
-                amount: formatMoney(x.amount, m),
+                cells: [formatMoney(x.amount, m)],
               }))}
             />
           </div>
@@ -547,19 +547,19 @@ export function OverridesScreen({ api, permissions = [] }: { api: Api; permissio
           />
           <div className="flex flex-wrap gap-3">
             <Totals
+              columns={[t('reports.ovr.list')]}
               title={t('reports.ovr.byRequester')}
-              count={t('reports.ovr.list')}
-              rows={report.byRequester.map((x) => ({ key: x.name, label: x.name, count: x.count }))}
+              rows={report.byRequester.map((x) => ({ key: x.name, label: x.name, cells: [x.count] }))}
             />
             <Totals
+              columns={[t('reports.ovr.list')]}
               title={t('reports.ovr.byApprover')}
-              count={t('reports.ovr.list')}
-              rows={report.byApprover.map((x) => ({ key: x.name, label: x.name, count: x.count }))}
+              rows={report.byApprover.map((x) => ({ key: x.name, label: x.name, cells: [x.count] }))}
             />
             <Totals
+              columns={[t('reports.ovr.list')]}
               title={t('reports.ovr.byKind')}
-              count={t('reports.ovr.list')}
-              rows={report.byKind.map((x) => ({ key: x.kind, label: kindName(t, x.kind), count: x.count }))}
+              rows={report.byKind.map((x) => ({ key: x.kind, label: kindName(t, x.kind), cells: [x.count] }))}
             />
           </div>
         </>
@@ -713,30 +713,26 @@ export function VoidsReturnsScreen({ api, permissions = [] }: { api: Api; permis
         <>
           <div className="flex flex-wrap gap-3">
             <Totals
+              columns={[t('reports.vr.voids')]}
               title={t('reports.vr.voidsByReason')}
-              count={t('reports.vr.voids')}
-              rows={report.voidsByReason.map((x) => ({ key: x.reason, label: x.reason, count: x.count }))}
+              rows={report.voidsByReason.map((x) => ({ key: x.reason, label: x.reason, cells: [x.count] }))}
             />
             <Totals
+              columns={[t('reports.vr.returns'), t('reports.col.amount')]}
               title={t('reports.vr.returnsByReason')}
-              count={t('reports.vr.returns')}
-              amount={t('reports.col.amount')}
               rows={report.returnsByReason.map((x) => ({
                 key: x.reason,
                 label: x.reason,
-                count: x.count,
-                amount: formatMoney(x.amount, m),
+                cells: [x.count, formatMoney(x.amount, m)],
               }))}
             />
             <Totals
+              columns={[t('reports.vr.returns'), t('reports.col.amount')]}
               title={t('reports.vr.returnsByCondition')}
-              count={t('reports.vr.returns')}
-              amount={t('reports.col.amount')}
               rows={report.returnsByCondition.map((x) => ({
                 key: x.condition,
                 label: t(`reports.vr.condition.${x.condition}`),
-                count: x.count,
-                amount: formatMoney(x.amount, m),
+                cells: [x.count, formatMoney(x.amount, m)],
               }))}
             />
           </div>
@@ -784,123 +780,177 @@ export function VoidsReturnsScreen({ api, permissions = [] }: { api: Api; permis
 
 // ---- Stock and valuation (RPT-05, owner answer 7) ----
 
+/**
+ * A text the server searches (beyond the lines a list can hold): typed here, put in the address once typing stops,
+ * and back to the address's on Back.
+ */
+function SearchFilter({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [text, setText] = useState(value);
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    setText(value);
+  }
+  const latest = useRef(onChange);
+  useEffect(() => {
+    latest.current = onChange;
+  });
+  useEffect(() => {
+    if (text.trim() === value) return;
+    const id = setTimeout(() => latest.current(text.trim()), 300);
+    return () => clearTimeout(id);
+  }, [text, value]);
+  return (
+    <TextField
+      type="search"
+      label={label}
+      value={text}
+      wrapperClassName="gap-1"
+      className="h-9 w-64"
+      onChange={(e) => setText(e.target.value)}
+    />
+  );
+}
+
 export function StockReportScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
-  const [text, setText] = useState('');
-  const [below, setBelow] = useState(false);
-  const url = `/api/reports/stock?q=${encodeURIComponent(text.trim())}${below ? '&below=1' : ''}`;
-  const { report, error } = useOldReport<StockView>(api, url);
+  const [filters, setFilters] = useFilters('stockReport');
+  const text = filters['q'] ?? '';
+  const below = filters['below'] === '1';
+  const url = `/api/reports/stock?${apiQuery({ q: text, ...(below ? { below: '1' } : {}) })}`;
+  const { report, error } = useReport<StockView>(api, url);
+  const m = report?.money;
+  const set = (next: Filters) => setFilters(only({ ...current(filters), ...next }, ['q', 'below']));
+  const values = report?.values === true;
+  const columns: ListColumn<StockRow>[] = m
+    ? [
+        {
+          key: 'item',
+          label: t('reports.col.item'),
+          sort: (x) => x.itemCode,
+          cell: (x) => (
+            <a href={href.stockCard(x.itemId)} className="underline-offset-4 hover:underline">
+              <span className="font-mono">{x.itemCode}</span> {x.itemName}
+            </a>
+          ),
+        },
+        {
+          key: 'category',
+          label: t('reports.stock.category'),
+          sort: (x) => x.categoryName ?? '',
+          cell: (x) => x.categoryName ?? '—',
+        },
+        {
+          key: 'location',
+          label: t('reports.stock.location'),
+          sort: (x) => x.locationCode,
+          cell: (x) => x.locationCode,
+        },
+        {
+          key: 'qty',
+          label: t('reports.col.qty'),
+          end: true,
+          sort: (x) => x.qty,
+          cell: (x) => <span className={x.qty < 0 ? 'text-bad' : undefined}>{qtyText(x.qty)}</span>,
+        },
+        ...(values
+          ? [
+              {
+                key: 'avgCost',
+                label: t('reports.stock.avgCost'),
+                end: true,
+                sort: (x: StockRow) => x.avgCost ?? -Infinity,
+                cell: (x: StockRow) =>
+                  x.avgCost === null ? t('reports.stock.noCostShort') : money(x.avgCost, m),
+              },
+              {
+                key: 'value',
+                label: t('reports.stock.value'),
+                end: true,
+                sort: (x: StockRow) => x.value ?? -Infinity,
+                cell: (x: StockRow) => money(x.value, m),
+              },
+            ]
+          : []),
+      ]
+    : [];
+  const breakdown = (rows: { key: string; label: string; qty: number; value: number | null }[]) =>
+    rows.map((x) => ({
+      key: x.key,
+      label: x.label,
+      cells: [qtyText(x.qty), ...(values && m ? [money(x.value, m)] : [])],
+    }));
+  const headings = [t('reports.stock.onHand'), ...(values ? [t('reports.stock.value')] : [])];
   return (
-    <>
-      <PageHeader title={t('reports.stock.title')} help={t('reports.stock.help')} />
-      <Panel className="flex flex-wrap items-end gap-4 p-3.5">
-        <TextField label={t('reports.stock.search')} value={text} onChange={(e) => setText(e.target.value)} />
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={below} onChange={(e) => setBelow(e.target.checked)} />
-          {t('reports.stock.below')}
-        </label>
-        {report && (
-          <Button asChild variant="outline">
-            <a href={`${url}&format=csv`}>{t('reports.csv')}</a>
-          </Button>
-        )}
-      </Panel>
-      <Failed text={error} />
-      {report && (
+    <ReportPage
+      title={t('reports.stock.title')}
+      help={t('reports.stock.help')}
+      filters={
         <>
-          <Panel className="flex flex-wrap gap-6 p-3.5">
-            <span>
-              <span className={LABEL_CLASS}>{t('reports.stock.onHand')}</span>{' '}
-              <span className="font-semibold tabular-nums">{qtyText(report.total.qty)}</span>
-            </span>
-            {report.values && (
-              <span>
-                <span className={LABEL_CLASS}>{t('reports.stock.value')}</span>{' '}
-                <span className="font-semibold tabular-nums">{money(report.total.value, report.money)}</span>
-              </span>
-            )}
-            {report.noCost > 0 && (
-              <span className="text-warn">{t('reports.stock.noCost', { count: report.noCost })}</span>
-            )}
-          </Panel>
-          <div className="grid gap-2.5 lg:grid-cols-2">
-            {(
-              [
-                [
-                  'byLocation',
-                  report.byLocation.map((x) => ({ key: x.code, label: x.name, qty: x.qty, value: x.value })),
-                ],
-                [
-                  'byCategory',
-                  report.byCategory.map((x) => ({
-                    key: x.name,
-                    label: x.name || '—',
-                    qty: x.qty,
-                    value: x.value,
-                  })),
-                ],
-              ] as const
-            ).map(([key, rows]) => (
-              <Panel key={key} title={t(`reports.stock.${key}`)} className="pb-2">
-                <Table aria-label={t(`reports.stock.${key}`)}>
-                  <TableBody>
-                    {rows.map((x) => (
-                      <TableRow key={x.key}>
-                        <TableCell>{x.label}</TableCell>
-                        <Num>{qtyText(x.qty)}</Num>
-                        {report.values && <Num>{money(x.value, report.money)}</Num>}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Panel>
-            ))}
+          <SearchFilter label={t('reports.stock.search')} value={text} onChange={(v) => set({ q: v })} />
+          <div className="flex h-9 items-center gap-2">
+            <Checkbox
+              id="stock-below"
+              checked={below}
+              onCheckedChange={(c) => set({ below: c === true ? '1' : '' })}
+            />
+            <Label htmlFor="stock-below">{t('reports.stock.below')}</Label>
           </div>
-          <Panel title={t('reports.stock.list')} className="overflow-x-auto">
-            <Table aria-label={t('reports.stock.list')}>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('reports.col.item')}</TableHead>
-                  <TableHead>{t('reports.stock.category')}</TableHead>
-                  <TableHead>{t('reports.stock.location')}</TableHead>
-                  <TableHead className="text-end">{t('reports.col.qty')}</TableHead>
-                  {report.values && <TableHead className="text-end">{t('reports.stock.avgCost')}</TableHead>}
-                  {report.values && <TableHead className="text-end">{t('reports.stock.value')}</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {report.rows.map((x) => (
-                  <TableRow key={`${x.itemId}-${x.locationCode}`}>
-                    <TableCell>
-                      <a href={href.stockCard(x.itemId)} className="underline-offset-4 hover:underline">
-                        <span className="font-mono">{x.itemCode}</span> {x.itemName}
-                      </a>
-                    </TableCell>
-                    <TableCell>{x.categoryName ?? '—'}</TableCell>
-                    <TableCell>{x.locationCode}</TableCell>
-                    <TableCell className={`text-end tabular-nums ${x.qty < 0 ? 'text-bad' : ''}`}>
-                      {qtyText(x.qty)}
-                    </TableCell>
-                    {report.values && (
-                      <Num>
-                        {x.avgCost === null ? t('reports.stock.noCostShort') : money(x.avgCost, report.money)}
-                      </Num>
-                    )}
-                    {report.values && <Num>{money(x.value, report.money)}</Num>}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {report.rows.length === 0 && (
-              <p className="m-0 p-3.5 text-muted-foreground">{t('reports.none')}</p>
-            )}
-            {report.truncated && (
-              <p className="m-0 p-3.5 text-muted-foreground">{t('reports.stock.truncated')}</p>
-            )}
-          </Panel>
+        </>
+      }
+      printFilters={[text, below ? t('reports.stock.below') : ''].filter(Boolean).join(' · ')}
+      csv={report && `${url}&format=csv`}
+      error={error}
+      loading={report === null && error === null}
+      figures={
+        report && m
+          ? [
+              { key: 'qty', label: t('reports.stock.onHand'), value: qtyText(report.total.qty) },
+              ...(values
+                ? [{ key: 'value', label: t('reports.stock.value'), value: money(report.total.value, m) }]
+                : []),
+            ]
+          : []
+      }
+    >
+      {report && m && (
+        <>
+          {report.noCost > 0 && (
+            <p className="m-0 text-sm text-warn">{t('reports.stock.noCost', { count: report.noCost })}</p>
+          )}
+          {report.truncated && (
+            <p className="m-0 text-sm text-muted-foreground">{t('reports.stock.truncated')}</p>
+          )}
+          <ListTable
+            label={t('reports.stock.list')}
+            columns={columns}
+            rows={report.rows}
+            rowKey={(x) => `${x.itemId}-${x.locationCode}`}
+            text={(x) => `${x.itemCode} ${x.itemName} ${x.categoryName ?? ''} ${x.locationCode}`}
+          />
+          <div className="flex flex-wrap gap-3">
+            <Totals
+              title={t('reports.stock.byLocation')}
+              columns={headings}
+              rows={breakdown(report.byLocation.map((x) => ({ ...x, key: x.code, label: x.name })))}
+            />
+            <Totals
+              title={t('reports.stock.byCategory')}
+              columns={headings}
+              rows={breakdown(report.byCategory.map((x) => ({ ...x, key: x.name, label: x.name || '—' })))}
+            />
+          </div>
         </>
       )}
-    </>
+    </ReportPage>
   );
 }
 
