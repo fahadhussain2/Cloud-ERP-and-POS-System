@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#179](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/179) |
 | **Module** | reports (back-office screens and API, read only; one index migration) |
-| **Status** | Owner answers given (2026-11-19): questions 1–7 as recommended, **question 8 against the recommendation** (the built reports move onto the frame in W2-04 if time allows). Waiting for acceptance |
+| **Status** | Accepted (owner, 2026-11-19): questions 1–7 as recommended, **question 8 against the recommendation** (the built reports move onto the frame in W2-04 if time allows) |
 | **Refs** | RPT-16, RPT-17, ACC-07 (cash flow); CLAUDE.md rules 1, 3, 4, 5, 10; D-085 (no limit = null), D-100 (no legacy bills), D-110 (reports read the ledgers), D-116 (reports before go-live), D-117 (the business date); PLT-08 (the audit log) |
 | **Depends on** | W2-01 (the frame, periods, the Reports home, the cash book), W1-20 (ageing and its FIFO rule, `ageBalances`), W1-22 and W1-16 (the customer and supplier screens with their ledgers), W1-11 (counter collections and cash-outs), W1-19 (bank receipts, payments, expenses, transfers, vouchers) |
 | **Size** | about 3 days: domain golden files ½; API with integration tests 1; screens and the statement's print 1; e2e and docs ½. **Plus about 1 day if time allows** to move the built reports onto the frame (answer 8) |
