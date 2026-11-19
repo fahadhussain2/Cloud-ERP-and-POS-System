@@ -718,12 +718,13 @@ describe('overdue and over the limit (RPT-17, owner answer 4)', () => {
       ['BUTT', CAN, daysAgo(45), 45],
     ]);
     const all = await view<OverdueView>('/api/reports/overdue?days=0');
+    // The most overdue first.
     expect(all.rows.map((r) => [r.code, r.overdue, r.oldestLate])).toEqual([
-      ['KHAN', 110000, 10],
       ['BUTT', CAN, 45],
+      ['KHAN', 110000, 10],
     ]);
-    expect(all.rows[0]!.lastPayment).toEqual({ date: today(), amount: 50000 });
-    expect(all.rows[0]).toMatchObject({ limit: 120000, termsDays: 30, phones: ['0300 1234567'] });
+    expect(all.rows[1]!.lastPayment).toEqual({ date: today(), amount: 50000 });
+    expect(all.rows[1]).toMatchObject({ limit: 120000, termsDays: 30, phones: ['0300 1234567'] });
     expect((await send('GET', '/api/reports/overdue?days=7', 'fahad')).statusCode).toBe(400);
   });
 

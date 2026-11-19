@@ -14,7 +14,7 @@ import {
   type VoidsReturnsView,
 } from '@erp/contracts';
 import { withTenant } from '@erp/db';
-import { ageBalances, can, registerTotals, type Permission } from '@erp/domain';
+import { ageBalances, can, registerTotals, withoutVoidedBills, type Permission } from '@erp/domain';
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
 import type pg from 'pg';
 
@@ -595,19 +595,32 @@ export function registerReportViews(scope: FastifyInstance, { pool, now, require
         entry_date: string;
         due_date: string;
         amount: string;
+        source_type: string;
+        source_id: string;
+        void_of: string | null;
       }>(
-        `SELECT party_id, entry_date::text, due_date::text, amount FROM erp.party_ledger_entries
-         WHERE role = $1 AND entry_date <= $2 ORDER BY party_id, due_date, entry_date`,
+        `SELECT e.party_id, e.entry_date::text, e.due_date::text, e.amount, e.source_type, e.source_id,
+           v.sale_document_id AS void_of
+         FROM erp.party_ledger_entries e
+         LEFT JOIN erp.sales_voids v ON e.source_type = 'sales_void' AND v.id = e.source_id
+         WHERE e.role = $1 AND e.entry_date <= $2 ORDER BY e.party_id, e.due_date, e.entry_date`,
         [role, asOf],
       );
+      // A void cancels its own bill, not the oldest one: the pair is taken out before credits settle the oldest
+      // debits first (W2-04, found while building; the pair nets to nothing on the bill's own day).
       const aged = ageBalances({
         asOf,
-        entries: entries.rows.map((e) => ({
-          partyId: e.party_id,
-          entryDate: e.entry_date,
-          dueDate: e.due_date,
-          amount: Number(e.amount),
-        })),
+        entries: withoutVoidedBills(
+          entries.rows.map((e) => ({
+            partyId: e.party_id,
+            entryDate: e.entry_date,
+            dueDate: e.due_date,
+            amount: Number(e.amount),
+            kind: e.source_type,
+            sourceId: e.source_id,
+            voidOf: e.void_of,
+          })),
+        ),
       });
       const parties = await c.query<{ id: string; code: string; name: string; terms: number | null }>(
         side === 'customers'

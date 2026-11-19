@@ -216,6 +216,23 @@ async function itemsOf(c: Client, ids: string[]): Promise<Map<string, StatementI
   return out;
 }
 
+/**
+ * A party's entries as the ageing settles them: a voided bill and its void taken out (they net to nothing on the
+ * bill's day), so the void cancels its own bill rather than the oldest one.
+ */
+const settling = (partyId: string, rows: readonly EntryRow[]) =>
+  withoutVoidedBills(
+    rows.map((r) => ({
+      partyId,
+      entryDate: r.entry_date,
+      dueDate: r.due_date,
+      amount: num(r.amount),
+      kind: r.source_type,
+      sourceId: r.source_id,
+      voidOf: r.void_of,
+    })),
+  );
+
 /** One party's ledger over the period from its entries up to `to` (owner answers 1 and 2). */
 function ledgerBody(
   party: PartyView,
@@ -240,15 +257,7 @@ function ledgerBody(
     opening,
     entries: statement ? withoutVoidedBills(inRange) : inRange,
   });
-  const aged = ageBalances({
-    asOf: p.to,
-    entries: rows.map((r) => ({
-      partyId: party.id,
-      entryDate: r.entry_date,
-      dueDate: r.due_date,
-      amount: num(r.amount),
-    })),
-  });
+  const aged = ageBalances({ asOf: p.to, entries: settling(party.id, rows) });
   return {
     party,
     opening: ledger.opening,
@@ -499,11 +508,7 @@ export function registerPartnerReports(scope: FastifyInstance, { pool, now, requ
       for (const r of rows) byParty.set(r.party_id, [...(byParty.get(r.party_id) ?? []), r]);
       const late = [...byParty.entries()]
         .map(([id, es]) => {
-          const o = overdueOf({
-            asOf,
-            days,
-            entries: es.map((e) => ({ entryDate: e.entry_date, dueDate: e.due_date, amount: num(e.amount) })),
-          });
+          const o = overdueOf({ asOf, days, entries: settling(id, es) });
           const paid = es.filter((e) => ['payment', 'customer_receipt'].includes(e.source_type)).at(-1);
           return {
             id,
