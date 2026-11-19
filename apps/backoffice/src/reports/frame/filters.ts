@@ -54,6 +54,9 @@ export function useFilters(report: string): [Filters, (next: Filters) => void] {
       const to = withQuery(baseOf(window.location.hash), next);
       remember(report, to.includes('?') ? to.slice(to.indexOf('?') + 1) : '');
       window.location.hash = to;
+      // Drawn from the new address at once: the browser's hashchange comes later, and a box or a choice must not look
+      // unchanged until it does.
+      setHash(window.location.hash);
     },
     [report],
   );
