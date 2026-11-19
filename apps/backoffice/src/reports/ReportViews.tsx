@@ -4,6 +4,7 @@ import type {
   ExceptionRow,
   ExceptionsView,
   OverridesView,
+  RegisterRow,
   SalesRegisterView,
   StockView,
   VoidsReturnsView,
@@ -31,10 +32,24 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { qtyText } from '../catalog/data';
-import { href, navigate } from '../router';
+import { href, navigate, queryOf } from '../router';
 import { DateField } from '../screens/ReportsScreens';
 import { useShopToday } from '../shopDay';
 import { FormDialog } from '../staff/dialogs';
+import { apiQuery, useFilters, type Filters } from './frame/filters';
+import {
+  DAY_PRESETS,
+  datesOn,
+  ListTable,
+  PeriodFilter,
+  periodOf,
+  periodQuery,
+  periodWords,
+  ReportPage,
+  useReport,
+  type ListColumn,
+  type PeriodValue,
+} from './frame/ReportFrame';
 
 // The W1-20 reports and support screens (RPT-01, RPT-03, RPT-04, RPT-05, RPT-06, RPT-10, PLT-12, D-110): filters at
 // the top, totals, then the list, and Download CSV (owner answer 2). Read only, except an exception's review. Values
@@ -43,7 +58,11 @@ import { FormDialog } from '../staff/dialogs';
 type Money = SalesRegisterView['money'];
 
 /** Fetches a report whenever its address changes; null while loading or after a refusal (with the words for it). */
-function useReport<T>(api: Api, url: string | null, version = 0): { report: T | null; error: string | null } {
+function useOldReport<T>(
+  api: Api,
+  url: string | null,
+  version = 0,
+): { report: T | null; error: string | null } {
   const { t } = useTranslation();
   const [state, setState] = useState<{ url: string | null; report: T | null; error: string | null }>({
     url: null,
@@ -118,7 +137,7 @@ const money = (v: number | null, m: Money) => (v === null ? '—' : formatMoney(
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 /** A small table of totals: a name, a count, an amount. */
-function Totals({
+function OldTotals({
   title,
   rows,
   m,
@@ -159,122 +178,287 @@ const useRange = (api: Api) => {
   return { from, to, setFrom, setTo, query: `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` };
 };
 
+/// ---- On the report frame (W2-04 answer 8): the dates on the shop's business date, the totals, a bill's link ----
+
+/** The filters now: the address's (two quick changes), else the ones the screen was drawn with. */
+function current(filters: Filters): Filters {
+  const q = queryOf(window.location.hash);
+  return q.size > 0 ? Object.fromEntries(q) : filters;
+}
+
+/** Only the filters a screen keeps, without empty ones. */
+const only = (f: Filters, keys: readonly string[]): Filters =>
+  Object.fromEntries(keys.filter((k) => f[k]).map((k) => [k, f[k]!]));
+
+/**
+ * A W1 report's period, in its address: a preset worked out on the shop's business date (D-117: today unless said),
+ * or two dates, which are never remembered, so the report opens on the business date again next time. `dates` is
+ * null until the business date is known.
+ */
+function useDays(api: Api, report: string, keys: readonly string[], fallback = 'today') {
+  const [filters, setFilters] = useFilters(report, { forget: ['from', 'to'] });
+  const today = useShopToday(api);
+  const period = periodOf(filters, fallback);
+  const dates = 'from' in period ? period : today === null ? null : datesOn(period, today);
+  const all = ['preset', 'from', 'to', ...keys];
+  return {
+    filters,
+    period,
+    dates,
+    set: (next: Filters) => setFilters(only({ ...periodQuery(period), ...current(filters), ...next }, all)),
+    setPeriod: (p: PeriodValue) =>
+      setFilters(
+        only(
+          {
+            ...current(filters),
+            from: '',
+            to: '',
+            preset: '',
+            ...periodQuery(p),
+          },
+          all,
+        ),
+      ),
+  };
+}
+type Days = ReturnType<typeof useDays>;
+
+/** The period filter of a W1 report: the presets it works out itself, then two dates. */
+function DaysFilter({ days }: { days: Days }) {
+  return (
+    <PeriodFilter value={days.period} shown={days.dates} onChange={days.setPeriod} presets={DAY_PRESETS} />
+  );
+}
+
+/** A small table of totals: a name, and a count and an amount when it has them. */
+function Totals({
+  title,
+  rows,
+  count,
+  amount,
+}: {
+  title: string;
+  rows: { key: string; label: string; count?: number; amount?: ReactNode }[];
+  /** The count column's heading. */
+  count?: string;
+  /** The amount column's heading. */
+  amount?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Panel className="min-w-64 flex-1 px-1.5 pb-1.5 break-inside-avoid">
+      <Table aria-label={title}>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{title}</TableHead>
+            {count && <TableHead className="text-end">{count}</TableHead>}
+            {amount && <TableHead className="text-end">{amount}</TableHead>}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((r) => (
+            <TableRow key={r.key}>
+              <TableCell>{r.label}</TableCell>
+              {count && <Num>{r.count}</Num>}
+              {amount && <Num>{r.amount}</Num>}
+            </TableRow>
+          ))}
+          {rows.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={3} className="text-muted-foreground">
+                {t('reports.none')}
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </Panel>
+  );
+}
+
+/** A counter bill's number, opening its trace for someone who may trace bills (PLT-12). */
+function BillNumber({ number, permissions }: { number: string; permissions: readonly string[] }) {
+  return permissions.includes('support.trace') ? (
+    <a href={href.trace(number)} className="underline-offset-4 hover:underline">
+      {number}
+    </a>
+  ) : (
+    <>{number}</>
+  );
+}
+
 // ---- Sales register (RPT-01, owner answer 3) ----
 
-export function SalesRegisterScreen({ api }: { api: Api }) {
+export function SalesRegisterScreen({
+  api,
+  permissions = [],
+}: {
+  api: Api;
+  permissions?: readonly string[];
+}) {
   const { t } = useTranslation();
-  const r = useRange(api);
-  const url = r.from && r.to ? `/api/reports/sales-register?${r.query}` : null;
+  const days = useDays(api, 'salesRegister', []);
+  const url = days.dates ? `/api/reports/sales-register?${apiQuery(days.dates)}` : null;
   const { report, error } = useReport<SalesRegisterView>(api, url);
-  return (
-    <>
-      <PageHeader title={t('reports.register.title')} help={t('reports.register.help')} />
-      <Range from={r.from} to={r.to} onFrom={r.setFrom} onTo={r.setTo} csv={report && `${url}&format=csv`} />
-      <Failed text={error} />
-      {report && (
-        <>
-          <Panel className="flex flex-wrap gap-6 p-3.5">
-            <span>
-              <span className={LABEL_CLASS}>{t('reports.register.bills')}</span>{' '}
-              <span className="font-semibold tabular-nums">{report.totals.bills}</span>
-            </span>
-            <span>
-              <span className={LABEL_CLASS}>{t('reports.register.total')}</span>{' '}
-              <span className="font-semibold tabular-nums">
-                {formatMoney(report.totals.total, report.money)}
+  const m = report?.money;
+  const columns: ListColumn<RegisterRow>[] = m
+    ? [
+        {
+          key: 'number',
+          label: t('reports.col.number'),
+          sort: (b) => b.number,
+          cell: (b) => {
+            const voided = b.status === 'voided';
+            return (
+              <span className="font-mono">
+                <span className={voided ? 'line-through' : undefined}>
+                  <BillNumber number={b.number} permissions={permissions} />
+                </span>
+                {b.kind !== 'sale' && (
+                  <span className="ms-2 inline-block">
+                    <StatusChip tone="neutral">{t(`reports.kind.${b.kind}`)}</StatusChip>
+                  </span>
+                )}
+                {voided && (
+                  <span className="ms-2 inline-block">
+                    <StatusChip tone="bad">
+                      {t('reports.register.voidedAs', {
+                        number: b.voidNumber ?? '',
+                      })}
+                    </StatusChip>
+                  </span>
+                )}
               </span>
+            );
+          },
+        },
+        {
+          key: 'time',
+          label: t('reports.col.time'),
+          sort: (b) => b.createdAt,
+          cell: (b) => `${b.businessDate} ${time(b.createdAt)}`,
+        },
+        {
+          key: 'counter',
+          label: t('reports.col.counter'),
+          sort: (b) => b.deviceCode,
+          cell: (b) => b.deviceCode,
+        },
+        {
+          key: 'salesman',
+          label: t('reports.col.salesman'),
+          sort: (b) => b.salespersonName,
+          cell: (b) => b.salespersonName,
+        },
+        {
+          key: 'customer',
+          label: t('reports.col.customer'),
+          sort: (b) => b.customerName ?? '',
+          cell: (b) => b.customerName ?? '—',
+        },
+        {
+          key: 'tenders',
+          label: t('reports.col.tenders'),
+          cell: (b) => b.payments.map((p) => `${p.methodName} ${formatMoney(p.amount, m)}`).join(' · '),
+        },
+        {
+          key: 'total',
+          label: t('reports.col.total'),
+          end: true,
+          sort: (b) => b.total,
+          cell: (b) => (
+            <span className={b.status === 'voided' ? 'text-muted-foreground line-through' : undefined}>
+              {formatMoney(b.total, m)}
             </span>
-            <span>
-              <span className={LABEL_CLASS}>{t('reports.register.voided')}</span>{' '}
-              <span className="font-semibold tabular-nums">{report.totals.voided}</span>
-            </span>
-          </Panel>
-          <div className="grid gap-2.5 lg:grid-cols-3">
+          ),
+        },
+      ]
+    : [];
+  return (
+    <ReportPage
+      title={t('reports.register.title')}
+      help={t('reports.register.help')}
+      filters={<DaysFilter days={days} />}
+      printFilters={periodWords(days.dates)}
+      csv={report && `${url}&format=csv`}
+      error={error}
+      loading={report === null && error === null}
+      figures={
+        report && m
+          ? [
+              {
+                key: 'bills',
+                label: t('reports.register.bills'),
+                value: report.totals.bills,
+              },
+              {
+                key: 'total',
+                label: t('reports.register.total'),
+                value: formatMoney(report.totals.total, m),
+              },
+              {
+                key: 'voided',
+                label: t('reports.register.voided'),
+                value: report.totals.voided,
+              },
+            ]
+          : []
+      }
+    >
+      {report && m && (
+        <>
+          <ListTable
+            label={t('reports.register.list')}
+            columns={columns}
+            rows={report.bills}
+            rowKey={(b) => b.id}
+            text={(b) =>
+              [
+                b.number,
+                b.voidNumber ?? '',
+                b.deviceCode,
+                b.salespersonName,
+                b.customerName ?? '',
+                ...b.payments.map((p) => p.methodName),
+              ].join(' ')
+            }
+          />
+          <div className="flex flex-wrap gap-3">
             <Totals
               title={t('reports.register.bySalesman')}
-              m={report.money}
-              rows={report.totals.bySalesperson.map((s) => ({
-                key: s.id,
-                label: s.name,
-                count: s.bills,
-                amount: s.total,
+              count={t('reports.register.bills')}
+              amount={t('reports.col.total')}
+              rows={report.totals.bySalesperson.map((x) => ({
+                key: x.id,
+                label: x.name,
+                count: x.bills,
+                amount: formatMoney(x.total, m),
               }))}
             />
             <Totals
               title={t('reports.register.byCounter')}
-              m={report.money}
-              rows={report.totals.byCounter.map((c) => ({
-                key: c.code,
-                label: c.code,
-                count: c.bills,
-                amount: c.total,
+              count={t('reports.register.bills')}
+              amount={t('reports.col.total')}
+              rows={report.totals.byCounter.map((x) => ({
+                key: x.code,
+                label: x.code,
+                count: x.bills,
+                amount: formatMoney(x.total, m),
               }))}
             />
             <Totals
               title={t('reports.register.byTender')}
-              m={report.money}
-              rows={report.totals.byTender.map((p) => ({ key: p.code, label: p.name, amount: p.amount }))}
+              amount={t('reports.col.amount')}
+              rows={report.totals.byTender.map((x) => ({
+                key: x.code,
+                label: x.name,
+                amount: formatMoney(x.amount, m),
+              }))}
             />
           </div>
-          <Panel title={t('reports.register.list')} className="overflow-x-auto">
-            <Table aria-label={t('reports.register.list')}>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('reports.col.number')}</TableHead>
-                  <TableHead>{t('reports.col.time')}</TableHead>
-                  <TableHead>{t('reports.col.counter')}</TableHead>
-                  <TableHead>{t('reports.col.salesman')}</TableHead>
-                  <TableHead>{t('reports.col.customer')}</TableHead>
-                  <TableHead>{t('reports.col.tenders')}</TableHead>
-                  <TableHead className="text-end">{t('reports.col.total')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {report.bills.map((b) => {
-                  const voided = b.status === 'voided';
-                  return (
-                    <TableRow key={b.id} className={voided ? 'text-muted-foreground' : undefined}>
-                      <TableCell className="font-mono">
-                        <span className={voided ? 'line-through' : undefined}>{b.number}</span>
-                        {b.kind !== 'sale' && (
-                          <span className="ms-2 inline-block">
-                            <StatusChip tone="neutral">{t(`reports.kind.${b.kind}`)}</StatusChip>
-                          </span>
-                        )}
-                        {voided && (
-                          <span className="ms-2 inline-block">
-                            <StatusChip tone="bad">
-                              {t('reports.register.voidedAs', { number: b.voidNumber ?? '' })}
-                            </StatusChip>
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {b.businessDate} {time(b.createdAt)}
-                      </TableCell>
-                      <TableCell>{b.deviceCode}</TableCell>
-                      <TableCell>{b.salespersonName}</TableCell>
-                      <TableCell>{b.customerName ?? '—'}</TableCell>
-                      <TableCell>
-                        {b.payments
-                          .map((p) => `${p.methodName} ${formatMoney(p.amount, report.money)}`)
-                          .join(' · ')}
-                      </TableCell>
-                      <TableCell className={`text-end tabular-nums ${voided ? 'line-through' : ''}`}>
-                        {formatMoney(b.total, report.money)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            {report.bills.length === 0 && (
-              <p className="m-0 p-3.5 text-muted-foreground">{t('reports.none')}</p>
-            )}
-          </Panel>
         </>
       )}
-    </>
+    </ReportPage>
   );
 }
 
@@ -284,7 +468,7 @@ export function OverridesScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
   const r = useRange(api);
   const url = r.from && r.to ? `/api/reports/overrides?${r.query}` : null;
-  const { report, error } = useReport<OverridesView>(api, url);
+  const { report, error } = useOldReport<OverridesView>(api, url);
   return (
     <>
       <PageHeader title={t('reports.ovr.title')} help={t('reports.ovr.help')} />
@@ -377,7 +561,7 @@ export function VoidsReturnsScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
   const r = useRange(api);
   const url = r.from && r.to ? `/api/reports/voids-returns?${r.query}` : null;
-  const { report, error } = useReport<VoidsReturnsView>(api, url);
+  const { report, error } = useOldReport<VoidsReturnsView>(api, url);
   return (
     <>
       <PageHeader title={t('reports.vr.title')} help={t('reports.vr.help')} />
@@ -386,7 +570,7 @@ export function VoidsReturnsScreen({ api }: { api: Api }) {
       {report && (
         <>
           <div className="grid gap-2.5 lg:grid-cols-3">
-            <Totals
+            <OldTotals
               title={t('reports.vr.voidsByReason')}
               m={report.money}
               rows={report.voidsByReason.map((x) => ({
@@ -396,7 +580,7 @@ export function VoidsReturnsScreen({ api }: { api: Api }) {
                 amount: null,
               }))}
             />
-            <Totals
+            <OldTotals
               title={t('reports.vr.returnsByReason')}
               m={report.money}
               rows={report.returnsByReason.map((x) => ({
@@ -406,7 +590,7 @@ export function VoidsReturnsScreen({ api }: { api: Api }) {
                 amount: x.amount,
               }))}
             />
-            <Totals
+            <OldTotals
               title={t('reports.vr.returnsByCondition')}
               m={report.money}
               rows={report.returnsByCondition.map((x) => ({
@@ -504,7 +688,7 @@ export function StockReportScreen({ api }: { api: Api }) {
   const [text, setText] = useState('');
   const [below, setBelow] = useState(false);
   const url = `/api/reports/stock?q=${encodeURIComponent(text.trim())}${below ? '&below=1' : ''}`;
-  const { report, error } = useReport<StockView>(api, url);
+  const { report, error } = useOldReport<StockView>(api, url);
   return (
     <>
       <PageHeader title={t('reports.stock.title')} help={t('reports.stock.help')} />
@@ -631,7 +815,7 @@ export function AgeingScreen({ api }: { api: Api }) {
   const [picked, setAsOf] = useState<string | null>(null);
   const asOf = picked ?? today;
   const url = asOf ? `/api/reports/ageing?side=${side}&asOf=${encodeURIComponent(asOf)}` : null;
-  const { report, error } = useReport<AgeingView>(api, url);
+  const { report, error } = useOldReport<AgeingView>(api, url);
   return (
     <>
       <PageHeader title={t('reports.ageing.title')} help={t('reports.ageing.help')} />
@@ -736,7 +920,7 @@ export function ExceptionsScreen({ api, permissions }: { api: Api; permissions: 
   const [reviewing, setReviewing] = useState<ExceptionRow | null>(null);
   const url =
     r.from && r.to ? `/api/reports/exceptions?${r.query}${status === 'open' ? '&status=open' : ''}` : null;
-  const { report, error } = useReport<ExceptionsView>(api, url, version);
+  const { report, error } = useOldReport<ExceptionsView>(api, url, version);
   const canReview = permissions.includes('exceptions.review');
   return (
     <>

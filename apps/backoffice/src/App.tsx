@@ -174,7 +174,7 @@ export function App({ api }: { api: Api }) {
         ) : shown.screen === 'cashVariance' ? (
           <CashVarianceScreen api={api} />
         ) : shown.screen === 'salesRegister' ? (
-          <SalesRegisterScreen api={api} />
+          <SalesRegisterScreen api={api} permissions={me.permissions} />
         ) : shown.screen === 'overridesReport' ? (
           <OverridesScreen api={api} />
         ) : shown.screen === 'voidsReturns' ? (

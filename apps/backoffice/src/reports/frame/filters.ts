@@ -31,9 +31,14 @@ const plain = (q: URLSearchParams): Filters => Object.fromEntries(q.entries());
 
 /**
  * The report's filters and a way to change them. Opening a report with no filters in its address brings back the
- * last ones used; changing them moves to a new address (so Back undoes it) and remembers them.
+ * last ones used; changing them moves to a new address (so Back undoes it) and remembers them. `forget` names filters
+ * that stay in the address but are never remembered: the W1 reports' dates, so they open on the shop's business date
+ * each time (D-117) while a preset, a branch or a side is remembered.
  */
-export function useFilters(report: string): [Filters, (next: Filters) => void] {
+export function useFilters(
+  report: string,
+  { forget = [] }: { forget?: readonly string[] } = {},
+): [Filters, (next: Filters) => void] {
   const [hash, setHash] = useState(() => window.location.hash);
   useEffect(() => {
     const follow = () => setHash(window.location.hash);
@@ -49,13 +54,16 @@ export function useFilters(report: string): [Filters, (next: Filters) => void] {
     if (saved) window.history.replaceState(null, '', `${baseOf(window.location.hash)}?${saved}`);
   }, [saved]);
 
+  const forgotten = forget.join(',');
   const set = useCallback(
     (next: Filters) => {
-      const to = withQuery(baseOf(window.location.hash), next);
-      remember(report, to.includes('?') ? to.slice(to.indexOf('?') + 1) : '');
-      window.location.hash = to;
+      const kept = Object.fromEntries(
+        Object.entries(next).filter(([k]) => !forgotten.split(',').includes(k)),
+      );
+      remember(report, withQuery('', kept).slice(1));
+      window.location.hash = withQuery(baseOf(window.location.hash), next);
     },
-    [report],
+    [report, forgotten],
   );
   return [plain(saved ? new URLSearchParams(saved) : query), set];
 }

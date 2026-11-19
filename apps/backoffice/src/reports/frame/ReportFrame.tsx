@@ -1,4 +1,4 @@
-import { PERIOD_PRESETS } from '@erp/domain';
+import { periodOf as presetDates, PERIOD_PRESETS, type PeriodPreset } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -23,6 +23,7 @@ import { createContext, useContext, useEffect, useId, useState, type ReactNode }
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api';
+import { addDays } from '../../shopDay';
 
 // The report frame (W2-01 plan; D-116): every report from here on is drawn with it. Filters at the top with date
 // presets, key figures, the list (sortable and searchable, or a statement with its groups and subtotals), drill-down
@@ -41,8 +42,15 @@ export const PrintProvider = PrintContext.Provider;
 
 // ---- Fetching ----
 
-/** Fetches a report whenever its address changes; null while loading or after a refusal (with the words for it). */
-export function useReport<T>(api: Api, url: string | null): { report: T | null; error: string | null } {
+/**
+ * Fetches a report whenever its address changes, or `version` does (after a change on the screen: a review, an
+ * acknowledgement); null while loading or after a refusal (with the words for it).
+ */
+export function useReport<T>(
+  api: Api,
+  url: string | null,
+  version = 0,
+): { report: T | null; error: string | null } {
   const { t } = useTranslation();
   const [state, setState] = useState<{ url: string | null; report: T | null; error: string | null }>({
     url: null,
@@ -68,7 +76,7 @@ export function useReport<T>(api: Api, url: string | null): { report: T | null; 
     return () => {
       live = false;
     };
-  }, [api, url, t]);
+  }, [api, url, version, t]);
   return state.url === url ? { report: state.report, error: state.error } : { report: null, error: null };
 }
 
@@ -272,10 +280,13 @@ export function PeriodFilter({
   value,
   shown,
   onChange,
+  presets = PERIOD_PRESETS,
 }: {
   value: PeriodValue;
   shown: { from: string; to: string } | null;
   onChange: (v: PeriodValue) => void;
+  /** The presets offered: all the API's, unless the screen works them out itself (`DAY_PRESETS`). */
+  presets?: readonly string[];
 }) {
   const { t } = useTranslation();
   const preset = 'preset' in value ? value.preset : 'custom';
@@ -287,7 +298,7 @@ export function PeriodFilter({
         label={t('reports.frame.period')}
         value={preset}
         options={[
-          ...PERIOD_PRESETS.map((p) => ({ value: p, label: t(`reports.frame.presets.${p}`) })),
+          ...presets.map((p) => ({ value: p, label: t(`reports.frame.presets.${p}`) })),
           { value: 'custom', label: t('reports.frame.presets.custom') },
         ]}
         onChange={(v) => onChange(v === 'custom' ? { from, to } : { preset: v })}
@@ -296,6 +307,28 @@ export function PeriodFilter({
       <DateFilter label={t('reports.frame.to')} value={to} onChange={(v) => onChange({ from, to: v })} />
     </>
   );
+}
+
+/**
+ * The presets a screen works out itself from the shop's business date, for the W1 reports whose APIs take two dates
+ * (W2-04 answer 8): those that need no fiscal year, and the week up to today (the cash variance's default, D-117).
+ */
+export const DAY_PRESETS = [
+  'today',
+  'yesterday',
+  'weekToToday',
+  'thisWeek',
+  'thisMonth',
+  'lastMonth',
+] as const;
+
+/** A period's two dates on the shop's business date `today`; an unknown preset is today. */
+export function datesOn(p: PeriodValue, today: string): { from: string; to: string } {
+  if ('from' in p) return { from: p.from, to: p.to };
+  if (p.preset === 'weekToToday') return { from: addDays(today, -7), to: today };
+  // None of these needs the fiscal year's first month.
+  const preset = (DAY_PRESETS as readonly string[]).includes(p.preset) ? (p.preset as PeriodPreset) : 'today';
+  return presetDates(preset, today, 1);
 }
 
 /** The period in words, for the printed header. */
@@ -453,6 +486,7 @@ export function ListTable<R>({
   text,
   footer,
   details,
+  empty,
 }: {
   label: string;
   columns: ListColumn<R>[];
@@ -464,6 +498,8 @@ export function ListTable<R>({
   footer?: ReactNode[];
   /** Rows shown under a row (a journal entry's lines). */
   details?: (r: R) => ReactNode;
+  /** What an empty list says, unless "Nothing in these dates". */
+  empty?: string;
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
@@ -528,7 +564,7 @@ export function ListTable<R>({
           {shown.length === 0 && (
             <TableRow>
               <TableCell colSpan={columns.length} className="text-muted-foreground">
-                {t('reports.none')}
+                {empty ?? t('reports.none')}
               </TableCell>
             </TableRow>
           )}

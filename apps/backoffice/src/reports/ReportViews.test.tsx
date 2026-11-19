@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Api } from '../api';
 import { i18n } from '../i18n';
 import en from '../locales/en.json';
-import { href, parseHash } from '../router';
+import { href, parseHash, queryOf } from '../router';
 import {
   AgeingScreen,
   ExceptionsScreen,
@@ -37,8 +37,14 @@ function fakeApi(answers: Record<string, unknown>) {
   return { api, calls };
 }
 const show = (ui: ReactElement) => render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
+beforeEach(() => {
+  localStorage.clear();
+  window.location.hash = '';
+});
 afterEach(cleanup);
 const r = en.reports;
+const calledWith = (calls: { path: string }[], prefix: string) =>
+  calls.map((c) => c.path).filter((p) => p.startsWith(prefix));
 
 describe('the report addresses', () => {
   it('open the report and support screens', () => {
@@ -100,9 +106,51 @@ describe('the sales register', () => {
     show(<SalesRegisterScreen api={fakeApi({ 'GET /api/reports/sales-register': view }).api} />);
     const list = await screen.findByRole('table', { name: r.register.list });
     const voided = within(list).getByText('S-C1-000002');
-    expect(voided.className).toContain('line-through');
+    expect(voided.closest('.line-through')).toBeTruthy();
     expect(within(list).getByText('Voided V-C1-000001')).toBeTruthy();
     expect(screen.getByRole('link', { name: r.csv }).getAttribute('href')).toContain('format=csv');
+    // The key figures are the server's, the voided bill left out (W2-04 answer 8: no figure moves).
+    const figures = screen.getByRole('region', { name: r.frame.figures });
+    expect(plain(figures.textContent ?? '')).toMatch(/Bills1Net salesRs 2,400Voided1/);
+    // No support.trace: the numbers are plain text.
+    expect(within(list).queryByRole('link')).toBeNull();
+  });
+
+  it("opens a bill's trace for someone who may trace, and narrows the bills by a search", async () => {
+    const view: SalesRegisterView = {
+      money: MONEY,
+      from: '2026-11-19',
+      to: '2026-11-19',
+      bills: ['S-C1-000001', 'S-C2-000009'].map((number, i) => ({
+        id: `b${i}`,
+        number,
+        kind: 'sale' as const,
+        status: 'finalized' as const,
+        businessDate: '2026-11-19',
+        createdAt: '2026-11-19T06:00:00.000Z',
+        deviceCode: i === 0 ? 'C1' : 'C2',
+        salespersonName: i === 0 ? 'Sara' : 'Bilal',
+        customerName: null,
+        total: 1000,
+        payments: [],
+        voidNumber: null,
+        voidReason: null,
+      })),
+      totals: { bills: 2, voided: 0, total: 2000, bySalesperson: [], byCounter: [], byTender: [] },
+    };
+    show(
+      <SalesRegisterScreen
+        api={fakeApi({ 'GET /api/reports/sales-register': view }).api}
+        permissions={['reports.view', 'support.trace']}
+      />,
+    );
+    const list = await screen.findByRole('table', { name: r.register.list });
+    expect(within(list).getByRole('link', { name: 'S-C1-000001' }).getAttribute('href')).toBe(
+      href.trace('S-C1-000001'),
+    );
+    fireEvent.change(screen.getByLabelText(r.frame.search), { target: { value: 'bilal' } });
+    expect(within(list).queryByText('S-C1-000001')).toBeNull();
+    expect(within(list).getByText('S-C2-000009')).toBeTruthy();
   });
 });
 
@@ -253,6 +301,54 @@ describe('Trace a bill', () => {
   it('says when no such bill is here', async () => {
     show(<TraceScreen api={fakeApi({}).api} number="S-X" />);
     expect(await screen.findByText('No bill S-X in this shop.')).toBeTruthy();
+  });
+});
+
+// W2-04 answer 8: the W1 reports on the frame keep a preset in the address and remember it, but never two dates, so
+// they open on the shop's business date again (D-117).
+describe('the dates of a W1 report on the frame', () => {
+  it('remember a preset, worked out on the business date, and forget two dates', async () => {
+    window.location.hash = href.salesRegister;
+    const f = fakeApi({});
+    show(<SalesRegisterScreen api={f.api} />);
+    await waitFor(() =>
+      expect(calledWith(f.calls, '/api/reports/sales-register')).toEqual([
+        '/api/reports/sales-register?from=2026-11-19&to=2026-11-19',
+      ]),
+    );
+    fireEvent.change(screen.getByLabelText(r.frame.period), { target: { value: 'weekToToday' } });
+    expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({ preset: 'weekToToday' });
+    await waitFor(() =>
+      expect(calledWith(f.calls, '/api/reports/sales-register')).toContain(
+        '/api/reports/sales-register?from=2026-11-12&to=2026-11-19',
+      ),
+    );
+    cleanup();
+
+    window.location.hash = href.salesRegister;
+    const again = fakeApi({});
+    show(<SalesRegisterScreen api={again.api} />);
+    await waitFor(() =>
+      expect(calledWith(again.calls, '/api/reports/sales-register')).toEqual([
+        '/api/reports/sales-register?from=2026-11-12&to=2026-11-19',
+      ]),
+    );
+    fireEvent.change(screen.getByLabelText(r.frame.from), { target: { value: '2026-11-01' } });
+    expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({
+      from: '2026-11-01',
+      to: '2026-11-19',
+    });
+    cleanup();
+
+    // Two dates stay in the address (a shared link), but the report opens on the business date again.
+    window.location.hash = href.salesRegister;
+    const third = fakeApi({});
+    show(<SalesRegisterScreen api={third.api} />);
+    await waitFor(() =>
+      expect(calledWith(third.calls, '/api/reports/sales-register')).toEqual([
+        '/api/reports/sales-register?from=2026-11-19&to=2026-11-19',
+      ]),
+    );
   });
 });
 
