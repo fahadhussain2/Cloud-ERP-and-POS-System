@@ -6,8 +6,10 @@ import type {
   OverrideRow,
   OverridesView,
   RegisterRow,
+  ReturnLineRow,
   SalesRegisterView,
   StockView,
+  VoidRow,
   VoidsReturnsView,
 } from '@erp/contracts';
 import {
@@ -136,38 +138,6 @@ const Num = ({ children }: { children: ReactNode }) => (
 );
 const money = (v: number | null, m: Money) => (v === null ? '—' : formatMoney(v, m));
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-/** A small table of totals: a name, a count, an amount. */
-function OldTotals({
-  title,
-  rows,
-  m,
-}: {
-  title: string;
-  rows: { key: string; label: string; count?: number; amount: number | null }[];
-  m: Money;
-}) {
-  const { t } = useTranslation();
-  return (
-    <Panel title={title} className="pb-2">
-      {rows.length === 0 ? (
-        <p className="m-0 px-3.5 text-muted-foreground">{t('reports.none')}</p>
-      ) : (
-        <Table aria-label={title}>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.key}>
-                <TableCell>{r.label}</TableCell>
-                {r.count !== undefined && <Num>{r.count}</Num>}
-                <Num>{money(r.amount, m)}</Num>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </Panel>
-  );
-}
 
 /** From and to: the shop's business date (W2-05) until other dates are picked. */
 const useRange = (api: Api) => {
@@ -602,127 +572,213 @@ const kindName = (t: TFunction, kind: string) => t(`reports.ovr.kinds.${kind}`, 
 
 // ---- Voids and returns (RPT-04) ----
 
-export function VoidsReturnsScreen({ api }: { api: Api }) {
+export function VoidsReturnsScreen({ api, permissions = [] }: { api: Api; permissions?: readonly string[] }) {
   const { t } = useTranslation();
-  const r = useRange(api);
-  const url = r.from && r.to ? `/api/reports/voids-returns?${r.query}` : null;
-  const { report, error } = useOldReport<VoidsReturnsView>(api, url);
+  const days = useDays(api, 'voidsReturns', []);
+  const url = days.dates ? `/api/reports/voids-returns?${apiQuery(days.dates)}` : null;
+  const { report, error } = useReport<VoidsReturnsView>(api, url);
+  const m = report?.money;
+  const bill = (number: string) => (
+    <span className="font-mono">
+      <BillNumber number={number} permissions={permissions} />
+    </span>
+  );
+  const voidColumns: ListColumn<VoidRow>[] = m
+    ? [
+        {
+          key: 'time',
+          label: t('reports.col.time'),
+          sort: (v) => v.at,
+          cell: (v) => `${v.businessDate} ${time(v.at)}`,
+        },
+        { key: 'number', label: t('reports.col.number'), sort: (v) => v.number, cell: (v) => bill(v.number) },
+        {
+          key: 'bill',
+          label: t('reports.vr.bill'),
+          sort: (v) => v.saleNumber,
+          cell: (v) => bill(v.saleNumber),
+        },
+        {
+          key: 'reason',
+          label: t('reports.col.reason'),
+          sort: (v) => v.reasonCode,
+          cell: (v) => (v.note ? `${v.reasonCode}: ${v.note}` : v.reasonCode),
+        },
+        {
+          key: 'voidedBy',
+          label: t('reports.vr.voidedBy'),
+          sort: (v) => v.voidedByName,
+          cell: (v) => v.voidedByName,
+        },
+        {
+          key: 'approvedBy',
+          label: t('reports.ovr.approvedBy'),
+          sort: (v) => v.approvedByName,
+          cell: (v) => v.approvedByName,
+        },
+        {
+          key: 'reissue',
+          label: t('reports.vr.reissue'),
+          sort: (v) => v.reissueNumber ?? '',
+          cell: (v) => (v.reissueNumber ? bill(v.reissueNumber) : '—'),
+        },
+        {
+          key: 'total',
+          label: t('reports.col.total'),
+          end: true,
+          sort: (v) => v.saleTotal ?? -Infinity,
+          cell: (v) => moneyOrDash(v.saleTotal, m),
+        },
+      ]
+    : [];
+  const returnColumns: ListColumn<ReturnLineRow & { n: number }>[] = m
+    ? [
+        {
+          key: 'date',
+          label: t('reports.col.date'),
+          sort: (x) => x.businessDate,
+          cell: (x) => x.businessDate,
+        },
+        {
+          key: 'number',
+          label: t('reports.col.number'),
+          sort: (x) => x.billNumber,
+          cell: (x) => bill(x.billNumber),
+        },
+        {
+          key: 'salesman',
+          label: t('reports.col.salesman'),
+          sort: (x) => x.salespersonName,
+          cell: (x) => x.salespersonName,
+        },
+        {
+          key: 'item',
+          label: t('reports.col.item'),
+          sort: (x) => x.itemCode,
+          cell: (x) => `${x.itemCode} ${x.itemName}`,
+        },
+        {
+          key: 'qty',
+          label: t('reports.col.qty'),
+          end: true,
+          sort: (x) => x.qty,
+          cell: (x) => qtyText(x.qty),
+        },
+        {
+          key: 'reason',
+          label: t('reports.col.reason'),
+          sort: (x) => x.reasonCode,
+          cell: (x) => x.reasonCode,
+        },
+        {
+          key: 'condition',
+          label: t('reports.vr.conditionTitle'),
+          sort: (x) => x.condition,
+          cell: (x) => t(`reports.vr.condition.${x.condition}`),
+        },
+        {
+          key: 'original',
+          label: t('reports.vr.original'),
+          sort: (x) => x.originalBillNumber ?? '',
+          cell: (x) => (x.originalBillNumber ? bill(x.originalBillNumber) : t('reports.vr.noReceipt')),
+        },
+        {
+          key: 'amount',
+          label: t('reports.col.amount'),
+          end: true,
+          sort: (x) => x.amount,
+          cell: (x) => formatMoney(x.amount, m),
+        },
+      ]
+    : [];
   return (
-    <>
-      <PageHeader title={t('reports.vr.title')} help={t('reports.vr.help')} />
-      <Range from={r.from} to={r.to} onFrom={r.setFrom} onTo={r.setTo} csv={report && `${url}&format=csv`} />
-      <Failed text={error} />
-      {report && (
+    <ReportPage
+      title={t('reports.vr.title')}
+      help={t('reports.vr.help')}
+      filters={<DaysFilter days={days} />}
+      printFilters={periodWords(days.dates)}
+      csv={report && `${url}&format=csv`}
+      error={error}
+      loading={report === null && error === null}
+      figures={
+        report
+          ? [
+              { key: 'voids', label: t('reports.vr.voids'), value: report.voids.length },
+              { key: 'returns', label: t('reports.vr.returns'), value: report.returns.length },
+            ]
+          : []
+      }
+    >
+      {report && m && (
         <>
-          <div className="grid gap-2.5 lg:grid-cols-3">
-            <OldTotals
+          <div className="flex flex-wrap gap-3">
+            <Totals
               title={t('reports.vr.voidsByReason')}
-              m={report.money}
-              rows={report.voidsByReason.map((x) => ({
-                key: x.reason,
-                label: x.reason,
-                count: x.count,
-                amount: null,
-              }))}
+              count={t('reports.vr.voids')}
+              rows={report.voidsByReason.map((x) => ({ key: x.reason, label: x.reason, count: x.count }))}
             />
-            <OldTotals
+            <Totals
               title={t('reports.vr.returnsByReason')}
-              m={report.money}
+              count={t('reports.vr.returns')}
+              amount={t('reports.col.amount')}
               rows={report.returnsByReason.map((x) => ({
                 key: x.reason,
                 label: x.reason,
                 count: x.count,
-                amount: x.amount,
+                amount: formatMoney(x.amount, m),
               }))}
             />
-            <OldTotals
+            <Totals
               title={t('reports.vr.returnsByCondition')}
-              m={report.money}
+              count={t('reports.vr.returns')}
+              amount={t('reports.col.amount')}
               rows={report.returnsByCondition.map((x) => ({
                 key: x.condition,
                 label: t(`reports.vr.condition.${x.condition}`),
                 count: x.count,
-                amount: x.amount,
+                amount: formatMoney(x.amount, m),
               }))}
             />
           </div>
-          <Panel title={t('reports.vr.voids')} className="overflow-x-auto">
-            <Table aria-label={t('reports.vr.voids')}>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('reports.col.time')}</TableHead>
-                  <TableHead>{t('reports.col.number')}</TableHead>
-                  <TableHead>{t('reports.vr.bill')}</TableHead>
-                  <TableHead>{t('reports.col.reason')}</TableHead>
-                  <TableHead>{t('reports.vr.voidedBy')}</TableHead>
-                  <TableHead>{t('reports.ovr.approvedBy')}</TableHead>
-                  <TableHead>{t('reports.vr.reissue')}</TableHead>
-                  <TableHead className="text-end">{t('reports.col.total')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {report.voids.map((v) => (
-                  <TableRow key={v.number}>
-                    <TableCell>
-                      {v.businessDate} {time(v.at)}
-                    </TableCell>
-                    <TableCell className="font-mono">{v.number}</TableCell>
-                    <TableCell className="font-mono">{v.saleNumber}</TableCell>
-                    <TableCell>{v.note ? `${v.reasonCode}: ${v.note}` : v.reasonCode}</TableCell>
-                    <TableCell>{v.voidedByName}</TableCell>
-                    <TableCell>{v.approvedByName}</TableCell>
-                    <TableCell className="font-mono">{v.reissueNumber ?? '—'}</TableCell>
-                    <Num>{money(v.saleTotal, report.money)}</Num>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {report.voids.length === 0 && (
-              <p className="m-0 p-3.5 text-muted-foreground">{t('reports.none')}</p>
-            )}
-          </Panel>
-          <Panel title={t('reports.vr.returns')} className="overflow-x-auto">
-            <Table aria-label={t('reports.vr.returns')}>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('reports.col.date')}</TableHead>
-                  <TableHead>{t('reports.col.number')}</TableHead>
-                  <TableHead>{t('reports.col.salesman')}</TableHead>
-                  <TableHead>{t('reports.col.item')}</TableHead>
-                  <TableHead className="text-end">{t('reports.col.qty')}</TableHead>
-                  <TableHead>{t('reports.col.reason')}</TableHead>
-                  <TableHead>{t('reports.vr.conditionTitle')}</TableHead>
-                  <TableHead>{t('reports.vr.original')}</TableHead>
-                  <TableHead className="text-end">{t('reports.col.amount')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {report.returns.map((x, i) => (
-                  <TableRow key={`${x.billNumber}-${i}`}>
-                    <TableCell>{x.businessDate}</TableCell>
-                    <TableCell className="font-mono">{x.billNumber}</TableCell>
-                    <TableCell>{x.salespersonName}</TableCell>
-                    <TableCell>
-                      {x.itemCode} {x.itemName}
-                    </TableCell>
-                    <Num>{qtyText(x.qty)}</Num>
-                    <TableCell>{x.reasonCode}</TableCell>
-                    <TableCell>{t(`reports.vr.condition.${x.condition}`)}</TableCell>
-                    <TableCell className="font-mono">
-                      {x.originalBillNumber ?? t('reports.vr.noReceipt')}
-                    </TableCell>
-                    <Num>{formatMoney(x.amount, report.money)}</Num>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {report.returns.length === 0 && (
-              <p className="m-0 p-3.5 text-muted-foreground">{t('reports.none')}</p>
-            )}
-          </Panel>
+          <h2 className="m-0 text-base font-semibold">{t('reports.vr.voids')}</h2>
+          <ListTable
+            label={t('reports.vr.voids')}
+            columns={voidColumns}
+            rows={report.voids}
+            rowKey={(v) => v.number}
+            text={(v) =>
+              [
+                v.number,
+                v.saleNumber,
+                v.reissueNumber ?? '',
+                v.reasonCode,
+                v.note ?? '',
+                v.voidedByName,
+                v.approvedByName,
+              ].join(' ')
+            }
+          />
+          <h2 className="m-0 text-base font-semibold">{t('reports.vr.returns')}</h2>
+          <ListTable
+            label={t('reports.vr.returns')}
+            columns={returnColumns}
+            // A bill can return the same item twice: each line keeps its place.
+            rows={report.returns.map((x, n) => ({ ...x, n }))}
+            rowKey={(x) => String(x.n)}
+            text={(x) =>
+              [
+                x.billNumber,
+                x.originalBillNumber ?? '',
+                x.salespersonName,
+                x.itemCode,
+                x.itemName,
+                x.reasonCode,
+              ].join(' ')
+            }
+          />
         </>
       )}
-    </>
+    </ReportPage>
   );
 }
 

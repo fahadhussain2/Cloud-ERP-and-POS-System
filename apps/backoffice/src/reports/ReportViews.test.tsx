@@ -5,6 +5,7 @@ import type {
   OverridesView,
   SalesRegisterView,
   StockView,
+  VoidsReturnsView,
 } from '@erp/contracts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
@@ -22,6 +23,7 @@ import {
   SalesRegisterScreen,
   StockReportScreen,
   TraceScreen,
+  VoidsReturnsScreen,
 } from './ReportViews';
 
 // The W1-20 report screens (D-110) over a fake API: the register's struck-through void, left out of the totals; the
@@ -201,6 +203,55 @@ describe('overrides', () => {
     expect(plain(row.textContent ?? '')).toMatch(/Rs 3,000.*Rs 2,800.*—$/);
     const byKind = screen.getByRole('table', { name: r.ovr.byKind });
     expect(plain(byKind.textContent ?? '')).toContain(`${r.ovr.kinds.below_list}1`);
+  });
+});
+
+describe('voids and returns', () => {
+  it('lists the voids with the bill issued in their place, and two equal returned lines both', async () => {
+    const line = {
+      billNumber: 'R-C1-000002',
+      businessDate: '2026-11-19',
+      salespersonName: 'Sara',
+      itemCode: 'OIL001',
+      itemName: 'ENGINE OIL 4L',
+      qty: 1000,
+      amount: 300000,
+      reasonCode: 'wrong_item',
+      condition: 'resellable' as const,
+      originalBillNumber: null,
+    };
+    const view: VoidsReturnsView = {
+      money: MONEY,
+      from: '2026-11-19',
+      to: '2026-11-19',
+      voids: [
+        {
+          number: 'V-C1-000001',
+          saleNumber: 'S-C1-000004',
+          businessDate: '2026-11-19',
+          at: '2026-11-19T08:00:00.000Z',
+          reasonCode: 'wrong_price',
+          note: null,
+          voidedByName: 'Sara',
+          approvedByName: 'Imran',
+          saleTotal: 450000,
+          reissueNumber: 'S-C1-000005',
+        },
+      ],
+      returns: [line, line],
+      voidsByReason: [{ reason: 'wrong_price', count: 1 }],
+      returnsByReason: [{ reason: 'wrong_item', count: 2, amount: 600000 }],
+      returnsByCondition: [{ condition: 'resellable', count: 2, amount: 600000 }],
+    };
+    show(<VoidsReturnsScreen api={fakeApi({ 'GET /api/reports/voids-returns': view }).api} />);
+    const voids = await screen.findByRole('table', { name: r.vr.voids });
+    expect(plain(within(voids).getAllByRole('row')[1]!.textContent ?? '')).toMatch(
+      /V-C1-000001S-C1-000004wrong_priceSaraImranS-C1-000005Rs 4,500/,
+    );
+    const returns = screen.getByRole('table', { name: r.vr.returns });
+    expect(within(returns).getAllByText(r.vr.noReceipt)).toHaveLength(2);
+    const byCondition = screen.getByRole('table', { name: r.vr.returnsByCondition });
+    expect(plain(byCondition.textContent ?? '')).toContain(`${r.vr.condition.resellable}2Rs 6,000`);
   });
 });
 
