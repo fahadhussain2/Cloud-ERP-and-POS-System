@@ -289,7 +289,7 @@ describe('the cash desk screen', () => {
       </I18nextProvider>
     );
     const { rerender } = render(screenWith(0));
-    fireEvent.click((await screen.findByText('C03-S000416')).closest('tr'));
+    fireEvent.click((await screen.findByText('C03-S000416')).closest('tr')!);
     queue = [bill('C01-S000100', 'ali', 517500), ...queue];
     rerender(screenWith(1));
     await screen.findByText('C01-S000100');
@@ -554,7 +554,7 @@ describe('collections, cash-out and the count (W1-11)', { timeout: 15_000 }, () 
     expect(approval.queryByRole('button', { name: /^Ali/ })).toBeNull();
     fireEvent.click(approval.getByRole('button', { name: /Imran/ }));
     fireEvent.change(approval.getByLabelText(/PIN/), { target: { value: '1234' } });
-    fireEvent.submit(approval.getByLabelText(/PIN/).closest('form'));
+    fireEvent.submit(approval.getByLabelText(/PIN/).closest('form')!);
     await screen.findByText(/given back for C03-S000051 \(D01-M000012\)/);
     expect(f.desk()).toEqual(['give back C03-S000051 approved by imran']);
     expect(f.printed()).toEqual(['cash_out D01-M000012']);
