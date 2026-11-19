@@ -891,3 +891,132 @@ describe('who may read them', () => {
     expect((await send('GET', `/api/reports/balance-trend?role=supplier`, 'viewer')).statusCode).toBe(403);
   });
 });
+
+describe('a year of a busy shop', () => {
+  it('answers each report in under 2 s, and 131 statements in under 5 s', async () => {
+    // Straight into the other shop's books: 300 cash bills a day, 100 bills a day on 131 customers' accounts, 10
+    // collections a day, and 500,000 audit rows (catalog edits) over the year.
+    const owner = new pg.Client({ connectionString: db.ownerUrl });
+    await owner.connect();
+    try {
+      await owner.query('BEGIN');
+      await owner.query("SELECT set_config('app.tenant_id', $1, true)", [otherId]);
+      const one = async (sql: string) => (await owner.query<{ id: string }>(sql, [otherId])).rows[0]!.id;
+      const branch = await one('SELECT id FROM erp.branches WHERE tenant_id = $1');
+      const tier = await one("SELECT id FROM erp.price_tiers WHERE tenant_id = $1 AND code = 'RETAIL'");
+      const user = await one('SELECT id FROM erp.users WHERE tenant_id = $1 LIMIT 1');
+      const drawer = await one(
+        "SELECT id FROM erp.accounts WHERE tenant_id = $1 AND system_role = 'CASH_DRAWER'",
+      );
+      const sales = await one("SELECT id FROM erp.accounts WHERE tenant_id = $1 AND system_role = 'SALES'");
+      const ar = await one("SELECT id FROM erp.accounts WHERE tenant_id = $1 AND system_role = 'AR_CONTROL'");
+      await owner.query(
+        `INSERT INTO erp.parties (tenant_id, code, name, created_at, updated_at, row_version, txid)
+         SELECT $1::uuid, 'C' || lpad(g::text, 4, '0'), 'Customer ' || g, now(), now(), 1, pg_current_xact_id()
+         FROM generate_series(1, 131) g`,
+        [otherId],
+      );
+      await owner.query(
+        `INSERT INTO erp.customer_accounts (tenant_id, party_id, price_tier_id, credit_allowed, credit_limit,
+           offline_daily_cap, created_at, updated_at, row_version, txid)
+         SELECT $1::uuid, p.id, $2::uuid, true, CASE WHEN p.code < 'C0045' THEN 5000000 END, 0, now(), now(), 1,
+           pg_current_xact_id()
+         FROM erp.parties p WHERE p.tenant_id = $1`,
+        [otherId, tier],
+      );
+      await owner.query(
+        `INSERT INTO erp.postings (tenant_id, seq, source_type, source_id, entry_date, posted_at, context)
+         SELECT $1::uuid, g + 1, 'opening', erp.uuid_v7(), current_date - 364 + g, now(), '{}'
+         FROM generate_series(0, 364) g`,
+        [otherId],
+      );
+      // 300 cash bills and 10 collections a day: one journal entry each.
+      await owner.query(
+        `CREATE TEMP TABLE gen_entries ON COMMIT DROP AS
+         SELECT erp.uuid_v7() AS id, n, (n - 1) / 310 AS day, ((n - 1) % 310) >= 300 AS collection
+         FROM generate_series(1, 365 * 310) n`,
+      );
+      await owner.query(
+        `INSERT INTO erp.journal_entries (id, tenant_id, number, entry_date, source_type, source_id, posting_seq,
+           posted_at)
+         SELECT g.id, $1, 'JG' || g.n, current_date - 364 + g.day, CASE WHEN g.collection THEN 'payment' ELSE 'sale' END,
+           erp.uuid_v7(), g.day + 1, now()
+         FROM gen_entries g`,
+        [otherId],
+      );
+      await owner.query(
+        `INSERT INTO erp.journal_lines (tenant_id, entry_id, line_no, account_id, party_id, branch_id, debit, credit)
+         SELECT $1::uuid, g.id, 1, $3::uuid, NULL::uuid, $2::uuid, 50000, 0 FROM gen_entries g
+         UNION ALL
+         SELECT $1::uuid, g.id, 2, CASE WHEN g.collection THEN $5::uuid ELSE $4::uuid END, NULL::uuid, $2::uuid, 0, 50000 FROM gen_entries g`,
+        [otherId, branch, drawer, sales, ar],
+      );
+      // 100 bills a day on account and the 10 collections, in the customers' sub-ledger.
+      await owner.query(
+        `INSERT INTO erp.party_ledger_entries (tenant_id, posting_seq, party_id, role, entry_date, due_date, amount,
+           source_type, source_id, posted_at)
+         SELECT $1::uuid, d + 1, p.id, 'customer', current_date - 364 + d, current_date - 364 + d,
+           CASE WHEN k < 100 THEN 50000 ELSE -400000 END, CASE WHEN k < 100 THEN 'sale' ELSE 'payment' END,
+           erp.uuid_v7(), now()
+         FROM generate_series(0, 364) d CROSS JOIN generate_series(0, 109) k
+         JOIN (SELECT id, row_number() OVER (ORDER BY code) - 1 AS r FROM erp.parties WHERE tenant_id = $1) p
+           ON p.r = (d * 110 + k) % 131`,
+        [otherId],
+      );
+      await owner.query(
+        `INSERT INTO erp.audit_log (tenant_id, at, user_id, action, entity, entity_id, before, after)
+         SELECT $1::uuid, now() - (g % 365) * interval '1 day' - (g % 600) * interval '1 minute', $2::uuid, 'update',
+           'item_prices', erp.uuid_v7(), jsonb_build_object('price', g, 'row_version', 1),
+           jsonb_build_object('price', g + 100, 'row_version', 2)
+         FROM generate_series(1, 500000) g`,
+        [otherId, user],
+      );
+      // Statistics before the commit: each journal line's balance check runs then, on a plan made for these sizes.
+      await owner.query('ANALYZE erp.journal_entries, erp.journal_lines');
+      await owner.query('COMMIT');
+      await owner.query(
+        'ANALYZE erp.journal_entries, erp.journal_lines, erp.party_ledger_entries, erp.audit_log, erp.parties',
+      );
+    } finally {
+      await owner.end();
+    }
+    const timed = async <T>(url: string) => {
+      const started = performance.now();
+      const res = await send('GET', url, 'fahad', undefined, OTHER);
+      expect(res.statusCode, res.body).toBe(200);
+      return { ms: performance.now() - started, body: res.json<T>() };
+    };
+    const year = `from=${daysAgo(364)}&to=${today()}`;
+    const quarter = `from=${daysAgo(91)}&to=${today()}`;
+    const [someone] = await q<{ id: string }>("SELECT id FROM erp.parties WHERE code = 'C0001'", [], otherId);
+    const ledger = await timed<PartnerLedgerView>(
+      `/api/reports/partner-ledger?role=customer&partyId=${someone!.id}&${year}`,
+    );
+    const statements = await timed<StatementsView>(
+      `/api/reports/statements?from=${daysAgo(30)}&to=${today()}`,
+    );
+    const trend = await timed<BalanceTrendView>('/api/reports/balance-trend?role=customer');
+    const overdue = await timed<OverdueView>('/api/reports/overdue');
+    const limits = await timed<OverLimitView>('/api/reports/over-limit');
+    const activity = await timed<UserActivityView>(`/api/reports/user-activity?${quarter}`);
+    const flow = await timed<CashFlowView>(`/api/reports/cash-flow?${year}`);
+    expect(ledger.body.lines.length).toBeGreaterThan(250);
+    expect(statements.body.statements).toHaveLength(131);
+    expect(trend.body.rows).toHaveLength(131);
+    expect(limits.body.withLimit).toBe(44);
+    expect(activity.body.rows).toHaveLength(2000);
+    expect(activity.body.count).toBeGreaterThan(100_000);
+    expect(flow.body.total.net).toBe(365 * 310 * 50000);
+    const times = {
+      ledger: ledger.ms,
+      trend: trend.ms,
+      overdue: overdue.ms,
+      limits: limits.ms,
+      activity: activity.ms,
+      flow: flow.ms,
+    };
+    console.log('W2-04 timings (ms):', { ...times, statements: statements.ms });
+    for (const [name, ms] of Object.entries(times)) expect(ms, name).toBeLessThan(2000);
+    expect(statements.ms).toBeLessThan(5000);
+  }, 300_000);
+});

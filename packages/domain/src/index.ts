@@ -184,8 +184,12 @@ export {
   type TrendStep,
 } from './sales-reports';
 export {
+  ACTIVITY_EVENTS,
   ACTIVITY_KINDS,
+  ACTIVITY_LINE_TABLES,
+  ACTIVITY_TABLES,
   activityKind,
+  BOOKKEEPING_FIELDS,
   CASH_FLOW_CLASSES,
   cashFlowOf,
   cashFlowStatement,

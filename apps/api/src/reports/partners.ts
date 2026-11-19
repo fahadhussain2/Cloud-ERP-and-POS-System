@@ -26,15 +26,17 @@ import {
 } from '@erp/contracts';
 import { withTenant } from '@erp/db';
 import {
-  activityKind,
+  ACTIVITY_EVENTS,
+  ACTIVITY_LINE_TABLES,
+  ACTIVITY_TABLES,
+  BOOKKEEPING_FIELDS,
   ageBalances,
   can,
   cashFlowOf,
   cashFlowStatement,
   changedFields,
-  DomainError,
   limitState,
-  monthsOf,
+  periodBuckets,
   overdueOf,
   partnerLedger,
   trendDates,
@@ -775,7 +777,13 @@ export function registerPartnerReports(scope: FastifyInstance, { pool, now, requ
       // with its before and after) and named events (voids, reviews, locks); documents keep who made them on their own
       // rows, so each document of the shop's days counts as its maker's "create". From the audit log: the shop's days,
       // from the cut-off hour of `from` to the one after `to`, in its time zone; an update carries only the fields it
-      // changed (changedFields drops the bookkeeping columns); rows without a user (the data import) are left out.
+      // changed, leaving out the bookkeeping columns (the log's trigger never writes an update that changed nothing
+      // else); rows without a user (the data import) and a bill's lines are left out. Each row's kind comes from
+      // @erp/domain's tables (as activityKind), so the database filters, counts and keeps the newest page, and only
+      // the page's rows read their before and after.
+      const csvWanted = wantsCsv(req);
+      const tables = Object.entries(ACTIVITY_TABLES);
+      const events = Object.entries(ACTIVITY_EVENTS);
       const { rows } = await c.query<{
         at: Date;
         user_id: string;
@@ -785,86 +793,108 @@ export function registerPartnerReports(scope: FastifyInstance, { pool, now, requ
         entity: string;
         entity_id: string | null;
         label: string | null;
-        before: Record<string, unknown> | null;
-        after: Record<string, unknown> | null;
+        diff: Record<string, [unknown, unknown]> | null;
+        kind: ActivityKindView;
+        total: string;
       }>(
         `WITH t AS (
            SELECT (($1::date + make_interval(hours => day_cutoff_hour))::timestamp AT TIME ZONE timezone) AS lo,
              (($2::date + 1 + make_interval(hours => day_cutoff_hour))::timestamp AT TIME ZONE timezone) AS hi
-           FROM erp.tenants)
-         SELECT a.at, a.user_id, u.full_name AS user_name, coalesce(d.name, d.code) AS device, a.action, a.entity, a.entity_id,
-           coalesce(a.after->>'number', a.after->>'code', a.after->>'username', a.after->>'name') AS label,
-           CASE WHEN a.action = 'update' THEN (SELECT jsonb_object_agg(k, a.before->k)
-             FROM jsonb_object_keys(a.after) k WHERE a.before->k IS DISTINCT FROM a.after->k) END AS before,
-           CASE WHEN a.action = 'update' THEN (SELECT jsonb_object_agg(k, a.after->k)
-             FROM jsonb_object_keys(a.after) k WHERE a.before->k IS DISTINCT FROM a.after->k)
-             WHEN a.action LIKE '%.%' THEN a.after END AS after
-         FROM erp.audit_log a CROSS JOIN t
-         JOIN erp.users u ON u.id = a.user_id LEFT JOIN erp.devices d ON d.id = a.device_id
-         WHERE a.at >= t.lo AND a.at < t.hi AND a.user_id IS NOT NULL
-           AND a.entity NOT IN ('sales_lines', 'sales_payments') AND ($3::uuid IS NULL OR a.user_id = $3)
-         UNION ALL
-         SELECT x.at, x.user_id, u.full_name, coalesce(d.name, d.code), 'create', x.entity, x.id, x.label, NULL, NULL
-         FROM (
-           SELECT created_at_device AS at, salesperson_user_id AS user_id, device_id, 'sales_documents' AS entity, id,
-             number AS label FROM erp.sales_documents WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT at_device, cashier_user_id, device_id, 'payments', id, number FROM erp.payments
-             WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT at_device, cashier_user_id, device_id, 'cash_movements', id, number FROM erp.cash_movements
-             WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT at_device, cashier_user_id, device_id, 'cash_handovers', id, number FROM erp.cash_handovers
-             WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT created_at, cashier_user_id, device_id, 'cash_sessions', id, number FROM erp.cash_sessions
-             WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT created_at, created_by_user_id, device_id, 'customer_receipts', id, number
-             FROM erp.customer_receipts WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT created_at, created_by_user_id, device_id, 'supplier_payments', id, number
-             FROM erp.supplier_payments WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT created_at, created_by_user_id, device_id, 'expenses', id, number FROM erp.expenses
-             WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT created_at, created_by_user_id, device_id, 'fund_transfers', id, number
-             FROM erp.fund_transfers WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT created_at, created_by_user_id, device_id, 'journal_vouchers', id, number
-             FROM erp.journal_vouchers WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT created_at, created_by_user_id, device_id, 'goods_receipts', id,
-             coalesce(number, supplier_bill_no) FROM erp.goods_receipts WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT created_at, created_by_user_id, device_id, 'purchase_returns', id, number
-             FROM erp.purchase_returns WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT created_at, created_by_user_id, device_id, 'stock_adjustments', id, number
-             FROM erp.stock_adjustments WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT created_at, created_by_user_id, device_id, 'stock_transfers', id, number
-             FROM erp.stock_transfers WHERE business_date BETWEEN $1 AND $2
-           UNION ALL SELECT o.created_at, o.approved_by_user_id, NULL, 'overrides', o.id, o.kind FROM erp.overrides o
-             CROSS JOIN t WHERE o.created_at >= t.lo AND o.created_at < t.hi AND o.deleted_at IS NULL
-         ) x JOIN erp.users u ON u.id = x.user_id LEFT JOIN erp.devices d ON d.id = x.device_id
-         WHERE $3::uuid IS NULL OR x.user_id = $3
-         ORDER BY 1 DESC, 7 DESC`,
-        [p.from, p.to, userId],
+           FROM erp.tenants),
+         tables (entity, kind) AS (SELECT * FROM unnest($4::text[], $5::text[])),
+         events (prefix, kind) AS (SELECT * FROM unnest($6::text[], $7::text[])),
+         act AS (
+           SELECT a.id AS audit_id, a.at, a.user_id, a.device_id, a.action, a.entity, a.entity_id, NULL AS label
+           FROM erp.audit_log a CROSS JOIN t
+           WHERE a.at >= t.lo AND a.at < t.hi AND a.user_id IS NOT NULL AND a.entity <> ALL ($11)
+             AND ($3::uuid IS NULL OR a.user_id = $3)
+           UNION ALL
+           SELECT NULL, x.at, x.user_id, x.device_id, 'create', x.entity, x.id, x.label
+           FROM (
+             SELECT created_at_device AS at, salesperson_user_id AS user_id, device_id, 'sales_documents' AS entity,
+               id, number AS label FROM erp.sales_documents WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT at_device, cashier_user_id, device_id, 'payments', id, number FROM erp.payments
+               WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT at_device, cashier_user_id, device_id, 'cash_movements', id, number
+               FROM erp.cash_movements WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT at_device, cashier_user_id, device_id, 'cash_handovers', id, number
+               FROM erp.cash_handovers WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT created_at, cashier_user_id, device_id, 'cash_sessions', id, number FROM erp.cash_sessions
+               WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT created_at, created_by_user_id, device_id, 'customer_receipts', id, number
+               FROM erp.customer_receipts WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT created_at, created_by_user_id, device_id, 'supplier_payments', id, number
+               FROM erp.supplier_payments WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT created_at, created_by_user_id, device_id, 'expenses', id, number FROM erp.expenses
+               WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT created_at, created_by_user_id, device_id, 'fund_transfers', id, number
+               FROM erp.fund_transfers WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT created_at, created_by_user_id, device_id, 'journal_vouchers', id, number
+               FROM erp.journal_vouchers WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT created_at, created_by_user_id, device_id, 'goods_receipts', id,
+               coalesce(number, supplier_bill_no) FROM erp.goods_receipts WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT created_at, created_by_user_id, device_id, 'purchase_returns', id, number
+               FROM erp.purchase_returns WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT created_at, created_by_user_id, device_id, 'stock_adjustments', id, number
+               FROM erp.stock_adjustments WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT created_at, created_by_user_id, device_id, 'stock_transfers', id, number
+               FROM erp.stock_transfers WHERE business_date BETWEEN $1 AND $2
+             UNION ALL SELECT o.created_at, o.approved_by_user_id, NULL, 'overrides', o.id, o.kind
+               FROM erp.overrides o CROSS JOIN t
+               WHERE o.created_at >= t.lo AND o.created_at < t.hi AND o.deleted_at IS NULL
+           ) x WHERE $3::uuid IS NULL OR x.user_id = $3),
+         page AS (
+           SELECT act.*, CASE WHEN act.action LIKE '%.%' THEN coalesce(e.kind, 'other')
+               ELSE coalesce(k.kind, 'other') END AS kind, count(*) OVER () AS total
+           FROM act LEFT JOIN tables k ON k.entity = act.entity
+           LEFT JOIN events e ON act.action LIKE '%.%' AND e.prefix = split_part(act.action, '.', 1)
+           WHERE $8::text IS NULL
+             OR $8 = CASE WHEN act.action LIKE '%.%' THEN coalesce(e.kind, 'other') ELSE coalesce(k.kind, 'other') END
+           ORDER BY act.at DESC, act.entity_id DESC LIMIT $9)
+         SELECT x.at, x.user_id, u.full_name AS user_name, coalesce(d.name, d.code) AS device, x.action, x.entity,
+           x.entity_id, x.kind, x.total,
+           coalesce(x.label, a.after->>'number', a.after->>'code', a.after->>'username', a.after->>'name') AS label,
+           CASE WHEN x.action = 'update' THEN (
+             SELECT jsonb_object_agg(f.k, jsonb_build_array(a.before->f.k, a.after->f.k))
+             FROM (SELECT jsonb_object_keys(a.before) UNION SELECT jsonb_object_keys(a.after)) AS f (k)
+             WHERE f.k <> ALL ($10) AND a.before->f.k IS DISTINCT FROM a.after->f.k) END AS diff
+         FROM page x JOIN erp.users u ON u.id = x.user_id LEFT JOIN erp.devices d ON d.id = x.device_id
+         LEFT JOIN erp.audit_log a ON a.id = x.audit_id
+         ORDER BY x.at DESC, x.entity_id DESC`,
+        [
+          p.from,
+          p.to,
+          userId,
+          tables.map(([e]) => e),
+          tables.map(([, k]) => k),
+          events.map(([e]) => e),
+          events.map(([, k]) => k),
+          kind,
+          csvWanted ? null : ACTIVITY_PAGE,
+          BOOKKEEPING_FIELDS,
+          ACTIVITY_LINE_TABLES,
+        ],
       );
-      const all = rows
-        .map((r): ActivityRow | null => {
-          const k = activityKind(r.entity, r.action);
-          if (k === null || (kind !== null && k !== kind)) return null;
-          return {
-            at: r.at.toISOString(),
-            userId: r.user_id,
-            userName: r.user_name,
-            device: r.device,
-            kind: k,
-            action: r.action,
-            entity: r.entity,
-            entityId: r.entity_id,
-            label: r.action.includes('.') ? null : r.label,
-            changes: r.action === 'update' ? changedFields(r.before ?? {}, r.after ?? {}) : [],
-          };
-        })
-        .filter((r): r is ActivityRow => r !== null && (r.action !== 'update' || r.changes.length > 0));
-      const users = (
-        await c.query<{ id: string; name: string }>(
-          'SELECT id, full_name AS name FROM erp.users WHERE deleted_at IS NULL ORDER BY lower(full_name), id',
-        )
-      ).rows;
-      if (wantsCsv(req))
+      const all = rows.map((r): ActivityRow => {
+        // The fields an update changed, as { field: [before, after] }.
+        const diff = Object.entries(r.diff ?? {});
+        return {
+          at: r.at.toISOString(),
+          userId: r.user_id,
+          userName: r.user_name,
+          device: r.device,
+          kind: r.kind,
+          action: r.action,
+          entity: r.entity,
+          entityId: r.entity_id,
+          label: r.action.includes('.') ? null : r.label,
+          changes: changedFields(
+            Object.fromEntries(diff.map(([f, v]) => [f, v[0]])),
+            Object.fromEntries(diff.map(([f, v]) => [f, v[1]])),
+          ),
+        };
+      });
+      if (csvWanted)
         return sendCsv(
           reply,
           `user-activity-${p.from}-${p.to}.csv`,
@@ -885,7 +915,12 @@ export function registerPartnerReports(scope: FastifyInstance, { pool, now, requ
             ]),
           ),
         );
-      return { from: p.from, to: p.to, users, rows: all.slice(0, ACTIVITY_PAGE), count: all.length };
+      const users = (
+        await c.query<{ id: string; name: string }>(
+          'SELECT id, full_name AS name FROM erp.users WHERE deleted_at IS NULL ORDER BY lower(full_name), id',
+        )
+      ).rows;
+      return { from: p.from, to: p.to, users, rows: all, count: Number(rows[0]?.total ?? 0) };
     }),
   );
 
@@ -894,13 +929,8 @@ export function registerPartnerReports(scope: FastifyInstance, { pool, now, requ
     run(req, reply, async (c, s): Promise<CashFlowView | FastifyReply> => {
       const q = query(req);
       const p = rangeOf(q, { from: `${s.today.slice(0, 8)}01`, to: s.today }, SUMMARY_DAYS, s);
-      let columns: Period[];
-      try {
-        columns = monthsOf(p);
-      } catch (err) {
-        if (err instanceof DomainError) throw new BadRequest('range_too_long');
-        throw err;
-      }
+      // Month by month, the first and last cut to the range: a rolling year is 13 part-months.
+      const columns: Period[] = periodBuckets(p, 'month');
       const cash = await cashAccounts(c);
       const opening = num(
         (
@@ -924,11 +954,10 @@ export function registerPartnerReports(scope: FastifyInstance, { pool, now, requ
         `WITH moved AS (
            SELECT DISTINCT l.entry_id FROM erp.journal_lines l JOIN erp.journal_entries e ON e.id = l.entry_id
            WHERE l.account_id = ANY ($1) AND e.entry_date BETWEEN $2 AND $3)
-         SELECT l.entry_id, e.entry_date::text AS date, x.source_type, l.account_id, a.system_role AS role, a.type,
+         SELECT l.entry_id, e.entry_date::text AS date, e.source_type, l.account_id, a.system_role AS role, a.type,
            (l.debit - l.credit)::text AS amount, l.account_id = ANY ($1) AS is_cash
          FROM moved m JOIN erp.journal_lines l ON l.entry_id = m.entry_id
-         JOIN erp.journal_entries e ON e.id = l.entry_id JOIN erp.postings x ON x.seq = e.posting_seq
-         JOIN erp.accounts a ON a.id = l.account_id
+         JOIN erp.journal_entries e ON e.id = l.entry_id JOIN erp.accounts a ON a.id = l.account_id
          ORDER BY l.entry_id, l.line_no`,
         [cash, p.from, p.to],
       );

@@ -169,7 +169,8 @@ export const ACTIVITY_KINDS = [
 ] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 
-const TABLE_KINDS: Record<string, ActivityKind> = {
+/** Each audited table's or document's kind; anything else is `other`. */
+export const ACTIVITY_TABLES: Readonly<Record<string, ActivityKind>> = {
   sales_documents: 'sales',
   sales_voids: 'sales',
   overrides: 'approvals',
@@ -216,7 +217,8 @@ const TABLE_KINDS: Record<string, ActivityKind> = {
   opening_balances: 'books',
 };
 
-const EVENT_KINDS: Record<string, ActivityKind> = {
+/** A named event's kind by its first word (`login.failed` → `login`); anything else is `other`. */
+export const ACTIVITY_EVENTS: Readonly<Record<string, ActivityKind>> = {
   login: 'sign_in',
   password: 'sign_in',
   pin: 'sign_in',
@@ -230,7 +232,7 @@ const EVENT_KINDS: Record<string, ActivityKind> = {
 };
 
 /** A bill's lines and payments are part of the bill's own row (one row per bill). */
-const LINE_TABLES = new Set(['sales_lines', 'sales_payments']);
+export const ACTIVITY_LINE_TABLES: readonly string[] = ['sales_lines', 'sales_payments'];
 
 /**
  * The kind of an audit row: a named event (`login.failed`, `sale.voided`) by its first word, a row change (`create`,
@@ -238,9 +240,9 @@ const LINE_TABLES = new Set(['sales_lines', 'sales_payments']);
  */
 export function activityKind(entity: string, action: string): ActivityKind | null {
   const dot = action.indexOf('.');
-  if (dot > 0) return EVENT_KINDS[action.slice(0, dot)] ?? 'other';
-  if (LINE_TABLES.has(entity)) return null;
-  return TABLE_KINDS[entity] ?? 'other';
+  if (dot > 0) return ACTIVITY_EVENTS[action.slice(0, dot)] ?? 'other';
+  if (ACTIVITY_LINE_TABLES.includes(entity)) return null;
+  return ACTIVITY_TABLES[entity] ?? 'other';
 }
 
 export interface ChangedField {
@@ -250,7 +252,13 @@ export interface ChangedField {
 }
 
 /** Bookkeeping columns every change touches; never a change worth showing. */
-const NOISE = new Set(['row_version', 'txid', 'updated_at', 'updated_by_user_id']);
+export const BOOKKEEPING_FIELDS: readonly string[] = [
+  'row_version',
+  'txid',
+  'updated_at',
+  'updated_by_user_id',
+];
+const NOISE = new Set(BOOKKEEPING_FIELDS);
 
 /** The fields an update changed, by name; a field added or removed counts, with null on the missing side. */
 export function changedFields(
