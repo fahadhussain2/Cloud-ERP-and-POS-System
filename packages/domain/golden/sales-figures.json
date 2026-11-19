@@ -1,0 +1,59 @@
+{
+  "description": "Many lines' figures from their sums (W2-03): the same rules as one line's, so a group's figures come from its totals, never from adding up margins.",
+  "cases": [
+    {
+      "name": "an exchange: one returned, one sold at a higher price",
+      "input": {
+        "qty": 0,
+        "sales": 2474,
+        "cost": 0,
+        "listSales": 0
+      },
+      "expected": {
+        "qty": 0,
+        "sales": 2474,
+        "cost": 0,
+        "profit": 2474,
+        "discount": -2474,
+        "marginBp": 10000,
+        "discountBp": null
+      }
+    },
+    {
+      "name": "nothing sold",
+      "input": {
+        "qty": 0,
+        "sales": 0,
+        "cost": 0,
+        "listSales": 0
+      },
+      "expected": {
+        "qty": 0,
+        "sales": 0,
+        "cost": 0,
+        "profit": 0,
+        "discount": 0,
+        "marginBp": null,
+        "discountBp": null
+      }
+    },
+    {
+      "name": "a category over a month",
+      "input": {
+        "qty": 37000,
+        "sales": 2450000,
+        "cost": 1900000,
+        "listSales": 2600000
+      },
+      "expected": {
+        "qty": 37000,
+        "sales": 2450000,
+        "cost": 1900000,
+        "profit": 550000,
+        "discount": 150000,
+        "marginBp": 2245,
+        "discountBp": 577
+      }
+    }
+  ]
+}

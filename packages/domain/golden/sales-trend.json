@@ -1,0 +1,118 @@
+{
+  "description": "The daily trend (W2-03 owner answer 5): each day's bills, sales and profit added into its bucket; a bucket with nothing sold is there with 0.",
+  "cases": [
+    {
+      "name": "by week, two weeks empty",
+      "input": {
+        "period": {
+          "from": "2027-01-01",
+          "to": "2027-01-20"
+        },
+        "step": "week",
+        "days": [
+          {
+            "date": "2027-01-02",
+            "bills": 3,
+            "sales": 100000,
+            "profit": 30000
+          },
+          {
+            "date": "2027-01-05",
+            "bills": 2,
+            "sales": 50000,
+            "profit": 10000
+          },
+          {
+            "date": "2027-01-10",
+            "bills": 1,
+            "sales": 20000,
+            "profit": 5000
+          }
+        ]
+      },
+      "expected": [
+        {
+          "from": "2027-01-01",
+          "to": "2027-01-03",
+          "bills": 3,
+          "sales": 100000,
+          "profit": 30000
+        },
+        {
+          "from": "2027-01-04",
+          "to": "2027-01-10",
+          "bills": 3,
+          "sales": 70000,
+          "profit": 15000
+        },
+        {
+          "from": "2027-01-11",
+          "to": "2027-01-17",
+          "bills": 0,
+          "sales": 0,
+          "profit": 0
+        },
+        {
+          "from": "2027-01-18",
+          "to": "2027-01-20",
+          "bills": 0,
+          "sales": 0,
+          "profit": 0
+        }
+      ]
+    },
+    {
+      "name": "by day, with a day of only returns",
+      "input": {
+        "period": {
+          "from": "2027-01-04",
+          "to": "2027-01-05"
+        },
+        "step": "day",
+        "days": [
+          {
+            "date": "2027-01-05",
+            "bills": 1,
+            "sales": -117526,
+            "profit": -37526
+          }
+        ]
+      },
+      "expected": [
+        {
+          "from": "2027-01-04",
+          "to": "2027-01-04",
+          "bills": 0,
+          "sales": 0,
+          "profit": 0
+        },
+        {
+          "from": "2027-01-05",
+          "to": "2027-01-05",
+          "bills": 1,
+          "sales": -117526,
+          "profit": -37526
+        }
+      ]
+    },
+    {
+      "name": "a day outside the range",
+      "input": {
+        "period": {
+          "from": "2027-01-04",
+          "to": "2027-01-05"
+        },
+        "step": "day",
+        "days": [
+          {
+            "date": "2027-01-06",
+            "bills": 1,
+            "sales": 1,
+            "profit": 1
+          }
+        ]
+      },
+      "error": "invalid_range"
+    }
+  ]
+}

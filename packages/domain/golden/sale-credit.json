@@ -1,0 +1,71 @@
+{
+  "description": "Whose figures a line is (W2-03 owner answer 2): a sold line counts for its own bill's salesman and customer; a returned line for those of the bill it returns, when known; a return with no receipt for whoever took it back.",
+  "cases": [
+    {
+      "name": "a sold line",
+      "input": {
+        "qty": 1000,
+        "own": {
+          "salesmanId": "u-bilal",
+          "customerId": null
+        },
+        "original": null
+      },
+      "expected": {
+        "salesmanId": "u-bilal",
+        "customerId": null
+      }
+    },
+    {
+      "name": "an exchange's sold line stays its own bill's",
+      "input": {
+        "qty": 1000,
+        "own": {
+          "salesmanId": "u-bilal",
+          "customerId": null
+        },
+        "original": {
+          "salesmanId": "u-imran",
+          "customerId": "p-khan"
+        }
+      },
+      "expected": {
+        "salesmanId": "u-bilal",
+        "customerId": null
+      }
+    },
+    {
+      "name": "a return of a known bill: the original salesman and customer",
+      "input": {
+        "qty": -1000,
+        "own": {
+          "salesmanId": "u-bilal",
+          "customerId": null
+        },
+        "original": {
+          "salesmanId": "u-imran",
+          "customerId": "p-khan"
+        }
+      },
+      "expected": {
+        "salesmanId": "u-imran",
+        "customerId": "p-khan"
+      }
+    },
+    {
+      "name": "a return with no receipt: whoever took it back",
+      "input": {
+        "qty": -1000,
+        "own": {
+          "salesmanId": "u-bilal",
+          "customerId": null
+        },
+        "original": null
+      },
+      "expected": {
+        "salesmanId": "u-bilal",
+        "customerId": null
+      }
+    }
+  ]
+}

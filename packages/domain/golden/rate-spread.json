@@ -1,0 +1,46 @@
+{
+  "description": "The spread (W2-03 owner answer 4): average net sale rate − average net purchase rate, and as a share of the sale rate in basis points; null without both.",
+  "cases": [
+    {
+      "name": "sold above cost",
+      "input": {
+        "sale": 350000,
+        "purchase": 308333
+      },
+      "expected": {
+        "amount": 41667,
+        "marginBp": 1190
+      }
+    },
+    {
+      "name": "sold below cost",
+      "input": {
+        "sale": 100000,
+        "purchase": 120000
+      },
+      "expected": {
+        "amount": -20000,
+        "marginBp": -2000
+      }
+    },
+    {
+      "name": "given away",
+      "input": {
+        "sale": 0,
+        "purchase": 0
+      },
+      "expected": {
+        "amount": 0,
+        "marginBp": null
+      }
+    },
+    {
+      "name": "never bought",
+      "input": {
+        "sale": 100000,
+        "purchase": null
+      },
+      "expected": null
+    }
+  ]
+}
