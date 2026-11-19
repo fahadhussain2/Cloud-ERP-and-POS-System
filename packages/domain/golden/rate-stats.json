@@ -1,0 +1,84 @@
+{
+  "description": "Purchase or sale rates (W2-03 owner answer 4): each line's net rate per unit = value ÷ quantity, half away from zero; the average is the total value ÷ the total quantity, never an average of rates; the last is the last line's (in date order). Lines with no quantity above 0 are left out.",
+  "cases": [
+    {
+      "name": "three receipts",
+      "input": [
+        {
+          "qty": 10000,
+          "value": 3000000
+        },
+        {
+          "qty": 5000,
+          "value": 1600000
+        },
+        {
+          "qty": 1000,
+          "value": 333333
+        }
+      ],
+      "expected": {
+        "count": 3,
+        "qty": 16000,
+        "value": 4933333,
+        "average": 308333,
+        "lowest": 300000,
+        "highest": 333333,
+        "last": 333333
+      }
+    },
+    {
+      "name": "1.5 m of hose",
+      "input": [
+        {
+          "qty": 1500,
+          "value": 50000
+        }
+      ],
+      "expected": {
+        "count": 1,
+        "qty": 1500,
+        "value": 50000,
+        "average": 33333,
+        "lowest": 33333,
+        "highest": 33333,
+        "last": 33333
+      }
+    },
+    {
+      "name": "half a paisa rounds up, a line with no quantity is left out",
+      "input": [
+        {
+          "qty": 0,
+          "value": 0
+        },
+        {
+          "qty": 2000,
+          "value": 100001
+        }
+      ],
+      "expected": {
+        "count": 1,
+        "qty": 2000,
+        "value": 100001,
+        "average": 50001,
+        "lowest": 50001,
+        "highest": 50001,
+        "last": 50001
+      }
+    },
+    {
+      "name": "nothing",
+      "input": [],
+      "expected": {
+        "count": 0,
+        "qty": 0,
+        "value": 0,
+        "average": null,
+        "lowest": null,
+        "highest": null,
+        "last": null
+      }
+    }
+  ]
+}

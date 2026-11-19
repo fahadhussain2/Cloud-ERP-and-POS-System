@@ -1,0 +1,60 @@
+{
+  "description": "The change against the comparison period (W2-03 owner answer 3): the difference, and as a share of the earlier figure's size in basis points (half away from zero), null when it was 0.",
+  "cases": [
+    {
+      "name": "up by half",
+      "input": {
+        "now": 150000,
+        "before": 100000
+      },
+      "expected": {
+        "amount": 50000,
+        "bp": 5000
+      }
+    },
+    {
+      "name": "down by a fifth",
+      "input": {
+        "now": 80000,
+        "before": 100000
+      },
+      "expected": {
+        "amount": -20000,
+        "bp": -2000
+      }
+    },
+    {
+      "name": "nothing before",
+      "input": {
+        "now": 50000,
+        "before": 0
+      },
+      "expected": {
+        "amount": 50000,
+        "bp": null
+      }
+    },
+    {
+      "name": "a smaller loss is an improvement",
+      "input": {
+        "now": -10000,
+        "before": -20000
+      },
+      "expected": {
+        "amount": 10000,
+        "bp": 5000
+      }
+    },
+    {
+      "name": "rounded half away from zero",
+      "input": {
+        "now": 1,
+        "before": 3
+      },
+      "expected": {
+        "amount": -2,
+        "bp": -6667
+      }
+    }
+  ]
+}

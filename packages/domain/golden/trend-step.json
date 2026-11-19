@@ -1,0 +1,45 @@
+{
+  "description": "The daily trend's step (W2-03 owner answer 5): by day up to 92 days, by week up to a year (366 days), by month beyond.",
+  "cases": [
+    {
+      "name": "92 days: by day",
+      "input": {
+        "from": "2027-01-01",
+        "to": "2027-04-02"
+      },
+      "expected": "day"
+    },
+    {
+      "name": "93 days: by week",
+      "input": {
+        "from": "2027-01-01",
+        "to": "2027-04-03"
+      },
+      "expected": "week"
+    },
+    {
+      "name": "366 days: by week",
+      "input": {
+        "from": "2027-01-01",
+        "to": "2028-01-01"
+      },
+      "expected": "week"
+    },
+    {
+      "name": "367 days: by month",
+      "input": {
+        "from": "2027-01-01",
+        "to": "2028-01-02"
+      },
+      "expected": "month"
+    },
+    {
+      "name": "the wrong way round",
+      "input": {
+        "from": "2027-02-01",
+        "to": "2027-01-01"
+      },
+      "error": "invalid_range"
+    }
+  ]
+}

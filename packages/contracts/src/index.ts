@@ -174,6 +174,29 @@ export type {
   StockMovementView,
   StockQtyValue,
 } from './stock-reports';
+export { GRID_MEASURES, SALES_COMPARES, SALES_GROUPS, SALES_RANKINGS, WALK_IN } from './sales-reports';
+export type {
+  ChangeView,
+  DiscountRowView,
+  GridMeasure,
+  PurchaseDocumentRow,
+  PurchaseLineView,
+  PurchaseRegisterView,
+  RateLineView,
+  RatesView,
+  RateStatsView,
+  SalesBefore,
+  SalesCells,
+  SalesChoicesView,
+  SalesCompare,
+  SalesGroup,
+  SalesOverTimeView,
+  SalesProfitView,
+  SalesRanking,
+  SalesRow,
+  TopItemView,
+  TrendPointView,
+} from './sales-reports';
 export {
   AddNameRequest,
   CreateItemRequest,

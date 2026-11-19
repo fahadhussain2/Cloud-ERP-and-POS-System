@@ -1,0 +1,256 @@
+{
+  "description": "Top and bottom items (W2-03 owner answer 5): the top n by sales, profit or quantity (above 0 only, largest first); the bottom n are the items that sold (net quantity above 0) with the least, losses first, leaving out the top. Ties by id. An item sold and all returned (d) is in neither.",
+  "cases": [
+    {
+      "name": "by sales: a tie at 300000 goes to the first id",
+      "input": {
+        "items": [
+          {
+            "id": "a",
+            "qty": 5000,
+            "sales": 500000,
+            "profit": 100000
+          },
+          {
+            "id": "b",
+            "qty": 1000,
+            "sales": 300000,
+            "profit": -20000
+          },
+          {
+            "id": "c",
+            "qty": 2000,
+            "sales": 300000,
+            "profit": 50000
+          },
+          {
+            "id": "d",
+            "qty": 0,
+            "sales": 0,
+            "profit": 0
+          },
+          {
+            "id": "e",
+            "qty": 1000,
+            "sales": 10000,
+            "profit": 2000
+          }
+        ],
+        "by": "sales",
+        "n": 2
+      },
+      "expected": {
+        "top": [
+          {
+            "id": "a",
+            "qty": 5000,
+            "sales": 500000,
+            "profit": 100000
+          },
+          {
+            "id": "b",
+            "qty": 1000,
+            "sales": 300000,
+            "profit": -20000
+          }
+        ],
+        "bottom": [
+          {
+            "id": "e",
+            "qty": 1000,
+            "sales": 10000,
+            "profit": 2000
+          },
+          {
+            "id": "c",
+            "qty": 2000,
+            "sales": 300000,
+            "profit": 50000
+          }
+        ]
+      }
+    },
+    {
+      "name": "by profit: a loss is at the bottom",
+      "input": {
+        "items": [
+          {
+            "id": "a",
+            "qty": 5000,
+            "sales": 500000,
+            "profit": 100000
+          },
+          {
+            "id": "b",
+            "qty": 1000,
+            "sales": 300000,
+            "profit": -20000
+          },
+          {
+            "id": "c",
+            "qty": 2000,
+            "sales": 300000,
+            "profit": 50000
+          },
+          {
+            "id": "d",
+            "qty": 0,
+            "sales": 0,
+            "profit": 0
+          },
+          {
+            "id": "e",
+            "qty": 1000,
+            "sales": 10000,
+            "profit": 2000
+          }
+        ],
+        "by": "profit",
+        "n": 2
+      },
+      "expected": {
+        "top": [
+          {
+            "id": "a",
+            "qty": 5000,
+            "sales": 500000,
+            "profit": 100000
+          },
+          {
+            "id": "c",
+            "qty": 2000,
+            "sales": 300000,
+            "profit": 50000
+          }
+        ],
+        "bottom": [
+          {
+            "id": "b",
+            "qty": 1000,
+            "sales": 300000,
+            "profit": -20000
+          },
+          {
+            "id": "e",
+            "qty": 1000,
+            "sales": 10000,
+            "profit": 2000
+          }
+        ]
+      }
+    },
+    {
+      "name": "by quantity: fewer items than n, the bottom is empty",
+      "input": {
+        "items": [
+          {
+            "id": "a",
+            "qty": 5000,
+            "sales": 500000,
+            "profit": 100000
+          },
+          {
+            "id": "b",
+            "qty": 1000,
+            "sales": 300000,
+            "profit": -20000
+          },
+          {
+            "id": "c",
+            "qty": 2000,
+            "sales": 300000,
+            "profit": 50000
+          },
+          {
+            "id": "d",
+            "qty": 0,
+            "sales": 0,
+            "profit": 0
+          },
+          {
+            "id": "e",
+            "qty": 1000,
+            "sales": 10000,
+            "profit": 2000
+          }
+        ],
+        "by": "qty",
+        "n": 10
+      },
+      "expected": {
+        "top": [
+          {
+            "id": "a",
+            "qty": 5000,
+            "sales": 500000,
+            "profit": 100000
+          },
+          {
+            "id": "c",
+            "qty": 2000,
+            "sales": 300000,
+            "profit": 50000
+          },
+          {
+            "id": "b",
+            "qty": 1000,
+            "sales": 300000,
+            "profit": -20000
+          },
+          {
+            "id": "e",
+            "qty": 1000,
+            "sales": 10000,
+            "profit": 2000
+          }
+        ],
+        "bottom": []
+      }
+    },
+    {
+      "name": "a tie at the bottom goes to the first id",
+      "input": {
+        "items": [
+          {
+            "id": "a",
+            "qty": 5000,
+            "sales": 500000,
+            "profit": 100000
+          },
+          {
+            "id": "f",
+            "qty": 1000,
+            "sales": 10000,
+            "profit": 1000
+          },
+          {
+            "id": "e",
+            "qty": 1000,
+            "sales": 10000,
+            "profit": 2000
+          }
+        ],
+        "by": "sales",
+        "n": 1
+      },
+      "expected": {
+        "top": [
+          {
+            "id": "a",
+            "qty": 5000,
+            "sales": 500000,
+            "profit": 100000
+          }
+        ],
+        "bottom": [
+          {
+            "id": "e",
+            "qty": 1000,
+            "sales": 10000,
+            "profit": 2000
+          }
+        ]
+      }
+    }
+  ]
+}

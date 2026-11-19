@@ -28,6 +28,10 @@ export type Route =
   | { screen: 'reorder' }
   | { screen: 'deadStock' }
   | { screen: 'inventoryAnalysis' }
+  | { screen: 'salesProfit' }
+  | { screen: 'purchaseRegister' }
+  | { screen: 'rates' }
+  | { screen: 'salesOverTime' }
   | { screen: 'ageing' }
   | { screen: 'exceptions' }
   | { screen: 'trace'; number: string | null }
@@ -86,6 +90,11 @@ export const href = {
   reorder: '#/reports/reorder',
   deadStock: '#/reports/dead-stock',
   inventoryAnalysis: '#/reports/inventory-analysis',
+  // The sales and purchase reports (W2-03).
+  salesProfit: '#/reports/sales-profit',
+  purchaseRegister: '#/reports/purchase-register',
+  rates: '#/reports/rates',
+  salesOverTime: '#/reports/sales-over-time',
   ageing: '#/reports/ageing',
   exceptions: '#/reports/exceptions',
   trace: (number?: string) => (number ? `#/support/trace/${encodeURIComponent(number)}` : '#/support/trace'),
@@ -168,6 +177,10 @@ export function parseHash(hash: string): Route {
   if (parts[0] === 'reports' && parts[1] === 'reorder') return { screen: 'reorder' };
   if (parts[0] === 'reports' && parts[1] === 'dead-stock') return { screen: 'deadStock' };
   if (parts[0] === 'reports' && parts[1] === 'inventory-analysis') return { screen: 'inventoryAnalysis' };
+  if (parts[0] === 'reports' && parts[1] === 'sales-profit') return { screen: 'salesProfit' };
+  if (parts[0] === 'reports' && parts[1] === 'purchase-register') return { screen: 'purchaseRegister' };
+  if (parts[0] === 'reports' && parts[1] === 'rates') return { screen: 'rates' };
+  if (parts[0] === 'reports' && parts[1] === 'sales-over-time') return { screen: 'salesOverTime' };
   if (parts[0] === 'reports' && parts[1] === 'ageing') return { screen: 'ageing' };
   if (parts[0] === 'reports' && parts[1] === 'exceptions') return { screen: 'exceptions' };
   if (parts[0] === 'support' && parts[1] === 'trace')

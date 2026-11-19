@@ -27,6 +27,10 @@ export interface ReportEntry {
     | 'dayBook'
     | 'expensesReport'
     | 'salesRegister'
+    | 'salesProfit'
+    | 'purchaseRegister'
+    | 'rates'
+    | 'salesOverTime'
     | 'overridesReport'
     | 'voidsReturns'
     | 'stockReport'
@@ -91,6 +95,23 @@ export const REPORTS: readonly ReportEntry[] = [
     href: href.salesRegister,
     needs: VIEW,
     screens: ['salesRegister'],
+  },
+  // The sales and purchase analysis (W2-03): what the shop uses today first, sales over time last.
+  { key: 'salesProfit', section: 'sales', href: href.salesProfit, needs: VIEW, screens: ['salesProfit'] },
+  {
+    key: 'purchaseRegister',
+    section: 'sales',
+    href: href.purchaseRegister,
+    needs: VIEW,
+    screens: ['purchaseRegister'],
+  },
+  { key: 'rates', section: 'sales', href: href.rates, needs: VIEW, screens: ['rates'] },
+  {
+    key: 'salesOverTime',
+    section: 'sales',
+    href: href.salesOverTime,
+    needs: VIEW,
+    screens: ['salesOverTime'],
   },
   {
     key: 'overridesReport',

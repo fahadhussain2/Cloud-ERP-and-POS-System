@@ -17,6 +17,7 @@ import { registerDevices } from './devices/routes';
 import { registerEvents } from './sync/events';
 import { registerFinancialReports } from './reports/financial';
 import { registerReports } from './reports/routes';
+import { registerSalesReports } from './reports/sales';
 import { registerStockReports } from './reports/stock';
 import { registerReportViews } from './reports/views';
 import { registerPush } from './sync/push';
@@ -99,6 +100,7 @@ export function buildApp({
         registerReportViews(api, { pool, now, requireAuth });
         registerFinancialReports(api, { pool, now, requireAuth });
         registerStockReports(api, { pool, now, requireAuth });
+        registerSalesReports(api, { pool, now, requireAuth });
         registerSupport(api, { pool, now, requireAuth, requireDevice });
         registerCatalog(api, { pool, now, requireAuth });
         registerLabels(api, { pool, requireAuth });

@@ -73,6 +73,7 @@ export type DomainErrorCode =
   // Return and exchange (POS spec §19, W1-13)
   | 'return_over_quantity'
   | 'invalid_date'
+  | 'invalid_hour'
   | 'invalid_reason'
   | 'invalid_condition'
   | 'bill_not_empty'

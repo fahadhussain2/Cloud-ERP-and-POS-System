@@ -88,6 +88,10 @@
     "reorder": "Reorder list",
     "deadStock": "Dead and slow stock",
     "inventoryAnalysis": "Inventory analysis",
+    "salesProfit": "Sales and gross profit",
+    "purchaseRegister": "Purchase register",
+    "rates": "Purchase and sale rates",
+    "salesOverTime": "Sales over time",
     "ageing": "Outstanding and ageing",
     "exceptions": "Exceptions",
     "trace": "Trace a bill",
@@ -571,6 +575,10 @@
         "dayBook": "Every voucher posted in a period, with its lines.",
         "expensesReport": "Each expense account month by month, for up to a year.",
         "salesRegister": "Every bill of a day or range, with totals by salesman, counter and tender.",
+        "salesProfit": "Sales, cost and gross profit by category, item, brand, salesman, customer, bill, day or month, against another period.",
+        "purchaseRegister": "Every goods receipt and purchase return in a period, by supplier.",
+        "rates": "For an item, a supplier or a customer: every purchase and sale with its rate, and the spread between them.",
+        "salesOverTime": "The daily trend, the busy hours of the week, the top and bottom items, and the discounts given.",
         "overridesReport": "Prices below the list or the floor, and every other approval: who asked and who approved.",
         "voidsReturns": "Voided and reissued bills; returns by reason, condition, salesman and item.",
         "stockReport": "Stock on hand by location, and its value at average cost.",
@@ -842,6 +850,140 @@
         "unsold": "In stock, not sold",
         "turnover": "Stock turnover",
         "costOfSales": "Cost of sales"
+      }
+    },
+    "salesReports": {
+      "help": {
+        "profit": "What sold in the period, what it cost and the gross profit. Sales are what customers paid after every discount; cost is the average cost when it sold, as in the books. A return counts on its day for the salesman and customer of the bill it returns. A row opens the next level: a category its items, an item its bills, a bill its trace.",
+        "register": "Every goods receipt and purchase return posted in the period, by supplier. Drafts are not purchases yet. A document opens it.",
+        "rates": "Pick an item, a supplier or a customer (or an item and a party): every purchase with its rate on the supplier's bill and its net rate after discounts, every sale with its price and net rate, and for one item the spread between the average sale and purchase rates.",
+        "overTime": "How sales moved day by day against another period, when the shop is busy, what sold most and least, and what discounts were given. Every chart has its figures in a table below it."
+      },
+      "all": "All",
+      "walkIn": "Walk-in",
+      "filter": {
+        "categoryId": "Category",
+        "brandId": "Brand",
+        "makeId": "Make",
+        "salesmanId": "Salesman",
+        "customerId": "Customer",
+        "locationId": "Location",
+        "supplierId": "Supplier"
+      },
+      "groupBy": "Show by",
+      "group": {
+        "category": "Category",
+        "item": "Item",
+        "brand": "Brand",
+        "make": "Make",
+        "salesman": "Salesman",
+        "customer": "Customer",
+        "bill": "Bill",
+        "day": "Day",
+        "month": "Month"
+      },
+      "none": {
+        "category": "No category",
+        "item": "No item",
+        "brand": "No brand",
+        "make": "No make",
+        "salesman": "No salesman",
+        "customer": "Walk-in",
+        "bill": "No bill",
+        "day": "No day",
+        "month": "No month"
+      },
+      "anyItem": "Any item",
+      "date": "Date",
+      "bills": "Bills",
+      "qty": "Qty",
+      "sales": "Sales",
+      "discount": "Discount given",
+      "cost": "Cost",
+      "profit": "Gross profit",
+      "margin": "Margin",
+      "beforeSales": "Sales before",
+      "change": "Change",
+      "changeSales": "Sales change",
+      "total": "Total",
+      "truncated": "Only the first 2,000 rows are shown, but every total counts them all. Narrow the filters or download the CSV to see the rest.",
+      "beforeGoLive": "The comparison starts before {{since}}, when the system began: it holds only what was sold since then.",
+      "register": {
+        "kind": "Type",
+        "kinds": {
+          "receipt": "Receipt",
+          "return": "Return"
+        },
+        "supplierBill": "Supplier's bill",
+        "paidBy": "Paid",
+        "paid": {
+          "bank": "By bank",
+          "account": "On account"
+        },
+        "due": "Due",
+        "total": "Amount",
+        "withLines": "Show lines",
+        "documents": "Documents",
+        "receipts": "Received",
+        "returns": "Returned",
+        "net": "Net purchases",
+        "bySupplier": "By supplier"
+      },
+      "rates": {
+        "item": "Item",
+        "party": "Supplier or customer",
+        "clear": {
+          "item": "Any item",
+          "party": "Any supplier or customer"
+        },
+        "pick": "Pick an item, a supplier or a customer to see their rates.",
+        "manyItems": "The averages and the spread are shown for one item: pick an item too.",
+        "purchases": "Purchases",
+        "sales": "Sales",
+        "billRate": "Rate on bill",
+        "price": "Price",
+        "list": "List",
+        "netRate": "Net rate",
+        "purchaseAverage": "Average purchase rate",
+        "purchaseLast": "Last purchase rate",
+        "purchaseRange": "Purchase rates",
+        "saleAverage": "Average sale rate",
+        "saleLast": "Last sale rate",
+        "saleRange": "Sale rates",
+        "spread": "Spread"
+      },
+      "overTime": {
+        "trend": {
+          "day": "Sales by day",
+          "week": "Sales by week",
+          "month": "Sales by month"
+        },
+        "trendTable": "Sales over the period",
+        "hours": "Busy hours",
+        "measure": "Show",
+        "measures": {
+          "bills": "Bills",
+          "sales": "Sales"
+        },
+        "billsN_one": "{{count}} bill",
+        "billsN_other": "{{count}} bills",
+        "top": "Top items",
+        "topTable": "Top items, figures",
+        "bottom": "Items that sold least",
+        "bottomTable": "Items that sold least, figures",
+        "rankBy": "Rank by",
+        "rankings": {
+          "sales": "Sales",
+          "profit": "Gross profit",
+          "qty": "Quantity"
+        },
+        "discounts": "Discounts given",
+        "discountsHelp": "List price × quantity less what the customer paid: the line discounts and the bill discount together. A price above the list counts as a negative discount.",
+        "bySalesman": "Discounts by salesman",
+        "byDay": "Discounts by day",
+        "listSales": "At list price",
+        "discountShare": "Of list",
+        "approvals": "Approvals"
       }
     }
   },

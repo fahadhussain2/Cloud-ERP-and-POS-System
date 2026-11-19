@@ -1,0 +1,121 @@
+{
+  "description": "A range cut into days, weeks (Monday to Sunday) or months, the first and last cut to the range (W2-03).",
+  "cases": [
+    {
+      "name": "days across a month end",
+      "input": {
+        "period": {
+          "from": "2027-01-30",
+          "to": "2027-02-02"
+        },
+        "step": "day"
+      },
+      "expected": [
+        {
+          "from": "2027-01-30",
+          "to": "2027-01-30"
+        },
+        {
+          "from": "2027-01-31",
+          "to": "2027-01-31"
+        },
+        {
+          "from": "2027-02-01",
+          "to": "2027-02-01"
+        },
+        {
+          "from": "2027-02-02",
+          "to": "2027-02-02"
+        }
+      ]
+    },
+    {
+      "name": "weeks from a Friday to a Wednesday",
+      "input": {
+        "period": {
+          "from": "2027-01-01",
+          "to": "2027-01-20"
+        },
+        "step": "week"
+      },
+      "expected": [
+        {
+          "from": "2027-01-01",
+          "to": "2027-01-03"
+        },
+        {
+          "from": "2027-01-04",
+          "to": "2027-01-10"
+        },
+        {
+          "from": "2027-01-11",
+          "to": "2027-01-17"
+        },
+        {
+          "from": "2027-01-18",
+          "to": "2027-01-20"
+        }
+      ]
+    },
+    {
+      "name": "months across a year end",
+      "input": {
+        "period": {
+          "from": "2026-12-15",
+          "to": "2027-02-10"
+        },
+        "step": "month"
+      },
+      "expected": [
+        {
+          "from": "2026-12-15",
+          "to": "2026-12-31"
+        },
+        {
+          "from": "2027-01-01",
+          "to": "2027-01-31"
+        },
+        {
+          "from": "2027-02-01",
+          "to": "2027-02-10"
+        }
+      ]
+    },
+    {
+      "name": "a leap February",
+      "input": {
+        "period": {
+          "from": "2028-02-10",
+          "to": "2028-03-01"
+        },
+        "step": "month"
+      },
+      "expected": [
+        {
+          "from": "2028-02-10",
+          "to": "2028-02-29"
+        },
+        {
+          "from": "2028-03-01",
+          "to": "2028-03-01"
+        }
+      ]
+    },
+    {
+      "name": "one day",
+      "input": {
+        "period": {
+          "from": "2027-01-06",
+          "to": "2027-01-06"
+        },
+        "step": "week"
+      },
+      "expected": [
+        {
+          "from": "2027-01-06",
+          "to": "2027-01-06"
+        }
+      ]
+    }
+  ]
+}

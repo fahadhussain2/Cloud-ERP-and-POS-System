@@ -1,0 +1,131 @@
+{
+  "description": "A bill line's figures (W2-03 owner answers 1 and 6): sales = what the customer paid after the line and bill discounts; cost = its stock movements' cost; profit = sales − cost; discount = list price × quantity − sales (no list price: no discount); margin = profit ÷ sales and discount share = discount ÷ list sales, in basis points rounded half away from zero, null when the base is not above 0. Money in paisa, quantities in thousandths.",
+  "cases": [
+    {
+      "name": "at list price",
+      "input": {
+        "qty": 2000,
+        "listPrice": 425000,
+        "lineTotal": 850000,
+        "cost": 600000
+      },
+      "expected": {
+        "qty": 2000,
+        "sales": 850000,
+        "cost": 600000,
+        "profit": 250000,
+        "discount": 0,
+        "marginBp": 2941,
+        "discountBp": 0
+      }
+    },
+    {
+      "name": "below list, with a share of the bill discount",
+      "input": {
+        "qty": 2000,
+        "listPrice": 425000,
+        "lineTotal": 783505,
+        "cost": 600000
+      },
+      "expected": {
+        "qty": 2000,
+        "sales": 783505,
+        "cost": 600000,
+        "profit": 183505,
+        "discount": 66495,
+        "marginBp": 2342,
+        "discountBp": 782
+      }
+    },
+    {
+      "name": "above list: a negative discount",
+      "input": {
+        "qty": 1000,
+        "listPrice": 120000,
+        "lineTotal": 130000,
+        "cost": 80000
+      },
+      "expected": {
+        "qty": 1000,
+        "sales": 130000,
+        "cost": 80000,
+        "profit": 50000,
+        "discount": -10000,
+        "marginBp": 3846,
+        "discountBp": -833
+      }
+    },
+    {
+      "name": "no list price: no discount",
+      "input": {
+        "qty": 1000,
+        "listPrice": null,
+        "lineTotal": 50000,
+        "cost": 30000
+      },
+      "expected": {
+        "qty": 1000,
+        "sales": 50000,
+        "cost": 30000,
+        "profit": 20000,
+        "discount": 0,
+        "marginBp": 4000,
+        "discountBp": 0
+      }
+    },
+    {
+      "name": "a returned line: negative sales and cost, no margin",
+      "input": {
+        "qty": -1000,
+        "listPrice": 120000,
+        "lineTotal": -117526,
+        "cost": -80000
+      },
+      "expected": {
+        "qty": -1000,
+        "sales": -117526,
+        "cost": -80000,
+        "profit": -37526,
+        "discount": -2474,
+        "marginBp": null,
+        "discountBp": null
+      }
+    },
+    {
+      "name": "1.5 m of hose: list amount rounded half away from zero",
+      "input": {
+        "qty": 1500,
+        "listPrice": 33333,
+        "lineTotal": 50000,
+        "cost": 30000
+      },
+      "expected": {
+        "qty": 1500,
+        "sales": 50000,
+        "cost": 30000,
+        "profit": 20000,
+        "discount": 0,
+        "marginBp": 4000,
+        "discountBp": 0
+      }
+    },
+    {
+      "name": "sold at a loss",
+      "input": {
+        "qty": 1000,
+        "listPrice": 100000,
+        "lineTotal": 90000,
+        "cost": 95000
+      },
+      "expected": {
+        "qty": 1000,
+        "sales": 90000,
+        "cost": 95000,
+        "profit": -5000,
+        "discount": 10000,
+        "marginBp": -556,
+        "discountBp": 1000
+      }
+    }
+  ]
+}
