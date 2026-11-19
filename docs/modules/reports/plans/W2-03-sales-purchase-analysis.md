@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#178](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178) |
 | **Module** | reports (back-office screens and API, read only) |
-| **Status** | Accepted (owner, 2026-11-19): questions 1–6 as recommended |
+| **Status** | Accepted (owner, 2026-11-19): questions 1–6 as recommended. Built, waiting for review |
 | **Refs** | RPT-07, RPT-09, RPT-15; CLAUDE.md rules 1, 3, 4, 5, 10; D-017 (one average cost per item), D-044 (a return's cost), D-100 (no legacy bills), D-105 (purchase discounts in the cost), D-110 (reports read the ledgers), D-116 (reports before go-live) |
 | **Depends on** | W2-01 (the frame, periods and comparisons, the Reports home), W2-02 (the item picker, the report choices), W1-20 (the sales register), W1-16 (goods receipts and purchase returns); **the bill-discount posting fix** (see Risks) for the tie to the profit and loss |
 | **Size** | about 3 days: domain golden files ½; API with integration tests 1; four screens and the first charts 1; e2e and docs ½ |
@@ -153,6 +153,21 @@ Four tasks; this is the third (1). Everything by go-live, the new analysis last 
   - the purchase register for one supplier, compared by the purchaser with the receipts entered;
   - the rates for a few common items, read with the owner against what they know they pay and charge;
   - each report prints on A4 and downloads as CSV.
+
+## Changes during the build
+
+| Change | Why |
+|---|---|
+| **The purchase register ties receipts to Inventory, and receipts with returns to what the suppliers are owed** (not returns to Inventory) | A purchase return's stock leaves at the average cost and the difference goes to price variance (posting rules §5), while the register shows what the supplier credits. The integration test ties receipts to Inventory's debits and the net to the suppliers' account |
+| **Rates list sold and received lines only**; returns are not rates. The averages, lowest, highest and the spread are shown **for one item**: for a supplier or a customer alone, the lines are listed and the screen asks for an item too | Rates of different items don't average into anything |
+| Three small read endpoints, with `reports.view`: **`/api/reports/sales-choices`** (salesmen, customers), **`/api/reports/parties`** (the rates' supplier-or-customer picker, reusing the item picker) and the stock reports' choices for categories, brands, makes, locations and suppliers | Purchasing's and the customers' own searches need permissions an accountant or a manager may not have |
+| **Sales over time reads the lines once** (grouping sets for days, bills, items and salesmen), plus once for the comparison | Five passes took 2.8 s on the generated year |
+| **Names are sorted with one collator**, made once | A new one per comparison made sorting 19,500 items take 1.5 s |
+| **The year of sales** (19,500 items, 300 lines a day): by category 0.74 s, by item 1.19 s, over time 1.00 s, rates 0.06 s. **No new index** | The plan's risk said an index only if 2 s was missed |
+| The price approvals beside the discounts count every approval in the period for the bill's own salesman; the filters don't narrow them | Approvals belong to bills, not lines; the overrides report (W1-20) has them in detail |
+| Without `cost.view`, *rank by profit* falls back to sales and isn't offered | Profit needs cost |
+| **Charts: two theme tokens, `--chart-1` and `--chart-2`** (this period and the comparison), checked with the dataviz validator for colour blindness, lightness and contrast in both modes; the dark steps are a little deeper than the accent. The comparison is also dashed | The muted grey failed the chroma check; dashes keep the comparison readable in black and white |
+| On the e2e shop, gross profit equals sales | The parts sold there were never received or opened, so they left at no cost, in the books too; the report agrees with the books |
 
 ## Order
 

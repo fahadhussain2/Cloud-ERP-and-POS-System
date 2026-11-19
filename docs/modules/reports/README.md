@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Done and verified on staging: [W1-20](plans/W1-20-reports-and-support.md) (sales register, overrides, voids and returns, stock and valuation, ageing, exceptions, Trace a bill); RPT-02 built in W1-11. **Every remaining report is pulled forward before go-live** (D-116) in four tasks, W2-01 to W2-04 ([catalog](#report-catalog-d-116)); W2-01 is built ([plan](plans/W2-01-report-frame-financial-statements.md), [#176](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176)): the report frame, the Reports home and the financial statements, waiting for review. W2-02 is built ([plan](plans/W2-02-stock-reports.md), [#177](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/177)): the six stock reports, waiting for review. W2-03's plan is accepted ([plan](plans/W2-03-sales-purchase-analysis.md), [#178](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178)): sales and gross profit, the purchase register, purchase and sale rates, sales over time |
+| **Status** | Done and verified on staging: [W1-20](plans/W1-20-reports-and-support.md) (sales register, overrides, voids and returns, stock and valuation, ageing, exceptions, Trace a bill); RPT-02 built in W1-11. **Every remaining report is pulled forward before go-live** (D-116) in four tasks, W2-01 to W2-04 ([catalog](#report-catalog-d-116)); W2-01 is built ([plan](plans/W2-01-report-frame-financial-statements.md), [#176](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176)): the report frame, the Reports home and the financial statements, waiting for review. W2-02 is built ([plan](plans/W2-02-stock-reports.md), [#177](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/177)): the six stock reports, waiting for review. W2-03 is built ([plan](plans/W2-03-sales-purchase-analysis.md), [#178](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178)): sales and gross profit, the purchase register, purchase and sale rates, sales over time, waiting for review |
 | **Requirements** | 17 (RPT-01…RPT-17), plus ACC-07 (financial statements) and the list part of PUR-07 (reorder list) |
 | **Feature spec needed** | No: the catalog below and each task's plan are enough |
 
@@ -61,10 +61,10 @@ The reports are designed the modern way: one frame for all of them (filters at t
 | Inventory analysis | ABC by sales and by profit, turnover, days of cover | none | RPT-14 | W2-02 (last) | Built |
 | **Sales and purchases** | | | | | |
 | Sales register | Every bill of a day or range, totals by salesman, counter and tender | Daily Sales Register (bill-wise) | RPT-01 | W1-20 | Built |
-| Sales and gross profit | Sales, cost and profit by item, category, brand, salesman, customer or period | Daily Sales Register (item list, bill-wise P&L) | RPT-07 | W2-03 | Planned |
-| Purchase register | Every goods receipt and return in a range, by supplier | none | RPT-09 | W2-03 | Planned |
-| Purchase and sale rates | For an item or a party: every purchase and sale with its rate, and the spread | Item Purchase and Sale Rate Analysis (four variants become one report) | RPT-09 | W2-03 | Planned |
-| Sales over time | Daily trend, hour × weekday, top and bottom items, discounts | none | RPT-15 | W2-03 (last) | Planned |
+| Sales and gross profit | Sales, cost and profit by item, category, brand, salesman, customer or period | Daily Sales Register (item list, bill-wise P&L) | RPT-07 | W2-03 | Built; equals net sales and cost of goods sold in the books |
+| Purchase register | Every goods receipt and return in a range, by supplier | none | RPT-09 | W2-03 | Built |
+| Purchase and sale rates | For an item or a party: every purchase and sale with its rate, and the spread | Item Purchase and Sale Rate Analysis (four variants become one report) | RPT-09 | W2-03 | Built; up to a year (W2-03 answer 4) |
+| Sales over time | Daily trend, hour × weekday, top and bottom items, discounts | none | RPT-15 | W2-03 (last) | Built; the first charts |
 | Overrides, voids and returns, exceptions | What was approved, undone or flagged | none | RPT-03, RPT-04, RPT-10 | W1-20 | Built |
 | Day reconciliation, cash variance | The day's cash, by session and cashier | none | RPT-02 | W1-11 | Built |
 | **Customers and suppliers** | | | | | |
@@ -81,7 +81,7 @@ The reports are designed the modern way: one frame for all of them (filters at t
 |---|---|---|---|---|
 | [W2-01](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/176) | The report frame (filters, presets, key figures, sortable list, drill-down, CSV, print) and the financial statements: trial balance, profit and loss, balance sheet, cash book, day book, expenses; the account ledger moves to the frame ([plan](plans/W2-01-report-frame-financial-statements.md)) | ACC-07, RPT-11 | W1-08, W1-19, W1-20 | 4 |
 | [W2-02](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/177) | Stock reports: stock ledger, stock at a date, stock movement, reorder list, dead stock, inventory analysis ([plan](plans/W2-02-stock-reports.md), accepted) | RPT-08, RPT-12, RPT-13, RPT-14, PUR-07 (list) | W2-01 | 3 |
-| [W2-03](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178) | Sales and purchase analysis: sales and gross profit, purchase register, purchase and sale rates, sales over time ([plan](plans/W2-03-sales-purchase-analysis.md), accepted) | RPT-07, RPT-09, RPT-15 | W2-01 | 3 |
+| [W2-03](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178) | Sales and purchase analysis: sales and gross profit, purchase register, purchase and sale rates, sales over time ([plan](plans/W2-03-sales-purchase-analysis.md), built) | RPT-07, RPT-09, RPT-15 | W2-01 | 3 |
 | [W2-04](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/179) | Customers and suppliers: partner ledger and statement, balance trend, control reports; the built reports onto the frame; the cash flow statement last | RPT-16, RPT-17, ACC-07 (cash flow) | W2-01 | 2 |
 
 **Total ≈ 12 days**, from 23 Nov; go/no-go is 18 Dec. W2-02 to W2-04 each start with their own plan, after W2-01's frame exists.

@@ -30,4 +30,9 @@
 | **ABC class** | A for the items making the first 80% of sales (or gross profit), B the next 15%, C the last 5% (RPT-14) |
 | **Days of cover** | How many days the stock on hand lasts at the rate it sold over a period |
 | **Stock turnover** | Cost of sales ÷ the average stock value (opening and closing) over a period: how many times the stock was sold through |
+| **Gross profit** | Sales (what customers paid, after every discount) − their cost in the books (the average cost when sold); over a period it equals gross profit on the profit and loss (RPT-07) |
+| **Margin** | Gross profit ÷ sales, as a percentage |
+| **Discount given** | List price × quantity − what the customer paid: a line's own discount and its share of the bill discount together; a price above the list is a negative discount (W2-03) |
+| **Net rate** | A purchase's or sale's value after the line and bill discounts, per unit; an average rate is the total value ÷ the total quantity (RPT-09) |
+| **Spread** | An item's average net sale rate − its average net purchase rate, and as a share of the sale rate (RPT-09) |
 | **Wave** | A build-order block of the MVP (Wave 0 foundations, Wave 1 critical path, Wave 2 rest of MVP) |
