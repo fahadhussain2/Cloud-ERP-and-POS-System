@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#178](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178) |
 | **Module** | reports (back-office screens and API, read only) |
-| **Status** | Answered (owner, 2026-11-19): questions 1–6 as recommended. Waiting for acceptance |
+| **Status** | Accepted (owner, 2026-11-19): questions 1–6 as recommended |
 | **Refs** | RPT-07, RPT-09, RPT-15; CLAUDE.md rules 1, 3, 4, 5, 10; D-017 (one average cost per item), D-044 (a return's cost), D-100 (no legacy bills), D-105 (purchase discounts in the cost), D-110 (reports read the ledgers), D-116 (reports before go-live) |
 | **Depends on** | W2-01 (the frame, periods and comparisons, the Reports home), W2-02 (the item picker, the report choices), W1-20 (the sales register), W1-16 (goods receipts and purchase returns); **the bill-discount posting fix** (see Risks) for the tie to the profit and loss |
 | **Size** | about 3 days: domain golden files ½; API with integration tests 1; four screens and the first charts 1; e2e and docs ½ |
