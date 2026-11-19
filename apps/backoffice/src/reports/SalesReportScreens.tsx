@@ -1048,12 +1048,14 @@ export function SalesOverTimeScreen({ api }: { api: Api }) {
           </ChartPanel>
 
           <ChartPanel title={s(t, 'overTime.hours')}>
-            <ChoiceFilter
-              label={s(t, 'overTime.measure')}
-              value={measure}
-              options={GRID_MEASURES.map((x) => ({ value: x, label: s(t, `overTime.measures.${x}`) }))}
-              onChange={(v) => set({ measure: v })}
-            />
+            <div className="self-start">
+              <ChoiceFilter
+                label={s(t, 'overTime.measure')}
+                value={measure}
+                options={GRID_MEASURES.map((x) => ({ value: x, label: s(t, `overTime.measures.${x}`) }))}
+                onChange={(v) => set({ measure: v })}
+              />
+            </div>
             {report.grid.hours ? (
               <HourGridChart
                 label={s(t, 'overTime.hours')}
@@ -1071,15 +1073,17 @@ export function SalesOverTimeScreen({ api }: { api: Api }) {
           </ChartPanel>
 
           <ChartPanel title={s(t, 'overTime.top')}>
-            <ChoiceFilter
-              label={s(t, 'overTime.rankBy')}
-              value={by}
-              options={SALES_RANKINGS.filter((r) => values || r !== 'profit').map((r) => ({
-                value: r,
-                label: s(t, `overTime.rankings.${r}`),
-              }))}
-              onChange={(v) => set({ by: v })}
-            />
+            <div className="self-start">
+              <ChoiceFilter
+                label={s(t, 'overTime.rankBy')}
+                value={by}
+                options={SALES_RANKINGS.filter((r) => values || r !== 'profit').map((r) => ({
+                  value: r,
+                  label: s(t, `overTime.rankings.${r}`),
+                }))}
+                onChange={(v) => set({ by: v })}
+              />
+            </div>
             <BarList
               label={s(t, 'overTime.top')}
               rows={report.top.map((r) => ({

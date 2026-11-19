@@ -207,8 +207,8 @@ export function TrendChart({
       {at !== null && (
         <div
           role="status"
-          className="pointer-events-none absolute top-1 rounded-md border border-line bg-surface px-2 py-1 text-sm shadow-md"
-          style={{ insetInlineStart: `${Math.min(80, (xAt(at) / W) * 100)}%` }}
+          className="pointer-events-none absolute top-1 rounded-md border border-line bg-surface px-2 py-1 text-sm whitespace-nowrap shadow-md print:hidden"
+          style={{ insetInlineStart: `${Math.min(60, (xAt(at) / W) * 100)}%` }}
         >
           <div className="font-semibold">{points[at]}</div>
           {series.map((s) => (
