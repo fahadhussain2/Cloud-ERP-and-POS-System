@@ -154,6 +154,8 @@ describe('the trial balance on the frame', () => {
       preset: 'lastMonth',
       level: 'accounts',
     });
+    // The new period's report, then its first date changed (its last date stays the one shown).
+    await screen.findByRole('table', { name: en.nav.trialBalance });
     fireEvent.change(screen.getByLabelText(r.frame.from), { target: { value: '2027-10-15' } });
     expect(Object.fromEntries(queryOf(window.location.hash))).toMatchObject({
       from: '2027-10-15',
