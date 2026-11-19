@@ -177,7 +177,7 @@ describe('the cash variance', () => {
     const f = fakeApi();
     wrap(<CashVarianceScreen api={f.api} />);
     expect(await screen.findByText('Ali')).toBeTruthy();
-    expect((screen.getByLabelText(en.reports.frame.period) as HTMLSelectElement).value).toBe('weekToToday');
+    expect(screen.getByLabelText<HTMLSelectElement>(en.reports.frame.period).value).toBe('weekToToday');
     fireEvent.change(screen.getByLabelText(en.reports.frame.period), { target: { value: 'lastMonth' } });
     await waitFor(() =>
       expect(f.calls).toContain('GET /api/reports/cash-variance?from=2026-10-01&to=2026-10-31'),
