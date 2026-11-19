@@ -66,8 +66,8 @@ test('the owner finds a counter bill in the register, traces it, reviews an exce
 
   // The sales register on the bill's day lists it.
   await report(page, bo.nav.salesRegister);
-  await page.getByLabel(r.range.from).fill(bill!.day);
-  await page.getByLabel(r.range.to).fill(bill!.day);
+  await page.getByLabel(r.frame.from).fill(bill!.day);
+  await page.getByLabel(r.frame.to).fill(bill!.day);
   await expect(page.getByRole('table', { name: r.register.list })).toContainText(bill!.number);
 
   // Its trace: made on the counter, accepted by the server, posted.
@@ -86,8 +86,8 @@ test('the owner finds a counter bill in the register, traces it, reviews an exce
     [bill!.id],
   );
   await report(page, bo.nav.exceptions);
-  await page.getByLabel(r.range.from).fill(bill!.day);
-  await page.getByLabel(r.range.to).fill(bill!.day);
+  await page.getByLabel(r.frame.from).fill(bill!.day);
+  await page.getByLabel(r.frame.to).fill(bill!.day);
   const row = page.getByRole('row', { name: new RegExp(r.exc.kinds.clock_skew) });
   await row.getByRole('button', { name: r.exc.review }).click();
   await page.getByRole('dialog').getByLabel(r.exc.note).fill('PC clock fixed');

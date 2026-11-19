@@ -304,7 +304,8 @@
       "status": "Status",
       "final": "Final",
       "provisional": "Provisional",
-      "transit": "Cash in transit at the end of the day: {{amount}} (0 when every cash bill reached the drawer)",
+      "inTransit": "Cash in transit at the day’s end",
+      "holds": "Why the day isn’t final yet",
       "sessions": "Cash sessions",
       "noSessions": "No cash session on this day.",
       "deskSaid": "the desk counted against {{amount}}: some documents haven’t arrived",
@@ -383,8 +384,6 @@
     "variance": {
       "title": "Cash variance",
       "help": "Every counted cash session in the dates, and each cashier’s total.",
-      "from": "From",
-      "to": "To",
       "byCashier": "By cashier",
       "none": "No counted session in these dates.",
       "sessions_one": "{{count}} session",
@@ -392,11 +391,6 @@
       "sessionsTitle": "Sessions"
     },
     "none": "Nothing in these dates.",
-    "range": {
-      "from": "From",
-      "to": "To",
-      "tooLong": "Pick at most 92 days (a quarter)."
-    },
     "kind": {
       "sale": "Sale",
       "return": "Return",
@@ -631,6 +625,7 @@
         "lastQuarter": "Last quarter",
         "thisYear": "This year",
         "lastYear": "Last year",
+        "weekToToday": "A week to today",
         "custom": "Dates…"
       },
       "search": "Search the list",

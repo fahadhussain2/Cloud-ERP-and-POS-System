@@ -174,11 +174,11 @@ export function App({ api }: { api: Api }) {
         ) : shown.screen === 'cashVariance' ? (
           <CashVarianceScreen api={api} />
         ) : shown.screen === 'salesRegister' ? (
-          <SalesRegisterScreen api={api} />
+          <SalesRegisterScreen api={api} permissions={me.permissions} />
         ) : shown.screen === 'overridesReport' ? (
-          <OverridesScreen api={api} />
+          <OverridesScreen api={api} permissions={me.permissions} />
         ) : shown.screen === 'voidsReturns' ? (
-          <VoidsReturnsScreen api={api} />
+          <VoidsReturnsScreen api={api} permissions={me.permissions} />
         ) : shown.screen === 'stockReport' ? (
           <StockReportScreen api={api} />
         ) : shown.screen === 'stockAt' ? (
