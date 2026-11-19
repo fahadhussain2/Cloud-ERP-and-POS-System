@@ -305,7 +305,7 @@
       "final": "Final",
       "provisional": "Provisional",
       "inTransit": "Cash in transit at the day’s end",
-      "holds": "What keeps the day provisional",
+      "holds": "Why the day isn’t final yet",
       "sessions": "Cash sessions",
       "noSessions": "No cash session on this day.",
       "deskSaid": "the desk counted against {{amount}}: some documents haven’t arrived",
