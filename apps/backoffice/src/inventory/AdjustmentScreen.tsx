@@ -1,5 +1,5 @@
 import type { AdjustmentView, InventoryItem, InventoryLookups, StockDocumentRow } from '@erp/contracts';
-import { adjustmentApproval, checkAdjustment, isDateLocked, isEmptyDraft } from '@erp/domain';
+import { adjustmentApproval, checkAdjustment, isEmptyDraft } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -25,7 +25,7 @@ import type { Api } from '../api';
 import { qtyText, qtyValue } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
 import { carry, href, navigate, takeCarried } from '../router';
-import { inventoryRefusal, locationName, problemText, today, useInventoryLookups } from './data';
+import { dateProblem, inventoryRefusal, locationName, problemText, useInventoryLookups } from './data';
 import { StatusOf } from './TransferScreen';
 
 // Stock adjustments (W1-18, INV-05; owner answers 1 and 3): found (+) or gone (−) at one location, with a reason,
@@ -181,7 +181,7 @@ function AdjustmentForm({
   const fixedAt = a !== undefined && !lookups.locations.some((l) => l.id === a.locationId);
   const [h, setH] = useState({
     locationId: a?.locationId ?? lookups.locations.find((l) => l.kind === 'shop')?.id ?? '',
-    adjustedOn: a?.adjustedOn ?? today(),
+    adjustedOn: a?.adjustedOn ?? lookups.today,
     reason: a?.reason ?? '',
     note: a?.note ?? '',
   });
@@ -209,14 +209,10 @@ function AdjustmentForm({
   const nan = (v: number | null | undefined) => (v === undefined ? Number.NaN : (v ?? 0));
   const used = lines.filter((l) => l.item.id !== null || l.qty.trim() !== '');
   // The owner can't approve one dated on or before the lock date either.
-  const approveLocked =
-    a && isDateLocked(a.adjustedOn, lookups.lockDate)
-      ? t('inventory.errors.date_locked', { date: lookups.lockDate })
-      : null;
-  // A date on or before the lock date can't post (D-108): Post waits, and the date says why. Save draft still works.
-  const locked = isDateLocked(h.adjustedOn, lookups.lockDate)
-    ? t('inventory.errors.date_locked', { date: lookups.lockDate })
-    : null;
+  const approveLocked = a ? dateProblem(t, a.adjustedOn, lookups) : null;
+  // A date after the shop's business date (W2-05) or on or before the lock date (D-108) can't post: Post waits, and
+  // the date says why. Save draft still works.
+  const locked = dateProblem(t, h.adjustedOn, lookups);
   const check = checkAdjustment({
     locationId: h.locationId || null,
     locationKind: fixedAt ? 'transit' : (lookups.locations.find((l) => l.id === h.locationId)?.kind ?? null),
@@ -350,6 +346,7 @@ function AdjustmentForm({
             label={t('inventory.fields.adjustedOn')}
             type="date"
             error={locked}
+            max={lookups.today}
             value={h.adjustedOn}
             onChange={(e) => set('adjustedOn', e.target.value)}
           />

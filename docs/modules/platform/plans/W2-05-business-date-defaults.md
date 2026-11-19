@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Issue** | none yet: opened when the owner accepts this plan (W2-05 is the next free number on 2026-11-19) |
+| **Issue** | [#185](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/185) |
 | **Module** | platform (the shop's day), touching purchasing, inventory and accounting screens and their API |
-| **Status** | Proposed (2026-11-19): waiting for the owner's answers 1–4 |
+| **Status** | Accepted (owner, 2026-11-19, PR #184): answers 1–4 as recommended ("let's do it now"). Built (2026-11-19) on `w2-05-business-date-defaults` |
 | **Refs** | GLOSSARY *Business date*; data model §tenants (`timezone`, `day_cutoff_hour`, `lock_date`); ACC-06; PUR-01, PUR-02, PUR-09; INV-04, INV-05; CLAUDE.md rules 2, 7, 10; D-108 (dates and the lock date); found during W2-02 (#183) |
 | **Depends on** | W1-16 (purchasing), W1-18 (stock operations), W1-19 (back-office accounting, `shopDay`, `checkDocumentDate`) |
 | **Size** | about 1 day: API and contracts ¼, six forms ¼, tests ½ |
@@ -59,9 +59,10 @@ The counters date a bill with the **business date** (`businessDate(now, timezone
 |---|---|
 | **The day** | `PurchasingLookups` and `InventoryLookups` (`packages/contracts`) gain `today: string`, filled by `shopDay(c, now())`, like `AccountingLookups`. No new endpoint, no new rule outside `packages/domain` (rule 2: `businessDate` and `checkDocumentDate` already live there) |
 | **Forms** | Goods receipt (received on, bill date), purchase return, supplier payment, transfer sending and receiving, adjustment default to `lookups.today` and set `max={lookups.today}`. Remove `today()` from `purchasing/data.ts` and `inventory/data.ts` |
-| **API** | On post of a goods receipt, purchase return, transfer (sending and receiving) and adjustment, and on saving a supplier payment: `checkDocumentDate(date, today, lockDate)` before `lockedOn`; `date_in_future` → `400 {error: 'invalid', problems: ['date_in_future']}`, as accounting returns it. Drafts are saved with any date |
+| **API** | On post of a goods receipt, purchase return, transfer (sending and receiving) and adjustment, and on saving a supplier payment: `dateRefusal` (`apps/api/src/lock.ts`, `checkDocumentDate` on the document's stored date) replaces `lockedOn` there. A date after the business date → `400 {error: 'date_in_future', today}`, shaped like the existing `409 {error: 'date_locked', lockDate}` these screens already show (built so instead of accounting's `problems` list, 2026-11-19). Drafts are saved with any date |
 | **Messages** | `purchasing.errors.date_in_future` and `inventory.errors.date_in_future` (i18n keys, rule 10), same wording as `accounting.problems.date_in_future` |
 | **Counters** | Unchanged: the POS already dates by business date and is never refused (rule 7) |
+| **Report screens** (added by the owner, 2026-11-19) | `GET /api/shop/today` (any signed-in user, `shopDay`) and `useShopToday` (`apps/backoffice/src/shopDay.ts`) replace the browser `dayOf` helper: *Day reconciliation* opens on the business day before the shop's, *Cash variance* on the 7 days up to it, the sales register, overrides, voids and returns and exceptions on it, the ageing as on it. Only the dates a screen starts on change; the reports already read by business date in the API |
 
 ## Tests written first
 
@@ -83,7 +84,7 @@ The counters date a bill with the **business date** (`businessDate(now, timezone
 1. Failing tests (component and integration), committed.
 2. Contracts and lookups (`today`), then the API date checks.
 3. The six forms, the messages, the e2e fix.
-4. A decision-log entry (next free number): *back-office documents default to the shop's business date and are never dated after it*, amending D-108's dates.
+4. Decision-log entry **D-117**: *back-office documents are dated by the shop's business date, never after it*, amending D-108's dates.
 
 ## Risks
 
@@ -92,6 +93,5 @@ The counters date a bill with the **business date** (`businessDate(now, timezone
 
 ## Out of scope (noted, not changed here)
 
-- **Report screens** that pick their first date from the browser: *Day reconciliation* (`screens/ReportsScreens.tsx:83`, yesterday) and *Cash variance* (`:386`, the last 7 days to today). Reports read by business date in the API; only the pre-filled date is off between 00:00 and 04:00. A small follow-up, or part of W2-03 / W2-04 if they touch those screens.
 - **The generated opening on staging** (`apps/api/src/generated-opening.ts:29`) dates itself by the UTC calendar date; staging only, never production.
 - **A transfer received before it was sent** is not refused today; a separate question if it matters.

@@ -217,4 +217,6 @@ export interface PurchasingLookups {
   can: { receive: boolean; payByBank: boolean };
   /** The shop's lock date (D-108): a document dated on or before it can't post; null = none. */
   lockDate: string | null;
+  /** The shop's business date now (04:00 cut-off): the forms' default and latest date (W2-05). */
+  today: string;
 }

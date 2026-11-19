@@ -2,13 +2,14 @@ import type { PurchasingLookups, ReceiptView, SupplierDetail, SupplierRow } from
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Api } from '../api';
 import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import { href, navigate } from '../router';
 import { ReceiptScreen } from './ReceiptScreen';
+import { ReturnScreen } from './ReturnScreen';
 import { SupplierScreen, SuppliersScreen } from './SuppliersScreen';
 
 // The purchasing screens (W1-16) over a fake API: a receipt checked against the bill as you type (the difference,
@@ -16,6 +17,8 @@ import { SupplierScreen, SuppliersScreen } from './SuppliersScreen';
 // for those who may (owner answer 2).
 
 const MONEY = { locale: 'en-PK', currency: 'PKR', minorUnits: 2 };
+/** The shop's business date, from the API (W2-05). */
+const TODAY = '2026-11-19';
 const lookups = (over: Partial<PurchasingLookups> = {}): PurchasingLookups => ({
   locations: [
     { id: 'shop', code: 'SHOP', name: 'Shop' },
@@ -27,6 +30,7 @@ const lookups = (over: Partial<PurchasingLookups> = {}): PurchasingLookups => ({
   money: MONEY,
   can: { receive: true, payByBank: false },
   lockDate: null,
+  today: TODAY,
   ...over,
 });
 const DRAFT: ReceiptView = {
@@ -401,5 +405,76 @@ describe('the suppliers table (owner review)', () => {
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: en.purchasing.suppliers.delete }));
     expect(await screen.findByText('Typo Traders is deleted.')).toBeDefined();
+  });
+});
+
+// W2-05: every purchasing form is dated by the shop's business date from the API (04:00 cut-off), never by this
+// browser's calendar, and Post waits on a date after it. The browser's clock is set days away from the shop's day,
+// so the test holds in any time zone.
+describe("the shop's business date (W2-05)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-21T12:00:00.000Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+  const onToday = (input: HTMLInputElement) => {
+    expect(input.value).toBe(TODAY);
+    expect(input.max).toBe(TODAY);
+  };
+  const ahead = "The date can't be after 2026-11-19, the shop's business date.";
+
+  it('a new goods receipt is received and billed on it, and received no later', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="new" />);
+    onToday(await screen.findByLabelText<HTMLInputElement>(en.purchasing.fields.receivedOn));
+    // The bill date is the supplier's paper: the same default, no limit (owner answer 3).
+    const bill = screen.getByLabelText<HTMLInputElement>(en.purchasing.fields.billDate);
+    expect(bill.value).toBe(TODAY);
+    expect(bill.max).toBe('');
+  });
+
+  it('greys out Post and says why when Received on is after it', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    fireEvent.change(await screen.findByLabelText(en.purchasing.fields.billTotal), {
+      target: { value: '13401' },
+    });
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post }).disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText(en.purchasing.fields.receivedOn), {
+      target: { value: '2026-11-20' },
+    });
+    expect(screen.getByText(ahead)).toBeDefined();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post }).disabled).toBe(true);
+  });
+
+  it('says why when Post is refused for a date after it', async () => {
+    const f = fakeApi(lookups(), {
+      'POST /api/purchasing/receipts/r1/post': {
+        status: 400,
+        body: { error: 'date_in_future', today: TODAY },
+      },
+    });
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    fireEvent.change(await screen.findByLabelText(en.purchasing.fields.billTotal), {
+      target: { value: '13401' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.post }));
+    expect(await screen.findByText(ahead)).toBeDefined();
+  });
+
+  it('a new purchase return is returned on it', async () => {
+    show(<ReturnScreen api={fakeApi(lookups()).api} id="new" />);
+    onToday(await screen.findByLabelText<HTMLInputElement>(en.purchasing.fields.returnedOn));
+  });
+
+  it('a supplier payment is paid on it, and not sent when dated later', async () => {
+    const f = fakeApi(lookups({ can: { receive: false, payByBank: true } }));
+    show(<SupplierScreen api={f.api} id="s1" />);
+    fireEvent.click(await screen.findByRole('button', { name: en.purchasing.pay.action }));
+    const date = await screen.findByLabelText<HTMLInputElement>(en.purchasing.pay.date);
+    onToday(date);
+    fireEvent.change(screen.getByLabelText(en.purchasing.pay.amount), { target: { value: '5000' } });
+    fireEvent.change(date, { target: { value: '2026-11-20' } });
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.pay.confirm }));
+    expect((await screen.findAllByText(ahead)).length).toBeGreaterThan(0);
+    expect(f.calls.some((c) => c.method === 'POST')).toBe(false);
   });
 });

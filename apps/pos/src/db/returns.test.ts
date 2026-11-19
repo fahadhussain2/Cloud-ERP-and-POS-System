@@ -414,6 +414,8 @@ describe('a return on the cash desk', () => {
     });
     expect(saved.handover?.kind).toBe('payout');
     expect(saved.handover?.amount).toBe(430000);
-    expect(deskState(db).local.map((h) => h.billNumber)).toContain(saved.document.number);
+    // The desk lists the last 7 days of its handovers: read on the test's own day, not the real clock (the test
+    // stopped passing 7 days after T0).
+    expect(deskState(db, T0 + 60_000).local.map((h) => h.billNumber)).toContain(saved.document.number);
   });
 });

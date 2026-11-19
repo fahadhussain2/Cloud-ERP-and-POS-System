@@ -2,7 +2,7 @@ import type { AgeingView, BillTraceView, ExceptionsView, SalesRegisterView, Stoc
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Api } from '../api';
 import { i18n } from '../i18n';
@@ -28,6 +28,8 @@ function fakeApi(answers: Record<string, unknown>) {
   const api: Api = (method, path, body) => {
     calls.push({ method, path, body });
     const key = `${method} ${path.split('?')[0]}`;
+    // The shop's business date, where the report screens start (W2-05).
+    if (key === 'GET /api/shop/today') return Promise.resolve({ status: 200, body: { today: '2026-11-19' } });
     return Promise.resolve(
       key in answers ? { status: 200, body: answers[key] } : { status: 404, body: null },
     );
@@ -251,5 +253,31 @@ describe('Trace a bill', () => {
   it('says when no such bill is here', async () => {
     show(<TraceScreen api={fakeApi({}).api} number="S-X" />);
     expect(await screen.findByText('No bill S-X in this shop.')).toBeTruthy();
+  });
+});
+
+// W2-05: the dates a report starts on come from the shop's business date (the API), not this browser's calendar.
+// The browser's clock is set days away from the shop's day (19 November), so the test holds anywhere.
+describe("the shop's business date (W2-05)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-21T12:00:00.000Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('a register opens on it, and the ageing is as on it', async () => {
+    const register = fakeApi({});
+    show(<SalesRegisterScreen api={register.api} />);
+    await waitFor(() =>
+      expect(register.calls.map((c) => c.path)).toContain(
+        '/api/reports/sales-register?from=2026-11-19&to=2026-11-19',
+      ),
+    );
+    cleanup();
+    const ageing = fakeApi({});
+    show(<AgeingScreen api={ageing.api} />);
+    await waitFor(() =>
+      expect(ageing.calls.map((c) => c.path)).toContain('/api/reports/ageing?side=customers&asOf=2026-11-19'),
+    );
   });
 });

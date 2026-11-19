@@ -35,7 +35,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHook
 import type pg from 'pg';
 
 import { requireAnyPermission, requirePermission } from '../auth/routes';
-import { lockedOn } from '../lock';
+import { dateRefusal, shopDay } from '../lock';
 import { moneyOf } from '../reports/routes';
 
 // Stock operations in the back office (W1-18 plan; INV-04, INV-05, INV-07; owner answers 1–4; D-107).
@@ -195,9 +195,9 @@ export function registerInventory(scope: FastifyInstance, { pool, now, requireAu
     type: 'stock_transfer' | 'stock_transfer_receipt' | 'stock_adjustment',
     id: string,
   ) => {
-    // Nothing posts into a locked month from the back office (D-108); pick a later date.
-    const locked = await lockedOn(c, type, id);
-    if (locked !== null) throw new Refusal(409, { error: 'date_locked', lockDate: locked });
+    // Nothing posts after the shop's business date (W2-05) or into a locked month (D-108); pick another date.
+    const refused = await dateRefusal(c, type, id, now());
+    if (refused) throw new Refusal(refused.error === 'date_locked' ? 409 : 400, refused);
     const outcome = await postDocument(c, { tenantId: req.auth!.tenantId, type, id, now: now() });
     if (outcome.status === 'failed') throw new Refusal(400, { error: 'posting_failed', code: outcome.code });
   };
@@ -236,6 +236,7 @@ export function registerInventory(scope: FastifyInstance, { pool, now, requireAu
           settings: allowed(req, 'admin.settings'),
         },
         lockDate: t?.lock_date ?? null,
+        today: (await shopDay(c, now())).today,
       };
       return out;
     }),

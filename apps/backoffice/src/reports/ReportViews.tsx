@@ -32,7 +32,8 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../api';
 import { qtyText } from '../catalog/data';
 import { href, navigate } from '../router';
-import { DateField, dayOf } from '../screens/ReportsScreens';
+import { DateField } from '../screens/ReportsScreens';
+import { useShopToday } from '../shopDay';
 import { FormDialog } from '../staff/dialogs';
 
 // The W1-20 reports and support screens (RPT-01, RPT-03, RPT-04, RPT-05, RPT-06, RPT-10, PLT-12, D-110): filters at
@@ -148,9 +149,13 @@ function Totals({
   );
 }
 
-const useRange = () => {
-  const [from, setFrom] = useState(() => dayOf(0));
-  const [to, setTo] = useState(() => dayOf(0));
+/** From and to: the shop's business date (W2-05) until other dates are picked. */
+const useRange = (api: Api) => {
+  const today = useShopToday(api) ?? '';
+  const [pickedFrom, setFrom] = useState<string | null>(null);
+  const [pickedTo, setTo] = useState<string | null>(null);
+  const from = pickedFrom ?? today;
+  const to = pickedTo ?? today;
   return { from, to, setFrom, setTo, query: `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` };
 };
 
@@ -158,7 +163,7 @@ const useRange = () => {
 
 export function SalesRegisterScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
-  const r = useRange();
+  const r = useRange(api);
   const url = r.from && r.to ? `/api/reports/sales-register?${r.query}` : null;
   const { report, error } = useReport<SalesRegisterView>(api, url);
   return (
@@ -277,7 +282,7 @@ export function SalesRegisterScreen({ api }: { api: Api }) {
 
 export function OverridesScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
-  const r = useRange();
+  const r = useRange(api);
   const url = r.from && r.to ? `/api/reports/overrides?${r.query}` : null;
   const { report, error } = useReport<OverridesView>(api, url);
   return (
@@ -370,7 +375,7 @@ const kindName = (t: TFunction, kind: string) => t(`reports.ovr.kinds.${kind}`, 
 
 export function VoidsReturnsScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
-  const r = useRange();
+  const r = useRange(api);
   const url = r.from && r.to ? `/api/reports/voids-returns?${r.query}` : null;
   const { report, error } = useReport<VoidsReturnsView>(api, url);
   return (
@@ -621,7 +626,10 @@ const BUCKETS = ['notDue', 'days1to30', 'days31to60', 'days61to90', 'over90'] as
 export function AgeingScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
   const [side, setSide] = useState<'customers' | 'suppliers'>('customers');
-  const [asOf, setAsOf] = useState(() => dayOf(0));
+  // As on the shop's business date (W2-05) until another date is picked.
+  const today = useShopToday(api) ?? '';
+  const [picked, setAsOf] = useState<string | null>(null);
+  const asOf = picked ?? today;
   const url = asOf ? `/api/reports/ageing?side=${side}&asOf=${encodeURIComponent(asOf)}` : null;
   const { report, error } = useReport<AgeingView>(api, url);
   return (
@@ -722,7 +730,7 @@ const SEVERITY_TONE = { high: 'bad', medium: 'warn', low: 'neutral' } as const;
 
 export function ExceptionsScreen({ api, permissions }: { api: Api; permissions: readonly string[] }) {
   const { t } = useTranslation();
-  const r = useRange();
+  const r = useRange(api);
   const [status, setStatus] = useState<'open' | 'all'>('open');
   const [version, setVersion] = useState(0);
   const [reviewing, setReviewing] = useState<ExceptionRow | null>(null);

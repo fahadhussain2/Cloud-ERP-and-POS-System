@@ -25,6 +25,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { addDays, useShopToday } from '../shopDay';
 
 // The cash reports (CSH-08, RPT-02, cash desk spec, W1-11): the day reconciliation of one branch and business date,
 // and the cash variance by session over a date range, each with its CSV. A manager acknowledges a waiting variance on
@@ -35,13 +36,6 @@ interface Branch {
   code: string;
   name: string;
 }
-
-/** A date as YYYY-MM-DD in this browser's time zone, `days` from today. */
-export const dayOf = (days: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
 
 const ACK_TONE: Record<AcknowledgementStatus, ChipTone> = {
   open: 'neutral',
@@ -80,7 +74,10 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
   const { t, i18n } = useTranslation();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchId, setBranchId] = useState('');
-  const [date, setDate] = useState(() => dayOf(-1));
+  // The business day before the shop's (W2-05), until another date is picked.
+  const today = useShopToday(api);
+  const [picked, setDate] = useState<string | null>(null);
+  const date = picked ?? (today === null ? '' : addDays(today, -1));
   const [report, setReport] = useState<DayReconciliationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const branchField = useId();
@@ -383,8 +380,12 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
 
 export function CashVarianceScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
-  const [from, setFrom] = useState(() => dayOf(-7));
-  const [to, setTo] = useState(() => dayOf(0));
+  // The 7 days up to the shop's business date (W2-05), until other dates are picked.
+  const today = useShopToday(api);
+  const [pickedFrom, setFrom] = useState<string | null>(null);
+  const [pickedTo, setTo] = useState<string | null>(null);
+  const from = pickedFrom ?? (today === null ? '' : addDays(today, -7));
+  const to = pickedTo ?? today ?? '';
   const [report, setReport] = useState<CashVarianceResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const query = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;

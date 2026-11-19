@@ -1,7 +1,7 @@
 import type { CashVarianceResponse, DayReconciliationResponse } from '@erp/contracts';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nextProvider } from 'react-i18next';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Api } from '../api';
 import { i18n } from '../i18n';
@@ -77,6 +77,7 @@ function fakeApi() {
   let acknowledged = false;
   const api: Api = (method, path) => {
     calls.push(`${method} ${path}`);
+    if (path === '/api/shop/today') return Promise.resolve({ status: 200, body: { today: '2026-11-19' } });
     if (path === '/api/branches')
       return Promise.resolve({ status: 200, body: [{ id: 'b1', code: 'MAIN', name: 'Main shop' }] });
     if (path.startsWith('/api/reports/day-reconciliation'))
@@ -141,5 +142,33 @@ describe('the cash variance', () => {
     wrap(<CashVarianceScreen api={fakeApi().api} />);
     expect(await screen.findByText('Ali')).toBeTruthy();
     expect(screen.getByText(/2 sessions/)).toBeTruthy();
+  });
+});
+
+// W2-05: the dates a cash report starts on come from the shop's business date (the API), not this browser's
+// calendar. The browser's clock is set days away from the shop's day (19 November), so the test holds anywhere.
+describe("the shop's business date (W2-05)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-21T12:00:00.000Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('the day reconciliation opens on the business day before it', async () => {
+    const f = fakeApi();
+    wrap(<DayReconciliationScreen api={f.api} permissions={['reports.view']} />);
+    expect(await screen.findByText('Provisional')).toBeTruthy();
+    expect(f.calls.filter((c) => c.includes('/day-reconciliation'))).toEqual([
+      'GET /api/reports/day-reconciliation?branchId=b1&date=2026-11-18',
+    ]);
+  });
+
+  it('the cash variance opens on the 7 days up to it', async () => {
+    const f = fakeApi();
+    wrap(<CashVarianceScreen api={f.api} />);
+    expect(await screen.findByText('Ali')).toBeTruthy();
+    expect(f.calls.filter((c) => c.includes('/cash-variance'))).toEqual([
+      'GET /api/reports/cash-variance?from=2026-11-12&to=2026-11-19',
+    ]);
   });
 });

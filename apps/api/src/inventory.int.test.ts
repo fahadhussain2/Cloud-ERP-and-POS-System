@@ -27,7 +27,8 @@ let tenant: string;
 let items: Record<string, string>;
 const loc: Record<string, string> = {};
 const cookies: Record<string, string> = {};
-const app = () => buildApp({ pool, now: () => new Date('2026-11-08T06:00:00.000Z') });
+// The morning of 9 November: the transfer below is received that day, never after the shop's business date (W2-05).
+const app = () => buildApp({ pool, now: () => new Date('2026-11-09T06:00:00.000Z') });
 
 async function addUser(username: string, template: RoleTemplateKey, tenantId = tenant) {
   const hash = await hashPassword(PASSWORD);

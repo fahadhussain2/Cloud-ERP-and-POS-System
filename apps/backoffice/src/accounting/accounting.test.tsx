@@ -9,7 +9,7 @@ import { formatMoney } from '@erp/ui';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Api } from '../api';
 import { i18n } from '../i18n';
@@ -420,5 +420,36 @@ describe('periods', () => {
         reason: 'A missed receipt',
       }),
     );
+  });
+});
+
+// W2-05: the accounting forms were already dated by the shop's business date from the API; they stay so, whatever
+// this browser's calendar says (its clock is set days away from the shop's day).
+describe("the shop's business date (W2-05)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-21T12:00:00.000Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+  const onToday = (input: HTMLInputElement) => {
+    expect(input.value).toBe('2026-11-08');
+    expect(input.max).toBe('2026-11-08');
+  };
+
+  it('a receipt, an expense and a transfer are dated on it, and no later', async () => {
+    show(<MoneyScreen api={fakeApi(lookups()).api} />);
+    await screen.findByText('EX000001');
+    for (const start of [a.money.newReceipt, a.money.newExpense, a.money.newTransfer]) {
+      fireEvent.click(screen.getByRole('button', { name: start }));
+      const dialog = await screen.findByRole('dialog');
+      onToday(within(dialog).getByLabelText<HTMLInputElement>(a.fields.date));
+      fireEvent.keyDown(dialog, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    }
+  });
+
+  it('a new journal voucher is dated on it, and no later', async () => {
+    show(<VoucherScreen api={fakeApi(lookups()).api} id="new" />);
+    onToday(await screen.findByLabelText<HTMLInputElement>(a.fields.date));
   });
 });
