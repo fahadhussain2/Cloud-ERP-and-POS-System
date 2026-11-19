@@ -261,6 +261,43 @@ describe('the cash desk screen', () => {
     await waitFor(() => expect(screen.queryByText('C03-S000412')).toBeNull());
   });
 
+  it('keeps the bill the cashier picked when the queue changes before Enter', async () => {
+    // A pull lands between the click and Enter with an older bill in a group above: the highlight and Enter stay on
+    // the picked bill, not on whatever row now has its place.
+    const f = fakeDesk();
+    let queue = [bill('C03-S000412', 'imran', 432000), bill('C03-S000416', 'imran', 90000)];
+    const counter: CashDeskCounter = {
+      ...f.counter,
+      deskState: async () => ({ ...(await f.counter.deskState()), queue }),
+    };
+    const screenWith = (syncTick: number) => (
+      <I18nextProvider i18n={i18n}>
+        <CashDeskScreen
+          counter={counter}
+          money={{ locale: 'en-PK', currency: 'PKR', minorUnits: 2 }}
+          user={ALI}
+          staff={[ALI, IMRAN, BILAL]}
+          branchId="b"
+          timeZone="Asia/Karachi"
+          offline={false}
+          offlineSince={null}
+          syncTick={syncTick}
+          onSaved={() => {}}
+          onSell={() => {}}
+          onLock={() => {}}
+        />
+      </I18nextProvider>
+    );
+    const { rerender } = render(screenWith(0));
+    fireEvent.click((await screen.findByText('C03-S000416')).closest('tr'));
+    queue = [bill('C01-S000100', 'ali', 517500), ...queue];
+    rerender(screenWith(1));
+    await screen.findByText('C01-S000100');
+    expect(screen.getByRole('row', { selected: true }).textContent).toContain('C03-S000416');
+    press('Enter');
+    await waitFor(() => expect(f.calls[0]).toMatchObject({ billNumber: 'C03-S000416', method: 'queue' }));
+  });
+
   it('E corrects the cash received before confirming', async () => {
     const f = fakeDesk();
     show(f.counter);
@@ -517,7 +554,7 @@ describe('collections, cash-out and the count (W1-11)', { timeout: 15_000 }, () 
     expect(approval.queryByRole('button', { name: /^Ali/ })).toBeNull();
     fireEvent.click(approval.getByRole('button', { name: /Imran/ }));
     fireEvent.change(approval.getByLabelText(/PIN/), { target: { value: '1234' } });
-    fireEvent.submit(approval.getByLabelText(/PIN/).closest('form')!);
+    fireEvent.submit(approval.getByLabelText(/PIN/).closest('form'));
     await screen.findByText(/given back for C03-S000051 \(D01-M000012\)/);
     expect(f.desk()).toEqual(['give back C03-S000051 approved by imran']);
     expect(f.printed()).toEqual(['cash_out D01-M000012']);
