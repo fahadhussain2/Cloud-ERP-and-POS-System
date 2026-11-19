@@ -1,17 +1,15 @@
-import type { Page } from '@playwright/test';
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { report, signOut } from './backoffice';
+import { report, signInAsOwner as signIn } from './backoffice';
 import { expect, test } from './counter-test';
-import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
+import { SHOP } from './fixtures';
 
 // W2-02 plan (RPT-08, RPT-12, RPT-13, PUR-07 list; D-116): the owner reads the stock on the report frame. After the
 // counter's sales (counter.spec) and the supplier's bill (purchasing.spec): stock at today shows the stock the shop has;
 // a sold part's stock ledger opens the bill's trace; an item below its minimum is on the reorder list under its
 // supplier, and prints; the stock movement downloads as CSV. Reads only, except ENOL001's reorder levels, put back after.
 
-const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
 const r = bo.reports.stockReports;
 
 test.describe.configure({ mode: 'serial' });
@@ -27,20 +25,6 @@ async function sql<T extends pg.QueryResultRow>(text: string, params: unknown[] 
     await c.end();
   }
 }
-
-/** As the owner, whoever the shared browser profile left signed in. */
-const signIn = async (page: Page) => {
-  await page.goto(BACKOFFICE);
-  const form = page.getByLabel(bo.login.shopCode);
-  const nav = page.getByRole('navigation', { name: bo.nav.menu });
-  await expect(form.or(nav)).toBeVisible();
-  if (await nav.isVisible()) await signOut(page);
-  await form.fill(SHOP);
-  await page.getByLabel(bo.login.username).fill(OWNER.username);
-  await page.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
-  await page.getByRole('button', { name: bo.login.submit }).click();
-  await expect(page.getByRole('navigation', { name: bo.nav.menu })).toBeVisible();
-};
 
 /** Thousandths as the screens show them: 2500 → "2.5". */
 const qtyText = (t: number) => {

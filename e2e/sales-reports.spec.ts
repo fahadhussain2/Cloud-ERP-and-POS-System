@@ -1,10 +1,9 @@
-import type { Page } from '@playwright/test';
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { report, signOut } from './backoffice';
+import { report, signInAsOwner as signIn } from './backoffice';
 import { expect, test } from './counter-test';
-import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
+import { SHOP } from './fixtures';
 
 // W2-03 plan (RPT-07, RPT-09, RPT-15; D-116): the owner reads sales and purchases on the report frame. After the
 // counter's sales (counter.spec) and the supplier's bill (purchasing.spec): sales and gross profit for today, by
@@ -12,7 +11,6 @@ import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
 // supplier's receipt and opens it; the rates show BRPD001's sale and what Naveed Glass was paid; sales over time draws
 // its charts, prints them, and downloads as CSV. Reads only.
 
-const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
 const r = bo.reports.salesReports;
 
 test.describe.configure({ mode: 'serial' });
@@ -28,20 +26,6 @@ async function sql<T extends pg.QueryResultRow>(text: string, params: unknown[] 
     await c.end();
   }
 }
-
-/** As the owner, whoever the shared browser profile left signed in. */
-const signIn = async (page: Page) => {
-  await page.goto(BACKOFFICE);
-  const form = page.getByLabel(bo.login.shopCode);
-  const nav = page.getByRole('navigation', { name: bo.nav.menu });
-  await expect(form.or(nav)).toBeVisible();
-  if (await nav.isVisible()) await signOut(page);
-  await form.fill(SHOP);
-  await page.getByLabel(bo.login.username).fill(OWNER.username);
-  await page.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
-  await page.getByRole('button', { name: bo.login.submit }).click();
-  await expect(page.getByRole('navigation', { name: bo.nav.menu })).toBeVisible();
-};
 
 /** The shop's business date now (04:00 cut-off), and the finalized bills on it. */
 const TODAY = `((now() AT TIME ZONE t.timezone) - make_interval(hours => t.day_cutoff_hour))::date`;
