@@ -121,7 +121,12 @@ afterAll(async () => {
 
 describe('at 00:30 Karachi the shop is still on the day before', () => {
   it('every back-office screen gets that day from the API', async () => {
-    for (const url of ['/api/purchasing/lookups', '/api/inventory/lookups', '/api/accounting/lookups']) {
+    for (const url of [
+      '/api/purchasing/lookups',
+      '/api/inventory/lookups',
+      '/api/accounting/lookups',
+      '/api/shop/today',
+    ]) {
       const res = await send('GET', url);
       expect(res.statusCode, url).toBe(200);
       expect(res.json<{ today: string }>().today, url).toBe(TODAY);
@@ -251,7 +256,12 @@ describe('at 04:00 Karachi the next day opens', () => {
   it('the screens get the new day and a document dated on it posts', async () => {
     clock = CUT_OFF;
     await login();
-    for (const url of ['/api/purchasing/lookups', '/api/inventory/lookups', '/api/accounting/lookups'])
+    for (const url of [
+      '/api/purchasing/lookups',
+      '/api/inventory/lookups',
+      '/api/accounting/lookups',
+      '/api/shop/today',
+    ])
       expect((await send('GET', url)).json<{ today: string }>().today, url).toBe(TOMORROW);
     const draft = (await send('POST', '/api/purchasing/receipts', receipt(TOMORROW, 'INV-2'))).json<Made>();
     const posted = await send('POST', `/api/purchasing/receipts/${draft.id}/post`, {
