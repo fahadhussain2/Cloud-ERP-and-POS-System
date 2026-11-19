@@ -154,15 +154,14 @@ export function CashDeskScreen({
   const index = found >= 0 ? found : Math.min(selected.index, bills.length - 1);
   const current = bills[index] ?? null;
   const select = (i: number) => setSelected({ id: bills[i]?.id ?? null, index: i });
+  const currentId = current?.id ?? null;
+  // Whatever row is shown picked stays picked by its id, also one that took the place of a bill that left (state
+  // adjusted while rendering, so no frame shows another pick).
+  if (currentId !== null && currentId !== selected.id) setSelected({ id: currentId, index });
   const session = desk?.session ?? null;
   const open = session?.status === 'open' ? session : null;
 
   // The selected bill stays in view as ↑ ↓ or a scan move it (the rows scroll inside the panel, like the search list).
-  const currentId = current?.id ?? null;
-  // Whatever row is shown picked stays picked by its id, also one that took the place of a bill that left.
-  useEffect(() => {
-    if (currentId !== null && currentId !== selected.id) setSelected({ id: currentId, index });
-  }, [currentId, selected.id, index]);
   useEffect(() => {
     queuePanel.current
       ?.querySelector<HTMLElement>('tr[aria-selected="true"]')
