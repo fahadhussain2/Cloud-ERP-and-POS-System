@@ -171,6 +171,21 @@ describe('the cash variance', () => {
     expect(await screen.findByText('Ali')).toBeTruthy();
     expect(screen.getByText(/2 sessions/)).toBeTruthy();
   });
+
+  it('starts on the week to the business date, and a picked preset is worked out on it', async () => {
+    window.location.hash = href.cashVariance;
+    const f = fakeApi();
+    wrap(<CashVarianceScreen api={f.api} />);
+    expect(await screen.findByText('Ali')).toBeTruthy();
+    expect((screen.getByLabelText(en.reports.frame.period) as HTMLSelectElement).value).toBe('weekToToday');
+    fireEvent.change(screen.getByLabelText(en.reports.frame.period), { target: { value: 'lastMonth' } });
+    await waitFor(() =>
+      expect(f.calls).toContain('GET /api/reports/cash-variance?from=2026-10-01&to=2026-10-31'),
+    );
+    expect(screen.getByRole('table', { name: en.reports.variance.sessionsTitle }).textContent).toContain(
+      en.reports.variance.none,
+    );
+  });
 });
 
 // W2-05: the dates a cash report starts on come from the shop's business date (the API), not this browser's

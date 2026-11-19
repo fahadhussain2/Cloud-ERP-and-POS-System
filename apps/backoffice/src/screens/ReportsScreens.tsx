@@ -1,11 +1,7 @@
 import type { AcknowledgementStatus, CashVarianceResponse, DayReconciliationResponse } from '@erp/contracts';
 import {
-  Alert,
-  AlertDescription,
   Button,
   formatMoney,
-  LABEL_CLASS,
-  PageHeader,
   Panel,
   StatusChip,
   Table,
@@ -24,8 +20,11 @@ import { apiQuery, current, only, useFilters, type Filters } from '../reports/fr
 import {
   ChoiceFilter,
   DateFilter,
+  DaysFilter,
   ListTable,
+  periodWords,
   ReportPage,
+  useDays,
   useReport,
   type ListColumn,
 } from '../reports/frame/ReportFrame';
@@ -52,28 +51,6 @@ const ACK_TONE: Record<AcknowledgementStatus, ChipTone> = {
 
 const varianceTone = (v: number | null): string =>
   v === null || v === 0 ? '' : v < 0 ? 'text-bad' : 'text-warn';
-
-export function DateField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className={LABEL_CLASS}>{label}</span>
-      <input
-        type="date"
-        className="h-9 rounded-md border border-input bg-surface px-2"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
-  );
-}
 
 type Session = DayReconciliationResponse['sessions'][number];
 
@@ -407,112 +384,118 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
   );
 }
 
+type VarianceSession = CashVarianceResponse['sessions'][number];
+
 export function CashVarianceScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
-  // The 7 days up to the shop's business date (W2-05), until other dates are picked.
-  const today = useShopToday(api);
-  const [pickedFrom, setFrom] = useState<string | null>(null);
-  const [pickedTo, setTo] = useState<string | null>(null);
-  const from = pickedFrom ?? (today === null ? '' : addDays(today, -7));
-  const to = pickedTo ?? today ?? '';
-  const [report, setReport] = useState<CashVarianceResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const query = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-
-  useEffect(() => {
-    let live = true;
-    if (from === '' || to === '') return;
-    void api('GET', `/api/reports/cash-variance?${query}`).then((r) => {
-      if (!live) return;
-      if (r.status === 200) {
-        setReport(r.body as CashVarianceResponse);
-        setError(null);
-      } else {
-        setReport(null);
-        setError(t('reports.failed'));
-      }
-    });
-    return () => {
-      live = false;
-    };
-  }, [api, from, to, query, t]);
-
+  // The week up to the shop's business date (D-117), until another period is picked.
+  const days = useDays(api, 'cashVariance', [], 'weekToToday');
+  const url = days.dates ? `/api/reports/cash-variance?${apiQuery(days.dates)}` : null;
+  const { report, error } = useReport<CashVarianceResponse>(api, url);
+  const m = report?.money;
+  const money = (v: number | null) => (v === null || !m ? '—' : formatMoney(v, m));
+  const columns: ListColumn<VarianceSession>[] = [
+    { key: 'date', label: t('reports.col.date'), sort: (s) => s.businessDate, cell: (s) => s.businessDate },
+    {
+      key: 'session',
+      label: t('reports.col.session'),
+      sort: (s) => s.number,
+      cell: (s) => <span className="font-mono">{s.number}</span>,
+    },
+    {
+      key: 'cashier',
+      label: t('reports.col.cashier'),
+      sort: (s) => s.cashierName,
+      cell: (s) => s.cashierName,
+    },
+    {
+      key: 'expected',
+      label: t('reports.col.expected'),
+      end: true,
+      sort: (s) => s.expected ?? -Infinity,
+      cell: (s) => money(s.expected),
+    },
+    {
+      key: 'counted',
+      label: t('reports.col.counted'),
+      end: true,
+      sort: (s) => s.counted ?? -Infinity,
+      cell: (s) => money(s.counted),
+    },
+    {
+      key: 'variance',
+      label: t('reports.col.variance'),
+      end: true,
+      sort: (s) => s.variance ?? -Infinity,
+      cell: (s) => <span className={`font-semibold ${varianceTone(s.variance)}`}>{money(s.variance)}</span>,
+    },
+    {
+      key: 'acknowledgement',
+      label: t('reports.col.acknowledgement'),
+      sort: (s) => s.acknowledgement,
+      cell: (s) => (
+        <StatusChip tone={ACK_TONE[s.acknowledgement]}>
+          {s.acknowledgement === 'acknowledged'
+            ? t('reports.ack.by', { name: s.acknowledgedByName ?? '' })
+            : t(`reports.ack.${s.acknowledgement}`)}
+        </StatusChip>
+      ),
+    },
+  ];
   return (
-    <>
-      <PageHeader title={t('reports.variance.title')} help={t('reports.variance.help')} />
-      <Panel className="flex flex-wrap items-end gap-4 p-3.5">
-        <DateField label={t('reports.variance.from')} value={from} onChange={setFrom} />
-        <DateField label={t('reports.variance.to')} value={to} onChange={setTo} />
-        {report && (
-          <Button asChild variant="outline">
-            <a href={`/api/reports/cash-variance?${query}&format=csv`}>{t('reports.csv')}</a>
-          </Button>
-        )}
-      </Panel>
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-      {report && (
+    <ReportPage
+      title={t('reports.variance.title')}
+      help={t('reports.variance.help')}
+      filters={<DaysFilter days={days} />}
+      printFilters={periodWords(days.dates)}
+      csv={report && `${url}&format=csv`}
+      error={error}
+      loading={report === null && error === null}
+    >
+      {report && m && (
         <>
-          <Panel title={t('reports.variance.byCashier')} className="pb-3">
-            {report.byCashier.length === 0 ? (
-              <p className="m-0 px-3.5 text-muted-foreground">{t('reports.variance.none')}</p>
-            ) : (
-              <ul className="m-0 ps-8">
-                {report.byCashier.map((c) => (
-                  <li key={c.cashierName}>
-                    <span className="font-semibold">{c.cashierName}</span> ·{' '}
-                    {t('reports.variance.sessions', { count: c.sessions })} ·{' '}
-                    <span className={varianceTone(c.variance)}>{formatMoney(c.variance, report.money)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-          <Panel title={t('reports.variance.sessionsTitle')} className="overflow-x-auto">
-            <Table>
+          <Panel className="px-1.5 pb-1.5 break-inside-avoid">
+            <Table aria-label={t('reports.variance.byCashier')}>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('reports.col.date')}</TableHead>
-                  <TableHead>{t('reports.col.session')}</TableHead>
-                  <TableHead>{t('reports.col.cashier')}</TableHead>
-                  <TableHead className="text-end">{t('reports.col.expected')}</TableHead>
-                  <TableHead className="text-end">{t('reports.col.counted')}</TableHead>
+                  <TableHead>{t('reports.variance.byCashier')}</TableHead>
+                  <TableHead className="text-end">{t('reports.variance.sessionsTitle')}</TableHead>
                   <TableHead className="text-end">{t('reports.col.variance')}</TableHead>
-                  <TableHead>{t('reports.col.acknowledgement')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {report.sessions.map((s) => (
-                  <TableRow key={s.sessionId}>
-                    <TableCell>{s.businessDate}</TableCell>
-                    <TableCell className="font-mono">{s.number}</TableCell>
-                    <TableCell>{s.cashierName}</TableCell>
+                {report.byCashier.map((c) => (
+                  <TableRow key={c.cashierName}>
+                    <TableCell className="font-semibold">{c.cashierName}</TableCell>
                     <TableCell className="text-end tabular-nums">
-                      {s.expected === null ? '—' : formatMoney(s.expected, report.money)}
+                      {t('reports.variance.sessions', { count: c.sessions })}
                     </TableCell>
-                    <TableCell className="text-end tabular-nums">
-                      {s.counted === null ? '—' : formatMoney(s.counted, report.money)}
-                    </TableCell>
-                    <TableCell className={`text-end font-semibold tabular-nums ${varianceTone(s.variance)}`}>
-                      {s.variance === null ? '—' : formatMoney(s.variance, report.money)}
-                    </TableCell>
-                    <TableCell>
-                      <StatusChip tone={ACK_TONE[s.acknowledgement]}>
-                        {s.acknowledgement === 'acknowledged'
-                          ? t('reports.ack.by', { name: s.acknowledgedByName ?? '' })
-                          : t(`reports.ack.${s.acknowledgement}`)}
-                      </StatusChip>
+                    <TableCell className={`text-end tabular-nums ${varianceTone(c.variance)}`}>
+                      {formatMoney(c.variance, m)}
                     </TableCell>
                   </TableRow>
                 ))}
+                {report.byCashier.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-muted-foreground">
+                      {t('reports.variance.none')}
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </Panel>
+          <h2 className="m-0 text-base font-semibold">{t('reports.variance.sessionsTitle')}</h2>
+          <ListTable
+            label={t('reports.variance.sessionsTitle')}
+            columns={columns}
+            rows={report.sessions}
+            rowKey={(s) => s.sessionId}
+            text={(s) => `${s.number} ${s.cashierName} ${s.businessDate}`}
+            empty={t('reports.variance.none')}
+          />
         </>
       )}
-    </>
+    </ReportPage>
   );
 }
