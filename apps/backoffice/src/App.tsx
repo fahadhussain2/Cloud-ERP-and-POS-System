@@ -58,6 +58,16 @@ import {
   SalesProfitScreen,
 } from './reports/SalesReportScreens';
 import { PrintProvider } from './reports/frame/ReportFrame';
+import {
+  BalanceTrendScreen,
+  CashFlowScreen,
+  CollectionsScreen,
+  OverdueScreen,
+  OverLimitScreen,
+  PartnerLedgerScreen,
+  StatementsScreen,
+  UserActivityScreen,
+} from './reports/PartnerReportScreens';
 import { CashVarianceScreen, DayReconciliationScreen } from './screens/ReportsScreens';
 import { PersonScreen } from './staff/PersonScreen';
 import { StaffScreen } from './staff/StaffScreen';
@@ -191,6 +201,22 @@ export function App({ api }: { api: Api }) {
           <RatesScreen api={api} />
         ) : shown.screen === 'salesOverTime' ? (
           <SalesOverTimeScreen api={api} />
+        ) : shown.screen === 'partnerLedger' ? (
+          <PartnerLedgerScreen api={api} />
+        ) : shown.screen === 'statements' ? (
+          <StatementsScreen api={api} />
+        ) : shown.screen === 'balanceTrend' ? (
+          <BalanceTrendScreen api={api} />
+        ) : shown.screen === 'overdue' ? (
+          <OverdueScreen api={api} />
+        ) : shown.screen === 'overLimit' ? (
+          <OverLimitScreen api={api} />
+        ) : shown.screen === 'collections' ? (
+          <CollectionsScreen api={api} />
+        ) : shown.screen === 'userActivity' ? (
+          <UserActivityScreen api={api} />
+        ) : shown.screen === 'cashFlow' ? (
+          <CashFlowScreen api={api} />
         ) : shown.screen === 'ageing' ? (
           <AgeingScreen api={api} />
         ) : shown.screen === 'exceptions' ? (
@@ -215,11 +241,21 @@ export function App({ api }: { api: Api }) {
         ) : shown.screen === 'customers' ? (
           <CustomersScreen api={api} />
         ) : shown.screen === 'customer' ? (
-          <CustomerScreen key={shown.id} api={api} id={shown.id} />
+          <CustomerScreen
+            key={shown.id}
+            api={api}
+            id={shown.id}
+            reports={me.permissions.includes('reports.view')}
+          />
         ) : shown.screen === 'suppliers' ? (
           <SuppliersScreen api={api} />
         ) : shown.screen === 'supplier' ? (
-          <SupplierScreen key={shown.id} api={api} id={shown.id} />
+          <SupplierScreen
+            key={shown.id}
+            api={api}
+            id={shown.id}
+            reports={me.permissions.includes('reports.view') && me.permissions.includes('cost.view')}
+          />
         ) : shown.screen === 'receipts' ? (
           <ReceiptsScreen api={api} />
         ) : shown.screen === 'receipt' ? (

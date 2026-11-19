@@ -32,6 +32,14 @@ export type Route =
   | { screen: 'purchaseRegister' }
   | { screen: 'rates' }
   | { screen: 'salesOverTime' }
+  | { screen: 'partnerLedger' }
+  | { screen: 'statements' }
+  | { screen: 'balanceTrend' }
+  | { screen: 'overdue' }
+  | { screen: 'overLimit' }
+  | { screen: 'collections' }
+  | { screen: 'userActivity' }
+  | { screen: 'cashFlow' }
   | { screen: 'ageing' }
   | { screen: 'exceptions' }
   | { screen: 'trace'; number: string | null }
@@ -95,6 +103,15 @@ export const href = {
   purchaseRegister: '#/reports/purchase-register',
   rates: '#/reports/rates',
   salesOverTime: '#/reports/sales-over-time',
+  // The customer, supplier and control reports and the cash flow (W2-04).
+  partnerLedger: '#/reports/partner-ledger',
+  statements: '#/reports/statements',
+  balanceTrend: '#/reports/balance-trend',
+  overdue: '#/reports/overdue',
+  overLimit: '#/reports/over-limit',
+  collections: '#/reports/collections',
+  userActivity: '#/reports/user-activity',
+  cashFlow: '#/reports/cash-flow',
   ageing: '#/reports/ageing',
   exceptions: '#/reports/exceptions',
   trace: (number?: string) => (number ? `#/support/trace/${encodeURIComponent(number)}` : '#/support/trace'),
@@ -181,6 +198,14 @@ export function parseHash(hash: string): Route {
   if (parts[0] === 'reports' && parts[1] === 'purchase-register') return { screen: 'purchaseRegister' };
   if (parts[0] === 'reports' && parts[1] === 'rates') return { screen: 'rates' };
   if (parts[0] === 'reports' && parts[1] === 'sales-over-time') return { screen: 'salesOverTime' };
+  if (parts[0] === 'reports' && parts[1] === 'partner-ledger') return { screen: 'partnerLedger' };
+  if (parts[0] === 'reports' && parts[1] === 'statements') return { screen: 'statements' };
+  if (parts[0] === 'reports' && parts[1] === 'balance-trend') return { screen: 'balanceTrend' };
+  if (parts[0] === 'reports' && parts[1] === 'overdue') return { screen: 'overdue' };
+  if (parts[0] === 'reports' && parts[1] === 'over-limit') return { screen: 'overLimit' };
+  if (parts[0] === 'reports' && parts[1] === 'collections') return { screen: 'collections' };
+  if (parts[0] === 'reports' && parts[1] === 'user-activity') return { screen: 'userActivity' };
+  if (parts[0] === 'reports' && parts[1] === 'cash-flow') return { screen: 'cashFlow' };
   if (parts[0] === 'reports' && parts[1] === 'ageing') return { screen: 'ageing' };
   if (parts[0] === 'reports' && parts[1] === 'exceptions') return { screen: 'exceptions' };
   if (parts[0] === 'support' && parts[1] === 'trace')

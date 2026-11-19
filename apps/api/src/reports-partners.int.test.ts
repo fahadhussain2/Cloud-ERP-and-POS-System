@@ -678,6 +678,14 @@ describe('the partner ledger and the statement (RPT-16, owner answers 1 and 2)',
     ]);
   });
 
+  it("finds only customers, or only suppliers, for the ledger's picker", async () => {
+    const names = async (url: string) =>
+      (await view<{ items: { code: string }[] }>(url)).items.map((x) => x.code);
+    expect(await names('/api/reports/customers?q=o')).toEqual(['BUTT', 'KHAN']);
+    expect(await names('/api/reports/suppliers?q=o')).toEqual(['S1']);
+    expect(await names('/api/reports/parties?q=o')).toEqual(['BUTT', 'KHAN', 'S1']);
+  });
+
   it('goes back a year at most, and downloads as CSV', async () => {
     const base = `/api/reports/partner-ledger?role=customer&partyId=${khan}`;
     const long = await send('GET', `${base}&from=${daysAgo(366)}&to=${today()}`, 'fahad');

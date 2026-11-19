@@ -62,7 +62,10 @@ const ENTRIES: Record<string, { href: string; needs: string[] }> = {
   counters: { href: href.counters, needs: ['admin.devices'] },
   shopSettings: { href: href.shopSettings, needs: ['admin.settings'] },
   // Every report on one page (W2-01, owner answer 1): anyone who may open one of them.
-  reports: { href: href.reports, needs: ['reports.financial', 'reports.view', 'support.trace'] },
+  reports: {
+    href: href.reports,
+    needs: ['reports.financial', 'reports.view', 'admin.users', 'support.trace'],
+  },
   items: { href: href.items, needs: ['cat.item.edit', 'cat.price.edit'] },
   categories: { href: href.categories, needs: ['cat.item.edit', 'cat.price.edit'] },
   labels: { href: href.labels, needs: ['cat.label.print'] },
