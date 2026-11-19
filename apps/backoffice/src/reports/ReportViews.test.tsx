@@ -282,6 +282,40 @@ describe('ageing', () => {
     const table = await screen.findByRole('table', { name: r.ageing.customers });
     for (const b of Object.values(r.ageing.buckets)) expect(within(table).getByText(b)).toBeTruthy();
     expect(plain(screen.getByText(/^Equals Accounts receivable/).textContent ?? '')).toMatch(/Rs 1,500/);
+    // The totals under the list, as the server counted them.
+    const foot = within(table).getAllByRole('row').at(-1)!;
+    expect(plain(foot.textContent ?? '')).toBe(`${r.ageing.total}Rs 500Rs 0Rs 0Rs 0Rs 1,000Rs 1,500`);
+  });
+
+  it('remembers the side but not the date, which starts on the business date again (D-117)', async () => {
+    window.location.hash = href.ageing;
+    const f = fakeApi({});
+    show(<AgeingScreen api={f.api} />);
+    await waitFor(() =>
+      expect(calledWith(f.calls, '/api/reports/ageing')).toEqual([
+        '/api/reports/ageing?side=customers&asOf=2026-11-19',
+      ]),
+    );
+    fireEvent.change(screen.getByLabelText(r.ageing.side), { target: { value: 'suppliers' } });
+    fireEvent.change(screen.getByLabelText(r.ageing.asOf), { target: { value: '2026-10-31' } });
+    expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({
+      side: 'suppliers',
+      asOf: '2026-10-31',
+    });
+    await waitFor(() =>
+      expect(calledWith(f.calls, '/api/reports/ageing')).toContain(
+        '/api/reports/ageing?side=suppliers&asOf=2026-10-31',
+      ),
+    );
+    cleanup();
+    window.location.hash = href.ageing;
+    const again = fakeApi({});
+    show(<AgeingScreen api={again.api} />);
+    await waitFor(() =>
+      expect(calledWith(again.calls, '/api/reports/ageing')).toEqual([
+        '/api/reports/ageing?side=suppliers&asOf=2026-11-19',
+      ]),
+    );
   });
 });
 

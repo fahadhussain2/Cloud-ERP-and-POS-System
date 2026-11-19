@@ -1,4 +1,5 @@
 import type {
+  AgeingPartyRow,
   AgeingView,
   BillTraceView,
   ExceptionRow,
@@ -44,6 +45,8 @@ import { useShopToday } from '../shopDay';
 import { FormDialog } from '../staff/dialogs';
 import { apiQuery, useFilters, type Filters } from './frame/filters';
 import {
+  ChoiceFilter,
+  DateFilter,
   DAY_PRESETS,
   datesOn,
   ListTable,
@@ -957,105 +960,126 @@ export function StockReportScreen({ api }: { api: Api }) {
 // ---- Outstanding and ageing (RPT-06, owner answer 4) ----
 
 const BUCKETS = ['notDue', 'days1to30', 'days31to60', 'days61to90', 'over90'] as const;
+const SIDES = ['customers', 'suppliers'] as const;
 
 export function AgeingScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
-  const [side, setSide] = useState<'customers' | 'suppliers'>('customers');
-  // As on the shop's business date (W2-05) until another date is picked.
-  const today = useShopToday(api) ?? '';
-  const [picked, setAsOf] = useState<string | null>(null);
-  const asOf = picked ?? today;
-  const url = asOf ? `/api/reports/ageing?side=${side}&asOf=${encodeURIComponent(asOf)}` : null;
-  const { report, error } = useOldReport<AgeingView>(api, url);
+  // As on the shop's business date (D-117) until another date is picked; that date isn't remembered.
+  const [filters, setFilters] = useFilters('ageing', { forget: ['asOf'] });
+  const today = useShopToday(api);
+  const side = filters['side'] === 'suppliers' ? 'suppliers' : 'customers';
+  const asOf = filters['asOf'] || today || '';
+  const url = asOf ? `/api/reports/ageing?${apiQuery({ side, asOf })}` : null;
+  const { report, error } = useReport<AgeingView>(api, url);
+  const m = report?.money;
+  const set = (next: Filters) => setFilters(only({ ...current(filters), ...next }, ['side', 'asOf']));
+  const matches = report !== null && report.controlBalance === report.totals.balance;
+  const columns: ListColumn<AgeingPartyRow>[] = m
+    ? [
+        {
+          key: 'party',
+          label: t('reports.ageing.party'),
+          sort: (x) => x.name,
+          cell: (x) => (
+            <>
+              <span className="font-mono">{x.code}</span> {x.name}
+            </>
+          ),
+        },
+        {
+          key: 'terms',
+          label: t('reports.ageing.terms'),
+          end: true,
+          sort: (x) => x.termsDays ?? -1,
+          cell: (x) => (x.termsDays === null ? '—' : t('reports.ageing.days', { count: x.termsDays })),
+        },
+        ...BUCKETS.map((b) => ({
+          key: b,
+          label: t(`reports.ageing.buckets.${b}`),
+          end: true,
+          sort: (x: AgeingPartyRow) => x[b],
+          cell: (x: AgeingPartyRow) => (
+            <span className={b === 'over90' && x[b] > 0 ? 'text-bad' : undefined}>
+              {x[b] === 0 ? '' : formatMoney(x[b], m)}
+            </span>
+          ),
+        })),
+        {
+          key: 'balance',
+          label: t('reports.ageing.balance'),
+          end: true,
+          sort: (x) => x.balance,
+          cell: (x) => <span className="font-semibold">{formatMoney(x.balance, m)}</span>,
+        },
+      ]
+    : [];
   return (
-    <>
-      <PageHeader title={t('reports.ageing.title')} help={t('reports.ageing.help')} />
-      <Panel className="flex flex-wrap items-end gap-4 p-3.5">
-        <div className="flex gap-1" role="group" aria-label={t('reports.ageing.side')}>
-          {(['customers', 'suppliers'] as const).map((s) => (
-            <Button
-              key={s}
-              variant={side === s ? 'default' : 'outline'}
-              aria-pressed={side === s}
-              onClick={() => setSide(s)}
-            >
-              {t(`reports.ageing.${s}`)}
-            </Button>
-          ))}
-        </div>
-        <DateField label={t('reports.ageing.asOf')} value={asOf} onChange={setAsOf} />
-        {report && (
-          <Button asChild variant="outline">
-            <a href={`${url}&format=csv`}>{t('reports.csv')}</a>
-          </Button>
-        )}
-      </Panel>
-      <Failed text={error} />
-      {report && (
-        <Panel title={t(`reports.ageing.${report.side}`)} className="overflow-x-auto">
-          <Table aria-label={t(`reports.ageing.${report.side}`)}>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('reports.ageing.party')}</TableHead>
-                <TableHead className="text-end">{t('reports.ageing.terms')}</TableHead>
-                {BUCKETS.map((b) => (
-                  <TableHead key={b} className="text-end">
-                    {t(`reports.ageing.buckets.${b}`)}
-                  </TableHead>
-                ))}
-                <TableHead className="text-end">{t('reports.ageing.balance')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {report.rows.map((x) => (
-                <TableRow key={x.partyId}>
-                  <TableCell>
-                    <span className="font-mono">{x.code}</span> {x.name}
-                  </TableCell>
-                  <Num>{x.termsDays === null ? '—' : t('reports.ageing.days', { count: x.termsDays })}</Num>
-                  {BUCKETS.map((b) => (
-                    <TableCell
-                      key={b}
-                      className={`text-end tabular-nums ${b === 'over90' && x[b] > 0 ? 'text-bad' : ''}`}
-                    >
-                      {x[b] === 0 ? '' : formatMoney(x[b], report.money)}
-                    </TableCell>
-                  ))}
-                  <TableCell className="text-end font-semibold tabular-nums">
-                    {formatMoney(x.balance, report.money)}
-                  </TableCell>
-                </TableRow>
-              ))}
-              <TableRow>
-                <TableCell className="font-semibold">{t('reports.ageing.total')}</TableCell>
-                <TableCell />
-                {BUCKETS.map((b) => (
-                  <TableCell key={b} className="text-end font-semibold tabular-nums">
-                    {formatMoney(report.totals[b], report.money)}
-                  </TableCell>
-                ))}
-                <TableCell className="text-end font-semibold tabular-nums">
-                  {formatMoney(report.totals.balance, report.money)}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-          <p
-            className={`m-0 p-3.5 text-sm ${report.controlBalance === report.totals.balance ? 'text-muted-foreground' : 'text-bad'}`}
-          >
-            {t(
-              report.controlBalance === report.totals.balance
-                ? 'reports.ageing.matches'
-                : 'reports.ageing.differs',
+    <ReportPage
+      title={t('reports.ageing.title')}
+      help={t('reports.ageing.help')}
+      filters={
+        <>
+          <ChoiceFilter
+            label={t('reports.ageing.side')}
+            value={side}
+            options={SIDES.map((s) => ({ value: s, label: t(`reports.ageing.${s}`) }))}
+            onChange={(v) => set({ side: v })}
+          />
+          <DateFilter label={t('reports.ageing.asOf')} value={asOf} onChange={(v) => set({ asOf: v })} />
+        </>
+      }
+      printFilters={`${t(`reports.ageing.${side}`)} · ${asOf}`}
+      csv={report && `${url}&format=csv`}
+      error={error}
+      loading={report === null && error === null}
+      figures={
+        report && m
+          ? [
               {
-                account: t(`reports.ageing.control.${report.side}`),
-                amount: formatMoney(report.controlBalance, report.money),
+                key: 'balance',
+                label: t('reports.ageing.balance'),
+                value: formatMoney(report.totals.balance, m),
               },
-            )}
+              {
+                key: 'over90',
+                label: t('reports.ageing.buckets.over90'),
+                value: formatMoney(report.totals.over90, m),
+                ...(report.totals.over90 > 0 ? { tone: 'bad' as const } : {}),
+              },
+              {
+                key: 'control',
+                label: t(`reports.ageing.control.${report.side}`),
+                value: formatMoney(report.controlBalance, m),
+                ...(matches ? {} : { tone: 'bad' as const }),
+              },
+            ]
+          : []
+      }
+    >
+      {report && m && (
+        <>
+          <ListTable
+            label={t(`reports.ageing.${report.side}`)}
+            columns={columns}
+            rows={report.rows}
+            rowKey={(x) => x.partyId}
+            text={(x) => `${x.code} ${x.name}`}
+            footer={[
+              t('reports.ageing.total'),
+              '',
+              ...BUCKETS.map((b) => formatMoney(report.totals[b], m)),
+              formatMoney(report.totals.balance, m),
+            ]}
+          />
+          <p className={`m-0 text-sm ${matches ? 'text-muted-foreground' : 'text-bad'}`}>
+            {t(matches ? 'reports.ageing.matches' : 'reports.ageing.differs', {
+              account: t(`reports.ageing.control.${report.side}`),
+              amount: formatMoney(report.controlBalance, m),
+            })}
           </p>
-        </Panel>
+        </>
       )}
-    </>
+    </ReportPage>
   );
 }
 
