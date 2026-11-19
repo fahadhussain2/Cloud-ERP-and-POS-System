@@ -1,0 +1,66 @@
+{
+  "description": "The cash flow by month (W2-04 owner answer 7, ACC-07): opening + every class = closing, each month opening where the last closed; rows in the classes' order, expenses by account; a class with nothing is left out.",
+  "cases": [
+    {
+      "name": "Go-live month and the next: the opening entry, sales, a refund, a collection, a supplier paid, two expenses",
+      "input": {
+        "columns": [
+          { "from": "2027-01-01", "to": "2027-01-31" },
+          { "from": "2027-02-01", "to": "2027-02-28" }
+        ],
+        "opening": 0,
+        "parts": [
+          { "date": "2027-01-01", "cls": "opening", "accountId": null, "amount": 2500000 },
+          { "date": "2027-01-05", "cls": "sales", "accountId": null, "amount": 900000 },
+          { "date": "2027-01-20", "cls": "expenses", "accountId": "exp-rent", "amount": -20000 },
+          { "date": "2027-02-03", "cls": "customers", "accountId": null, "amount": 50000 },
+          { "date": "2027-02-10", "cls": "suppliers", "accountId": null, "amount": -200000 },
+          { "date": "2027-02-11", "cls": "expenses", "accountId": "exp-bank", "amount": -500 },
+          { "date": "2027-02-15", "cls": "sales", "accountId": null, "amount": -100000 }
+        ]
+      },
+      "expected": {
+        "columns": [
+          { "from": "2027-01-01", "to": "2027-01-31", "opening": 0, "net": 3380000, "closing": 3380000 },
+          { "from": "2027-02-01", "to": "2027-02-28", "opening": 3380000, "net": -250500, "closing": 3129500 }
+        ],
+        "rows": [
+          { "cls": "opening", "accountId": null, "amounts": [2500000, 0], "total": 2500000 },
+          { "cls": "sales", "accountId": null, "amounts": [900000, -100000], "total": 800000 },
+          { "cls": "customers", "accountId": null, "amounts": [0, 50000], "total": 50000 },
+          { "cls": "suppliers", "accountId": null, "amounts": [0, -200000], "total": -200000 },
+          { "cls": "expenses", "accountId": "exp-bank", "amounts": [0, -500], "total": -500 },
+          { "cls": "expenses", "accountId": "exp-rent", "amounts": [-20000, 0], "total": -20000 }
+        ],
+        "total": { "opening": 0, "net": 3129500, "closing": 3129500 }
+      }
+    },
+    {
+      "name": "A sale and its refund the same month: the row is left out, the month has no change",
+      "input": {
+        "columns": [{ "from": "2027-03-01", "to": "2027-03-15" }],
+        "opening": 750000,
+        "parts": [
+          { "date": "2027-03-02", "cls": "sales", "accountId": null, "amount": 1000 },
+          { "date": "2027-03-02", "cls": "sales", "accountId": null, "amount": -1000 }
+        ]
+      },
+      "expected": {
+        "columns": [
+          { "from": "2027-03-01", "to": "2027-03-15", "opening": 750000, "net": 0, "closing": 750000 }
+        ],
+        "rows": [],
+        "total": { "opening": 750000, "net": 0, "closing": 750000 }
+      }
+    },
+    {
+      "name": "A part outside the columns is refused",
+      "input": {
+        "columns": [{ "from": "2027-03-01", "to": "2027-03-31" }],
+        "opening": 0,
+        "parts": [{ "date": "2027-04-01", "cls": "sales", "accountId": null, "amount": 1000 }]
+      },
+      "error": "invalid_range"
+    }
+  ]
+}

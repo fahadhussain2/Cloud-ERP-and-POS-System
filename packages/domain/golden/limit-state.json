@@ -1,0 +1,21 @@
+{
+  "description": "Over the limit or near it (W2-04 owner answer 4, RPT-17): over when the balance is above the limit, near at 90% of it or more with something owed; a null limit is no limit (D-085).",
+  "cases": [
+    { "name": "89.99%: not near", "input": { "balance": 899900, "limit": 1000000 }, "expected": null },
+    { "name": "Exactly 90%: near", "input": { "balance": 900000, "limit": 1000000 }, "expected": "near" },
+    {
+      "name": "At the limit: near, not over",
+      "input": { "balance": 1000000, "limit": 1000000 },
+      "expected": "near"
+    },
+    { "name": "One paisa over", "input": { "balance": 1000001, "limit": 1000000 }, "expected": "over" },
+    { "name": "No limit", "input": { "balance": 99999999, "limit": null }, "expected": null },
+    { "name": "A limit of 0 with nothing owed", "input": { "balance": 0, "limit": 0 }, "expected": null },
+    {
+      "name": "A limit of 0 with something owed: over",
+      "input": { "balance": 100, "limit": 0 },
+      "expected": "over"
+    },
+    { "name": "An advance", "input": { "balance": -50000, "limit": 1000000 }, "expected": null }
+  ]
+}
