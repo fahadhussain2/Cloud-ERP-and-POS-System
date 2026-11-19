@@ -23,7 +23,8 @@ import { createContext, useContext, useEffect, useId, useState, type ReactNode }
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api';
-import { addDays } from '../../shopDay';
+import { addDays, useShopToday } from '../../shopDay';
+import { current, only, useFilters, type Filters } from './filters';
 
 // The report frame (W2-01 plan; D-116): every report from here on is drawn with it. Filters at the top with date
 // presets, key figures, the list (sortable and searchable, or a statement with its groups and subtotals), drill-down
@@ -329,6 +330,34 @@ export function datesOn(p: PeriodValue, today: string): { from: string; to: stri
   // None of these needs the fiscal year's first month.
   const preset = (DAY_PRESETS as readonly string[]).includes(p.preset) ? (p.preset as PeriodPreset) : 'today';
   return presetDates(preset, today, 1);
+}
+
+/**
+ * A W1 report's period (W2-04 answer 8), in its address: a preset worked out on the shop's business date (`fallback`
+ * until one is picked: today, D-117), or two dates, which are never remembered, so the report opens on the business
+ * date again next time. `keys` are the screen's other filters; `dates` is null until the business date is known.
+ */
+export function useDays(api: Api, report: string, keys: readonly string[], fallback = 'today') {
+  const [filters, setFilters] = useFilters(report, { forget: ['from', 'to'] });
+  const today = useShopToday(api);
+  const period = periodOf(filters, fallback);
+  const dates = 'from' in period ? period : today === null ? null : datesOn(period, today);
+  const all = ['preset', 'from', 'to', ...keys];
+  return {
+    filters,
+    period,
+    dates,
+    set: (next: Filters) => setFilters(only({ ...periodQuery(period), ...current(filters), ...next }, all)),
+    setPeriod: (p: PeriodValue) =>
+      setFilters(only({ ...current(filters), from: '', to: '', preset: '', ...periodQuery(p) }, all)),
+  };
+}
+
+/** A W1 report's period filter: the presets it works out itself, then two dates. */
+export function DaysFilter({ days }: { days: ReturnType<typeof useDays> }) {
+  return (
+    <PeriodFilter value={days.period} shown={days.dates} onChange={days.setPeriod} presets={DAY_PRESETS} />
+  );
 }
 
 /** The period in words, for the printed header. */

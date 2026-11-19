@@ -70,3 +70,14 @@ export function useFilters(
 
 /** The API's query for these filters. */
 export const apiQuery = (filters: Filters) => new URLSearchParams(filters).toString();
+
+/** The filters now: the address's, which a change before the screen caught up (two quick changes) already moved, else
+ * the ones the screen was drawn with. */
+export function current(filters: Filters): Filters {
+  const q = queryOf(window.location.hash);
+  return q.size > 0 ? Object.fromEntries(q) : filters;
+}
+
+/** Only the filters a screen keeps, without empty ones. */
+export const only = (f: Filters, keys: readonly string[]): Filters =>
+  Object.fromEntries(keys.filter((k) => f[k]).map((k) => [k, f[k]!]));

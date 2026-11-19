@@ -1,9 +1,4 @@
-import type {
-  AcknowledgementStatus,
-  CashVarianceResponse,
-  DayReconciliationResponse,
-  ReportMoney,
-} from '@erp/contracts';
+import type { AcknowledgementStatus, CashVarianceResponse, DayReconciliationResponse } from '@erp/contracts';
 import {
   Alert,
   AlertDescription,
@@ -21,15 +16,25 @@ import {
   TableRow,
   type ChipTone,
 } from '@erp/ui';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { apiQuery, current, only, useFilters, type Filters } from '../reports/frame/filters';
+import {
+  ChoiceFilter,
+  DateFilter,
+  ListTable,
+  ReportPage,
+  useReport,
+  type ListColumn,
+} from '../reports/frame/ReportFrame';
 import { addDays, useShopToday } from '../shopDay';
 
-// The cash reports (CSH-08, RPT-02, cash desk spec, W1-11): the day reconciliation of one branch and business date,
-// and the cash variance by session over a date range, each with its CSV. A manager acknowledges a waiting variance on
-// the day reconciliation (owner answer 1); the API refuses the session's own cashier.
+// The cash reports (CSH-08, RPT-02, cash desk spec, W1-11), on the report frame since W2-04 (answer 8; D-116): the
+// day reconciliation of one branch and business date, and the cash variance by session over a date range, each with
+// its CSV and print layout. A manager acknowledges a waiting variance on the day reconciliation (owner answer 1); the
+// API refuses the session's own cashier. Every figure is the API's, as before.
 
 interface Branch {
   id: string;
@@ -70,109 +75,217 @@ export function DateField({
   );
 }
 
+type Session = DayReconciliationResponse['sessions'][number];
+
+/** Every rupee out of a session; what came in from the safe is shown beside it, never netted off. */
+const outOf = (s: Session) =>
+  s.paidOut +
+  s.cashOuts.expense +
+  s.cashOuts.supplier_payment +
+  s.cashOuts.bank_deposit +
+  s.cashOuts.to_safe +
+  // Cash given back for a voided bill (W1-23).
+  s.cashOuts.void_cash;
+
 export function DayReconciliationScreen({ api, permissions }: { api: Api; permissions: readonly string[] }) {
   const { t, i18n } = useTranslation();
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [branchId, setBranchId] = useState('');
-  // The business day before the shop's (W2-05), until another date is picked.
+  // The branch and the date are in the address; the date isn't remembered, so the report opens on the business day
+  // before the shop's (D-117) again.
+  const [filters, setFilters] = useFilters('dayReconciliation', { forget: ['date'] });
   const today = useShopToday(api);
-  const [picked, setDate] = useState<string | null>(null);
-  const date = picked ?? (today === null ? '' : addDays(today, -1));
-  const [report, setReport] = useState<DayReconciliationResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const branchField = useId();
+  const branchId = filters['branchId'] || (branches[0]?.id ?? '');
+  const date = filters['date'] || (today === null ? '' : addDays(today, -1));
+  const [version, setVersion] = useState(0);
+  const [ackError, setAckError] = useState<string | null>(null);
+  const set = (next: Filters) => {
+    setAckError(null);
+    setFilters(only({ branchId, ...current(filters), ...next }, ['branchId', 'date']));
+  };
   const mayAcknowledge = permissions.includes('cash.variance.approve') || permissions.includes('*');
 
   useEffect(() => {
-    void api('GET', '/api/branches').then((r) => {
-      const list = r.status === 200 ? (r.body as Branch[]) : [];
-      setBranches(list);
-      setBranchId((id) => id || (list[0]?.id ?? ''));
-    });
+    void api('GET', '/api/branches').then((r) => setBranches(r.status === 200 ? (r.body as Branch[]) : []));
   }, [api]);
 
-  const query = `branchId=${encodeURIComponent(branchId)}&date=${encodeURIComponent(date)}`;
-  const fetchReport = useCallback(async (): Promise<DayReconciliationResponse | null | undefined> => {
-    if (branchId === '' || date === '') return undefined;
-    const r = await api('GET', `/api/reports/day-reconciliation?${query}`);
-    return r.status === 200 ? (r.body as DayReconciliationResponse) : null;
-  }, [api, branchId, date, query]);
-  /** A report, or null when it couldn't be read (undefined: nothing to read yet). */
-  const show = useCallback(
-    (r: DayReconciliationResponse | null | undefined) => {
-      if (r === undefined) return;
-      setReport(r);
-      setError(r === null ? t('reports.failed') : null);
-    },
-    [t],
-  );
-  useEffect(() => {
-    let live = true;
-    void fetchReport().then((r) => live && show(r));
-    return () => {
-      live = false;
-    };
-  }, [fetchReport, show]);
+  const url =
+    branchId !== '' && date !== '' ? `/api/reports/day-reconciliation?${apiQuery({ branchId, date })}` : null;
+  const { report, error } = useReport<DayReconciliationResponse>(api, url, version);
 
   const acknowledge = async (sessionId: string) => {
     const r = await api('POST', `/api/reports/cash-sessions/${encodeURIComponent(sessionId)}/acknowledge`);
-    show(await fetchReport());
-    if (r.status !== 200)
-      setError(t(`reports.ack.${(r.body as { error?: string } | null)?.error ?? 'failed'}`));
+    setAckError(
+      r.status === 200 ? null : t(`reports.ack.${(r.body as { error?: string } | null)?.error ?? 'failed'}`),
+    );
+    setVersion((v) => v + 1);
   };
 
-  const m = (minor: number, money: ReportMoney) => formatMoney(minor, money);
   const time = (iso: string | null) =>
     iso === null
       ? t('reports.never')
       : new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(
           new Date(iso),
         );
+  const m = report?.money;
+  const money = (minor: number) => (m ? formatMoney(minor, m) : '');
+  const branchName = branches.find((b) => b.id === branchId)?.name ?? '';
+
+  const columns: ListColumn<Session>[] = [
+    {
+      key: 'session',
+      label: t('reports.col.session'),
+      sort: (s) => s.number,
+      cell: (s) => <span className="font-mono">{s.number}</span>,
+    },
+    {
+      key: 'cashier',
+      label: t('reports.col.cashier'),
+      sort: (s) => s.cashierName,
+      cell: (s) => s.cashierName,
+    },
+    {
+      key: 'float',
+      label: t('reports.col.float'),
+      end: true,
+      sort: (s) => s.openingFloat,
+      cell: (s) => money(s.openingFloat),
+    },
+    {
+      key: 'in',
+      label: t('reports.col.in'),
+      end: true,
+      sort: (s) => s.handedIn,
+      cell: (s) => money(s.handedIn),
+    },
+    {
+      key: 'collected',
+      label: t('reports.col.collected'),
+      end: true,
+      sort: (s) => s.cashCollections,
+      cell: (s) => money(s.cashCollections),
+    },
+    {
+      key: 'out',
+      label: t('reports.col.out'),
+      end: true,
+      sort: outOf,
+      cell: (s) => (
+        <>
+          {money(outOf(s))}
+          {s.cashOuts.from_safe > 0 && (
+            <span className="block text-xs text-muted-foreground">
+              {t('reports.day.fromSafe', { amount: money(s.cashOuts.from_safe) })}
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      key: 'expected',
+      label: t('reports.col.expected'),
+      end: true,
+      sort: (s) => s.expected,
+      cell: (s) => (
+        <>
+          {money(s.expected)}
+          {s.expectedDiffers && (
+            <span className="block text-xs text-warn">
+              {t('reports.day.deskSaid', { amount: money(s.deskExpected ?? 0) })}
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      key: 'counted',
+      label: t('reports.col.counted'),
+      end: true,
+      sort: (s) => s.counted ?? -Infinity,
+      cell: (s) => (s.counted === null ? '—' : money(s.counted)),
+    },
+    {
+      key: 'variance',
+      label: t('reports.col.variance'),
+      end: true,
+      sort: (s) => s.variance ?? -Infinity,
+      cell: (s) => (
+        <span className={`font-semibold ${varianceTone(s.variance)}`}>
+          {s.variance === null ? '—' : money(s.variance)}
+          {s.varianceReason && (
+            <span className="block text-xs font-normal text-muted-foreground">
+              {t(`reports.reason.${s.varianceReason}`)}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'acknowledgement',
+      label: t('reports.col.acknowledgement'),
+      sort: (s) => s.acknowledgement,
+      cell: (s) => (
+        <div className="flex items-center gap-2">
+          <StatusChip tone={ACK_TONE[s.acknowledgement]}>
+            {s.acknowledgement === 'acknowledged'
+              ? t('reports.ack.by', { name: s.acknowledgedByName ?? '' })
+              : t(`reports.ack.${s.acknowledgement}`)}
+          </StatusChip>
+          {s.acknowledgement === 'waiting' && mayAcknowledge && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="print:hidden"
+              onClick={() => void acknowledge(s.id)}
+            >
+              {t('reports.ack.action')}
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <>
-      <PageHeader title={t('reports.day.title')} help={t('reports.day.help')} />
-      <Panel className="flex flex-wrap items-end gap-4 p-3.5">
-        <div className="flex flex-col gap-1">
-          <label htmlFor={branchField} className={LABEL_CLASS}>
-            {t('reports.branch')}
-          </label>
-          <select
-            id={branchField}
-            className="h-9 rounded-md border border-input bg-surface px-2"
+    <ReportPage
+      title={t('reports.day.title')}
+      help={t('reports.day.help')}
+      filters={
+        <>
+          <ChoiceFilter
+            label={t('reports.branch')}
             value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-          >
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <DateField label={t('reports.day.date')} value={date} onChange={setDate} />
-        {report && (
-          <Button asChild variant="outline">
-            <a href={`/api/reports/day-reconciliation?${query}&format=csv`}>{t('reports.csv')}</a>
-          </Button>
-        )}
-      </Panel>
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+            options={branches.map((b) => ({ value: b.id, label: b.name }))}
+            onChange={(v) => set({ branchId: v })}
+          />
+          <DateFilter label={t('reports.day.date')} value={date} onChange={(v) => set({ date: v })} />
+        </>
+      }
+      printFilters={`${branchName} · ${date}`}
+      csv={report && `${url}&format=csv`}
+      error={error ?? ackError}
+      loading={report === null && error === null}
+      figures={
+        report
+          ? [
+              {
+                key: 'status',
+                label: t('reports.day.status'),
+                value: (
+                  <StatusChip tone={report.status === 'final' ? 'ok' : 'warn'}>
+                    {t(`reports.day.${report.status}`)}
+                  </StatusChip>
+                ),
+              },
+              { key: 'transit', label: t('reports.day.inTransit'), value: money(report.cashInTransit) },
+            ]
+          : []
+      }
+    >
       {report && (
         <>
-          <Panel className="flex flex-col gap-2 p-3.5" aria-label={t('reports.day.status')}>
-            <div className="flex items-center gap-3">
-              <StatusChip tone={report.status === 'final' ? 'ok' : 'warn'}>
-                {t(`reports.day.${report.status}`)}
-              </StatusChip>
-              <span>{t('reports.day.transit', { amount: m(report.cashInTransit, report.money) })}</span>
-            </div>
-            {report.holds.length > 0 && (
-              <ul className="m-0 ps-5">
+          {report.holds.length > 0 && (
+            <Panel title={t('reports.day.holds')} className="pb-3">
+              <ul className="m-0 ps-8">
                 {report.holds.map((h, i) => (
                   <li key={i}>
                     {h.kind === 'day_not_over'
@@ -197,103 +310,21 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
                   </li>
                 ))}
               </ul>
-            )}
-          </Panel>
+            </Panel>
+          )}
 
-          <Panel title={t('reports.day.sessions')} className="overflow-x-auto">
-            {report.sessions.length === 0 ? (
-              <p className="m-0 px-3.5 pb-3 text-muted-foreground">{t('reports.day.noSessions')}</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('reports.col.session')}</TableHead>
-                    <TableHead>{t('reports.col.cashier')}</TableHead>
-                    <TableHead className="text-end">{t('reports.col.float')}</TableHead>
-                    <TableHead className="text-end">{t('reports.col.in')}</TableHead>
-                    <TableHead className="text-end">{t('reports.col.collected')}</TableHead>
-                    <TableHead className="text-end">{t('reports.col.out')}</TableHead>
-                    <TableHead className="text-end">{t('reports.col.expected')}</TableHead>
-                    <TableHead className="text-end">{t('reports.col.counted')}</TableHead>
-                    <TableHead className="text-end">{t('reports.col.variance')}</TableHead>
-                    <TableHead>{t('reports.col.acknowledgement')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {report.sessions.map((s) => {
-                    // Every rupee out; what came in from the safe is shown beside it, never netted off.
-                    const out =
-                      s.paidOut +
-                      s.cashOuts.expense +
-                      s.cashOuts.supplier_payment +
-                      s.cashOuts.bank_deposit +
-                      s.cashOuts.to_safe +
-                      // Cash given back for a voided bill (W1-23).
-                      s.cashOuts.void_cash;
-                    return (
-                      <TableRow key={s.id}>
-                        <TableCell className="font-mono">{s.number}</TableCell>
-                        <TableCell>{s.cashierName}</TableCell>
-                        <TableCell className="text-end tabular-nums">
-                          {m(s.openingFloat, report.money)}
-                        </TableCell>
-                        <TableCell className="text-end tabular-nums">{m(s.handedIn, report.money)}</TableCell>
-                        <TableCell className="text-end tabular-nums">
-                          {m(s.cashCollections, report.money)}
-                        </TableCell>
-                        <TableCell className="text-end tabular-nums">
-                          {m(out, report.money)}
-                          {s.cashOuts.from_safe > 0 && (
-                            <span className="block text-xs text-muted-foreground">
-                              {t('reports.day.fromSafe', { amount: m(s.cashOuts.from_safe, report.money) })}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-end tabular-nums">
-                          {m(s.expected, report.money)}
-                          {s.expectedDiffers && (
-                            <span className="block text-xs text-warn">
-                              {t('reports.day.deskSaid', { amount: m(s.deskExpected ?? 0, report.money) })}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-end tabular-nums">
-                          {s.counted === null ? '—' : m(s.counted, report.money)}
-                        </TableCell>
-                        <TableCell
-                          className={`text-end font-semibold tabular-nums ${varianceTone(s.variance)}`}
-                        >
-                          {s.variance === null ? '—' : m(s.variance, report.money)}
-                          {s.varianceReason && (
-                            <span className="block text-xs font-normal text-muted-foreground">
-                              {t(`reports.reason.${s.varianceReason}`)}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <StatusChip tone={ACK_TONE[s.acknowledgement]}>
-                              {s.acknowledgement === 'acknowledged'
-                                ? t('reports.ack.by', { name: s.acknowledgedByName ?? '' })
-                                : t(`reports.ack.${s.acknowledgement}`)}
-                            </StatusChip>
-                            {s.acknowledgement === 'waiting' && mayAcknowledge && (
-                              <Button size="sm" variant="outline" onClick={() => void acknowledge(s.id)}>
-                                {t('reports.ack.action')}
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </Panel>
+          <h2 className="m-0 text-base font-semibold">{t('reports.day.sessions')}</h2>
+          <ListTable
+            label={t('reports.day.sessions')}
+            columns={columns}
+            rows={report.sessions}
+            rowKey={(s) => s.id}
+            text={(s) => `${s.number} ${s.deviceCode} ${s.cashierName}`}
+            empty={t('reports.day.noSessions')}
+          />
 
           {report.missingHandovers !== null && (
-            <Panel title={t('reports.day.missing')} className="flex flex-col gap-2 pb-3">
+            <Panel title={t('reports.day.missing')} className="flex flex-col gap-2 pb-3 break-inside-avoid">
               {report.missingHandovers.length === 0 ? (
                 <p className="m-0 px-3.5 text-muted-foreground">{t('reports.day.noMissing')}</p>
               ) : (
@@ -301,15 +332,13 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
                   <div key={g.sellerId} className="px-3.5">
                     <p className="m-0 font-semibold">
                       {g.sellerName ?? t('reports.unknownSeller')} ·{' '}
-                      {t('reports.day.toCollect', { amount: m(g.toCollect, report.money) })}
-                      {g.toPayOut > 0 &&
-                        ` · ${t('reports.day.toPayOut', { amount: m(g.toPayOut, report.money) })}`}
+                      {t('reports.day.toCollect', { amount: money(g.toCollect) })}
+                      {g.toPayOut > 0 && ` · ${t('reports.day.toPayOut', { amount: money(g.toPayOut) })}`}
                     </p>
                     <ul className="m-0 ps-5">
                       {g.bills.map((b) => (
                         <li key={b.number} className="font-mono">
-                          {b.number} ·{' '}
-                          {b.kind === 'in' ? m(b.amount, report.money) : `−${m(b.amount, report.money)}`}
+                          {b.number} · {b.kind === 'in' ? money(b.amount) : `−${money(b.amount)}`}
                         </li>
                       ))}
                     </ul>
@@ -320,7 +349,7 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
           )}
 
           {report.voidCash.length > 0 && (
-            <Panel title={t('reports.day.voidCash')} className="pb-3">
+            <Panel title={t('reports.day.voidCash')} className="pb-3 break-inside-avoid">
               <ul className="m-0 ps-8">
                 {report.voidCash.map((v) => (
                   <li key={v.billNumber}>
@@ -328,12 +357,12 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
                       ? t('reports.day.voidCashOpen', {
                           bill: v.billNumber,
                           void: v.voidNumber,
-                          amount: m(v.amount, report.money),
+                          amount: money(v.amount),
                         })
                       : t('reports.day.voidCashGivenBack', {
                           bill: v.billNumber,
                           void: v.voidNumber,
-                          amount: m(v.amount, report.money),
+                          amount: money(v.amount),
                           number: v.givenBack.number,
                           date: v.givenBack.businessDate,
                         })}
@@ -344,14 +373,14 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
           )}
 
           {report.unmatchedScans.length > 0 && (
-            <Panel title={t('reports.day.unmatched')} className="pb-3">
+            <Panel title={t('reports.day.unmatched')} className="pb-3 break-inside-avoid">
               <ul className="m-0 ps-8">
                 {report.unmatchedScans.map((h) => (
                   <li key={h.number}>
                     {t('reports.day.unmatchedRow', {
                       number: h.number,
                       bill: h.billNumber,
-                      amount: m(h.amount, report.money),
+                      amount: money(h.amount),
                     })}
                   </li>
                 ))}
@@ -359,7 +388,7 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
             </Panel>
           )}
 
-          <Panel title={t('reports.day.exceptions')} className="pb-3">
+          <Panel title={t('reports.day.exceptions')} className="pb-3 break-inside-avoid">
             {report.exceptions.length === 0 ? (
               <p className="m-0 px-3.5 text-muted-foreground">{t('reports.day.noExceptions')}</p>
             ) : (
@@ -374,7 +403,7 @@ export function DayReconciliationScreen({ api, permissions }: { api: Api; permis
           </Panel>
         </>
       )}
-    </>
+    </ReportPage>
   );
 }
 

@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Api } from '../api';
 import { i18n } from '../i18n';
+import en from '../locales/en.json';
+import { href, queryOf } from '../router';
 import { CashVarianceScreen, DayReconciliationScreen } from './ReportsScreens';
 
 // The cash reports (W1-11, CSH-08, RPT-02) over a fake API: the day's status and what holds it, the sessions with
@@ -104,6 +106,10 @@ function fakeApi() {
 
 const wrap = (ui: React.ReactNode) => render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
 
+beforeEach(() => {
+  localStorage.clear();
+  window.location.hash = '';
+});
 afterEach(cleanup);
 
 describe('the day reconciliation', () => {
@@ -126,6 +132,28 @@ describe('the day reconciliation', () => {
     expect(await screen.findByText('Cash taken for voided bills')).toBeTruthy();
     expect(screen.getByText(/C03-S000051 \(voided on C03-V000004\) · .* · not given back yet/)).toBeTruthy();
     expect(screen.getByText(/C03-S000047 .* given back on 2026-11-03 \(D01-M000012\)/)).toBeTruthy();
+  });
+
+  it('keeps the branch and the date in the address, and opens on the day before the business date again', async () => {
+    window.location.hash = href.dayReconciliation;
+    const f = fakeApi();
+    wrap(<DayReconciliationScreen api={f.api} permissions={['reports.view']} />);
+    expect(await screen.findByText('Provisional')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(en.reports.day.date), { target: { value: '2026-11-02' } });
+    expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({ branchId: 'b1', date: '2026-11-02' });
+    await waitFor(() =>
+      expect(f.calls).toContain('GET /api/reports/day-reconciliation?branchId=b1&date=2026-11-02'),
+    );
+    expect(screen.getByRole('table', { name: en.reports.day.sessions })).toBeTruthy();
+    cleanup();
+    window.location.hash = href.dayReconciliation;
+    const again = fakeApi();
+    wrap(<DayReconciliationScreen api={again.api} permissions={['reports.view']} />);
+    await waitFor(() =>
+      expect(again.calls.filter((c) => c.includes('/day-reconciliation'))).toEqual([
+        'GET /api/reports/day-reconciliation?branchId=b1&date=2026-11-18',
+      ]),
+    );
   });
 
   it('lets a manager acknowledge a waiting variance', async () => {

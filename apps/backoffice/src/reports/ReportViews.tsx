@@ -39,24 +39,20 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { qtyText } from '../catalog/data';
-import { href, navigate, queryOf } from '../router';
+import { href, navigate } from '../router';
 import { useShopToday } from '../shopDay';
 import { FormDialog } from '../staff/dialogs';
-import { apiQuery, useFilters, type Filters } from './frame/filters';
+import { apiQuery, current, only, useFilters, type Filters } from './frame/filters';
 import {
   ChoiceFilter,
   DateFilter,
-  DAY_PRESETS,
-  datesOn,
+  DaysFilter,
   ListTable,
-  PeriodFilter,
-  periodOf,
-  periodQuery,
   periodWords,
   ReportPage,
+  useDays,
   useReport,
   type ListColumn,
-  type PeriodValue,
 } from './frame/ReportFrame';
 
 // The W1-20 reports and support screens (RPT-01, RPT-03, RPT-04, RPT-05, RPT-06, RPT-10, PLT-12, D-110), the reports
@@ -81,56 +77,6 @@ const money = (v: number | null, m: Money) => (v === null ? '—' : formatMoney(
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 // ---- On the report frame (W2-04 answer 8): the dates on the shop's business date, the totals, a bill's link ----
-
-/** The filters now: the address's (two quick changes), else the ones the screen was drawn with. */
-function current(filters: Filters): Filters {
-  const q = queryOf(window.location.hash);
-  return q.size > 0 ? Object.fromEntries(q) : filters;
-}
-
-/** Only the filters a screen keeps, without empty ones. */
-const only = (f: Filters, keys: readonly string[]): Filters =>
-  Object.fromEntries(keys.filter((k) => f[k]).map((k) => [k, f[k]!]));
-
-/**
- * A W1 report's period, in its address: a preset worked out on the shop's business date (D-117: today unless said),
- * or two dates, which are never remembered, so the report opens on the business date again next time. `dates` is
- * null until the business date is known.
- */
-function useDays(api: Api, report: string, keys: readonly string[], fallback = 'today') {
-  const [filters, setFilters] = useFilters(report, { forget: ['from', 'to'] });
-  const today = useShopToday(api);
-  const period = periodOf(filters, fallback);
-  const dates = 'from' in period ? period : today === null ? null : datesOn(period, today);
-  const all = ['preset', 'from', 'to', ...keys];
-  return {
-    filters,
-    period,
-    dates,
-    set: (next: Filters) => setFilters(only({ ...periodQuery(period), ...current(filters), ...next }, all)),
-    setPeriod: (p: PeriodValue) =>
-      setFilters(
-        only(
-          {
-            ...current(filters),
-            from: '',
-            to: '',
-            preset: '',
-            ...periodQuery(p),
-          },
-          all,
-        ),
-      ),
-  };
-}
-type Days = ReturnType<typeof useDays>;
-
-/** The period filter of a W1 report: the presets it works out itself, then two dates. */
-function DaysFilter({ days }: { days: Days }) {
-  return (
-    <PeriodFilter value={days.period} shown={days.dates} onChange={days.setPeriod} presets={DAY_PRESETS} />
-  );
-}
 
 /** A small table of totals: a name and its figures (a count, an amount, a quantity). */
 function Totals({
