@@ -937,4 +937,8 @@ test('a customer added in the back office buys on account at a counter; credit o
     await find();
     await expect(onAccount(page)).toBeDisabled({ timeout: 1000 });
   }).toPass({ timeout: 15_000 });
+  // Leave no open bill on Asif's counter: the next spec would sell it along with its own lines.
+  await page.keyboard.press('Alt+C');
+  await page.getByRole('dialog').getByRole('button', { name: pos.clear.action }).click();
+  await expect(billLines(page)).toHaveCount(0);
 });
