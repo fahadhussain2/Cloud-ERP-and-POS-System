@@ -118,7 +118,11 @@ export function CashDeskScreen({
 }) {
   const { t } = useTranslation();
   const [desk, setDesk] = useState<DeskState | null>(null);
-  const [selected, setSelected] = useState(0);
+  /**
+   * The picked bill, by id: a pull can add or drop rows above it between the pick and Enter, and Enter must stay on the
+   * bill the cashier sees picked. `index` is its place, for when it leaves the queue (the next bill takes its place).
+   */
+  const [selected, setSelected] = useState<{ id: string | null; index: number }>({ id: null, index: 0 });
   const [scanned, setScanned] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -146,12 +150,18 @@ export function CashDeskScreen({
       })
     : [];
   const bills = groups.flatMap((g) => g.bills);
-  const current = bills[Math.min(selected, bills.length - 1)] ?? null;
+  const found = selected.id === null ? -1 : bills.findIndex((b) => b.id === selected.id);
+  const index = found >= 0 ? found : Math.min(selected.index, bills.length - 1);
+  const current = bills[index] ?? null;
+  const select = (i: number) => setSelected({ id: bills[i]?.id ?? null, index: i });
+  const currentId = current?.id ?? null;
+  // Whatever row is shown picked stays picked by its id, also one that took the place of a bill that left (state
+  // adjusted while rendering, so no frame shows another pick).
+  if (currentId !== null && currentId !== selected.id) setSelected({ id: currentId, index });
   const session = desk?.session ?? null;
   const open = session?.status === 'open' ? session : null;
 
   // The selected bill stays in view as ↑ ↓ or a scan move it (the rows scroll inside the panel, like the search list).
-  const currentId = current?.id ?? null;
   useEffect(() => {
     queuePanel.current
       ?.querySelector<HTMLElement>('tr[aria-selected="true"]')
@@ -217,7 +227,7 @@ export function CashDeskScreen({
     }
     const i = bills.findIndex((b) => b.number === code.number);
     if (i >= 0) {
-      setSelected(i);
+      select(i);
       setScanned(code.number);
       setMessage(null);
       return;
@@ -260,7 +270,7 @@ export function CashDeskScreen({
       e.preventDefault();
       const n = bills.length;
       if (n === 0) return;
-      setSelected((s) => Math.max(0, Math.min(n - 1, s + (e.key === 'ArrowDown' ? 1 : -1))));
+      select(Math.max(0, Math.min(n - 1, index + (e.key === 'ArrowDown' ? 1 : -1))));
       setScanned(null);
     } else if ((e.key === 'e' || e.key === 'E') && !e.altKey && !e.ctrlKey && current?.kind === 'in') {
       e.preventDefault();
@@ -624,7 +634,7 @@ export function CashDeskScreen({
                         key={b.id}
                         aria-selected={isSelected}
                         onClick={() => {
-                          setSelected(bills.indexOf(b));
+                          select(bills.indexOf(b));
                           setScanned(null);
                           scan.current?.focus();
                         }}
