@@ -82,10 +82,37 @@
     "overridesReport": "Overrides",
     "voidsReturns": "Voids and returns",
     "stockReport": "Stock and value",
+    "stockLedger": "Stock ledger",
+    "stockAt": "Stock at a date",
+    "stockMovement": "Stock movement",
+    "reorder": "Reorder list",
+    "deadStock": "Dead and slow stock",
+    "inventoryAnalysis": "Inventory analysis",
+    "salesProfit": "Sales and gross profit",
+    "purchaseRegister": "Purchase register",
+    "rates": "Purchase and sale rates",
+    "salesOverTime": "Sales over time",
     "ageing": "Outstanding and ageing",
     "exceptions": "Exceptions",
     "trace": "Trace a bill",
-    "badge": "{{count}} open, high"
+    "badge": "{{count}} open, high",
+    "reports": "Reports",
+    "trialBalance": "Trial balance",
+    "profitLoss": "Profit and loss",
+    "balanceSheet": "Balance sheet",
+    "accountLedger": "Account ledger",
+    "cashBook": "Cash book",
+    "dayBook": "Day book",
+    "expensesReport": "Expenses by month",
+    "partnerLedger": "Customer and supplier ledger",
+    "statement": "Statement",
+    "statements": "Statements for every customer",
+    "balanceTrend": "Balance trend",
+    "overdue": "Overdue customers",
+    "overLimit": "Customers near their limit",
+    "collections": "Collections and payments",
+    "userActivity": "User activity",
+    "cashFlow": "Cash flow"
   },
   "home": {
     "nothing": "There is nothing here for your role yet."
@@ -277,7 +304,8 @@
       "status": "Status",
       "final": "Final",
       "provisional": "Provisional",
-      "transit": "Cash in transit at the end of the day: {{amount}} (0 when every cash bill reached the drawer)",
+      "inTransit": "Cash in transit at the day’s end",
+      "holds": "Why the day isn’t final yet",
       "sessions": "Cash sessions",
       "noSessions": "No cash session on this day.",
       "deskSaid": "the desk counted against {{amount}}: some documents haven’t arrived",
@@ -356,8 +384,6 @@
     "variance": {
       "title": "Cash variance",
       "help": "Every counted cash session in the dates, and each cashier’s total.",
-      "from": "From",
-      "to": "To",
       "byCashier": "By cashier",
       "none": "No counted session in these dates.",
       "sessions_one": "{{count}} session",
@@ -365,11 +391,6 @@
       "sessionsTitle": "Sessions"
     },
     "none": "Nothing in these dates.",
-    "range": {
-      "from": "From",
-      "to": "To",
-      "tooLong": "Pick at most 92 days (a quarter)."
-    },
     "kind": {
       "sale": "Sale",
       "return": "Return",
@@ -533,6 +554,727 @@
         "void_cash_not_voided": "Cash given back for a bill that isn’t voided",
         "void_cash_without_handover": "Cash given back the desk never took",
         "void_cash_amount_mismatch": "Cash given back doesn’t match what was taken"
+      }
+    },
+    "home": {
+      "title": "Reports",
+      "help": "Every report you may open. Each one filters by date, downloads as CSV and prints; a figure opens the lines behind it.",
+      "search": "Find a report",
+      "none": "No report by that name.",
+      "sections": {
+        "accounts": "Accounts",
+        "sales": "Sales and purchases",
+        "stock": "Stock",
+        "parties": "Customers and suppliers",
+        "cash": "Cash",
+        "support": "Support"
+      },
+      "about": {
+        "trialBalance": "Every account's opening, movement and closing, debit and credit; it always balances.",
+        "profitLoss": "Revenue, cost of goods sold, gross profit, expenses and net profit, against another period or month by month.",
+        "balanceSheet": "What the shop owns and owes on a date, with this year's profit, against another date.",
+        "accountLedger": "Every line of one account, with its opening and running balance: pick the account on Accounts.",
+        "cashBook": "Each cash and bank account by day: opening, money in, money out, closing, and the documents.",
+        "dayBook": "Every voucher posted in a period, with its lines.",
+        "expensesReport": "Each expense account month by month, for up to a year.",
+        "salesRegister": "Every bill of a day or range, with totals by salesman, counter and tender.",
+        "salesProfit": "Sales, cost and gross profit by category, item, brand, salesman, customer, bill, day or month, against another period.",
+        "purchaseRegister": "Every goods receipt and purchase return in a period, by supplier.",
+        "rates": "For an item, a supplier or a customer: every purchase and sale with its rate, and the spread between them.",
+        "salesOverTime": "The daily trend, the busy hours of the week, the top and bottom items, and the discounts given.",
+        "overridesReport": "Prices below the list or the floor, and every other approval: who asked and who approved.",
+        "voidsReturns": "Voided and reissued bills; returns by reason, condition, salesman and item.",
+        "stockReport": "Stock on hand by location, and its value at average cost.",
+        "stockLedger": "One item's documents in a period: the opening, each one in or out, the running balance and its value.",
+        "stockAt": "On hand and its value on any date, by category and vehicle make.",
+        "stockMovement": "Per item: opening, purchases, returns, sales, adjustments, transfers and closing, for a period.",
+        "reorder": "Items at or below their minimum, with the quantity to order up to the maximum, by supplier.",
+        "deadStock": "Stock that hasn't sold in a number of days, or would take more than 180 days to sell.",
+        "inventoryAnalysis": "ABC by sales and by profit, stock turnover and days of cover.",
+        "ageing": "What each customer owes and each supplier is owed, by how overdue it is.",
+        "dayReconciliation": "One business day's cash: how each session closed and every bill not handed over.",
+        "cashVariance": "Each cash session's variance over a range of days.",
+        "exceptions": "What the counters and the server flagged for review.",
+        "trace": "One bill from the counter to the books.",
+        "partnerLedger": "One customer's or supplier's documents in a period, with the opening and running balance; print it as a statement.",
+        "statements": "A statement for every customer with a balance or a document in the period, one to a page.",
+        "balanceTrend": "Each customer's or supplier's balance today and 15 days, 1, 2, 3 and 6 months before.",
+        "overdue": "Customers with bills unpaid more than a number of days past their due date.",
+        "overLimit": "Customers over their credit limit or within 10% of it.",
+        "collections": "Money received from customers and paid to suppliers, by how and by whom.",
+        "userActivity": "Who did what: sign-ins, documents, edits and approvals.",
+        "cashFlow": "Money in and out of cash and bank by what it was for, month by month."
+      }
+    },
+    "frame": {
+      "tooLong": "That range is too long for this report. Lists take up to 92 days and summaries up to a year: narrow the dates.",
+      "printedBy": "Printed by {{name}} on {{at}}",
+      "print": "Print",
+      "filters": "Filters",
+      "figures": "Key figures",
+      "period": "Period",
+      "from": "From",
+      "to": "To",
+      "presets": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "thisWeek": "This week",
+        "thisMonth": "This month",
+        "lastMonth": "Last month",
+        "thisQuarter": "This quarter",
+        "lastQuarter": "Last quarter",
+        "thisYear": "This year",
+        "lastYear": "Last year",
+        "weekToToday": "A week to today",
+        "custom": "Dates…"
+      },
+      "search": "Search the list",
+      "account": "Account",
+      "document": "Document",
+      "truncated": "Only the first 1,000 lines are shown, but every total counts them all. Narrow the dates to see the rest."
+    },
+    "tb": {
+      "help": "Each account's opening, movement and closing in the period. A group's row adds up the rows beneath it, so debits equal credits at every level. An account opens its ledger.",
+      "show": "Show",
+      "accounts": "Accounts and groups",
+      "groups": "Groups only",
+      "empty": "Accounts with nothing in them",
+      "openingDebit": "Opening debit",
+      "openingCredit": "Opening credit",
+      "debit": "Debit",
+      "credit": "Credit",
+      "closingDebit": "Closing debit",
+      "closingCredit": "Closing credit",
+      "check": "Check",
+      "balanced": "Balanced",
+      "unbalanced": "Does not balance",
+      "total": "Total"
+    },
+    "pl": {
+      "help": "What the shop earned and spent in the period. Cost of goods sold is at average cost; the panel below shows it from the stock and purchases. An account opens its ledger.",
+      "revenue": "Revenue",
+      "totalRevenue": "Total revenue",
+      "costOfSales": "Cost of sales",
+      "totalCostOfSales": "Total cost of sales",
+      "grossProfit": "Gross profit",
+      "grossMargin": "Gross margin",
+      "expenses": "Expenses",
+      "totalExpenses": "Total expenses",
+      "netProfit": "Net profit",
+      "netMargin": "Net margin",
+      "compare": "Compare with",
+      "compareTo": {
+        "previous": "The period before",
+        "last-year": "The same period last year",
+        "months": "Month by month",
+        "none": "Nothing"
+      },
+      "change": "Change",
+      "changePct": "Change %",
+      "stock": {
+        "title": "Stock and purchases",
+        "opening": "Opening stock",
+        "purchases": "Purchases",
+        "purchaseReturns": "Purchase returns",
+        "adjustments": "Adjustments and counts",
+        "other": "Other stock movements",
+        "closing": "Closing stock",
+        "used": "Stock used (cost of goods sold)",
+        "books": "Cost of goods sold in the books",
+        "difference": "Difference to look into"
+      }
+    },
+    "bs": {
+      "help": "What the shop owns and owes on a date. This year's profit is worked out from the books, not posted; profit of earlier years is in retained earnings. An amount opens its ledger.",
+      "at": "On",
+      "compareAt": "Against",
+      "assets": "Assets",
+      "totalAssets": "Total assets",
+      "liabilities": "Liabilities",
+      "totalLiabilities": "Total liabilities",
+      "equity": "Equity",
+      "totalEquity": "Total equity",
+      "profitForYear": "Profit for the year",
+      "earlierProfit": "Profit of earlier years",
+      "liabilitiesAndEquity": "Total liabilities and equity",
+      "difference": "Difference to look into"
+    },
+    "cash": {
+      "help": "Every cash and bank account: the drawer, cash in transit, the safe, and the banks and wallets on Money. Money moved between two of them shows in both, marked as a transfer.",
+      "account": "Account",
+      "all": "All cash and bank accounts",
+      "opening": "Opening",
+      "in": "Money in",
+      "out": "Money out",
+      "closing": "Closing",
+      "summary": "Opening {{opening}} · in {{in}} · out {{out}} · closing {{closing}}",
+      "transfer": "Transfer",
+      "days": "{{account}} by day"
+    },
+    "dayBook": {
+      "help": "Every voucher posted in the period, in the order it was posted, with its lines. A document number opens the document.",
+      "type": "Document type",
+      "all": "Every type",
+      "entries": "Vouchers",
+      "reversal": "Reversal",
+      "amount": "Amount"
+    },
+    "sources": {
+      "opening": "Opening balances",
+      "sale": "Counter bill",
+      "sales_void": "Void",
+      "cash_handover": "Cash handover",
+      "payment": "Collection",
+      "cash_movement": "Cash movement",
+      "cash_session": "Cash session",
+      "goods_receipt": "Goods receipt",
+      "purchase_return": "Purchase return",
+      "supplier_payment": "Supplier payment",
+      "stock_transfer": "Stock transfer",
+      "stock_transfer_receipt": "Transfer received",
+      "stock_adjustment": "Stock adjustment",
+      "customer_receipt": "Bank receipt",
+      "expense": "Expense",
+      "fund_transfer": "Money transfer",
+      "journal_voucher": "Journal voucher"
+    },
+    "expenses": {
+      "help": "Each expense account month by month. An account opens its ledger for the whole period.",
+      "total": "Total"
+    },
+    "stockReports": {
+      "all": "All",
+      "groupBy": "Group by",
+      "group": {
+        "category": "Category, then make",
+        "brand": "Brand",
+        "location": "Location",
+        "supplier": "Supplier",
+        "none": "No groups"
+      },
+      "filter": {
+        "categoryId": "Category",
+        "makeId": "Vehicle make",
+        "brandId": "Brand",
+        "locationId": "Location",
+        "supplierId": "Supplier"
+      },
+      "noGroup": {
+        "category": "No category",
+        "make": "No make",
+        "brand": "No brand",
+        "location": "No location",
+        "supplier": "No supplier"
+      },
+      "truncated": "Only the first 2,000 items are shown, but every subtotal and total counts them all, and the CSV has every row. Narrow the filters to see the rest.",
+      "items": "Items",
+      "qty": "Quantity",
+      "value": "Value",
+      "total": "Total",
+      "item": "Item",
+      "code": "Code",
+      "name": "Name",
+      "location": "Location",
+      "lastReceipt": "Last received",
+      "daysOfCover": "Days of cover",
+      "since": "Sales counted since {{date}}",
+      "at": {
+        "help": "How much of each item the shop had on a date and what it was worth in the books, grouped the way the shop counts. An item opens its stock ledger.",
+        "date": "As on",
+        "negative": "Only items below zero"
+      },
+      "movement": {
+        "help": "What moved each item over a period: in is positive, out negative, so the opening plus every column is the closing. An item opens its stock ledger for the same period.",
+        "show": "Show",
+        "cols": {
+          "opening": "Opening",
+          "openings": "Opening stock entered",
+          "purchases": "Purchases",
+          "purchaseReturns": "Purchase returns",
+          "sales": "Sales",
+          "salesReturns": "Sales returns",
+          "adjustments": "Adjustments and counts",
+          "transfersIn": "Transfers in",
+          "transfersOut": "Transfers out",
+          "closing": "Closing"
+        }
+      },
+      "ledger": {
+        "help": "Every document that moved one item in a period, after its opening, with the running balance. A line opens its document.",
+        "date": "Date",
+        "kind": "Document type",
+        "in": "In",
+        "out": "Out",
+        "balance": "Balance",
+        "balanceValue": "Balance value",
+        "opening": "Opening",
+        "closing": "Closing",
+        "closingValue": "Closing value",
+        "pick": "Pick an item by its code, name, OEM number or a scan.",
+        "lines": "Movements"
+      },
+      "kinds": {
+        "opening": "Opening stock",
+        "sale": "Bill or return",
+        "sales_void": "Voided bill",
+        "goods_receipt": "Goods receipt",
+        "purchase_return": "Purchase return",
+        "stock_transfer": "Transfer",
+        "stock_transfer_receipt": "Transfer received",
+        "stock_adjustment": "Adjustment"
+      },
+      "reorder": {
+        "help": "Items whose stock in the Shop and the Godown is at or below their minimum, with the quantity that brings them up to the maximum, by supplier. Filter one supplier to print their list.",
+        "fixLevels": "Levels need fixing",
+        "onHand": "On hand",
+        "min": "Minimum",
+        "max": "Maximum",
+        "order": "To order",
+        "lastCost": "Last cost",
+        "orderValue": "Order value",
+        "sold30": "Sold in 30 days",
+        "sold90": "Sold in 90 days",
+        "items": "Items to order",
+        "suppliers": "Suppliers"
+      },
+      "dead": {
+        "help": "Dead: in stock and not sold in the days chosen. Slow: sold, but at the last 90 days' rate it would take more than 180 days to sell. Items never sold since go-live count as dead only once those days have passed.",
+        "kind": "Show",
+        "kinds": {
+          "dead": "Dead",
+          "notSoldSinceGoLive": "Not sold since go-live",
+          "slow": "Slow"
+        },
+        "lastSale": "Last sold",
+        "never": "Never",
+        "days": "No sale in",
+        "daysN_one": "{{count}} day",
+        "daysN_other": "{{count}} days"
+      },
+      "analysis": {
+        "help": "Class A items make the first 80% of sales (or of gross profit), B the next 15%, C the last 5%. Turnover is the cost of sales over the average stock value; days of cover is how long the stock lasts at the period's rate.",
+        "qtySold": "Sold",
+        "sales": "Sales",
+        "salesClass": "Class by sales",
+        "profit": "Gross profit",
+        "profitClass": "Class by profit",
+        "class": "Class {{name}}",
+        "unsold": "In stock, not sold",
+        "turnover": "Stock turnover",
+        "costOfSales": "Cost of sales"
+      }
+    },
+    "salesReports": {
+      "help": {
+        "profit": "What sold in the period, what it cost and the gross profit. Sales are what customers paid after every discount; cost is the average cost when it sold, as in the books. A return counts on its day for the salesman and customer of the bill it returns. A row opens the next level: a category its items, an item its bills, a bill its trace.",
+        "register": "Every goods receipt and purchase return posted in the period, by supplier. Drafts are not purchases yet. A document opens it.",
+        "rates": "Pick an item, a supplier or a customer (or an item and a party): every purchase with its rate on the supplier's bill and its net rate after discounts, every sale with its price and net rate, and for one item the spread between the average sale and purchase rates.",
+        "overTime": "How sales moved day by day against another period, when the shop is busy, what sold most and least, and what discounts were given. Every chart has its figures in a table below it."
+      },
+      "all": "All",
+      "walkIn": "Walk-in",
+      "filter": {
+        "categoryId": "Category",
+        "brandId": "Brand",
+        "makeId": "Make",
+        "salesmanId": "Salesman",
+        "customerId": "Customer",
+        "locationId": "Location",
+        "supplierId": "Supplier"
+      },
+      "groupBy": "Show by",
+      "group": {
+        "category": "Category",
+        "item": "Item",
+        "brand": "Brand",
+        "make": "Make",
+        "salesman": "Salesman",
+        "customer": "Customer",
+        "bill": "Bill",
+        "day": "Day",
+        "month": "Month"
+      },
+      "none": {
+        "category": "No category",
+        "item": "No item",
+        "brand": "No brand",
+        "make": "No make",
+        "salesman": "No salesman",
+        "customer": "Walk-in",
+        "bill": "No bill",
+        "day": "No day",
+        "month": "No month"
+      },
+      "anyItem": "Any item",
+      "date": "Date",
+      "bills": "Bills",
+      "qty": "Qty",
+      "sales": "Sales",
+      "discount": "Discount given",
+      "cost": "Cost",
+      "profit": "Gross profit",
+      "margin": "Margin",
+      "beforeSales": "Sales before",
+      "change": "Change",
+      "changeSales": "Sales change",
+      "total": "Total",
+      "truncated": "Only the first 2,000 rows are shown, but every total counts them all. Narrow the filters or download the CSV to see the rest.",
+      "beforeGoLive": "The comparison starts before {{since}}, when the system began: it holds only what was sold since then.",
+      "register": {
+        "kind": "Type",
+        "kinds": {
+          "receipt": "Receipt",
+          "return": "Return"
+        },
+        "supplierBill": "Supplier's bill",
+        "paidBy": "Paid",
+        "paid": {
+          "bank": "By bank",
+          "account": "On account"
+        },
+        "due": "Due",
+        "total": "Amount",
+        "withLines": "Show lines",
+        "documents": "Documents",
+        "receipts": "Received",
+        "returns": "Returned",
+        "net": "Net purchases",
+        "bySupplier": "By supplier"
+      },
+      "rates": {
+        "item": "Item",
+        "party": "Supplier or customer",
+        "clear": {
+          "item": "Any item",
+          "party": "Any supplier or customer"
+        },
+        "pick": "Pick an item, a supplier or a customer to see their rates.",
+        "manyItems": "The averages and the spread are shown for one item: pick an item too.",
+        "purchases": "Purchases",
+        "sales": "Sales",
+        "billRate": "Rate on bill",
+        "price": "Price",
+        "list": "List",
+        "netRate": "Net rate",
+        "purchaseAverage": "Average purchase rate",
+        "purchaseLast": "Last purchase rate",
+        "purchaseRange": "Purchase rates",
+        "saleAverage": "Average sale rate",
+        "saleLast": "Last sale rate",
+        "saleRange": "Sale rates",
+        "spread": "Spread"
+      },
+      "overTime": {
+        "trend": {
+          "day": "Sales by day",
+          "week": "Sales by week",
+          "month": "Sales by month"
+        },
+        "trendTable": "Sales over the period",
+        "hours": "Busy hours",
+        "measure": "Show",
+        "measures": {
+          "bills": "Bills",
+          "sales": "Sales"
+        },
+        "billsN_one": "{{count}} bill",
+        "billsN_other": "{{count}} bills",
+        "top": "Top items",
+        "topTable": "Top items, figures",
+        "bottom": "Items that sold least",
+        "bottomTable": "Items that sold least, figures",
+        "rankBy": "Rank by",
+        "rankings": {
+          "sales": "Sales",
+          "profit": "Gross profit",
+          "qty": "Quantity"
+        },
+        "discounts": "Discounts given",
+        "discountsHelp": "List price × quantity less what the customer paid: the line discounts and the bill discount together. A price above the list counts as a negative discount.",
+        "bySalesman": "Discounts by salesman",
+        "byDay": "Discounts by day",
+        "listSales": "At list price",
+        "discountShare": "Of list",
+        "approvals": "Approvals"
+      }
+    },
+    "partnerReports": {
+      "help": {
+        "partnerLedger": "Pick a customer or a supplier and a period: the balance before it, every document in it with its debit or credit and the running balance, the closing, and the closing balance by how overdue it is. 'As a statement' adds your shop's header and the customer's details for printing, and leaves out a voided bill and its void; 'With items' lists each bill's items.",
+        "statements": "A statement for every customer with a balance at the end of the period or a document in it, one to a page: print them or save them as a PDF to send.",
+        "balanceTrend": "Each party's balance as on a date and 15 days, 1, 2, 3 and 6 months before it, with the change in a month. A name opens the ledger.",
+        "overdue": "Customers with bills unpaid more than the chosen number of days past their due date. Payments settle the oldest bills first, as in the ageing. A customer without terms owes each bill on its own day.",
+        "overLimit": "Customers whose balance is over their credit limit, or within 10% of it. Customers without a limit are never listed.",
+        "collections": "Every payment received from a customer (at a desk or into a bank) or paid to a supplier (from a bank, at a desk, or with the goods), with totals by how and by whom. Cash sales are in the sales register.",
+        "userActivity": "Who did what in the period: sign-ins, the documents each person made, changes to items, prices, parties, users and settings with what changed, approvals, voids and locks. Passwords and PINs are never shown.",
+        "cashFlow": "Cash and bank at the start, what came in and went out by what it was for, and cash and bank at the end; each month ends where the cash book does."
+      },
+      "role": "Show",
+      "roles": {
+        "customer": "Customer",
+        "supplier": "Supplier"
+      },
+      "rolesMany": {
+        "customer": "Customers",
+        "supplier": "Suppliers"
+      },
+      "kinds": {
+        "sale": "Bill",
+        "sales_void": "Void",
+        "payment": "Payment at the desk",
+        "customer_receipt": "Bank receipt",
+        "journal_voucher": "Voucher",
+        "opening": "Opening balance",
+        "goods_receipt": "Goods receipt",
+        "purchase_return": "Purchase return",
+        "supplier_payment": "Bank payment",
+        "cash_movement": "Paid at the desk"
+      },
+      "balance": {
+        "label": "Balance",
+        "settled": "settled",
+        "customer": {
+          "owed": "owes you",
+          "advance": "paid in advance"
+        },
+        "supplier": {
+          "owed": "you owe",
+          "advance": "paid in advance"
+        }
+      },
+      "date": "Date",
+      "memo": "Description",
+      "due": "Due",
+      "debit": "Debit",
+      "credit": "Credit",
+      "kind": "Kind",
+      "opening": "Opening balance",
+      "closing": "Closing balance",
+      "voided": "Voided",
+      "count": "Count",
+      "amount": "Amount",
+      "total": "Total",
+      "byKind": "Totals by kind of document",
+      "ledger": {
+        "statement": "As a statement",
+        "items": "With items",
+        "pick": {
+          "customer": "Pick a customer to see their ledger.",
+          "supplier": "Pick a supplier to see their ledger."
+        }
+      },
+      "statement": {
+        "for": "Statement for {{from}} to {{to}}",
+        "ageing": "The closing balance by how overdue it is",
+        "lines": "{{name}}'s documents",
+        "count": "Statements",
+        "owed": "Their closing balances"
+      },
+      "buckets": {
+        "notDue": "Not yet due",
+        "days1to30": "1–30 days overdue",
+        "days31to60": "31–60 days",
+        "days61to90": "61–90 days",
+        "over90": "Over 90 days"
+      },
+      "points": {
+        "asOn": "As on",
+        "days15": "15 days before",
+        "month1": "1 month before",
+        "months2": "2 months before",
+        "months3": "3 months before",
+        "months6": "6 months before"
+      },
+      "changeMonth": "Change in a month",
+      "beforeGoLive": "before go-live",
+      "asOf": "As on",
+      "asOfDate": "As on {{date}}",
+      "trendChart": "{{role}}: total balance",
+      "phone": "Phone",
+      "limit": "Limit",
+      "noLimit": "No limit",
+      "terms": "Terms",
+      "noTerms": "None",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "backOffice": "Back office",
+      "overdue": {
+        "amount": "Overdue",
+        "by": "Overdue by",
+        "more_zero": "Any time past due",
+        "more_one": "More than {{count}} day",
+        "more_other": "More than {{count}} days",
+        "oldest": "Oldest unpaid bill",
+        "late": "Days past due",
+        "lastPayment": "Last payment",
+        "never": "None yet",
+        "total": "Overdue"
+      },
+      "limits": {
+        "state": "State",
+        "over": "Over the limit",
+        "near": "Near the limit",
+        "left": "Left",
+        "lastApproval": "Last approved past it",
+        "withLimit": "Customers with a limit",
+        "noneSet": "No customer has a credit limit yet. Set one on"
+      },
+      "register": {
+        "side": "Show",
+        "received": "Received from customers",
+        "paid": "Paid to suppliers",
+        "title": {
+          "received": "Money received from customers",
+          "paid": "Money paid to suppliers"
+        },
+        "how": "How",
+        "where": "Where",
+        "by": "By",
+        "reference": "Reference",
+        "byMethod": "By how",
+        "byPerson": "By whom"
+      },
+      "activity": {
+        "at": "When",
+        "who": "Who",
+        "what": "What",
+        "record": "Record",
+        "changes": "What changed",
+        "everyone": "Everyone",
+        "everything": "Everything",
+        "count": "Entries",
+        "newest": "Showing the newest {{shown}} of {{count}}; the CSV has every one.",
+        "kinds": {
+          "sign_in": "Sign-ins",
+          "sales": "Sales and voids",
+          "approvals": "Approvals",
+          "items": "Items and prices",
+          "parties": "Customers and suppliers",
+          "money": "Money",
+          "stock": "Stock and purchasing",
+          "settings": "Users and settings",
+          "books": "The books",
+          "other": "Other"
+        },
+        "actions": {
+          "create": "Created",
+          "update": "Changed",
+          "delete": "Removed",
+          "login": {
+            "success": "Signed in",
+            "failed": "Sign-in failed",
+            "locked": "Locked out",
+            "refused_locked": "Sign-in refused: locked out"
+          },
+          "password": {
+            "changed": "Changed their password",
+            "set_by_admin": "Was given a temporary password",
+            "removed": "Password removed"
+          },
+          "pin": {
+            "changed": "Changed their PIN",
+            "locked": "PIN locked",
+            "temporary_set": "Was given a temporary PIN",
+            "unlocked_by_manager": "PIN unlocked by a manager",
+            "cashier": "PIN used at a desk"
+          },
+          "sale": {
+            "voided": "Voided a bill"
+          },
+          "bill": {
+            "reprinted": "Reprinted a bill"
+          },
+          "device": {
+            "enrolled": "Enrolled a device",
+            "enroll_failed": "Device enrolment failed",
+            "code_created": "Made an enrolment code"
+          },
+          "exception": {
+            "reviewed": "Reviewed an exception",
+            "reopened": "Reopened an exception",
+            "settled": "Settled an exception"
+          },
+          "exceptions": {
+            "review": "Reviewed exceptions"
+          },
+          "period": {
+            "lock": "Moved the lock date",
+            "reopen": "Reopened a period"
+          },
+          "posting": {
+            "rebuild": "Rebuilt the ledgers",
+            "failed": "A posting failed"
+          },
+          "pilot": {
+            "wipe": "Wiped the pilot"
+          },
+          "diagnostics": {
+            "sent": "Sent diagnostics"
+          }
+        },
+        "records": {
+          "sales_documents": "Bill",
+          "payments": "Collection",
+          "cash_movements": "Cash-out",
+          "cash_handovers": "Handover",
+          "cash_sessions": "Cash session",
+          "customer_receipts": "Bank receipt",
+          "supplier_payments": "Supplier payment",
+          "expenses": "Expense",
+          "fund_transfers": "Transfer",
+          "journal_vouchers": "Voucher",
+          "goods_receipts": "Goods receipt",
+          "purchase_returns": "Purchase return",
+          "stock_adjustments": "Stock adjustment",
+          "stock_transfers": "Stock transfer",
+          "overrides": "Approval",
+          "items": "Item",
+          "item_prices": "Price",
+          "item_identifiers": "Barcode",
+          "item_compatibility": "Vehicle fit",
+          "categories": "Category",
+          "brands": "Brand",
+          "vehicle_makes": "Vehicle make",
+          "origins": "Origin",
+          "units": "Unit",
+          "price_tiers": "Price tier",
+          "parties": "Party",
+          "customer_accounts": "Customer account",
+          "supplier_accounts": "Supplier account",
+          "users": "User",
+          "roles": "Role",
+          "user_roles": "Role given",
+          "devices": "Device",
+          "tenants": "Shop",
+          "branches": "Branch",
+          "locations": "Location",
+          "payment_methods": "Payment method",
+          "print_profiles": "Print profile",
+          "tax_codes": "Tax code",
+          "transfer_routes": "Transfer route",
+          "bank_accounts": "Bank account",
+          "expense_categories": "Expense category",
+          "accounts": "Account",
+          "opening_balances": "Opening balances",
+          "exceptions": "Exception",
+          "session": "Sign-in"
+        }
+      },
+      "flow": {
+        "opening": "Cash and bank at the start",
+        "net": "Net change",
+        "closing": "Cash and bank at the end",
+        "classes": {
+          "opening": "Opening balances entered",
+          "sales": "Sales, less refunds",
+          "customers": "From customers",
+          "suppliers": "To suppliers",
+          "expenses": "Expenses",
+          "owner": "Owner's capital and drawings",
+          "shortOver": "Cash short and over",
+          "other": "Other"
+        },
+        "note": "Money moved between the shop's own cash and bank accounts (handovers, deposits, the safe, transfers) is left out; a transfer's charges are an expense. A month's heading opens the cash book for it."
       }
     }
   },
@@ -801,7 +1543,8 @@
       "customer_receipt": "Bank receipt",
       "journal_voucher": "Journal voucher",
       "opening": "Opening balance",
-      "other": "Entry"
+      "other": "Entry",
+      "report": "Ledger and statement"
     },
     "problems": {
       "limit": "Type the credit limit, or tick No limit.",
@@ -902,7 +1645,8 @@
       "supplier_payment": "Paid by bank",
       "cash_movement": "Paid at the desk",
       "opening": "Opening balance",
-      "other": "Entry"
+      "other": "Entry",
+      "report": "Ledger and statement"
     },
     "pay": {
       "action": "Pay by bank",
@@ -1016,6 +1760,7 @@
       "forbidden": "You can't do this.",
       "posting_failed": "It couldn't be posted ({{code}}). Nothing was changed.",
       "date_locked": "The books are locked up to {{date}}. Pick a later date.",
+      "date_in_future": "The date can't be after {{today}}, the shop's business date.",
       "balance_open": "The shop still owes this supplier {{amount}}. Settle it first, then deactivate.",
       "empty_draft": "Add at least one item before saving."
     }
@@ -1164,6 +1909,7 @@
       "forbidden": "You can't do this.",
       "posting_failed": "It couldn't be posted ({{code}}). Nothing was changed.",
       "date_locked": "The books are locked up to {{date}}. Pick a later date.",
+      "date_in_future": "The date can't be after {{today}}, the shop's business date.",
       "empty_draft": "Add at least one item before saving."
     },
     "transfers": {
@@ -1228,7 +1974,8 @@
         "sale": "Sale",
         "sales_void": "Void",
         "opening": "Opening"
-      }
+      },
+      "ledger": "Stock ledger"
     },
     "needed": {
       "title": "Transfer needed",

@@ -301,8 +301,15 @@ Printing to the shared network printer keeps working, because it only needs the 
 | RPT-08 | Dead/slow stock (no sale in N days, with value) | 2 |
 | RPT-09 | Purchase register; item purchase vs sale rate analysis (legacy parity) | 2 |
 | RPT-10 | Exceptions: below-floor sales without override, offline cap breaches, negative stock, clock skew, cash received for a voided bill, barcode amount not matching the synced bill (D-059) | 1 |
+| RPT-11 | Day book (every voucher in a range, with its lines); expenses by category and month | 2 |
+| RPT-12 | Stock ledger: one item's movements in a range, with opening, in, out, balance and value | 2 |
+| RPT-13 | Stock at any date, and its movement over a range (opening, purchases, returns, sales, adjustments, transfers, closing), in quantity and value | 2 |
+| RPT-14 | Inventory analysis: ABC by sales and by profit, stock turnover, days of cover | 2 |
+| RPT-15 | Sales over time: daily trend, hour × weekday, top and bottom items, discounts given | 2 |
+| RPT-16 | Customer and supplier ledger with opening balance; printable statement; balance trend over past dates | 2 |
+| RPT-17 | Control: overdue and over-limit customers, collections register, user activity from the audit log | 2 |
 
-All reports filter by date range and export to CSV. PDF/print is offered where it makes sense.
+All reports filter by date range and export to CSV. PDF/print is offered where it makes sense. **D-116:** every Wave 2 report (ACC-07, RPT-07 to RPT-17, the reorder list of PUR-07) is built before go-live; the catalog is in [the reports module](modules/reports/README.md).
 
 ### 6.9 Sync and offline (SYN)
 | ID | Requirement | Wave |

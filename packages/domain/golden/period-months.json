@@ -1,0 +1,104 @@
+{
+  "description": "Month by month (W2-01 plan, owner answer 3): the range cut at each month's end, the first and last months as far as the range goes; up to 12 months, more is refused.",
+  "cases": [
+    {
+      "name": "from mid-January to 10 March",
+      "input": {
+        "from": "2027-01-15",
+        "to": "2027-03-10"
+      },
+      "expected": [
+        {
+          "from": "2027-01-15",
+          "to": "2027-01-31"
+        },
+        {
+          "from": "2027-02-01",
+          "to": "2027-02-28"
+        },
+        {
+          "from": "2027-03-01",
+          "to": "2027-03-10"
+        }
+      ]
+    },
+    {
+      "name": "a whole year is twelve months",
+      "input": {
+        "from": "2027-01-01",
+        "to": "2027-12-31"
+      },
+      "expected": [
+        {
+          "from": "2027-01-01",
+          "to": "2027-01-31"
+        },
+        {
+          "from": "2027-02-01",
+          "to": "2027-02-28"
+        },
+        {
+          "from": "2027-03-01",
+          "to": "2027-03-31"
+        },
+        {
+          "from": "2027-04-01",
+          "to": "2027-04-30"
+        },
+        {
+          "from": "2027-05-01",
+          "to": "2027-05-31"
+        },
+        {
+          "from": "2027-06-01",
+          "to": "2027-06-30"
+        },
+        {
+          "from": "2027-07-01",
+          "to": "2027-07-31"
+        },
+        {
+          "from": "2027-08-01",
+          "to": "2027-08-31"
+        },
+        {
+          "from": "2027-09-01",
+          "to": "2027-09-30"
+        },
+        {
+          "from": "2027-10-01",
+          "to": "2027-10-31"
+        },
+        {
+          "from": "2027-11-01",
+          "to": "2027-11-30"
+        },
+        {
+          "from": "2027-12-01",
+          "to": "2027-12-31"
+        }
+      ]
+    },
+    {
+      "name": "one day",
+      "input": {
+        "from": "2027-05-05",
+        "to": "2027-05-05"
+      },
+      "expected": [
+        {
+          "from": "2027-05-05",
+          "to": "2027-05-05"
+        }
+      ]
+    },
+    {
+      "name": "thirteen months",
+      "input": {
+        "from": "2027-01-01",
+        "to": "2028-01-01"
+      },
+      "error": "range_too_long"
+    }
+  ]
+}

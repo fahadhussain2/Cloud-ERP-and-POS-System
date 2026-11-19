@@ -75,12 +75,13 @@ export async function loadGrants(c: pg.ClientBase, userId: string): Promise<Role
   return rows.map((r) => ({ permissions: r.permissions, limits: r.limits, branchId: r.branch_id }));
 }
 
-const me = (a: Omit<AuthContext, 'sessionId'>): MeResponse => ({
+const me = (a: Omit<AuthContext, 'sessionId'>, shopName: string): MeResponse => ({
   tenantId: a.tenantId,
   user: { id: a.userId, username: a.username, fullName: a.fullName },
   permissions: expandPermissions(a.grants, null),
   limits: effectiveLimits(a.grants, null),
   mustChangePassword: a.mustChangePassword,
+  shopName,
 });
 
 /** Registers the auth routes on `scope` and returns `requireAuth` for other routes in it. */
@@ -242,16 +243,20 @@ export async function registerAuth(
           ],
         );
         await audit('login.success', user.id);
+        const shop = await c.query<{ name: string }>('SELECT name FROM erp.tenants');
         return {
           token,
-          me: me({
-            tenantId,
-            userId: user.id,
-            username: user.username,
-            fullName: user.full_name,
-            grants: await loadGrants(c, user.id),
-            mustChangePassword: user.must_change_password,
-          }),
+          me: me(
+            {
+              tenantId,
+              userId: user.id,
+              username: user.username,
+              fullName: user.full_name,
+              grants: await loadGrants(c, user.id),
+              mustChangePassword: user.must_change_password,
+            },
+            shop.rows[0]!.name,
+          ),
         };
       });
 
@@ -281,7 +286,15 @@ export async function registerAuth(
     return reply.code(204).send();
   });
 
-  scope.get('/auth/me', { preHandler: requireSession }, (req) => me(req.auth!));
+  // The shop's name comes with it: the reports print it in their header (W2-01).
+  scope.get('/auth/me', { preHandler: requireSession }, async (req) => {
+    const a = req.auth!;
+    const shopName = await withTenant(pool, { tenantId: a.tenantId, requestId: req.id }, async (_db, c) => {
+      const { rows } = await c.query<{ name: string }>('SELECT name FROM erp.tenants');
+      return rows[0]!.name;
+    });
+    return me(a, shopName);
+  });
 
   // Change your own password (D-083): needs the current one; ends your other sessions.
   scope.put(

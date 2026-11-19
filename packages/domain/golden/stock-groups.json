@@ -1,0 +1,303 @@
+{
+  "description": "Grouped lists (stock at a date, stock movement; W2-02 owner answer 3): rows under their groups (category, then make), groups by name ignoring case with the unnamed group ('') last, rows in the order given; each group's line comes first, with its subtotals and how many rows it holds; the subtotals of every level add up to the total.",
+  "cases": [
+    {
+      "name": "category, then make",
+      "input": {
+        "rows": [
+          {
+            "key": "i1",
+            "group": ["Filters", "Toyota"],
+            "values": [2000, 500]
+          },
+          {
+            "key": "i2",
+            "group": ["Brakes", "Honda"],
+            "values": [1000, 300]
+          },
+          {
+            "key": "i3",
+            "group": ["Filters", "Honda"],
+            "values": [3000, 900]
+          },
+          {
+            "key": "i4",
+            "group": ["Filters", "Toyota"],
+            "values": [1000, 100]
+          },
+          {
+            "key": "i5",
+            "group": ["Brakes", ""],
+            "values": [500, 50]
+          }
+        ],
+        "depth": 2
+      },
+      "expected": {
+        "lines": [
+          {
+            "kind": "group",
+            "depth": 0,
+            "path": ["Brakes"],
+            "name": "Brakes",
+            "count": 2,
+            "values": [1500, 350]
+          },
+          {
+            "kind": "group",
+            "depth": 1,
+            "path": ["Brakes", "Honda"],
+            "name": "Honda",
+            "count": 1,
+            "values": [1000, 300]
+          },
+          {
+            "kind": "row",
+            "depth": 2,
+            "key": "i2",
+            "values": [1000, 300]
+          },
+          {
+            "kind": "group",
+            "depth": 1,
+            "path": ["Brakes", ""],
+            "name": "",
+            "count": 1,
+            "values": [500, 50]
+          },
+          {
+            "kind": "row",
+            "depth": 2,
+            "key": "i5",
+            "values": [500, 50]
+          },
+          {
+            "kind": "group",
+            "depth": 0,
+            "path": ["Filters"],
+            "name": "Filters",
+            "count": 3,
+            "values": [6000, 1500]
+          },
+          {
+            "kind": "group",
+            "depth": 1,
+            "path": ["Filters", "Honda"],
+            "name": "Honda",
+            "count": 1,
+            "values": [3000, 900]
+          },
+          {
+            "kind": "row",
+            "depth": 2,
+            "key": "i3",
+            "values": [3000, 900]
+          },
+          {
+            "kind": "group",
+            "depth": 1,
+            "path": ["Filters", "Toyota"],
+            "name": "Toyota",
+            "count": 2,
+            "values": [3000, 600]
+          },
+          {
+            "kind": "row",
+            "depth": 2,
+            "key": "i1",
+            "values": [2000, 500]
+          },
+          {
+            "kind": "row",
+            "depth": 2,
+            "key": "i4",
+            "values": [1000, 100]
+          }
+        ],
+        "total": {
+          "count": 5,
+          "values": [7500, 1850]
+        }
+      }
+    },
+    {
+      "name": "no grouping: the rows and a total",
+      "input": {
+        "rows": [
+          {
+            "key": "i1",
+            "group": ["Filters", "Toyota"],
+            "values": [2000, 500]
+          },
+          {
+            "key": "i2",
+            "group": ["Brakes", "Honda"],
+            "values": [1000, 300]
+          }
+        ],
+        "depth": 0
+      },
+      "expected": {
+        "lines": [
+          {
+            "kind": "row",
+            "depth": 0,
+            "key": "i1",
+            "values": [2000, 500]
+          },
+          {
+            "kind": "row",
+            "depth": 0,
+            "key": "i2",
+            "values": [1000, 300]
+          }
+        ],
+        "total": {
+          "count": 2,
+          "values": [3000, 800]
+        }
+      }
+    },
+    {
+      "name": "one level, names in any case, the unnamed (or a row with no group) last",
+      "input": {
+        "rows": [
+          {
+            "key": "a",
+            "group": [],
+            "values": [1]
+          },
+          {
+            "key": "b",
+            "group": ["Filters"],
+            "values": [2]
+          },
+          {
+            "key": "c",
+            "group": ["brakes"],
+            "values": [4]
+          }
+        ],
+        "depth": 1
+      },
+      "expected": {
+        "lines": [
+          {
+            "kind": "group",
+            "depth": 0,
+            "path": ["brakes"],
+            "name": "brakes",
+            "count": 1,
+            "values": [4]
+          },
+          {
+            "kind": "row",
+            "depth": 1,
+            "key": "c",
+            "values": [4]
+          },
+          {
+            "kind": "group",
+            "depth": 0,
+            "path": ["Filters"],
+            "name": "Filters",
+            "count": 1,
+            "values": [2]
+          },
+          {
+            "kind": "row",
+            "depth": 1,
+            "key": "b",
+            "values": [2]
+          },
+          {
+            "kind": "group",
+            "depth": 0,
+            "path": [""],
+            "name": "",
+            "count": 1,
+            "values": [1]
+          },
+          {
+            "kind": "row",
+            "depth": 1,
+            "key": "a",
+            "values": [1]
+          }
+        ],
+        "total": {
+          "count": 3,
+          "values": [7]
+        }
+      }
+    },
+    {
+      "name": "two groups differing only in case stay apart; a row with fewer values counts 0 for the rest",
+      "input": {
+        "rows": [
+          {
+            "key": "x",
+            "group": ["brakes"],
+            "values": [1, 2]
+          },
+          {
+            "key": "y",
+            "group": ["Brakes"],
+            "values": [3]
+          }
+        ],
+        "depth": 1
+      },
+      "expected": {
+        "lines": [
+          {
+            "kind": "group",
+            "depth": 0,
+            "path": ["Brakes"],
+            "name": "Brakes",
+            "count": 1,
+            "values": [3, 0]
+          },
+          {
+            "kind": "row",
+            "depth": 1,
+            "key": "y",
+            "values": [3]
+          },
+          {
+            "kind": "group",
+            "depth": 0,
+            "path": ["brakes"],
+            "name": "brakes",
+            "count": 1,
+            "values": [1, 2]
+          },
+          {
+            "kind": "row",
+            "depth": 1,
+            "key": "x",
+            "values": [1, 2]
+          }
+        ],
+        "total": {
+          "count": 2,
+          "values": [4, 2]
+        }
+      }
+    },
+    {
+      "name": "nothing",
+      "input": {
+        "rows": [],
+        "depth": 2
+      },
+      "expected": {
+        "lines": [],
+        "total": {
+          "count": 0,
+          "values": []
+        }
+      }
+    }
+  ]
+}

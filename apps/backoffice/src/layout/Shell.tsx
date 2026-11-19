@@ -1,6 +1,7 @@
 import { TooltipProvider, useShortcuts } from '@erp/ui';
 import { useState, type ReactNode } from 'react';
 
+import { mayOpen, REPORTS } from '../reports/catalog';
 import type { Route } from '../router';
 import { menuFor } from './menu';
 import { ScreenSearch } from './ScreenSearch';
@@ -11,7 +12,7 @@ import { TopBar } from './TopBar';
 // at its foot, a top bar over the screen, and the search for screens. Only the frame: every screen draws itself as
 // before.
 
-export { allowed, MENU, type MenuItem } from './menu';
+export { allowed, MENU, needsOf, type MenuItem } from './menu';
 
 export function Shell({
   fullName,
@@ -47,10 +48,15 @@ export function Shell({
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar route={route} onSearch={() => setSearching(true)} />
-          <main className="flex min-w-0 flex-col gap-2.5 p-4 md:px-7 md:py-5">{children}</main>
+          <main className="flex min-w-0 flex-col gap-2.5 p-4 md:px-7 md:py-5 print:p-0">{children}</main>
         </div>
       </div>
-      <ScreenSearch groups={menuFor(permissions)} open={searching} onOpenChange={setSearching} />
+      <ScreenSearch
+        groups={menuFor(permissions)}
+        reports={REPORTS.filter((r) => mayOpen(r, permissions))}
+        open={searching}
+        onOpenChange={setSearching}
+      />
     </TooltipProvider>
   );
 }

@@ -1,0 +1,66 @@
+{
+  "description": "The fields an update changed (W2-04 owner answer 6): by name, the bookkeeping columns ignored; a field added or removed counts, with null on the missing side; nested values compared whole.",
+  "cases": [
+    {
+      "name": "A price changed; the version columns ignored",
+      "input": {
+        "before": {
+          "id": "p1",
+          "price": 120000,
+          "row_version": "4",
+          "txid": "100",
+          "updated_at": "2027-01-01T10:00:00Z",
+          "updated_by_user_id": "u1"
+        },
+        "after": {
+          "id": "p1",
+          "price": 125000,
+          "row_version": "5",
+          "txid": "130",
+          "updated_at": "2027-01-02T10:00:00Z",
+          "updated_by_user_id": "u2"
+        }
+      },
+      "expected": [{ "field": "price", "before": 120000, "after": 125000 }]
+    },
+    {
+      "name": "Two fields changed, by name",
+      "input": {
+        "before": { "name": "Khan Motors", "city": "Karachi", "status": "active" },
+        "after": { "name": "Khan Motors (Saddar)", "city": "Karachi", "status": "inactive" }
+      },
+      "expected": [
+        { "field": "name", "before": "Khan Motors", "after": "Khan Motors (Saddar)" },
+        { "field": "status", "before": "active", "after": "inactive" }
+      ]
+    },
+    {
+      "name": "A field added and a field removed",
+      "input": { "before": { "a": 1, "old": "x" }, "after": { "a": 1, "new": "y" } },
+      "expected": [
+        { "field": "new", "before": null, "after": "y" },
+        { "field": "old", "before": "x", "after": null }
+      ]
+    },
+    {
+      "name": "A nested value changed",
+      "input": {
+        "before": { "phones": ["0300 1234567"], "header": { "line1": "Delux" } },
+        "after": { "phones": ["0300 1234567", "021 3456789"], "header": { "line1": "Delux" } }
+      },
+      "expected": [
+        { "field": "phones", "before": ["0300 1234567"], "after": ["0300 1234567", "021 3456789"] }
+      ]
+    },
+    {
+      "name": "A creation: nothing before, so no changed fields",
+      "input": { "before": null, "after": { "number": "B-1" } },
+      "expected": []
+    },
+    {
+      "name": "Nothing changed but the version",
+      "input": { "before": { "a": 1, "row_version": "1" }, "after": { "a": 1, "row_version": "2" } },
+      "expected": []
+    }
+  ]
+}

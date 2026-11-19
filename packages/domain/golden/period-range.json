@@ -1,0 +1,77 @@
+{
+  "description": "The longest range a report takes (D-116 answer 4): lists of lines up to 92 days, summaries up to 366, counting both ends. Gives the number of days; a longer range, one the wrong way round or a date that is not a date is refused.",
+  "cases": [
+    {
+      "name": "92 days for a list",
+      "input": {
+        "from": "2027-01-01",
+        "to": "2027-04-02",
+        "maxDays": 92
+      },
+      "expected": 92
+    },
+    {
+      "name": "93 days for a list",
+      "input": {
+        "from": "2027-01-01",
+        "to": "2027-04-03",
+        "maxDays": 92
+      },
+      "error": "range_too_long"
+    },
+    {
+      "name": "a year with 29 February for a summary",
+      "input": {
+        "from": "2027-07-01",
+        "to": "2028-06-30",
+        "maxDays": 366
+      },
+      "expected": 366
+    },
+    {
+      "name": "one day more",
+      "input": {
+        "from": "2027-07-01",
+        "to": "2028-07-01",
+        "maxDays": 366
+      },
+      "error": "range_too_long"
+    },
+    {
+      "name": "one day",
+      "input": {
+        "from": "2027-07-01",
+        "to": "2027-07-01",
+        "maxDays": 92
+      },
+      "expected": 1
+    },
+    {
+      "name": "the wrong way round",
+      "input": {
+        "from": "2027-07-02",
+        "to": "2027-07-01",
+        "maxDays": 92
+      },
+      "error": "invalid_range"
+    },
+    {
+      "name": "not a date",
+      "input": {
+        "from": "2027-13-01",
+        "to": "2027-07-01",
+        "maxDays": 92
+      },
+      "error": "invalid_date"
+    },
+    {
+      "name": "not even shaped like a date",
+      "input": {
+        "from": "tomorrow",
+        "to": "2027-07-01",
+        "maxDays": 92
+      },
+      "error": "invalid_date"
+    }
+  ]
+}

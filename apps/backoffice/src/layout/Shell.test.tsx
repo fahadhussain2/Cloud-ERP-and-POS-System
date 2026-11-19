@@ -6,10 +6,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import { href, type Route } from '../router';
+import { REPORTS } from '../reports/catalog';
 import { MENU, Shell } from './Shell';
 
 // The back-office frame (W1-28 plan): the menu in seven rows that open and close, the collapsed rail, the badges, the
 // top bar with where you are, the account menu and the search for screens.
+
+/** The nine reports of W1-11 and W1-20, now on the Reports home: each keeps its address and permission. */
+const MOVED: Record<string, { href: string; needs: string[] }> = {
+  dayReconciliation: { href: href.dayReconciliation, needs: ['reports.view'] },
+  cashVariance: { href: href.cashVariance, needs: ['reports.view'] },
+  salesRegister: { href: href.salesRegister, needs: ['reports.view'] },
+  overridesReport: { href: href.overridesReport, needs: ['reports.view'] },
+  voidsReturns: { href: href.voidsReturns, needs: ['reports.view'] },
+  stockReport: { href: href.stockReport, needs: ['reports.view'] },
+  ageing: { href: href.ageing, needs: ['reports.view'] },
+  exceptions: { href: href.exceptions, needs: ['reports.view'] },
+  trace: { href: href.trace(), needs: ['support.trace'] },
+};
 
 /** Every permission a menu entry needs: an owner sees everything. */
 const EVERYTHING = [
@@ -39,20 +53,19 @@ const EVERYTHING = [
   'cost.view',
 ];
 
-/** Today's 28 entries with their addresses and permissions (W1-04 to W1-25): the regrouping changes none of them. */
+/**
+ * The menu's entries with their addresses and permissions (W1-04 to W1-25): the regrouping changed none of them, and the
+ * nine reports moved onto the Reports home with theirs (W2-01, MOVED).
+ */
 const ENTRIES: Record<string, { href: string; needs: string[] }> = {
   staff: { href: href.staff, needs: ['admin.users', 'admin.devices'] },
   counters: { href: href.counters, needs: ['admin.devices'] },
   shopSettings: { href: href.shopSettings, needs: ['admin.settings'] },
-  dayReconciliation: { href: href.dayReconciliation, needs: ['reports.view'] },
-  cashVariance: { href: href.cashVariance, needs: ['reports.view'] },
-  salesRegister: { href: href.salesRegister, needs: ['reports.view'] },
-  overridesReport: { href: href.overridesReport, needs: ['reports.view'] },
-  voidsReturns: { href: href.voidsReturns, needs: ['reports.view'] },
-  stockReport: { href: href.stockReport, needs: ['reports.view'] },
-  ageing: { href: href.ageing, needs: ['reports.view'] },
-  exceptions: { href: href.exceptions, needs: ['reports.view'] },
-  trace: { href: href.trace(), needs: ['support.trace'] },
+  // Every report on one page (W2-01, owner answer 1): anyone who may open one of them.
+  reports: {
+    href: href.reports,
+    needs: ['reports.financial', 'reports.view', 'admin.users', 'support.trace'],
+  },
   items: { href: href.items, needs: ['cat.item.edit', 'cat.price.edit'] },
   categories: { href: href.categories, needs: ['cat.item.edit', 'cat.price.edit'] },
   labels: { href: href.labels, needs: ['cat.label.print'] },
@@ -128,15 +141,22 @@ describe('the menu', () => {
       en.nav.groups.purchasing,
       en.nav.groups.stock,
       en.nav.groups.accounting,
-      en.nav.groups.reports,
+      en.nav.reports,
       en.nav.groups.settings,
     ]);
   });
 
-  it('keeps every one of the 28 entries once, with its address and permissions', () => {
+  it('keeps every entry once, with its address and permissions; Reports opens the Reports home', () => {
     const entries = MENU.flatMap((g) => g.items);
     expect(entries.map((i) => i.key).sort()).toEqual(Object.keys(ENTRIES).sort());
     for (const i of entries) expect({ href: i.href, needs: [...i.needs] }).toEqual(ENTRIES[i.key]);
+  });
+
+  it('keeps each report that moved to the Reports home at its address, with its permission', () => {
+    for (const [key, entry] of Object.entries(MOVED)) {
+      const r = REPORTS.find((x) => x.key === key);
+      expect({ key, href: r?.href, needs: [...(r?.needs ?? [])] }).toEqual({ key, ...entry });
+    }
   });
 
   it('opens the group of the current screen and marks its entry; the others stay closed', () => {
@@ -190,9 +210,9 @@ describe('the menu', () => {
 
   it('shows a group with one entry the person may open as a direct link, and no group with none', () => {
     show({ permissions: ['support.trace', 'cat.label.print'], route: { screen: 'labels', source: null } });
-    expect(rows()).toEqual([en.nav.labels, en.nav.trace]);
+    expect(rows()).toEqual([en.nav.labels, en.nav.reports]);
     expect(link(en.nav.labels)?.getAttribute('aria-current')).toBe('page');
-    expect(link(en.nav.trace)?.getAttribute('href')).toBe(href.trace());
+    expect(link(en.nav.reports)?.getAttribute('href')).toBe(href.reports);
     expect(within(nav()).queryAllByRole('button', { expanded: false })).toHaveLength(0);
   });
 
@@ -202,29 +222,32 @@ describe('the menu', () => {
     expect(screen.getByText('the screen')).toBeDefined();
   });
 
-  it('puts a count on its entry, and on the group while the group is closed', () => {
-    show({ route: { screen: 'items' }, badges: { exceptions: 3 } });
-    expect(within(group(en.nav.groups.reports)).getByLabelText(badge(3))).toBeDefined();
-    fireEvent.click(group(en.nav.groups.reports));
-    expect(within(group(en.nav.groups.reports)).queryByLabelText(badge(3))).toBeNull();
-    expect(within(link(en.nav.exceptions)!).getByLabelText(badge(3))).toBeDefined();
+  it('puts a count on its entry: the open exceptions on Reports', () => {
+    show({ route: { screen: 'items' }, badges: { reports: 3 } });
+    expect(within(link(en.nav.reports)!).getByLabelText(badge(3))).toBeDefined();
+  });
+
+  it('lights Reports up on any report, and the top bar names the report', () => {
+    show({ route: { screen: 'trialBalance' } });
+    expect(link(en.nav.reports)?.getAttribute('aria-current')).toBe('page');
+    expect(within(screen.getByRole('banner')).getByText(en.nav.trialBalance)).toBeDefined();
   });
 
   it('shows no count at 0', () => {
-    show({ route: { screen: 'exceptions' }, badges: { exceptions: 0 } });
+    show({ route: { screen: 'exceptions' }, badges: { reports: 0 } });
     expect(screen.queryByLabelText(badge(0))).toBeNull();
   });
 });
 
 describe('the collapsed menu', () => {
   it('folds into a rail of named icons; a group lists its screens beside it; the choice is remembered', () => {
-    show({ route: { screen: 'items' }, badges: { exceptions: 2 } });
+    show({ route: { screen: 'items' }, badges: { reports: 2 } });
     fireEvent.click(screen.getByRole('button', { name: en.nav.collapse }));
     expect(link(en.nav.items)).toBeNull();
     expect(link(en.nav.customers)?.getAttribute('aria-label')).toBe(en.nav.customers);
-    for (const name of ['catalog', 'purchasing', 'stock', 'accounting', 'reports', 'settings'] as const)
+    for (const name of ['catalog', 'purchasing', 'stock', 'accounting', 'settings'] as const)
       expect(group(en.nav.groups[name]).getAttribute('aria-haspopup')).toBe('menu');
-    expect(within(group(en.nav.groups.reports)).getByLabelText(badge(2))).toBeDefined();
+    expect(link(en.nav.reports)?.getAttribute('aria-describedby')).toBeTruthy();
 
     openMenu(group(en.nav.groups.stock));
     const flyout = screen.getByRole('menu');
@@ -346,6 +369,15 @@ describe('the search for screens', () => {
     expect(options()).toHaveLength(4);
     fireEvent.click(screen.getAllByRole('option')[2]!);
     expect(window.location.hash).toBe(href.shopSettings);
+  });
+
+  it('finds each report by its own name, though the menu shows only the Reports home', () => {
+    show();
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    type('trial');
+    expect(options()).toEqual([`${en.nav.trialBalance}${en.nav.groups.reports}`]);
+    fireEvent.keyDown(box(), { key: 'Enter' });
+    expect(window.location.hash).toBe(href.trialBalance);
   });
 
   it('never lists a screen the person may not open', () => {

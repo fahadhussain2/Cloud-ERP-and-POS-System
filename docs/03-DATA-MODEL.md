@@ -176,7 +176,7 @@ This keeps the one-screen exchange (D-006) to one document, one number, one rece
 |---|---|
 | `document_id, line_no, item_id` | |
 | `qty` | + sold / − returned |
-| `list_price, unit_price, line_discount, line_total` | list = tier price at the time of sale |
+| `list_price, unit_price, line_discount, line_total` | list = tier price at the time of sale; line_total = qty × unit_price − bill_share |
 | `floor_price_at_sale` | snapshot used for validation |
 | `tax_code_id, tax_amount` | 0 for now |
 | `original_line_id` | for returned lines (W1-13) |

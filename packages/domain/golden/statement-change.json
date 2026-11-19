@@ -1,0 +1,60 @@
+{
+  "description": "The change from a comparison column (W2-01 plan, owner answer 3): the amount is current − previous; the percentage is basis points of the previous amount taken as positive, rounded half away from zero, and null when the previous amount is 0.",
+  "cases": [
+    {
+      "name": "up from 1,000.00 to 1,700.00",
+      "input": {
+        "current": 170000,
+        "previous": 100000
+      },
+      "expected": {
+        "amount": 70000,
+        "bp": 7000
+      }
+    },
+    {
+      "name": "from a loss to a profit",
+      "input": {
+        "current": 26000,
+        "previous": -2000
+      },
+      "expected": {
+        "amount": 28000,
+        "bp": 140000
+      }
+    },
+    {
+      "name": "a bigger loss",
+      "input": {
+        "current": -300,
+        "previous": -200
+      },
+      "expected": {
+        "amount": -100,
+        "bp": -5000
+      }
+    },
+    {
+      "name": "down by a third, rounded",
+      "input": {
+        "current": 200,
+        "previous": 300
+      },
+      "expected": {
+        "amount": -100,
+        "bp": -3333
+      }
+    },
+    {
+      "name": "nothing before",
+      "input": {
+        "current": 5,
+        "previous": 0
+      },
+      "expected": {
+        "amount": 5,
+        "bp": null
+      }
+    }
+  ]
+}

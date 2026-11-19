@@ -1,4 +1,4 @@
-import { businessDate } from '@erp/domain';
+import { businessDate, checkDocumentDate } from '@erp/domain';
 import type pg from 'pg';
 
 // The lock date in the back office (ACC-06, owner answer 5 to W1-19, D-108): a back-office document dated on or before
@@ -41,4 +41,32 @@ export async function shopDay(
   );
   const t = rows[0]!;
   return { today: businessDate(now.getTime(), t.timezone, t.day_cutoff_hour), lockDate: t.lock_date };
+}
+
+/** Why a back-office document can't post on its date: what the API answers, with the date to name. */
+export type DateRefusal =
+  { error: 'date_in_future'; today: string } | { error: 'date_locked'; lockDate: string };
+
+/**
+ * Why this back-office document can't post on its date, or null when it may: dated after the shop's business date
+ * (W2-05; the business date has a cut-off, so at 00:30 the shop is still on the day before), or on or before the lock
+ * date (D-108). Purchasing and stock documents; accounting checks its own with `checkDocumentDate` first.
+ */
+export async function dateRefusal(
+  c: pg.ClientBase,
+  type: string,
+  id: string,
+  now: Date,
+): Promise<DateRefusal | null> {
+  const d = DATED[type];
+  if (!d) throw new Error(`no date known for ${type}`);
+  const { rows } = await c.query<{ day: string | null }>(
+    `SELECT x.${d.column}::text AS day FROM erp.${d.table} x WHERE x.${d.by} = $1`,
+    [id],
+  );
+  const { today, lockDate } = await shopDay(c, now);
+  const problem = checkDocumentDate(rows[0]?.day ?? null, today, lockDate);
+  if (problem === 'date_in_future') return { error: 'date_in_future', today };
+  if (problem === 'date_locked') return { error: 'date_locked', lockDate: lockDate! };
+  return null;
 }

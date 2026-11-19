@@ -1,5 +1,4 @@
 import type { PurchasingLookups, SupplierDetail, SupplierRow } from '@erp/contracts';
-import { isDateLocked } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
@@ -23,8 +22,8 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { moneyValue } from '../catalog/data';
-import { href, navigate } from '../router';
-import { purchasingRefusal, today, usePurchasingLookups } from './data';
+import { href, navigate, withQuery } from '../router';
+import { dateProblem, purchasingRefusal, usePurchasingLookups } from './data';
 import { FormDialog } from '../staff/dialogs';
 
 // Suppliers (W1-16, PUR-01, PUR-09): the list with what the shop owes each, a supplier's details (terms, the label
@@ -440,7 +439,8 @@ const KIND_KEYS: Record<string, string> = {
   opening: 'purchasing.ledger.opening',
 };
 
-export function SupplierScreen({ api, id }: { api: Api; id: string }) {
+/** `reports`: whether this person may open the supplier ledger report (reports.view and cost.view, W2-04). */
+export function SupplierScreen({ api, id, reports = false }: { api: Api; id: string; reports?: boolean }) {
   const { t } = useTranslation();
   const lookups = usePurchasingLookups(api);
   const [detail, setDetail] = useState<SupplierDetail | null | undefined>(undefined);
@@ -536,7 +536,14 @@ export function SupplierScreen({ api, id }: { api: Api; id: string }) {
         </span>
       </Panel>
       <Panel className="px-1.5 pb-2.5">
-        <h2 className="m-0 px-2 pt-3 font-display text-lg font-semibold">{t('purchasing.ledger.title')}</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2 px-2 pt-3">
+          <h2 className="m-0 font-display text-lg font-semibold">{t('purchasing.ledger.title')}</h2>
+          {reports && (
+            <a href={withQuery(href.partnerLedger, { role: 'supplier', partyId: s.id, statement: '1' })}>
+              {t('purchasing.ledger.report')}
+            </a>
+          )}
+        </div>
         {detail.ledger.length === 0 ? (
           <p className="p-2 text-muted-foreground">{t('purchasing.ledger.empty')}</p>
         ) : (
@@ -605,15 +612,14 @@ function PayDialog({
   const { t } = useTranslation();
   const [bank, setBank] = useState(lookups.bankAccounts[0]?.id ?? '');
   const [amount, setAmount] = useState('');
-  const [paidOn, setPaidOn] = useState(today());
+  const [paidOn, setPaidOn] = useState(lookups.today);
   const [reference, setReference] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const bankId = useId();
-  // A payment dated on or before the lock date can't post (D-108): the date says why before it is sent.
-  const locked = isDateLocked(paidOn, lookups.lockDate)
-    ? t('purchasing.errors.date_locked', { date: lookups.lockDate })
-    : null;
+  // A payment dated after the shop's business date (W2-05) or on or before the lock date (D-108) can't post: the date
+  // says why before it is sent.
+  const locked = dateProblem(t, paidOn, lookups);
   const submit = async () => {
     if (locked) return setError(locked);
     const value = moneyValue(amount, lookups.money.minorUnits);
@@ -676,6 +682,7 @@ function PayDialog({
           label={t('purchasing.pay.date')}
           type="date"
           error={locked}
+          max={lookups.today}
           value={paidOn}
           onChange={(e) => setPaidOn(e.target.value)}
         />

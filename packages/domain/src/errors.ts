@@ -73,6 +73,7 @@ export type DomainErrorCode =
   // Return and exchange (POS spec §19, W1-13)
   | 'return_over_quantity'
   | 'invalid_date'
+  | 'invalid_hour'
   | 'invalid_reason'
   | 'invalid_condition'
   | 'bill_not_empty'
@@ -96,7 +97,14 @@ export type DomainErrorCode =
   | 'already_given_back'
   | 'approver_required'
   | 'approver_is_cashier'
-  | 'approver_not_permitted';
+  | 'approver_not_permitted'
+  // The financial statements and report periods (W2-01, D-116)
+  | 'unknown_account'
+  | 'invalid_preset'
+  | 'invalid_range'
+  | 'range_too_long'
+  // The stock reports (W2-02)
+  | 'unknown_source';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

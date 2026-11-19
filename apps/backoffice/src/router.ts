@@ -5,6 +5,13 @@ import { useEffect, useState } from 'react';
 
 export type Route =
   | { screen: 'home' }
+  | { screen: 'reportsHome' }
+  | { screen: 'trialBalance' }
+  | { screen: 'profitLoss' }
+  | { screen: 'balanceSheet' }
+  | { screen: 'cashBook' }
+  | { screen: 'dayBook' }
+  | { screen: 'expensesReport' }
   | { screen: 'staff' }
   | { screen: 'person'; id: string }
   | { screen: 'counters' }
@@ -15,6 +22,24 @@ export type Route =
   | { screen: 'overridesReport' }
   | { screen: 'voidsReturns' }
   | { screen: 'stockReport' }
+  | { screen: 'stockAt' }
+  | { screen: 'stockMovement' }
+  | { screen: 'stockLedger' }
+  | { screen: 'reorder' }
+  | { screen: 'deadStock' }
+  | { screen: 'inventoryAnalysis' }
+  | { screen: 'salesProfit' }
+  | { screen: 'purchaseRegister' }
+  | { screen: 'rates' }
+  | { screen: 'salesOverTime' }
+  | { screen: 'partnerLedger' }
+  | { screen: 'statements' }
+  | { screen: 'balanceTrend' }
+  | { screen: 'overdue' }
+  | { screen: 'overLimit' }
+  | { screen: 'collections' }
+  | { screen: 'userActivity' }
+  | { screen: 'cashFlow' }
   | { screen: 'ageing' }
   | { screen: 'exceptions' }
   | { screen: 'trace'; number: string | null }
@@ -53,11 +78,40 @@ export const href = {
   shopSettings: '#/shop',
   dayReconciliation: '#/reports/day',
   cashVariance: '#/reports/variance',
+  // The Reports home and the financial statements (W2-01, D-116); their filters follow a `?` (reportHref).
+  reports: '#/reports',
+  trialBalance: '#/reports/trial-balance',
+  profitLoss: '#/reports/profit-loss',
+  balanceSheet: '#/reports/balance-sheet',
+  cashBook: '#/reports/cash-book',
+  dayBook: '#/reports/day-book',
+  expensesReport: '#/reports/expenses',
   // The W1-20 reports and support (D-110).
   salesRegister: '#/reports/sales',
   overridesReport: '#/reports/overrides',
   voidsReturns: '#/reports/voids',
   stockReport: '#/reports/stock',
+  // The stock reports (W2-02).
+  stockAt: '#/reports/stock-at',
+  stockMovement: '#/reports/stock-movement',
+  stockLedger: '#/reports/stock-ledger',
+  reorder: '#/reports/reorder',
+  deadStock: '#/reports/dead-stock',
+  inventoryAnalysis: '#/reports/inventory-analysis',
+  // The sales and purchase reports (W2-03).
+  salesProfit: '#/reports/sales-profit',
+  purchaseRegister: '#/reports/purchase-register',
+  rates: '#/reports/rates',
+  salesOverTime: '#/reports/sales-over-time',
+  // The customer, supplier and control reports and the cash flow (W2-04).
+  partnerLedger: '#/reports/partner-ledger',
+  statements: '#/reports/statements',
+  balanceTrend: '#/reports/balance-trend',
+  overdue: '#/reports/overdue',
+  overLimit: '#/reports/over-limit',
+  collections: '#/reports/collections',
+  userActivity: '#/reports/user-activity',
+  cashFlow: '#/reports/cash-flow',
   ageing: '#/reports/ageing',
   exceptions: '#/reports/exceptions',
   trace: (number?: string) => (number ? `#/support/trace/${encodeURIComponent(number)}` : '#/support/trace'),
@@ -101,18 +155,57 @@ export const href = {
   expenseCategories: '#/accounting/categories',
 } as const;
 
+/** A screen's address with its filters (W2-01 plan, owner answer 6), e.g. a report's period. */
+export function withQuery(base: string, query: Record<string, string | null | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) if (v) q.set(k, v);
+  const text = q.toString();
+  return text ? `${base}?${text}` : base;
+}
+
+/** The filters after the `?` of an address (the hash), if any. */
+export function queryOf(hash: string): URLSearchParams {
+  const at = hash.indexOf('?');
+  return new URLSearchParams(at < 0 ? '' : hash.slice(at + 1));
+}
+
 export function parseHash(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+  const parts = hash.replace(/^#\/?/, '').split('?')[0]!.split('/').filter(Boolean);
   if (parts[0] === 'staff' && parts[1]) return { screen: 'person', id: decodeURIComponent(parts[1]) };
   if (parts[0] === 'staff') return { screen: 'staff' };
   if (parts[0] === 'counters') return { screen: 'counters' };
   if (parts[0] === 'shop' && parts.length === 1) return { screen: 'shopSettings' };
+  if (parts[0] === 'reports' && parts.length === 1) return { screen: 'reportsHome' };
+  if (parts[0] === 'reports' && parts[1] === 'trial-balance') return { screen: 'trialBalance' };
+  if (parts[0] === 'reports' && parts[1] === 'profit-loss') return { screen: 'profitLoss' };
+  if (parts[0] === 'reports' && parts[1] === 'balance-sheet') return { screen: 'balanceSheet' };
+  if (parts[0] === 'reports' && parts[1] === 'cash-book') return { screen: 'cashBook' };
+  if (parts[0] === 'reports' && parts[1] === 'day-book') return { screen: 'dayBook' };
+  if (parts[0] === 'reports' && parts[1] === 'expenses') return { screen: 'expensesReport' };
   if (parts[0] === 'reports' && parts[1] === 'day') return { screen: 'dayReconciliation' };
   if (parts[0] === 'reports' && parts[1] === 'variance') return { screen: 'cashVariance' };
   if (parts[0] === 'reports' && parts[1] === 'sales') return { screen: 'salesRegister' };
   if (parts[0] === 'reports' && parts[1] === 'overrides') return { screen: 'overridesReport' };
   if (parts[0] === 'reports' && parts[1] === 'voids') return { screen: 'voidsReturns' };
   if (parts[0] === 'reports' && parts[1] === 'stock') return { screen: 'stockReport' };
+  if (parts[0] === 'reports' && parts[1] === 'stock-at') return { screen: 'stockAt' };
+  if (parts[0] === 'reports' && parts[1] === 'stock-movement') return { screen: 'stockMovement' };
+  if (parts[0] === 'reports' && parts[1] === 'stock-ledger') return { screen: 'stockLedger' };
+  if (parts[0] === 'reports' && parts[1] === 'reorder') return { screen: 'reorder' };
+  if (parts[0] === 'reports' && parts[1] === 'dead-stock') return { screen: 'deadStock' };
+  if (parts[0] === 'reports' && parts[1] === 'inventory-analysis') return { screen: 'inventoryAnalysis' };
+  if (parts[0] === 'reports' && parts[1] === 'sales-profit') return { screen: 'salesProfit' };
+  if (parts[0] === 'reports' && parts[1] === 'purchase-register') return { screen: 'purchaseRegister' };
+  if (parts[0] === 'reports' && parts[1] === 'rates') return { screen: 'rates' };
+  if (parts[0] === 'reports' && parts[1] === 'sales-over-time') return { screen: 'salesOverTime' };
+  if (parts[0] === 'reports' && parts[1] === 'partner-ledger') return { screen: 'partnerLedger' };
+  if (parts[0] === 'reports' && parts[1] === 'statements') return { screen: 'statements' };
+  if (parts[0] === 'reports' && parts[1] === 'balance-trend') return { screen: 'balanceTrend' };
+  if (parts[0] === 'reports' && parts[1] === 'overdue') return { screen: 'overdue' };
+  if (parts[0] === 'reports' && parts[1] === 'over-limit') return { screen: 'overLimit' };
+  if (parts[0] === 'reports' && parts[1] === 'collections') return { screen: 'collections' };
+  if (parts[0] === 'reports' && parts[1] === 'user-activity') return { screen: 'userActivity' };
+  if (parts[0] === 'reports' && parts[1] === 'cash-flow') return { screen: 'cashFlow' };
   if (parts[0] === 'reports' && parts[1] === 'ageing') return { screen: 'ageing' };
   if (parts[0] === 'reports' && parts[1] === 'exceptions') return { screen: 'exceptions' };
   if (parts[0] === 'support' && parts[1] === 'trace')

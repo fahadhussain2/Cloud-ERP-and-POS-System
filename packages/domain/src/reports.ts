@@ -97,7 +97,7 @@ export interface AgeingRow extends AgeingBuckets {
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /** Days since 1970-01-01 of a calendar date; a date that isn't one is refused. */
-function dayNumber(date: string): number {
+export function dayNumber(date: string): number {
   const m = DAY.exec(date);
   const [y, mo, d] = m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [NaN, NaN, NaN];
   const t = new Date(Date.UTC(y, mo - 1, d));
@@ -115,6 +115,34 @@ const empty = (): AgeingBuckets => ({
   over90: 0,
 });
 
+/** A debit with what is still unpaid of it; days are `dayNumber`s. */
+export interface OpenDebit {
+  due: number;
+  at: number;
+  left: number;
+}
+
+/**
+ * One party's entries settled oldest first (owner answer 4 to W1-20): credits pay the debits in due-date order, then
+ * entry date. Returns every debit with what is left unpaid, and the credit left over (an advance), 0 or more.
+ */
+export function settleOldestFirst(entries: readonly Omit<AgeingEntry, 'partyId'>[]): {
+  debits: OpenDebit[];
+  credit: number;
+} {
+  const debits = entries
+    .filter((e) => e.amount > 0)
+    .map((e) => ({ due: dayNumber(e.dueDate), at: dayNumber(e.entryDate), left: e.amount }))
+    .sort((a, b) => a.due - b.due || a.at - b.at);
+  let credit = -entries.filter((e) => e.amount < 0).reduce((s, e) => s + e.amount, 0);
+  for (const d of debits) {
+    const used = Math.min(credit, d.left);
+    d.left -= used;
+    credit -= used;
+  }
+  return { debits, credit };
+}
+
 /**
  * Ageing by due date (RPT-06, owner answer 4 to W1-20): credits settle the oldest debits first (due date, then entry
  * date); what is left of each debit goes to its bucket by days past due at `asOf`; a credit left over goes to not yet
@@ -127,16 +155,7 @@ export function ageBalances(input: AgeingInput): { rows: AgeingRow[]; totals: Ag
 
   const rows: AgeingRow[] = [];
   for (const [partyId, entries] of byParty) {
-    const debits = entries
-      .filter((e) => e.amount > 0)
-      .map((e) => ({ due: dayNumber(e.dueDate), at: dayNumber(e.entryDate), left: e.amount }))
-      .sort((a, b) => a.due - b.due || a.at - b.at);
-    let credit = -entries.filter((e) => e.amount < 0).reduce((s, e) => s + e.amount, 0);
-    for (const d of debits) {
-      const used = Math.min(credit, d.left);
-      d.left -= used;
-      credit -= used;
-    }
+    const { debits, credit } = settleOldestFirst(entries);
     const row: AgeingRow = { partyId, ...empty() };
     for (const d of debits) {
       if (d.left === 0) continue;

@@ -7,7 +7,7 @@ import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import pos from '../apps/pos/src/locales/en.json' with { type: 'json' };
-import { account, menu, signOut } from './backoffice';
+import { account, menu, report, signOut } from './backoffice';
 import { expect, test } from './counter-test';
 import {
   BACKOFFICE_PORT,
@@ -110,6 +110,17 @@ const openCounter = async (page: Page) => {
   await page.goto(POS);
   await unlock(page, SALESMAN.fullName, OWN_PIN);
   await expect(page.getByRole('combobox')).toBeVisible();
+  // Each flow sells from an empty walk-in bill. The counter keeps a person's open bill, so whatever an earlier spec
+  // left on Asif's bill would be sold with it (Rs 4,275 of brake pads once made a Rs 900 bill Rs 5,175). The tier
+  // name shows once the saved bill has loaded.
+  const panel = page.getByRole('region', { name: pos.bill.title });
+  await expect(panel).toContainText(/\S prices/);
+  if ((await page.getByRole('listbox', { name: pos.keys.lines }).getByRole('option').count()) > 0) {
+    await page.keyboard.press('Alt+C');
+    await page.getByRole('dialog').getByRole('button', { name: pos.clear.action }).click();
+  }
+  await expect(panel).toContainText(`${pos.bill.walkIn} · Retail prices`);
+  await expect(page.getByRole('listbox', { name: pos.keys.lines }).getByRole('option')).toHaveCount(0);
 };
 
 test.afterAll(async () => {
@@ -577,7 +588,7 @@ test('the drawer is counted blind, short, acknowledged later; the owner acknowle
     await page.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
     await page.getByRole('button', { name: bo.login.submit }).click();
   }
-  await menu(page, bo.nav.dayReconciliation);
+  await report(page, bo.nav.dayReconciliation);
   await page.getByLabel(bo.reports.day.date).fill(today);
   await expect(page.getByText(bo.reports.day.provisional)).toBeVisible();
   // The earlier flows left cash bills nobody handed over: they are listed under their salesman.
@@ -768,6 +779,9 @@ test('a return of a bill of today not yet paid at the desk is offered as a void 
 }) => {
   await openCounter(page);
   const bill = await sell(page, 'FNBL002');
+  // The counter asks the server; a bill it hasn't pushed yet is "can't be asked" (sync/bills.ts), as designed. Once
+  // the desk's queue shows it, the server has it.
+  await expect(queue().getByText(bill)).toBeVisible({ timeout: 10_000 });
   await page.keyboard.press('F3');
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel(pos.return.search).fill(bill);
@@ -802,7 +816,9 @@ test("a split bill's refund waits at the desk until the bill's cash is collected
   await expect(notice).toHaveText(/^Bill C\d+-S\d{6} printed/);
   const bill = /C\d+-S\d{6}/.exec((await notice.textContent()) ?? '')![0];
 
-  // Its JazzCash part was paid at the counter: a return, not a void (guard 1 lets it through).
+  // Its JazzCash part was paid at the counter: a return, not a void (guard 1 lets it through). Once the bill's cash is
+  // in the desk's queue the server has it; before that the counter can't ask the desk and asks the salesman instead.
+  await expect(queue().getByText(bill)).toBeVisible({ timeout: 10_000 });
   await returnFrom(page, bill, 'FAN BELT MEHRAN', '1');
   const ret = await refundAtDesk(page);
   const refund = queue().getByRole('row', { name: new RegExp(ret) });

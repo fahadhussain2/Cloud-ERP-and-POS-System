@@ -1,0 +1,113 @@
+{
+  "description": "The stock and purchases panel under the cost of goods sold (W2-01 plan, owner answer 2), from the Inventory account's lines in the period by their source. Opening = the balance before the period plus any opening-balance posting inside it. Purchases are goods receipts, purchase returns are negative, adjustments are stock adjustments and counts; sales and their voids at cost make the stock used; anything else (a transfer between locations nets to 0) is `other`. Closing = opening + purchases + purchase returns + adjustments + other + sales at cost, and stock used = opening + purchases + purchase returns + adjustments + other − closing. `difference` = the COGS account's amount − stock used, shown when it isn't 0.",
+  "cases": [
+    {
+      "name": "November's sales, a return and a purchase, a purchase return and a loss on a count",
+      "input": {
+        "opening": 300000,
+        "movements": [
+          {
+            "sourceType": "sale",
+            "amount": -80000
+          },
+          {
+            "sourceType": "sale",
+            "amount": -40000
+          },
+          {
+            "sourceType": "sale",
+            "amount": 6000
+          },
+          {
+            "sourceType": "goods_receipt",
+            "amount": 50000
+          },
+          {
+            "sourceType": "purchase_return",
+            "amount": -5000
+          },
+          {
+            "sourceType": "stock_adjustment",
+            "amount": -2000
+          },
+          {
+            "sourceType": "stock_transfer",
+            "amount": 0
+          }
+        ],
+        "costOfGoodsSold": 114000
+      },
+      "expected": {
+        "opening": 300000,
+        "purchases": 50000,
+        "purchaseReturns": -5000,
+        "adjustments": -2000,
+        "other": 0,
+        "closing": 229000,
+        "stockUsed": 114000,
+        "costOfGoodsSold": 114000,
+        "difference": 0
+      }
+    },
+    {
+      "name": "January 2027: the opening balances inside the period are the opening stock; a voided bill's cost comes back",
+      "input": {
+        "opening": 0,
+        "movements": [
+          {
+            "sourceType": "opening",
+            "amount": 300000
+          },
+          {
+            "sourceType": "sale",
+            "amount": -1500
+          },
+          {
+            "sourceType": "sales_void",
+            "amount": 500
+          }
+        ],
+        "costOfGoodsSold": 1000
+      },
+      "expected": {
+        "opening": 300000,
+        "purchases": 0,
+        "purchaseReturns": 0,
+        "adjustments": 0,
+        "other": 0,
+        "closing": 299000,
+        "stockUsed": 1000,
+        "costOfGoodsSold": 1000,
+        "difference": 0
+      }
+    },
+    {
+      "name": "a difference with the books is its own line; an unexpected source is other",
+      "input": {
+        "opening": 1000,
+        "movements": [
+          {
+            "sourceType": "sale",
+            "amount": -400
+          },
+          {
+            "sourceType": "journal_voucher",
+            "amount": 50
+          }
+        ],
+        "costOfGoodsSold": 450
+      },
+      "expected": {
+        "opening": 1000,
+        "purchases": 0,
+        "purchaseReturns": 0,
+        "adjustments": 0,
+        "other": 50,
+        "closing": 650,
+        "stockUsed": 400,
+        "costOfGoodsSold": 450,
+        "difference": 50
+      }
+    }
+  ]
+}

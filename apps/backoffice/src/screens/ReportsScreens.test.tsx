@@ -1,10 +1,12 @@
 import type { CashVarianceResponse, DayReconciliationResponse } from '@erp/contracts';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nextProvider } from 'react-i18next';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Api } from '../api';
 import { i18n } from '../i18n';
+import en from '../locales/en.json';
+import { href, queryOf } from '../router';
 import { CashVarianceScreen, DayReconciliationScreen } from './ReportsScreens';
 
 // The cash reports (W1-11, CSH-08, RPT-02) over a fake API: the day's status and what holds it, the sessions with
@@ -77,6 +79,7 @@ function fakeApi() {
   let acknowledged = false;
   const api: Api = (method, path) => {
     calls.push(`${method} ${path}`);
+    if (path === '/api/shop/today') return Promise.resolve({ status: 200, body: { today: '2026-11-19' } });
     if (path === '/api/branches')
       return Promise.resolve({ status: 200, body: [{ id: 'b1', code: 'MAIN', name: 'Main shop' }] });
     if (path.startsWith('/api/reports/day-reconciliation'))
@@ -103,6 +106,10 @@ function fakeApi() {
 
 const wrap = (ui: React.ReactNode) => render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
 
+beforeEach(() => {
+  localStorage.clear();
+  window.location.hash = '';
+});
 afterEach(cleanup);
 
 describe('the day reconciliation', () => {
@@ -127,6 +134,28 @@ describe('the day reconciliation', () => {
     expect(screen.getByText(/C03-S000047 .* given back on 2026-11-03 \(D01-M000012\)/)).toBeTruthy();
   });
 
+  it('keeps the branch and the date in the address, and opens on the day before the business date again', async () => {
+    window.location.hash = href.dayReconciliation;
+    const f = fakeApi();
+    wrap(<DayReconciliationScreen api={f.api} permissions={['reports.view']} />);
+    expect(await screen.findByText('Provisional')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(en.reports.day.date), { target: { value: '2026-11-02' } });
+    expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({ branchId: 'b1', date: '2026-11-02' });
+    await waitFor(() =>
+      expect(f.calls).toContain('GET /api/reports/day-reconciliation?branchId=b1&date=2026-11-02'),
+    );
+    expect(screen.getByRole('table', { name: en.reports.day.sessions })).toBeTruthy();
+    cleanup();
+    window.location.hash = href.dayReconciliation;
+    const again = fakeApi();
+    wrap(<DayReconciliationScreen api={again.api} permissions={['reports.view']} />);
+    await waitFor(() =>
+      expect(again.calls.filter((c) => c.includes('/day-reconciliation'))).toEqual([
+        'GET /api/reports/day-reconciliation?branchId=b1&date=2026-11-18',
+      ]),
+    );
+  });
+
   it('lets a manager acknowledge a waiting variance', async () => {
     const f = fakeApi();
     wrap(<DayReconciliationScreen api={f.api} permissions={['reports.view', 'cash.variance.approve']} />);
@@ -141,5 +170,48 @@ describe('the cash variance', () => {
     wrap(<CashVarianceScreen api={fakeApi().api} />);
     expect(await screen.findByText('Ali')).toBeTruthy();
     expect(screen.getByText(/2 sessions/)).toBeTruthy();
+  });
+
+  it('starts on the week to the business date, and a picked preset is worked out on it', async () => {
+    window.location.hash = href.cashVariance;
+    const f = fakeApi();
+    wrap(<CashVarianceScreen api={f.api} />);
+    expect(await screen.findByText('Ali')).toBeTruthy();
+    expect(screen.getByLabelText<HTMLSelectElement>(en.reports.frame.period).value).toBe('weekToToday');
+    fireEvent.change(screen.getByLabelText(en.reports.frame.period), { target: { value: 'lastMonth' } });
+    await waitFor(() =>
+      expect(f.calls).toContain('GET /api/reports/cash-variance?from=2026-10-01&to=2026-10-31'),
+    );
+    expect(screen.getByRole('table', { name: en.reports.variance.sessionsTitle }).textContent).toContain(
+      en.reports.variance.none,
+    );
+  });
+});
+
+// W2-05: the dates a cash report starts on come from the shop's business date (the API), not this browser's
+// calendar. The browser's clock is set days away from the shop's day (19 November), so the test holds anywhere.
+describe("the shop's business date (W2-05)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-21T12:00:00.000Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('the day reconciliation opens on the business day before it', async () => {
+    const f = fakeApi();
+    wrap(<DayReconciliationScreen api={f.api} permissions={['reports.view']} />);
+    expect(await screen.findByText('Provisional')).toBeTruthy();
+    expect(f.calls.filter((c) => c.includes('/day-reconciliation'))).toEqual([
+      'GET /api/reports/day-reconciliation?branchId=b1&date=2026-11-18',
+    ]);
+  });
+
+  it('the cash variance opens on the 7 days up to it', async () => {
+    const f = fakeApi();
+    wrap(<CashVarianceScreen api={f.api} />);
+    expect(await screen.findByText('Ali')).toBeTruthy();
+    expect(f.calls.filter((c) => c.includes('/cash-variance'))).toEqual([
+      'GET /api/reports/cash-variance?from=2026-11-12&to=2026-11-19',
+    ]);
   });
 });

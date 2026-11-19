@@ -261,6 +261,16 @@ describe("a customer's page", () => {
     expect(rows[2]!.textContent).toMatch(/Bank receipt CR000001.*-Rs\s?1,000.*Rs\s?3,500/);
   });
 
+  it('links to the full ledger and statement for someone who may open the reports (W2-04)', async () => {
+    show(<CustomerScreen api={fakeApi(lookups()).api} id="c1" reports />);
+    const link = await screen.findByRole('link', { name: en.customers.ledger.report });
+    expect(link.getAttribute('href')).toBe('#/reports/partner-ledger?role=customer&partyId=c1&statement=1');
+    cleanup();
+    show(<CustomerScreen api={fakeApi(lookups()).api} id="c1" />);
+    await screen.findByRole('table', { name: en.customers.ledger.title });
+    expect(screen.queryByRole('link', { name: en.customers.ledger.report })).toBeNull();
+  });
+
   it('shows no go-live notice on an imported customer, even before go-live (D-113)', async () => {
     const imported = { ...DETAIL, customer: { ...DETAIL.customer, imported: true } };
     show(<CustomerScreen api={fakeApi(lookups({ live: false }), {}, imported).api} id="c1" />);

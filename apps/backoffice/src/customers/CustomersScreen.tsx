@@ -23,7 +23,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { moneyValue } from '../catalog/data';
-import { href, navigate } from '../router';
+import { href, navigate, withQuery } from '../router';
 import { FormDialog } from '../staff/dialogs';
 import { customerRefusal, phoneToCheck, useCustomerLookups } from './data';
 
@@ -655,7 +655,8 @@ const LEDGER_KINDS = new Set([
   'opening',
 ]);
 
-export function CustomerScreen({ api, id }: { api: Api; id: string }) {
+/** `reports`: whether this person may open the reports (reports.view): the ledger then links to the full one (W2-04). */
+export function CustomerScreen({ api, id, reports = false }: { api: Api; id: string; reports?: boolean }) {
   const { t } = useTranslation();
   const lookups = useCustomerLookups(api);
   const [detail, setDetail] = useState<CustomerDetail | null | undefined>(undefined);
@@ -733,7 +734,14 @@ export function CustomerScreen({ api, id }: { api: Api; id: string }) {
         {c.notes && <Fact label={t('customers.fields.notes')}>{c.notes}</Fact>}
       </Panel>
       <Panel className="px-1.5 pb-2.5">
-        <h2 className="m-0 px-2 pt-3 font-display text-lg font-semibold">{t('customers.ledger.title')}</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2 px-2 pt-3">
+          <h2 className="m-0 font-display text-lg font-semibold">{t('customers.ledger.title')}</h2>
+          {reports && (
+            <a href={withQuery(href.partnerLedger, { role: 'customer', partyId: c.id, statement: '1' })}>
+              {t('customers.ledger.report')}
+            </a>
+          )}
+        </div>
         {detail.ledger.length === 0 ? (
           <p className="p-2 text-muted-foreground">{t('customers.ledger.empty')}</p>
         ) : (
