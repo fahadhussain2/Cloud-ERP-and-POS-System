@@ -1,18 +1,33 @@
+import type { ShopTodayView } from '@erp/contracts';
 import { withTenant } from '@erp/db';
 import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import type pg from 'pg';
 
 import { requirePermission } from '../auth/routes';
+import { shopDay } from '../lock';
 
 // The lists the back office's Counters screen reads (W1-02, D-089). Devices need admin.devices, which managers have.
-// The staff list is GET /api/users (admin/users.ts, W1-04).
+// The staff list is GET /api/users (admin/users.ts, W1-04). The shop's business date is for every back-office screen
+// that starts on a date (W2-05).
 
 interface Deps {
   pool: pg.Pool;
+  now: () => Date;
   requireAuth: preHandlerAsyncHookHandler;
 }
 
-export function registerAdmin(scope: FastifyInstance, { pool, requireAuth }: Deps) {
+export function registerAdmin(scope: FastifyInstance, { pool, now, requireAuth }: Deps) {
+  // The shop's business date now (tenant time zone and day cut-off): any signed-in user.
+  scope.get('/shop/today', { preHandler: requireAuth }, async (req): Promise<ShopTodayView> => {
+    const a = req.auth!;
+    const { today } = await withTenant(
+      pool,
+      { tenantId: a.tenantId, userId: a.userId, requestId: req.id },
+      (_db, c) => shopDay(c, now()),
+    );
+    return { today };
+  });
+
   scope.get('/branches', { preHandler: requireAuth }, async (req) => {
     const a = req.auth!;
     const { rows } = await withTenant(

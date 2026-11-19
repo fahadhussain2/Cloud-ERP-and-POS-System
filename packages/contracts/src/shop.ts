@@ -4,6 +4,11 @@ import { z } from 'zod';
 // (`tenants.name`), the branch's address, phone and extra lines (`branches.address`, `phone`,
 // `receipt_header.lines`), and the policy line (the default print profile's `template_options.policyText`).
 
+/** The shop's business date now (GET /api/shop/today, W2-05): where the back office's dates start. */
+export interface ShopTodayView {
+  today: string;
+}
+
 /** One printed line fits the A5 landscape bill (owner answer 2). */
 export const SHOP_LINE_MAX = 60;
 /** Extra header lines after the address and phone (owner answer 2). */

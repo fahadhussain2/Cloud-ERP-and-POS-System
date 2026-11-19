@@ -62,6 +62,7 @@ The counters date a bill with the **business date** (`businessDate(now, timezone
 | **API** | On post of a goods receipt, purchase return, transfer (sending and receiving) and adjustment, and on saving a supplier payment: `dateRefusal` (`apps/api/src/lock.ts`, `checkDocumentDate` on the document's stored date) replaces `lockedOn` there. A date after the business date → `400 {error: 'date_in_future', today}`, shaped like the existing `409 {error: 'date_locked', lockDate}` these screens already show (built so instead of accounting's `problems` list, 2026-11-19). Drafts are saved with any date |
 | **Messages** | `purchasing.errors.date_in_future` and `inventory.errors.date_in_future` (i18n keys, rule 10), same wording as `accounting.problems.date_in_future` |
 | **Counters** | Unchanged: the POS already dates by business date and is never refused (rule 7) |
+| **Report screens** (added by the owner, 2026-11-19) | `GET /api/shop/today` (any signed-in user, `shopDay`) and `useShopToday` (`apps/backoffice/src/shopDay.ts`) replace the browser `dayOf` helper: *Day reconciliation* opens on the business day before the shop's, *Cash variance* on the 7 days up to it, the sales register, overrides, voids and returns and exceptions on it, the ageing as on it. Only the dates a screen starts on change; the reports already read by business date in the API |
 
 ## Tests written first
 
@@ -92,6 +93,5 @@ The counters date a bill with the **business date** (`businessDate(now, timezone
 
 ## Out of scope (noted, not changed here)
 
-- **Report screens** that pick their first date from the browser: *Day reconciliation* (`screens/ReportsScreens.tsx:83`, yesterday) and *Cash variance* (`:386`, the last 7 days to today). Reports read by business date in the API; only the pre-filled date is off between 00:00 and 04:00. A small follow-up, or part of W2-03 / W2-04 if they touch those screens.
 - **The generated opening on staging** (`apps/api/src/generated-opening.ts:29`) dates itself by the UTC calendar date; staging only, never production.
 - **A transfer received before it was sent** is not refused today; a separate question if it matters.

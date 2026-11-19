@@ -1094,6 +1094,7 @@ To change a decision, add a new entry that supersedes it. Never edit history.
   - **A purchasing or stock document dated after the business date is refused on post** (`date_in_future`, with the business date), and the date fields go no later than it; drafts keep any date (owner answer 2). D-108 already said back-office documents are never in the future; now purchasing and stock check it too.
   - **The supplier's bill date** defaults to the business date too, with no new check: it is what the supplier's paper says (owner answer 3).
   - **The default is read when a screen opens**; a screen left open across 04:00 keeps its date, and the API checks again on post (owner answer 4).
+  - **Report screens start on it too** (owner, 2026-11-19): the day reconciliation on the business day before, the cash variance on the 7 days up to it, the registers, exceptions and ageing on it, from `GET /api/shop/today`.
   - The lock date and the fiscal year are unchanged: a document typed after midnight lands in the same month and year as that night's counter bills.
 - **Why:** one shop day for the counters and the back office, so stock, the books and the reports agree at any hour; a mistyped year can't post into the future.
 - **Trade-off:** a draft dated ahead must be re-dated before it posts; the counters are not affected (they are never refused, rule 7).

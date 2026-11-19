@@ -91,6 +91,7 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 
 - **One business date** (`businessDate` in `@erp/domain`: the tenant's `timezone` and `day_cutoff_hour`, 04:00 at Delux) for the counters and the back office. The API works it out in `shopDay` (`apps/api/src/lock.ts`) and sends it as `today` in the purchasing, inventory and accounting lookups.
 - **Every back-office document form** defaults to it and goes no later than it; none reads the browser's calendar.
+- **Report screens** start on it: `GET /api/shop/today` (any signed-in user) and `useShopToday` (`apps/backoffice/src/shopDay.ts`).
 - **On post**, `dateRefusal` (`apps/api/src/lock.ts`) refuses a purchasing or stock document dated after it (`date_in_future`) or on or before the lock date (`date_locked`, D-108); accounting documents check the same with `checkDocumentDate`.
 
 ## Related

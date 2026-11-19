@@ -93,7 +93,7 @@ export function buildApp({
         const feed = createChangeFeed(pool, { onError: (err) => api.log.warn({ err }, 'sync change feed') });
         api.addHook('onClose', () => feed.close());
         registerEvents(api, { feed, requireDevice });
-        registerAdmin(api, { pool, requireAuth });
+        registerAdmin(api, { pool, now, requireAuth });
         registerUsers(api, { pool, now, requireAuth });
         registerReports(api, { pool, now, requireAuth });
         registerReportViews(api, { pool, now, requireAuth });
