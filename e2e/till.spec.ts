@@ -816,7 +816,9 @@ test("a split bill's refund waits at the desk until the bill's cash is collected
   await expect(notice).toHaveText(/^Bill C\d+-S\d{6} printed/);
   const bill = /C\d+-S\d{6}/.exec((await notice.textContent()) ?? '')![0];
 
-  // Its JazzCash part was paid at the counter: a return, not a void (guard 1 lets it through).
+  // Its JazzCash part was paid at the counter: a return, not a void (guard 1 lets it through). Once the bill's cash is
+  // in the desk's queue the server has it; before that the counter can't ask the desk and asks the salesman instead.
+  await expect(queue().getByText(bill)).toBeVisible({ timeout: 10_000 });
   await returnFrom(page, bill, 'FAN BELT MEHRAN', '1');
   const ret = await refundAtDesk(page);
   const refund = queue().getByRole('row', { name: new RegExp(ret) });
