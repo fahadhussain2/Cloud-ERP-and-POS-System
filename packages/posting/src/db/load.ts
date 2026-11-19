@@ -1,4 +1,12 @@
-import { add, money, qty, type CashMovementKind, type Money, type PaymentMethodCode, type Qty } from '@erp/domain';
+import {
+  add,
+  money,
+  qty,
+  type CashMovementKind,
+  type Money,
+  type PaymentMethodCode,
+  type Qty,
+} from '@erp/domain';
 import type pg from 'pg';
 
 import type {
