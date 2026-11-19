@@ -72,7 +72,7 @@ Note: the legacy "Purchases" account sat under Liabilities. Purchases now go **i
 ### 4.1 Sale (positive lines)
 | Line | Entry |
 |---|---|
-| Revenue | `Cr SALES`: Σ line_total of positive lines (at the negotiated price, after line discounts) |
+| Revenue | `Cr SALES`: Σ (line_total + bill_share) of positive lines (at the negotiated price, after line discounts and before the bill discount; the stored line_total is after its bill share) |
 | Bill discount | `Dr SALES_DISCOUNT`: bill_discount |
 | Rounding | `Dr/Cr ROUNDING`: rounding difference |
 | Cash tender | `Dr CASH_IN_TRANSIT`: cash portion (net of change) |
