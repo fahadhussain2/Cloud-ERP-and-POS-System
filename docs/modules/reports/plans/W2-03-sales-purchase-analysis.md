@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#178](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178) |
 | **Module** | reports (back-office screens and API, read only) |
-| **Status** | Written, waiting for the owner's answers to questions 1–6 |
+| **Status** | Answered (owner, 2026-11-19): questions 1–6 as recommended. Waiting for acceptance |
 | **Refs** | RPT-07, RPT-09, RPT-15; CLAUDE.md rules 1, 3, 4, 5, 10; D-017 (one average cost per item), D-044 (a return's cost), D-100 (no legacy bills), D-105 (purchase discounts in the cost), D-110 (reports read the ledgers), D-116 (reports before go-live) |
 | **Depends on** | W2-01 (the frame, periods and comparisons, the Reports home), W2-02 (the item picker, the report choices), W1-20 (the sales register), W1-16 (goods receipts and purchase returns); **the bill-discount posting fix** (see Risks) for the tie to the profit and loss |
 | **Size** | about 3 days: domain golden files ½; API with integration tests 1; four screens and the first charts 1; e2e and docs ½ |
@@ -22,6 +22,15 @@
 ## Owner answers already given (D-116, 2026-11-18)
 
 Four tasks; this is the third (1). Everything by go-live, the new analysis last (2): here, *sales over time*. 2026 stays in the legacy app, read-only; every report starts at 1 Jan 2027 (3). Lists of documents or lines up to 92 days, summaries up to a year with a comparison period (4). CSV and a print layout, PDFs from the browser (5). Sales reports for `reports.view`; cost and profit also need `cost.view`, left out by the API (6). Modern design; the legacy *Daily Sales Register* (its item list and bill-wise profit) and *Item Purchase and Sale Rate Analysis* give meaning only.
+
+## Owner answers (2026-11-19)
+
+1. **The books' cost**: gross profit equals the profit and loss's.
+2. **A return counts on its own day, against the original bill's salesman and customer** (a no-receipt return against whoever took it back); voided bills are left out.
+3. **Sales and gross profit opens by category**, then items, then bills, compared with the previous period by default.
+4. **The rates report goes back up to a year**: for this report alone, D-116 answer 4's 92 days for lists becomes a year.
+5. **Busy hours count bills; the top and bottom 20 are by sales**, each with switches.
+6. **Discount given = list × quantity − what the customer paid**, by salesman and by day.
 
 ## What the data looks like
 
