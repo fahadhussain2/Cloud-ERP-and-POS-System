@@ -46,8 +46,15 @@ export function useFilters(
     return () => window.removeEventListener('hashchange', follow);
   }, []);
 
+  // The last filters are read once, for the address the screen opened with, and used only while it is still that
+  // address: read again on a later draw, before a change's hashchange arrives, they would put the remembered filters
+  // back over the new address (and drop a forgotten one, such as a W1 report's date).
+  const [opened] = useState(() => ({
+    hash: window.location.hash,
+    saved: queryOf(window.location.hash).size === 0 ? remembered(report) : null,
+  }));
   const query = queryOf(hash);
-  const saved = query.size === 0 ? remembered(report) : null;
+  const saved = hash === opened.hash ? opened.saved : null;
   useEffect(() => {
     // Brought back into the address in place, so Back still leaves the report rather than undoing the restore. The
     // screen already reads them from `saved` until the next change of address.
