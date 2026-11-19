@@ -410,6 +410,25 @@ export function registerSalesReports(scope: FastifyInstance, { pool, now, requir
     }),
   );
 
+  // ---- Suppliers and customers for the rates' party picker: code or name words ----
+  scope.get('/reports/parties', { preHandler: view }, async (req, reply) => {
+    const text = (query(req)['q'] ?? '').trim();
+    if (text === '') return { items: [] };
+    return run(req, reply, async (c) => {
+      const words = text.split(/\s+/).map((w) => `%${likeEscape(w)}%`);
+      const { rows } = await c.query<{ id: string; code: string; name: string }>(
+        `SELECT p.id, p.code, p.name FROM erp.parties p
+         WHERE p.deleted_at IS NULL
+           AND (EXISTS (SELECT 1 FROM erp.customer_accounts a WHERE a.party_id = p.id AND a.deleted_at IS NULL)
+             OR EXISTS (SELECT 1 FROM erp.supplier_accounts a WHERE a.party_id = p.id AND a.deleted_at IS NULL))
+           AND NOT EXISTS (SELECT 1 FROM unnest($1::text[]) w WHERE NOT (p.code ILIKE w OR p.name ILIKE w))
+         ORDER BY lower(p.name), p.code LIMIT 20`,
+        [words],
+      );
+      return { items: rows };
+    });
+  });
+
   // ---- Sales and gross profit (RPT-07, owner answers 1-3) ----
   scope.get('/reports/sales-profit', { preHandler: view }, async (req, reply) =>
     run(req, reply, async (c, s) => {

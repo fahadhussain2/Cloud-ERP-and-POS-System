@@ -24,6 +24,10 @@
   --select: #e5edfb;
   --shadow: 0 1px 2px rgb(22 32 42 / 0.06), 0 8px 24px rgb(22 32 42 / 0.08);
   --radius: 0.5rem;
+  /* Charts (W2-03): this period and the one it is compared with; checked for colour blindness and contrast on the
+     surface with the dataviz validator, in both modes. */
+  --chart-1: #c24e1a;
+  --chart-2: #2b62c8;
   color-scheme: light;
 }
 
@@ -46,6 +50,8 @@
   --focus: #7ea9ff;
   --select: #1e2c44;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+  --chart-1: #e0622f;
+  --chart-2: #5a8ef0;
   color-scheme: dark;
 }
 
@@ -85,6 +91,8 @@
   --color-bad-soft: var(--bad-soft);
   --color-focus: var(--focus);
   --color-select: var(--select);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
   --color-backdrop: rgb(10 16 22 / 0.45);
   --color-transparent: transparent;
   --color-current: currentColor;

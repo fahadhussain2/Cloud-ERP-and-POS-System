@@ -706,6 +706,9 @@ describe('sales and gross profit (RPT-07, owner answers 1-3)', () => {
     const c = await view<SalesChoicesView>('/api/reports/sales-choices');
     expect(c.salesmen.map((x) => x.name)).toEqual(['Imran', 'Sara']);
     expect(c.customers.map((x) => x.name)).toEqual(['Khan Motors']);
+    const found = await view<{ items: { code: string }[] }>('/api/reports/parties?q=co');
+    expect(found.items.map((x) => x.code)).toEqual(['S2', 'S1']);
+    expect((await view<{ items: unknown[] }>('/api/reports/parties?q=khan')).items).toHaveLength(1);
   });
 });
 

@@ -51,6 +51,12 @@ import {
   StockLedgerScreen,
   StockMovementScreen,
 } from './reports/StockReportScreens';
+import {
+  PurchaseRegisterScreen,
+  RatesScreen,
+  SalesOverTimeScreen,
+  SalesProfitScreen,
+} from './reports/SalesReportScreens';
 import { PrintProvider } from './reports/frame/ReportFrame';
 import { CashVarianceScreen, DayReconciliationScreen } from './screens/ReportsScreens';
 import { PersonScreen } from './staff/PersonScreen';
@@ -177,6 +183,14 @@ export function App({ api }: { api: Api }) {
           <DeadStockScreen api={api} />
         ) : shown.screen === 'inventoryAnalysis' ? (
           <InventoryAnalysisScreen api={api} />
+        ) : shown.screen === 'salesProfit' ? (
+          <SalesProfitScreen api={api} />
+        ) : shown.screen === 'purchaseRegister' ? (
+          <PurchaseRegisterScreen api={api} />
+        ) : shown.screen === 'rates' ? (
+          <RatesScreen api={api} />
+        ) : shown.screen === 'salesOverTime' ? (
+          <SalesOverTimeScreen api={api} />
         ) : shown.screen === 'ageing' ? (
           <AgeingScreen api={api} />
         ) : shown.screen === 'exceptions' ? (
