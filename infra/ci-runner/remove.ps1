@@ -3,6 +3,6 @@
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 $repo = 'fahadhussain2/Cloud-ERP-and-POS-System'
-docker compose down
+docker compose down --remove-orphans
 $ids = gh api "repos/$repo/actions/runners" --jq '.runners[] | select(.name | startswith(\"erp-pc-\")) | .id'
 foreach ($id in $ids) { gh api -X DELETE "repos/$repo/actions/runners/$id" }

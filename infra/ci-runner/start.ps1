@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 $env:RUNNER_TOKEN = gh api -X POST 'repos/fahadhussain2/Cloud-ERP-and-POS-System/actions/runners/registration-token' --jq .token
 try {
-  docker compose up -d --build
+  docker compose up -d --build --remove-orphans
 } finally {
   Remove-Item Env:RUNNER_TOKEN
 }
