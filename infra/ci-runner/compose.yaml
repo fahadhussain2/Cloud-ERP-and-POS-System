@@ -1,4 +1,5 @@
-# Three CI runners on the owner's PC (D-119): a run's three check jobs side by side. Started by start.ps1.
+# The CI runner on the owner's PC (D-119), started by start.ps1. One runner: a run's three jobs take turns. Three side by
+# side ran Docker out of memory and slowed the timed integration tests past their limits (PR #204's first run).
 name: erp-ci-runner
 
 x-runner: &runner
@@ -18,15 +19,3 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /srv/ci-runner/erp-pc-1:/srv/ci-runner/erp-pc-1
-  erp-pc-2:
-    <<: *runner
-    environment: { <<: *env, RUNNER_NAME: erp-pc-2 }
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /srv/ci-runner/erp-pc-2:/srv/ci-runner/erp-pc-2
-  erp-pc-3:
-    <<: *runner
-    environment: { <<: *env, RUNNER_NAME: erp-pc-3 }
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /srv/ci-runner/erp-pc-3:/srv/ci-runner/erp-pc-3

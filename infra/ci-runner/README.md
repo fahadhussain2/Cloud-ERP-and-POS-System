@@ -1,7 +1,7 @@
 # CI runners on the owner's PC (D-119)
 
-The three CI checks (format, lint, typecheck, tests, build; integration; end-to-end) run on three runners in Docker
-Desktop on the owner's PC, `erp-pc-1` to `erp-pc-3`. Self-hosted runners are free and don't use the free plan's 2,000
+The three CI checks (format, lint, typecheck, tests, build; integration; end-to-end) run on one runner in Docker
+Desktop on the owner's PC, `erp-pc-1`; the jobs take turns (about 15 minutes a run). Self-hosted runners are free and don't use the free plan's 2,000
 Actions minutes a month, which ran out on 20 Nov 2026. Plan: [ci-runner-on-pc](../../docs/modules/devops/plans/ci-runner-on-pc.md).
 
 | Task | How (PowerShell, from this folder) |
