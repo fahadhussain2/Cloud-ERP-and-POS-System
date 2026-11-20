@@ -157,6 +157,34 @@ describe('signing in', () => {
     });
   });
 
+  it('opens the first screen after signing in, whatever the address still names: the Dashboard for the owner', async () => {
+    // Bug: signing out on Customers left #/sales/customers in the address, so the owner's next sign-in opened Customers
+    // instead of their Dashboard (W2-06; D-118).
+    window.location.hash = '#/sales/customers';
+    let me: unknown = null;
+    const owner = { ...OWNER, permissions: [...OWNER.permissions, 'cust.edit', 'dashboard.view'] };
+    const { api } = fakeApi({
+      ...signedIn(),
+      'GET /api/auth/me': () => (me ? { status: 200, body: me } : { status: 401, body: {} }),
+      'POST /api/auth/login': () => ((me = owner), { status: 200, body: me }),
+    });
+    show(api);
+    await screen.findByRole('heading', { name: en.login.title });
+    type(en.login.shopCode, 'delux');
+    type(en.login.username, 'fahad');
+    type(en.login.password, 'a password');
+    fireEvent.click(screen.getByRole('button', { name: en.login.submit }));
+    const menu = await screen.findByRole('navigation', { name: en.nav.menu });
+    await waitFor(() =>
+      expect(within(menu).getByRole('link', { name: en.nav.dashboard }).getAttribute('aria-current')).toBe(
+        'page',
+      ),
+    );
+    expect(
+      within(menu).getByRole('link', { name: en.nav.customers }).getAttribute('aria-current'),
+    ).toBeNull();
+  });
+
   it('shows a failed sign-in without saying which part was wrong', async () => {
     const { api } = fakeApi({
       'GET /api/auth/me': () => ({ status: 401, body: {} }),
