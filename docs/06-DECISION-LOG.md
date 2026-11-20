@@ -1099,3 +1099,29 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** one shop day for the counters and the back office, so stock, the books and the reports agree at any hour; a mistyped year can't post into the future.
 - **Trade-off:** a draft dated ahead must be re-dated before it posts; the counters are not affected (they are never refused, rule 7).
 - **Status:** Accepted (owner, 2026-11-19, the W2-05 plan's answers 1–4 as recommended). Amends D-108 (dates of purchasing and stock documents).
+
+### D-118 An owner's dashboard is the back office's first screen, built from the reports' own figures (2026-11-20)
+- **Context:** the back office has no home page: after sign-in it opens the first screen the person may open (D-114), and the owner checks the shop by opening several reports one by one. The owner asked for a modern, minimal dashboard with charts and agreed its design on a clickable prototype (2026-11-20), choosing layout A, *today first*, over an *attention first* layout.
+- **Decision:**
+  - **For the owner only:** a new permission, **`dashboard.view`**, that only the owner role holds (its `*`). The dashboard is the **first row of the menu and the owner's first screen** after sign-in. Everyone else keeps today's first screen; with custom roles (Wave 2) the permission can be given to others.
+  - **A period switch** (Today · 7 days · 30 days) for sales and profit, compared with the same time before. Balances (cash, bank, what customers owe, what the shop owes suppliers, stock) always show **the position now**; expenses and net profit show **this month**.
+  - **What it shows:**
+    - **Five key figures in one row:** net sales, gross profit (margin beside the change), cash, bank and what customers owe. Each card has an icon, the figure and one change chip, plus a coloured strip on the left that the card's rounded corners clip.
+    - **Cards, each opening its report with the same filters:**
+      - the sales trend;
+      - what needs attention;
+      - busy hours;
+      - top categories;
+      - discounts, returns and voids;
+      - where this month's gross profit went (a donut);
+      - what customers owe us (no ageing; the biggest balances);
+      - what the shop owes suppliers;
+      - stock;
+      - best-selling items;
+      - salesmen.
+  - **Every figure is the report's figure:** one read endpoint composes the report queries the reports already use (D-110). It adds no tables and no posting, and caches nothing.
+  - **Charts stay ours:** the W2-03 SVG components plus a donut, with no chart library. Colours are theme tokens checked with the dataviz validator in both modes.
+- **Alternatives:** a dashboard for every role with its own cards (the owner wants it for themself only); an *attention first* layout; sparklines on the key figures, ageing on what customers owe, and a payment-method split (each tried on the prototype and dropped by the owner).
+- **Why:** the owner sees the day, the money and what needs them on one screen, and each figure opens the report that explains it. Since the figures come from the same queries, the dashboard can't disagree with the reports.
+- **Trade-off:** one more endpoint that reads much of the shop's data on every load (timed in the plan). Other roles get nothing new until custom roles exist.
+- **Status:** Proposed (with the [W2-06 plan](modules/reports/plans/W2-06-owner-dashboard.md)). The design was agreed by the owner on the prototype on 2026-11-20; the plan's questions are open. Amends D-114 (the first screen after sign-in, for the owner).
