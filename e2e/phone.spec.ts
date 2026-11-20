@@ -78,6 +78,10 @@ test('every screen fits a phone with no sideways scroll; the side menu stays put
     await page.goto(`${BACKOFFICE}/${screen}`);
     await expect(page.locator('main h1').first()).toBeVisible();
     await page.waitForLoadState('networkidle');
+    // Measured once the screen has its data, and a frame later (a phone widens its page after layout).
+    for (const loading of [bo.app.loading, bo.dashboard.loading])
+      await expect(page.locator('main')).not.toContainText(loading);
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     const shots = process.env['E2E_SHOTS'];
     if (shots) {
       const name = screen.replace(/[#/]+/g, '-').replace(/^-|-$/g, '') || 'home';
