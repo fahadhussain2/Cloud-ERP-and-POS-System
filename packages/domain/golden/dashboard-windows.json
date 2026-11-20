@@ -54,7 +54,7 @@
     {
       "name": "an unknown period",
       "input": { "period": "year", "today": "2027-01-15", "minute": 0, "firstDay": "2027-01-01" },
-      "error": "invalid_period"
+      "error": "invalid_preset"
     }
   ]
 }
