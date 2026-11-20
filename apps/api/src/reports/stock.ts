@@ -64,7 +64,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** The screen shows at most this many rows; totals, subtotals and the CSV count every one (as the W1-20 stock report). */
 export const STOCK_ROWS = 2000;
 /** The Shop and the Godown: the stock the reorder list and dead stock count (owner answer 4, PUR-07). */
-const ON_HAND_KINDS = ['shop', 'storage'];
+export const ON_HAND_KINDS = ['shop', 'storage'];
 
 /** A LIKE pattern's own %, _ and \ taken literally (as purchasing's item search). */
 const likeEscape = (s: string) => s.replace(/[\\%_]/g, (x) => `\\${x}`);
@@ -185,7 +185,7 @@ async function locationsOf(c: Client) {
 }
 
 /** The first day the system knows: the opening's date, else the first movement's, else today (owner answer 1). */
-async function sinceOf(c: Client, today: string): Promise<string> {
+export async function sinceOf(c: Client, today: string): Promise<string> {
   const { rows } = await c.query<{ d: string | null }>(
     `SELECT coalesce(min(business_date) FILTER (WHERE source_type = 'opening'), min(business_date))::text AS d
      FROM erp.stock_movements`,
@@ -198,7 +198,7 @@ async function sinceOf(c: Client, today: string): Promise<string> {
  * Per item (and location, if `perLocation`): Σ quantity and value of the movements on or before `at`, or of every one
  * (`at` null: what is on hand now, a document dated by the calendar after midnight included).
  */
-async function stockAt(
+export async function stockAt(
   c: Client,
   at: string | null,
   locationId: string | null,
@@ -319,6 +319,70 @@ const groupOf = (q: Query): StockGroup => {
   if (!(STOCK_GROUPS as readonly string[]).includes(g)) throw new BadRequest('bad_request');
   return g as StockGroup;
 };
+
+/** The reorder list's items (PUR-07): on hand in the Shop and the Godown at or below the minimum, with the order. */
+export async function reorderListed(c: Client, q: Query) {
+  const onHand = new Map((await stockAt(c, null, null, false, ON_HAND_KINDS)).map((x) => [x.itemId, x.qty]));
+  const facts = await factsOf(c, null, q);
+  const listed = facts.flatMap((f) => {
+    const line = reorderLine({
+      onHand: onHand.get(f.id) ?? 0,
+      min: f.min,
+      max: f.max,
+      excluded: f.excluded,
+      status: f.status,
+    });
+    return line ? [{ f, line }] : [];
+  });
+  return { onHand, listed };
+}
+
+/** Dead and slow stock today (RPT-08, owner answers 1 and 5): items on hand not sold in `days`, or selling slowly. */
+export async function deadStockRows(
+  c: Client,
+  today: string,
+  since: string,
+  days: number,
+  q: Query,
+  values: boolean,
+): Promise<DeadStockRow[]> {
+  const stock = (await stockAt(c, null, null, false, ON_HAND_KINDS)).filter((x) => x.qty > 0);
+  const facts = await factsOf(
+    c,
+    stock.map((x) => x.itemId),
+    q,
+  );
+  const ids = facts.map((f) => f.id);
+  const byItem = new Map(stock.map((x) => [x.itemId, x]));
+  const ever = await salesOf(c, since, today, ids);
+  const recent = await salesOf(c, addDays(today, -(SLOW_WINDOW_DAYS - 1)), today, ids);
+  const receipts = await lastReceipts(c, ids);
+  const all: DeadStockRow[] = facts.flatMap((f) => {
+    const x = byItem.get(f.id)!;
+    const sold90 = recent.get(f.id)?.qty ?? 0;
+    const lastSale = ever.get(f.id)?.last ?? null;
+    const age = stockAge({ onHand: x.qty, lastSale, sold: sold90, today: today, days, since });
+    if (age.kind === 'moving' || age.kind === 'none') return [];
+    return [
+      {
+        itemId: f.id,
+        code: f.code,
+        name: f.name,
+        category: f.category,
+        make: f.make,
+        kind: age.kind,
+        onHand: x.qty,
+        value: values ? x.value : null,
+        lastSale,
+        lastReceipt: receipts.get(f.id) ?? null,
+        sold90,
+        daysSinceSale: age.daysSinceSale,
+        daysOfCover: age.daysOfCover,
+      },
+    ];
+  });
+  return all;
+}
 
 export function registerStockReports(scope: FastifyInstance, { pool, now, requireAuth }: Deps) {
   const view = requirePermission(requireAuth, 'reports.view');
@@ -739,20 +803,7 @@ export function registerStockReports(scope: FastifyInstance, { pool, now, requir
       const q = query(req);
       const values = allowed(req, 'cost.view');
       const since = await sinceOf(c, s.today);
-      const onHand = new Map(
-        (await stockAt(c, null, null, false, ON_HAND_KINDS)).map((x) => [x.itemId, x.qty]),
-      );
-      const facts = await factsOf(c, null, q);
-      const listed = facts.flatMap((f) => {
-        const line = reorderLine({
-          onHand: onHand.get(f.id) ?? 0,
-          min: f.min,
-          max: f.max,
-          excluded: f.excluded,
-          status: f.status,
-        });
-        return line ? [{ f, line }] : [];
-      });
+      const { onHand, listed } = await reorderListed(c, q);
       const ids = listed.map((x) => x.f.id);
       const recent = await salesOf(c, addDays(s.today, -(SLOW_WINDOW_DAYS - 1)), s.today, ids);
       const recent30 = await salesOf(c, addDays(s.today, -29), s.today, ids);
@@ -863,41 +914,7 @@ export function registerStockReports(scope: FastifyInstance, { pool, now, requir
       if (!(DEAD_DAYS as readonly number[]).includes(days)) throw new BadRequest('bad_request');
       const values = allowed(req, 'cost.view');
       const since = await sinceOf(c, s.today);
-      const stock = (await stockAt(c, null, null, false, ON_HAND_KINDS)).filter((x) => x.qty > 0);
-      const facts = await factsOf(
-        c,
-        stock.map((x) => x.itemId),
-        q,
-      );
-      const ids = facts.map((f) => f.id);
-      const byItem = new Map(stock.map((x) => [x.itemId, x]));
-      const ever = await salesOf(c, since, s.today, ids);
-      const recent = await salesOf(c, addDays(s.today, -(SLOW_WINDOW_DAYS - 1)), s.today, ids);
-      const receipts = await lastReceipts(c, ids);
-      const all: DeadStockRow[] = facts.flatMap((f) => {
-        const x = byItem.get(f.id)!;
-        const sold90 = recent.get(f.id)?.qty ?? 0;
-        const lastSale = ever.get(f.id)?.last ?? null;
-        const age = stockAge({ onHand: x.qty, lastSale, sold: sold90, today: s.today, days, since });
-        if (age.kind === 'moving' || age.kind === 'none') return [];
-        return [
-          {
-            itemId: f.id,
-            code: f.code,
-            name: f.name,
-            category: f.category,
-            make: f.make,
-            kind: age.kind,
-            onHand: x.qty,
-            value: values ? x.value : null,
-            lastSale,
-            lastReceipt: receipts.get(f.id) ?? null,
-            sold90,
-            daysSinceSale: age.daysSinceSale,
-            daysOfCover: age.daysOfCover,
-          },
-        ];
-      });
+      const all = await deadStockRows(c, s.today, since, days, q, values);
       const kinds: StockAgeKindView[] = ['dead', 'notSoldSinceGoLive', 'slow'];
       const totals = Object.fromEntries(
         kinds.map((k) => {

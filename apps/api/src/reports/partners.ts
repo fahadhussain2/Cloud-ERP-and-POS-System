@@ -327,6 +327,119 @@ async function controlAt(c: Client, role: PartyRoleView, dates: string[]): Promi
   return rows[0]!.b.map(num);
 }
 
+/** Customers over their credit limit or within 10% of it (RPT-17, owner answer 4), tightest first. */
+export async function limitRows(
+  c: Client,
+  today: string,
+): Promise<{ out: OverLimitView['rows']; withLimit: number }> {
+  const { rows } = await c.query<{
+    id: string;
+    code: string;
+    name: string;
+    phones: string[];
+    limit: string;
+    balance: string;
+    approved: string | null;
+  }>(
+    `SELECT p.id, p.code, p.name, p.phones, a.credit_limit::text AS limit,
+       coalesce((SELECT sum(e.amount) FROM erp.party_ledger_entries e
+         WHERE e.party_id = p.id AND e.role = 'customer' AND e.entry_date <= $1), 0)::text AS balance,
+       (SELECT max(d.business_date)::text FROM erp.overrides o JOIN erp.sales_documents d ON d.id = o.document_id
+        WHERE o.kind = 'credit_limit' AND o.deleted_at IS NULL AND d.customer_party_id = p.id) AS approved
+     FROM erp.customer_accounts a JOIN erp.parties p ON p.id = a.party_id
+     WHERE a.deleted_at IS NULL AND p.deleted_at IS NULL AND a.credit_limit IS NOT NULL`,
+    [today],
+  );
+  const out = rows
+    .map((r) => {
+      const balance = num(r.balance);
+      const limit = num(r.limit);
+      return { r, balance, limit, state: limitState({ balance, limit }) };
+    })
+    .filter((x): x is typeof x & { state: 'over' | 'near' } => x.state !== null)
+    .map((x) => ({
+      partyId: x.r.id,
+      code: x.r.code,
+      name: x.r.name,
+      phones: x.r.phones,
+      limit: x.limit,
+      balance: x.balance,
+      left: x.limit - x.balance,
+      state: x.state,
+      lastApproval: x.r.approved,
+    }))
+    .sort((a, b) => a.left - b.left || NAMES.compare(a.name, b.name));
+  return { out, withLimit: rows.length };
+}
+
+/** Money received from customers, or paid to suppliers, dated in a period (RPT-17, owner answer 5). */
+export async function moneyRegister(c: Client, side: RegisterSide, p: Period): Promise<MoneyRegisterRow[]> {
+  const { rows } = await c.query<{
+    date: string;
+    kind: string;
+    id: string;
+    number: string;
+    party_id: string;
+    code: string;
+    name: string;
+    how: string;
+    counter: string | null;
+    by: string | null;
+    reference: string | null;
+    amount: string;
+  }>(
+    side === 'received'
+      ? `SELECT x.business_date::text AS date, 'payment' AS kind, x.id, x.number, p.id AS party_id, p.code, p.name,
+           m.name AS how, coalesce(d.name, d.code) AS counter, u.full_name AS by, x.reference, x.amount::text
+         FROM erp.payments x JOIN erp.parties p ON p.id = x.party_id
+         JOIN erp.payment_methods m ON m.id = x.method_id LEFT JOIN erp.devices d ON d.id = x.device_id
+         LEFT JOIN erp.users u ON u.id = x.cashier_user_id
+         WHERE x.direction = 'in' AND x.deleted_at IS NULL AND x.business_date BETWEEN $1 AND $2
+         UNION ALL
+         SELECT x.business_date::text, 'customer_receipt', x.id, x.number, p.id, p.code, p.name, b.name, NULL,
+           u.full_name, x.reference, x.amount::text
+         FROM erp.customer_receipts x JOIN erp.parties p ON p.id = x.customer_party_id
+         JOIN erp.bank_accounts b ON b.id = x.bank_account_id LEFT JOIN erp.users u ON u.id = x.created_by_user_id
+         WHERE x.business_date BETWEEN $1 AND $2
+         ORDER BY 1, 4`
+      : `SELECT x.business_date::text AS date, 'supplier_payment' AS kind, x.id, x.number, p.id AS party_id, p.code,
+           p.name, b.name AS how, NULL AS counter, u.full_name AS by, x.reference, x.amount::text
+         FROM erp.supplier_payments x JOIN erp.parties p ON p.id = x.supplier_party_id
+         JOIN erp.bank_accounts b ON b.id = x.bank_account_id LEFT JOIN erp.users u ON u.id = x.created_by_user_id
+         WHERE x.business_date BETWEEN $1 AND $2
+         UNION ALL
+         SELECT x.business_date::text, 'cash_movement', x.id, x.number, p.id, p.code, p.name, 'cash', coalesce(d.name, d.code),
+           u.full_name, x.reference, x.amount::text
+         FROM erp.cash_movements x JOIN erp.parties p ON p.id = x.party_id
+         LEFT JOIN erp.devices d ON d.id = x.device_id LEFT JOIN erp.users u ON u.id = x.cashier_user_id
+         WHERE x.kind = 'supplier_payment' AND x.deleted_at IS NULL AND x.business_date BETWEEN $1 AND $2
+         UNION ALL
+         SELECT x.business_date::text, 'goods_receipt', x.id, x.number, p.id, p.code, p.name, b.name, NULL,
+           u.full_name, x.supplier_bill_no, x.total::text
+         FROM erp.goods_receipts x JOIN erp.parties p ON p.id = x.supplier_party_id
+         JOIN erp.bank_accounts b ON b.id = x.paid_from_bank_account_id
+         LEFT JOIN erp.users u ON u.id = x.created_by_user_id
+         WHERE x.status = 'posted' AND x.business_date BETWEEN $1 AND $2
+         ORDER BY 1, 4`,
+    [p.from, p.to],
+  );
+  const out = rows.map((r): MoneyRegisterRow => ({
+    date: r.date,
+    kind: r.kind,
+    sourceId: r.id,
+    number: r.number,
+    partyId: r.party_id,
+    partyCode: r.code,
+    partyName: r.name,
+    how: r.how,
+    counter: r.counter,
+    by: r.by,
+    reference: r.reference,
+    amount: num(r.amount),
+  }));
+  return out;
+}
+
 export function registerPartnerReports(scope: FastifyInstance, { pool, now, requireAuth }: Deps) {
   const view = requirePermission(requireAuth, 'reports.view');
   const financial = requirePermission(requireAuth, 'reports.financial');
@@ -591,48 +704,12 @@ export function registerPartnerReports(scope: FastifyInstance, { pool, now, requ
   // ---- Over the limit or near it (RPT-17, owner answer 4) ----
   scope.get('/reports/over-limit', { preHandler: view }, async (req, reply) =>
     run(req, reply, async (c, s): Promise<OverLimitView | FastifyReply> => {
-      const { rows } = await c.query<{
-        id: string;
-        code: string;
-        name: string;
-        phones: string[];
-        limit: string;
-        balance: string;
-        approved: string | null;
-      }>(
-        `SELECT p.id, p.code, p.name, p.phones, a.credit_limit::text AS limit,
-           coalesce((SELECT sum(e.amount) FROM erp.party_ledger_entries e
-             WHERE e.party_id = p.id AND e.role = 'customer' AND e.entry_date <= $1), 0)::text AS balance,
-           (SELECT max(d.business_date)::text FROM erp.overrides o JOIN erp.sales_documents d ON d.id = o.document_id
-            WHERE o.kind = 'credit_limit' AND o.deleted_at IS NULL AND d.customer_party_id = p.id) AS approved
-         FROM erp.customer_accounts a JOIN erp.parties p ON p.id = a.party_id
-         WHERE a.deleted_at IS NULL AND p.deleted_at IS NULL AND a.credit_limit IS NOT NULL`,
-        [s.today],
-      );
-      const out = rows
-        .map((r) => {
-          const balance = num(r.balance);
-          const limit = num(r.limit);
-          return { r, balance, limit, state: limitState({ balance, limit }) };
-        })
-        .filter((x): x is typeof x & { state: 'over' | 'near' } => x.state !== null)
-        .map((x) => ({
-          partyId: x.r.id,
-          code: x.r.code,
-          name: x.r.name,
-          phones: x.r.phones,
-          limit: x.limit,
-          balance: x.balance,
-          left: x.limit - x.balance,
-          state: x.state,
-          lastApproval: x.r.approved,
-        }))
-        .sort((a, b) => a.left - b.left || NAMES.compare(a.name, b.name));
+      const { out, withLimit } = await limitRows(c, s.today);
       const result: OverLimitView = {
         money: await moneyOf(c),
         asOf: s.today,
         rows: out,
-        withLimit: rows.length,
+        withLimit,
       };
       if (!wantsCsv(req)) return result;
       return sendCsv(
@@ -662,69 +739,7 @@ export function registerPartnerReports(scope: FastifyInstance, { pool, now, requ
       const side = choiceOf<RegisterSide>(q, 'side', REGISTER_SIDES, 'received');
       if (side === 'paid' && !allowed(req, 'cost.view')) throw new Forbidden();
       const p = rangeOf(q, { from: s.today, to: s.today }, LIST_DAYS, s);
-      const { rows } = await c.query<{
-        date: string;
-        kind: string;
-        id: string;
-        number: string;
-        party_id: string;
-        code: string;
-        name: string;
-        how: string;
-        counter: string | null;
-        by: string | null;
-        reference: string | null;
-        amount: string;
-      }>(
-        side === 'received'
-          ? `SELECT x.business_date::text AS date, 'payment' AS kind, x.id, x.number, p.id AS party_id, p.code, p.name,
-               m.name AS how, coalesce(d.name, d.code) AS counter, u.full_name AS by, x.reference, x.amount::text
-             FROM erp.payments x JOIN erp.parties p ON p.id = x.party_id
-             JOIN erp.payment_methods m ON m.id = x.method_id LEFT JOIN erp.devices d ON d.id = x.device_id
-             LEFT JOIN erp.users u ON u.id = x.cashier_user_id
-             WHERE x.direction = 'in' AND x.deleted_at IS NULL AND x.business_date BETWEEN $1 AND $2
-             UNION ALL
-             SELECT x.business_date::text, 'customer_receipt', x.id, x.number, p.id, p.code, p.name, b.name, NULL,
-               u.full_name, x.reference, x.amount::text
-             FROM erp.customer_receipts x JOIN erp.parties p ON p.id = x.customer_party_id
-             JOIN erp.bank_accounts b ON b.id = x.bank_account_id LEFT JOIN erp.users u ON u.id = x.created_by_user_id
-             WHERE x.business_date BETWEEN $1 AND $2
-             ORDER BY 1, 4`
-          : `SELECT x.business_date::text AS date, 'supplier_payment' AS kind, x.id, x.number, p.id AS party_id, p.code,
-               p.name, b.name AS how, NULL AS counter, u.full_name AS by, x.reference, x.amount::text
-             FROM erp.supplier_payments x JOIN erp.parties p ON p.id = x.supplier_party_id
-             JOIN erp.bank_accounts b ON b.id = x.bank_account_id LEFT JOIN erp.users u ON u.id = x.created_by_user_id
-             WHERE x.business_date BETWEEN $1 AND $2
-             UNION ALL
-             SELECT x.business_date::text, 'cash_movement', x.id, x.number, p.id, p.code, p.name, 'cash', coalesce(d.name, d.code),
-               u.full_name, x.reference, x.amount::text
-             FROM erp.cash_movements x JOIN erp.parties p ON p.id = x.party_id
-             LEFT JOIN erp.devices d ON d.id = x.device_id LEFT JOIN erp.users u ON u.id = x.cashier_user_id
-             WHERE x.kind = 'supplier_payment' AND x.deleted_at IS NULL AND x.business_date BETWEEN $1 AND $2
-             UNION ALL
-             SELECT x.business_date::text, 'goods_receipt', x.id, x.number, p.id, p.code, p.name, b.name, NULL,
-               u.full_name, x.supplier_bill_no, x.total::text
-             FROM erp.goods_receipts x JOIN erp.parties p ON p.id = x.supplier_party_id
-             JOIN erp.bank_accounts b ON b.id = x.paid_from_bank_account_id
-             LEFT JOIN erp.users u ON u.id = x.created_by_user_id
-             WHERE x.status = 'posted' AND x.business_date BETWEEN $1 AND $2
-             ORDER BY 1, 4`,
-        [p.from, p.to],
-      );
-      const out = rows.map((r): MoneyRegisterRow => ({
-        date: r.date,
-        kind: r.kind,
-        sourceId: r.id,
-        number: r.number,
-        partyId: r.party_id,
-        partyCode: r.code,
-        partyName: r.name,
-        how: r.how,
-        counter: r.counter,
-        by: r.by,
-        reference: r.reference,
-        amount: num(r.amount),
-      }));
+      const out = await moneyRegister(c, side, p);
       const totals = (key: (r: MoneyRegisterRow) => string): MoneyRegisterTotal[] => {
         const m = new Map<string, MoneyRegisterTotal>();
         for (const r of out) {

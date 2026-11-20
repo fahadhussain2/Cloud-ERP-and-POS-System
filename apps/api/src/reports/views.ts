@@ -49,7 +49,7 @@ const sortBy =
     key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0;
 
 type Query = Record<string, string | undefined>;
-type Range = { from: string; to: string; branchId: string | null };
+export type Range = { from: string; to: string; branchId: string | null };
 class BadRequest extends Error {
   constructor(readonly body: { error: string }) {
     super(body.error);
@@ -84,6 +84,213 @@ const counted = <K extends string>(values: string[], key: K) => {
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([v, count]) => ({ [key]: v, count }) as { [P in K]: string } & { count: number });
 };
+
+// ---- The queries the reports and the owner's dashboard share (W2-06, D-118): one definition each ----
+
+/** Price approvals on bills dated in the range (RPT-03), with the line's quantity (thousandths) and prices. */
+export async function overrideRows(c: pg.ClientBase, r: Range) {
+  const { rows } = await c.query<{
+    id: string;
+    kind: string;
+    bill_number: string;
+    business_date: string;
+    at: Date;
+    item_code: string | null;
+    item_name: string | null;
+    requested_by: string;
+    approved_by: string;
+    reason_code: string;
+    note: string | null;
+    qty: string | null;
+    list_price: string | null;
+    unit_price: string | null;
+    floor_price: string | null;
+  }>(
+    `SELECT o.id, o.kind, coalesce(d.number, sv.sale_number) AS bill_number,
+       coalesce(d.business_date, sv.business_date)::text AS business_date, o.at_device AS at,
+       i.code AS item_code, i.name AS item_name, rq.full_name AS requested_by, ap.full_name AS approved_by,
+       o.reason_code, o.note, (l.qty * 1000)::bigint::text AS qty, l.list_price, l.unit_price,
+       l.floor_price_at_sale AS floor_price
+     FROM erp.overrides o
+     LEFT JOIN erp.sales_documents d ON d.id = o.document_id
+     LEFT JOIN erp.sales_voids sv ON sv.id = o.document_id
+     LEFT JOIN erp.sales_lines l ON l.id = o.line_id
+     LEFT JOIN erp.items i ON i.id = l.item_id
+     JOIN erp.users rq ON rq.id = o.requested_by_user_id
+     JOIN erp.users ap ON ap.id = o.approved_by_user_id
+     WHERE o.deleted_at IS NULL AND coalesce(d.business_date, sv.business_date) BETWEEN $1 AND $2
+       AND ($3::uuid IS NULL OR coalesce(d.branch_id, sv.branch_id) = $3)
+     ORDER BY o.at_device, o.id`,
+    [r.from, r.to, r.branchId],
+  );
+  return rows;
+}
+
+/** Voids dated in the range, and the returned lines of finalized bills dated in it (RPT-04). */
+export async function voidsAndReturns(
+  c: pg.ClientBase,
+  r: Range,
+): Promise<{ voids: VoidRow[]; returns: ReturnLineRow[] }> {
+  const v = await c.query<{
+    number: string;
+    sale_number: string;
+    business_date: string;
+    at: Date;
+    reason_code: string;
+    note: string | null;
+    voided_by: string;
+    approved_by: string;
+    sale_total: string | null;
+    reissue_number: string | null;
+  }>(
+    `SELECT sv.number, sv.sale_number, sv.business_date::text, sv.at_device AS at, sv.reason_code, sv.note,
+       vb.full_name AS voided_by, ap.full_name AS approved_by, d.total AS sale_total,
+       (SELECT min(x.number) FROM erp.sales_documents x
+        WHERE x.reissue_of_number = sv.sale_number AND x.deleted_at IS NULL) AS reissue_number
+     FROM erp.sales_voids sv
+     JOIN erp.users vb ON vb.id = sv.voided_by_user_id
+     JOIN erp.users ap ON ap.id = sv.approved_by_user_id
+     LEFT JOIN erp.sales_documents d ON d.id = sv.sale_document_id
+     WHERE sv.duplicate_of_id IS NULL AND sv.business_date BETWEEN $1 AND $2
+       AND ($3::uuid IS NULL OR sv.branch_id = $3)
+     ORDER BY sv.at_device, sv.number`,
+    [r.from, r.to, r.branchId],
+  );
+  const ret = await c.query<{
+    bill_number: string;
+    business_date: string;
+    seller: string;
+    item_code: string;
+    item_name: string;
+    qty: string;
+    amount: string;
+    reason: string;
+    condition: 'resellable' | 'defective';
+    original_bill: string | null;
+  }>(
+    `SELECT d.number AS bill_number, d.business_date::text, u.full_name AS seller, i.code AS item_code,
+       i.name AS item_name, (-l.qty * 1000)::bigint::text AS qty, (-l.line_total)::text AS amount,
+       l.return_reason_code AS reason, l.return_condition AS condition, od.number AS original_bill
+     FROM erp.sales_lines l
+     JOIN erp.sales_documents d ON d.id = l.document_id
+     JOIN erp.users u ON u.id = d.salesperson_user_id
+     JOIN erp.items i ON i.id = l.item_id
+     LEFT JOIN erp.sales_lines ol ON ol.id = l.original_line_id
+     LEFT JOIN erp.sales_documents od ON od.id = ol.document_id
+     WHERE l.deleted_at IS NULL AND d.deleted_at IS NULL AND d.status = 'finalized' AND l.qty < 0
+       AND d.business_date BETWEEN $1 AND $2 AND ($3::uuid IS NULL OR d.branch_id = $3)
+     ORDER BY d.business_date, d.number, l.line_no`,
+    [r.from, r.to, r.branchId],
+  );
+  return {
+    voids: v.rows.map((x) => ({
+      number: x.number,
+      saleNumber: x.sale_number,
+      businessDate: x.business_date,
+      at: x.at.toISOString(),
+      reasonCode: x.reason_code,
+      note: x.note,
+      voidedByName: x.voided_by,
+      approvedByName: x.approved_by,
+      saleTotal: num(x.sale_total),
+      reissueNumber: x.reissue_number,
+    })),
+    returns: ret.rows.map((x) => ({
+      billNumber: x.bill_number,
+      businessDate: x.business_date,
+      salespersonName: x.seller,
+      itemCode: x.item_code,
+      itemName: x.item_name,
+      qty: Number(x.qty),
+      amount: Number(x.amount),
+      reasonCode: x.reason,
+      condition: x.condition,
+      originalBillNumber: x.original_bill,
+    })),
+  };
+}
+
+/** Customer or supplier outstanding and ageing as of a date (RPT-06), with the control account's balance. */
+export async function ageingOf(
+  c: pg.ClientBase,
+  side: 'customers' | 'suppliers',
+  asOf: string,
+): Promise<Omit<AgeingView, 'money'>> {
+  const role = side === 'customers' ? 'customer' : 'supplier';
+  const entries = await c.query<{
+    party_id: string;
+    entry_date: string;
+    due_date: string;
+    amount: string;
+    source_type: string;
+    source_id: string;
+    void_of: string | null;
+  }>(
+    `SELECT e.party_id, e.entry_date::text, e.due_date::text, e.amount, e.source_type, e.source_id,
+       v.sale_document_id AS void_of
+     FROM erp.party_ledger_entries e
+     LEFT JOIN erp.sales_voids v ON e.source_type = 'sales_void' AND v.id = e.source_id
+     WHERE e.role = $1 AND e.entry_date <= $2 ORDER BY e.party_id, e.due_date, e.entry_date`,
+    [role, asOf],
+  );
+  // A void cancels its own bill, not the oldest one: the pair is taken out before credits settle the oldest
+  // debits first (W2-04, found while building; the pair nets to nothing on the bill's own day).
+  const aged = ageBalances({
+    asOf,
+    entries: withoutVoidedBills(
+      entries.rows.map((e) => ({
+        partyId: e.party_id,
+        entryDate: e.entry_date,
+        dueDate: e.due_date,
+        amount: Number(e.amount),
+        kind: e.source_type,
+        sourceId: e.source_id,
+        voidOf: e.void_of,
+      })),
+    ),
+  });
+  const parties = await c.query<{ id: string; code: string; name: string; terms: number | null }>(
+    side === 'customers'
+      ? `SELECT p.id, p.code, p.name, a.payment_terms_days AS terms FROM erp.parties p
+         LEFT JOIN erp.customer_accounts a ON a.party_id = p.id WHERE p.id = ANY ($1)`
+      : `SELECT p.id, p.code, p.name, a.payment_terms_days AS terms FROM erp.parties p
+         LEFT JOIN erp.supplier_accounts a ON a.party_id = p.id WHERE p.id = ANY ($1)`,
+    [aged.rows.map((x) => x.partyId)],
+  );
+  const of = new Map(parties.rows.map((p) => [p.id, p]));
+  const control = await c.query<{ b: string }>(
+    `SELECT coalesce(sum(${side === 'customers' ? 'l.debit - l.credit' : 'l.credit - l.debit'}), 0)::text AS b
+     FROM erp.journal_lines l JOIN erp.journal_entries e ON e.id = l.entry_id
+     JOIN erp.accounts a ON a.id = l.account_id
+     WHERE a.system_role = $1 AND e.entry_date <= $2`,
+    [side === 'customers' ? 'AR_CONTROL' : 'AP_CONTROL', asOf],
+  );
+  return {
+    side,
+    asOf,
+    rows: aged.rows
+      .map((x) => {
+        const p = of.get(x.partyId);
+        return { ...x, code: p?.code ?? '', name: p?.name ?? '', termsDays: p?.terms ?? null };
+      })
+      .sort(sortBy((x) => x.name.toLowerCase())),
+    totals: aged.totals,
+    controlBalance: Number(control.rows[0]!.b),
+  };
+}
+
+/** Open exceptions of the last 7 business days, the high ones apart (the Reports badge, RPT-10). */
+export async function openExceptions(
+  c: pg.ClientBase,
+  today: string,
+): Promise<{ high: number; total: number }> {
+  const { rows } = await c.query<{ high: number; total: number }>(
+    `SELECT count(*) FILTER (WHERE severity = 'high')::int AS high, count(*)::int AS total
+     FROM erp.exceptions WHERE status = 'open' AND business_date > $1::date - 7`,
+    [today],
+  );
+  return rows[0]!;
+}
 
 export function registerReportViews(scope: FastifyInstance, { pool, now, requireAuth }: Deps) {
   const ctx = (req: FastifyRequest) => ({
@@ -222,38 +429,7 @@ export function registerReportViews(scope: FastifyInstance, { pool, now, require
     run(req, reply, async (c, today) => {
       const r = rangeOf(query(req), today);
       const cost = allowed(req, 'cost.view');
-      const { rows } = await c.query<{
-        id: string;
-        kind: string;
-        bill_number: string;
-        business_date: string;
-        at: Date;
-        item_code: string | null;
-        item_name: string | null;
-        requested_by: string;
-        approved_by: string;
-        reason_code: string;
-        note: string | null;
-        list_price: string | null;
-        unit_price: string | null;
-        floor_price: string | null;
-      }>(
-        `SELECT o.id, o.kind, coalesce(d.number, sv.sale_number) AS bill_number,
-           coalesce(d.business_date, sv.business_date)::text AS business_date, o.at_device AS at,
-           i.code AS item_code, i.name AS item_name, rq.full_name AS requested_by, ap.full_name AS approved_by,
-           o.reason_code, o.note, l.list_price, l.unit_price, l.floor_price_at_sale AS floor_price
-         FROM erp.overrides o
-         LEFT JOIN erp.sales_documents d ON d.id = o.document_id
-         LEFT JOIN erp.sales_voids sv ON sv.id = o.document_id
-         LEFT JOIN erp.sales_lines l ON l.id = o.line_id
-         LEFT JOIN erp.items i ON i.id = l.item_id
-         JOIN erp.users rq ON rq.id = o.requested_by_user_id
-         JOIN erp.users ap ON ap.id = o.approved_by_user_id
-         WHERE o.deleted_at IS NULL AND coalesce(d.business_date, sv.business_date) BETWEEN $1 AND $2
-           AND ($3::uuid IS NULL OR coalesce(d.branch_id, sv.branch_id) = $3)
-         ORDER BY o.at_device, o.id`,
-        [r.from, r.to, r.branchId],
-      );
+      const rows = await overrideRows(c, r);
       const overrides: OverrideRow[] = rows.map((o) => ({
         id: o.id,
         kind: o.kind,
@@ -330,81 +506,7 @@ export function registerReportViews(scope: FastifyInstance, { pool, now, require
   scope.get('/reports/voids-returns', { preHandler: view }, async (req, reply) =>
     run(req, reply, async (c, today) => {
       const r = rangeOf(query(req), today);
-      const v = await c.query<{
-        number: string;
-        sale_number: string;
-        business_date: string;
-        at: Date;
-        reason_code: string;
-        note: string | null;
-        voided_by: string;
-        approved_by: string;
-        sale_total: string | null;
-        reissue_number: string | null;
-      }>(
-        `SELECT sv.number, sv.sale_number, sv.business_date::text, sv.at_device AS at, sv.reason_code, sv.note,
-           vb.full_name AS voided_by, ap.full_name AS approved_by, d.total AS sale_total,
-           (SELECT min(x.number) FROM erp.sales_documents x
-            WHERE x.reissue_of_number = sv.sale_number AND x.deleted_at IS NULL) AS reissue_number
-         FROM erp.sales_voids sv
-         JOIN erp.users vb ON vb.id = sv.voided_by_user_id
-         JOIN erp.users ap ON ap.id = sv.approved_by_user_id
-         LEFT JOIN erp.sales_documents d ON d.id = sv.sale_document_id
-         WHERE sv.duplicate_of_id IS NULL AND sv.business_date BETWEEN $1 AND $2
-           AND ($3::uuid IS NULL OR sv.branch_id = $3)
-         ORDER BY sv.at_device, sv.number`,
-        [r.from, r.to, r.branchId],
-      );
-      const ret = await c.query<{
-        bill_number: string;
-        business_date: string;
-        seller: string;
-        item_code: string;
-        item_name: string;
-        qty: string;
-        amount: string;
-        reason: string;
-        condition: 'resellable' | 'defective';
-        original_bill: string | null;
-      }>(
-        `SELECT d.number AS bill_number, d.business_date::text, u.full_name AS seller, i.code AS item_code,
-           i.name AS item_name, (-l.qty * 1000)::bigint::text AS qty, (-l.line_total)::text AS amount,
-           l.return_reason_code AS reason, l.return_condition AS condition, od.number AS original_bill
-         FROM erp.sales_lines l
-         JOIN erp.sales_documents d ON d.id = l.document_id
-         JOIN erp.users u ON u.id = d.salesperson_user_id
-         JOIN erp.items i ON i.id = l.item_id
-         LEFT JOIN erp.sales_lines ol ON ol.id = l.original_line_id
-         LEFT JOIN erp.sales_documents od ON od.id = ol.document_id
-         WHERE l.deleted_at IS NULL AND d.deleted_at IS NULL AND d.status = 'finalized' AND l.qty < 0
-           AND d.business_date BETWEEN $1 AND $2 AND ($3::uuid IS NULL OR d.branch_id = $3)
-         ORDER BY d.business_date, d.number, l.line_no`,
-        [r.from, r.to, r.branchId],
-      );
-      const voids: VoidRow[] = v.rows.map((x) => ({
-        number: x.number,
-        saleNumber: x.sale_number,
-        businessDate: x.business_date,
-        at: x.at.toISOString(),
-        reasonCode: x.reason_code,
-        note: x.note,
-        voidedByName: x.voided_by,
-        approvedByName: x.approved_by,
-        saleTotal: num(x.sale_total),
-        reissueNumber: x.reissue_number,
-      }));
-      const returns: ReturnLineRow[] = ret.rows.map((x) => ({
-        billNumber: x.bill_number,
-        businessDate: x.business_date,
-        salespersonName: x.seller,
-        itemCode: x.item_code,
-        itemName: x.item_name,
-        qty: Number(x.qty),
-        amount: Number(x.amount),
-        reasonCode: x.reason,
-        condition: x.condition,
-        originalBillNumber: x.original_bill,
-      }));
+      const { voids, returns } = await voidsAndReturns(c, r);
       const summed = <K extends 'reason' | 'condition'>(key: K, of: (x: ReturnLineRow) => string) => {
         const m = new Map<string, { count: number; amount: number }>();
         for (const x of returns) {
@@ -589,68 +691,7 @@ export function registerReportViews(scope: FastifyInstance, { pool, now, require
       const side = f['side'] === 'suppliers' ? 'suppliers' : f['side'] === 'customers' ? 'customers' : null;
       const asOf = f['asOf'] || today;
       if (side === null || !DATE.test(asOf)) throw new BadRequest({ error: 'bad_request' });
-      const role = side === 'customers' ? 'customer' : 'supplier';
-      const entries = await c.query<{
-        party_id: string;
-        entry_date: string;
-        due_date: string;
-        amount: string;
-        source_type: string;
-        source_id: string;
-        void_of: string | null;
-      }>(
-        `SELECT e.party_id, e.entry_date::text, e.due_date::text, e.amount, e.source_type, e.source_id,
-           v.sale_document_id AS void_of
-         FROM erp.party_ledger_entries e
-         LEFT JOIN erp.sales_voids v ON e.source_type = 'sales_void' AND v.id = e.source_id
-         WHERE e.role = $1 AND e.entry_date <= $2 ORDER BY e.party_id, e.due_date, e.entry_date`,
-        [role, asOf],
-      );
-      // A void cancels its own bill, not the oldest one: the pair is taken out before credits settle the oldest
-      // debits first (W2-04, found while building; the pair nets to nothing on the bill's own day).
-      const aged = ageBalances({
-        asOf,
-        entries: withoutVoidedBills(
-          entries.rows.map((e) => ({
-            partyId: e.party_id,
-            entryDate: e.entry_date,
-            dueDate: e.due_date,
-            amount: Number(e.amount),
-            kind: e.source_type,
-            sourceId: e.source_id,
-            voidOf: e.void_of,
-          })),
-        ),
-      });
-      const parties = await c.query<{ id: string; code: string; name: string; terms: number | null }>(
-        side === 'customers'
-          ? `SELECT p.id, p.code, p.name, a.payment_terms_days AS terms FROM erp.parties p
-             LEFT JOIN erp.customer_accounts a ON a.party_id = p.id WHERE p.id = ANY ($1)`
-          : `SELECT p.id, p.code, p.name, a.payment_terms_days AS terms FROM erp.parties p
-             LEFT JOIN erp.supplier_accounts a ON a.party_id = p.id WHERE p.id = ANY ($1)`,
-        [aged.rows.map((x) => x.partyId)],
-      );
-      const of = new Map(parties.rows.map((p) => [p.id, p]));
-      const control = await c.query<{ b: string }>(
-        `SELECT coalesce(sum(${side === 'customers' ? 'l.debit - l.credit' : 'l.credit - l.debit'}), 0)::text AS b
-         FROM erp.journal_lines l JOIN erp.journal_entries e ON e.id = l.entry_id
-         JOIN erp.accounts a ON a.id = l.account_id
-         WHERE a.system_role = $1 AND e.entry_date <= $2`,
-        [side === 'customers' ? 'AR_CONTROL' : 'AP_CONTROL', asOf],
-      );
-      const result: AgeingView = {
-        money: await moneyOf(c),
-        side,
-        asOf,
-        rows: aged.rows
-          .map((x) => {
-            const p = of.get(x.partyId);
-            return { ...x, code: p?.code ?? '', name: p?.name ?? '', termsDays: p?.terms ?? null };
-          })
-          .sort(sortBy((x) => x.name.toLowerCase())),
-        totals: aged.totals,
-        controlBalance: Number(control.rows[0]!.b),
-      };
+      const result: AgeingView = { money: await moneyOf(c), ...(await ageingOf(c, side, asOf)) };
       if (!wantsCsv(req)) return result;
       return sendCsv(
         reply,
@@ -793,14 +834,7 @@ export function registerReportViews(scope: FastifyInstance, { pool, now, require
 
   // The home screen's count: open exceptions of the last 7 days, the high ones apart.
   scope.get('/reports/exceptions/open-count', { preHandler: view }, async (req, reply) =>
-    run(req, reply, async (c, today) => {
-      const { rows } = await c.query<{ high: number; total: number }>(
-        `SELECT count(*) FILTER (WHERE severity = 'high')::int AS high, count(*)::int AS total
-         FROM erp.exceptions WHERE status = 'open' AND business_date > $1::date - 7`,
-        [today],
-      );
-      return rows[0]!;
-    }),
+    run(req, reply, async (c, today) => openExceptions(c, today)),
   );
 
   scope.post<{ Params: { id: string } }>(

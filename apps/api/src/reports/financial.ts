@@ -80,7 +80,7 @@ export async function shop(c: Client, now: Date): Promise<{ today: string; start
 }
 
 /** The chart: every live account, and any removed one that still has lines. */
-async function chart(c: Client): Promise<StatementAccount[]> {
+export async function chart(c: Client): Promise<StatementAccount[]> {
   const { rows } = await c.query<{
     id: string;
     code: string;
@@ -106,7 +106,7 @@ async function chart(c: Client): Promise<StatementAccount[]> {
 }
 
 /** Per account: debits − credits before `from`, and the debits and credits from `from` to `to`. */
-async function periodSums(c: Client, p: Period) {
+export async function periodSums(c: Client, p: Period) {
   const { rows } = await c.query<{ account_id: string; opening: string; debit: string; credit: string }>(
     `SELECT l.account_id,
        coalesce(sum(l.debit - l.credit) FILTER (WHERE e.entry_date < $1), 0)::text AS opening,
@@ -125,7 +125,7 @@ async function periodSums(c: Client, p: Period) {
 }
 
 /** Per account: debits − credits from `since` (or the start) up to and including `at`. */
-async function balancesAt(c: Client, at: string, since: string | null) {
+export async function balancesAt(c: Client, at: string, since: string | null) {
   const { rows } = await c.query<{ account_id: string; balance: string }>(
     `SELECT l.account_id, sum(l.debit - l.credit)::text AS balance
      FROM erp.journal_lines l JOIN erp.journal_entries e ON e.id = l.entry_id
