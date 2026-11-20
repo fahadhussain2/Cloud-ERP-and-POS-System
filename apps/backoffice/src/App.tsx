@@ -10,6 +10,7 @@ import { VoucherScreen } from './accounting/VoucherScreen';
 import { CategoriesScreen } from './catalog/CategoriesScreen';
 import { ItemScreen } from './catalog/ItemScreen';
 import { ItemsScreen } from './catalog/ItemsScreen';
+import { DashboardScreen } from './dashboard/DashboardScreen';
 import { LabelsScreen } from './catalog/LabelsScreen';
 import { NewItemScreen } from './catalog/NewItemScreen';
 import { AdjustmentScreen, AdjustmentsScreen } from './inventory/AdjustmentScreen';
@@ -149,6 +150,8 @@ export function App({ api }: { api: Api }) {
       >
         {shown === null ? (
           <PageHeader title={t('app.title')} help={t('home.nothing')} />
+        ) : shown.screen === 'dashboard' ? (
+          <DashboardScreen api={api} />
         ) : shown.screen === 'reportsHome' ? (
           <ReportsHomeScreen permissions={me.permissions} badges={badges} />
         ) : shown.screen === 'trialBalance' ? (

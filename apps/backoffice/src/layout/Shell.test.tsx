@@ -58,6 +58,7 @@ const EVERYTHING = [
  * nine reports moved onto the Reports home with theirs (W2-01, MOVED).
  */
 const ENTRIES: Record<string, { href: string; needs: string[] }> = {
+  dashboard: { href: href.dashboard, needs: ['dashboard.view'] },
   staff: { href: href.staff, needs: ['admin.users', 'admin.devices'] },
   counters: { href: href.counters, needs: ['admin.devices'] },
   shopSettings: { href: href.shopSettings, needs: ['admin.settings'] },
