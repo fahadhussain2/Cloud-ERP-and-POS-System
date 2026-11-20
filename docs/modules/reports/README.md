@@ -84,7 +84,7 @@ The reports are designed the modern way: one frame for all of them (filters at t
 | [W2-02](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/177) | Stock reports: stock ledger, stock at a date, stock movement, reorder list, dead stock, inventory analysis ([plan](plans/W2-02-stock-reports.md), accepted) | RPT-08, RPT-12, RPT-13, RPT-14, PUR-07 (list) | W2-01 | 3 |
 | [W2-03](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/178) | Sales and purchase analysis: sales and gross profit, purchase register, purchase and sale rates, sales over time ([plan](plans/W2-03-sales-purchase-analysis.md), built) | RPT-07, RPT-09, RPT-15 | W2-01 | 3 |
 | [W2-04](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/179) | Customers and suppliers: partner ledger and statement, balance trend, control reports; the cash flow statement last; the built reports onto the frame ([plan](plans/W2-04-partners-control-cash-flow.md), built; the move of the built reports built in its own PR) | RPT-16, RPT-17, ACC-07 (cash flow) | W2-01 | 3 (+1 if time) |
-| W2-06 | The owner's dashboard: one screen for the owner with the key figures, the sales trend, what needs attention, and cards that open their reports ([plan](plans/W2-06-owner-dashboard.md), proposed) | RPT-18 | W2-01 to W2-04 | 3 days |
+| [W2-06](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/198) | The owner's dashboard: one screen for the owner with the key figures, the sales trend, what needs attention, and cards that open their reports ([plan](plans/W2-06-owner-dashboard.md), accepted) | RPT-18 | W2-01 to W2-04 | 3 days |
 
 **Total ≈ 12 days**, from 23 Nov; go/no-go is 18 Dec. W2-02 to W2-04 each start with their own plan, after W2-01's frame exists.
 

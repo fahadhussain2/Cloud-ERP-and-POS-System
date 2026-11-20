@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Issue** | to open when the plan is accepted |
+| **Issue** | [#198](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/198) |
 | **Module** | reports (a back-office screen and one read endpoint) |
-| **Status** | Proposed. The design was agreed by the owner on the prototype (2026-11-20); questions 1–6 below are open |
+| **Status** | Accepted (owner, 2026-11-20): the design on the prototype, and questions 1–6 as recommended |
 | **Refs** | RPT-18 (new); CLAUDE.md rules 1, 4, 5, 10; D-066, D-067 (the look), D-110 (reports read the ledgers), D-114 (the frame, the first screen), D-116 (the reports), D-117 (the business date), D-118 (this dashboard) |
 | **Depends on** | W2-01 to W2-04 (every figure's report and the report frame's filters in the address), W2-03 (the chart components), W1-20 (overrides, voids and returns, exceptions) |
 | **Size** | about 3 days: domain golden files ½; extracting the report queries and the endpoint with integration tests 1; the screen and two new chart pieces 1; e2e and docs ½ |
@@ -51,6 +51,15 @@ The design is the agreed prototype (layout A, *today first*). It is a private de
 - **Narrow windows** stack the cards. On a phone, net sales comes first with its trend, then the other key figures two by two.
 - **Every string is an i18n key.** CSS uses logical properties, and numbers use the tenant's format (rule 10).
 - **Before go-live and in the pilot,** a comparison that reaches back before the first business day says *before go-live* instead of showing zeros, as the reports do (W2-03).
+
+## Owner answers (2026-11-20)
+
+1. **Cash** = the open drawers' expected cash + the cash in the safe + cash in transit; **Bank** = the bank and wallet accounts, with card clearing left out and shown in the details. Both change chips compare with the balance when the business day began.
+2. **Today is compared with the same weekday last week, up to the same time of day.**
+3. **Unusual** = at least 1.5 times the comparison's count, and at least 3.
+4. **The donut** shows net profit, the month's two biggest expense categories by name, and *Other expenses*. A loss month shows the expenses only, with the loss in red in the centre.
+5. **A counter needs attention** when it hasn't been seen for 10 minutes while its cash session is open; the line says for how long.
+6. **The figures are read** on open, on a period change, and every 5 minutes while the tab is visible.
 
 ## Questions for the owner (each with a recommendation)
 
