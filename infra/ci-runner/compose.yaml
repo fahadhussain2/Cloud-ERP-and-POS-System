@@ -3,7 +3,10 @@
 name: erp-ci-runner
 
 x-runner: &runner
-  build: .
+  build:
+    context: .
+    args:
+      PNPM_VERSION: ${PNPM_VERSION:-}
   image: erp-ci-runner:local
   restart: unless-stopped
   # The Docker socket belongs to root's group: the runner user joins it to start service containers.

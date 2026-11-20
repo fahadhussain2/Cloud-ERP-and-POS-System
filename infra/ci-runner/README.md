@@ -23,7 +23,10 @@ sign in" setting). Each keeps its registration; no new token is needed.
 
 **How it works**
 
-- GitHub's runner image (`ghcr.io/actions/actions-runner`) plus `shellcheck`, `docker compose` and `libatomic1` for pnpm (`Dockerfile`).
+- GitHub's runner image (`ghcr.io/actions/actions-runner`) plus `shellcheck`, `docker compose` and pnpm at the
+  repository's version (`Dockerfile`; `start.ps1` reads it from `package.json`). On the PC the jobs skip pnpm's setup
+  action and GitHub's dependency cache: pnpm's store stays in the runner between jobs, so the shop's slow connection
+  downloads each package once. **After changing `packageManager`, run `start.ps1` again.**
   Dependabot bumps the image monthly; the runner also updates itself.
 - The runners share Docker Desktop's socket, so `docker run` starts containers next to them. The runner refuses
   `services:` inside a container, so each job starts its own PostgreSQL (`.github/actions/postgres`) on a random port,

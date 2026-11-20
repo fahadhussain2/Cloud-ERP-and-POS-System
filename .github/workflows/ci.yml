@@ -36,11 +36,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # On the PC, pnpm comes with the runner image and its store stays between jobs: downloading both every job over
+      # the shop's connection failed (D-119).
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: runner.environment != 'self-hosted'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+          cache: ${{ runner.environment != 'self-hosted' && 'pnpm' || '' }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       # Server and edge config (W0-03). shellcheck and Docker come with the runner.
@@ -71,11 +74,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # On the PC, pnpm comes with the runner image and its store stays between jobs: downloading both every job over
+      # the shop's connection failed (D-119).
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: runner.environment != 'self-hosted'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+          cache: ${{ runner.environment != 'self-hosted' && 'pnpm' || '' }}
       - run: pnpm install --frozen-lockfile
       - name: Start the database
         uses: ./.github/actions/postgres
@@ -93,11 +99,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # On the PC, pnpm comes with the runner image and its store stays between jobs: downloading both every job over
+      # the shop's connection failed (D-119).
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: runner.environment != 'self-hosted'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+          cache: ${{ runner.environment != 'self-hosted' && 'pnpm' || '' }}
       - run: pnpm install --frozen-lockfile
       - name: Start the database
         uses: ./.github/actions/postgres
