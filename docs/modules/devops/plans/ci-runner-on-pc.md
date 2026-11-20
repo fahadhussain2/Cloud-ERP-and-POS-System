@@ -42,7 +42,7 @@ A run takes 14–18 minutes across its three jobs; almost all of it is the tests
 
 | Choice | Why |
 |---|---|
-| **GitHub's own runner image** (`ghcr.io/actions/actions-runner`, pinned), in **Docker Desktop**, with a small `infra/ci-runner/Dockerfile` that adds what the jobs use and the image lacks: `shellcheck`, `python3`, the Docker Compose plugin, `openssh-client`, and Chromium's system libraries (saves the 1–6 minute `playwright install --with-deps` each run). | Service containers (`services: postgres`) need a Linux runner with Docker (GitHub docs). Docker Desktop already runs Linux containers here; nothing new to install on Windows. |
+| **GitHub's own runner image** (`ghcr.io/actions/actions-runner`, pinned), in **Docker Desktop**, with a small `infra/ci-runner/Dockerfile` that adds what the jobs use and the image lacks: `shellcheck` and the Docker Compose plugin (it already has `python3`, `ssh`, `jq` and `sudo`). Chromium's system libraries are installed by the job's `playwright install --with-deps` as today; the runners are kept between jobs, so only the first run pays for it. | Service containers (`services: postgres`) need a Linux runner with Docker (GitHub docs). Docker Desktop already runs Linux containers here; nothing new to install on Windows. |
 | **Three runner containers** (`erp-pc-1` to `3`), so a run's three jobs still run side by side, as they do today. | A run then takes about as long as now (about 6–10 minutes). Docker has 8 of the PC's 16 GB and 8 CPU threads. If the rehearsal shows the PC struggling, two runners: a run then takes longer, nothing else changes. |
 | **The Docker socket is shared with the runners** (Docker-outside-of-Docker): service containers and the `docker run` checks start next to the runners, not inside them. | The standard way to run the runner image with services. |
 | **The work folder has the same path inside and outside** (`/srv/ci-runner/<runner>/_work`, a bind at an identical path). | "Check edge and app config" runs `docker run -v "$PWD/…"`; with a shared socket, Docker reads that path on the Docker host, so it must be the same path there. |
@@ -69,9 +69,9 @@ A run takes 14–18 minutes across its three jobs; almost all of it is the tests
 
 ## Scope
 
-1. `infra/ci-runner/`: `Dockerfile`, `compose.yaml`, `start.ps1`, `stop.ps1`, `remove.ps1`, `README.md` (what it is, how to start and stop it, the variables, what to do when the PC is off).
-2. `.github/workflows/ci.yml`: `runs-on` from `CHECKS_RUNS_ON`; random Postgres ports and `DATABASE_URL` from the service port; no `--with-deps` on the PC (already in the image).
-3. `.github/workflows/deploy.yml`: `runs-on` from `DEPLOY_RUNS_ON`. The other scheduled workflows are unchanged.
+1. `infra/ci-runner/`: `Dockerfile`, `entrypoint.sh`, `compose.yaml`, `start.ps1`, `stop.ps1`, `remove.ps1`, `README.md` (what it is, how to start and stop it, the variables, what to do when the PC is off).
+2. `.github/workflows/ci.yml`: `runs-on` from `CHECKS_RUNS_ON`; random Postgres ports and `DATABASE_URL` from the service port; `shellcheck` and `compose config` also cover `infra/ci-runner`.
+3. `.github/workflows/deploy.yml`: `runs-on` from `DEPLOY_RUNS_ON`, and on the PC a last step that removes the deploy key and the built images. The other scheduled workflows are unchanged.
 4. `.github/dependabot.yml`: the `docker` ecosystem for `infra/ci-runner` (keeps the runner image pinned and current).
 5. `docs/06-DECISION-LOG.md`: D-119. `docs/02-ARCHITECTURE.md` §9 and the W0-02 plan's minutes risk: one line each.
 
@@ -86,7 +86,7 @@ A run takes 14–18 minutes across its three jobs; almost all of it is the tests
 
 ## Tests that prove it
 
-- [ ] A job on the PC runner starts while GitHub-hosted jobs are blocked (step 1), with the run link.
+- [x] A job on the PC runner starts while GitHub-hosted jobs are blocked (step 1): [run 44790254933](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/actions/runs/44790254933), green in 12 s on `erp-pc-smoke` (Ubuntu 24.04 in Docker Desktop's WSL2).
 - [ ] This change's own pull request: all three checks green **on the PC runners** (each job's log names `erp-pc-…`), with run links and times.
 - [ ] The edge-config check really reads the files: a deliberately broken Caddyfile on a throwaway commit turns it red (then reverted).
 - [ ] Two runs at once (this PR and a throwaway second PR) don't collide: both green, Postgres on different ports.
@@ -108,4 +108,7 @@ A run takes 14–18 minutes across its three jobs; almost all of it is the tests
 
 ## Results
 
-*(filled in as the tests run)*
+| Check | Result |
+|---|---|
+| Step 1, 20 Nov | GitHub ran a job on a temporary PC runner while its own machines were blocked ([run 44790254933](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/actions/runs/44790254933)). The runner unregistered itself; the throwaway branch was deleted. |
+| Probe, 20 Nov | From inside the runner image: Docker works once the runner joins group 0 (the socket's group); a nested `docker run -v` reads a file at an identical path; Postgres on a random port answers at `host.docker.internal`. |
