@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 
 export type Route =
   | { screen: 'home' }
+  | { screen: 'dashboard' }
   | { screen: 'reportsHome' }
   | { screen: 'trialBalance' }
   | { screen: 'profitLoss' }
@@ -72,6 +73,8 @@ export type Route =
   | { screen: 'expenseCategories' };
 
 export const href = {
+  // The owner's dashboard (W2-06, D-118).
+  dashboard: '#/dashboard',
   staff: '#/staff',
   person: (id: string) => `#/staff/${encodeURIComponent(id)}`,
   counters: '#/counters',
@@ -171,6 +174,7 @@ export function queryOf(hash: string): URLSearchParams {
 
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('?')[0]!.split('/').filter(Boolean);
+  if (parts[0] === 'dashboard' && parts.length === 1) return { screen: 'dashboard' };
   if (parts[0] === 'staff' && parts[1]) return { screen: 'person', id: decodeURIComponent(parts[1]) };
   if (parts[0] === 'staff') return { screen: 'staff' };
   if (parts[0] === 'counters') return { screen: 'counters' };

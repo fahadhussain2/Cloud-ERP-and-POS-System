@@ -1,5 +1,6 @@
 import {
   ChartColumn,
+  LayoutDashboard,
   Landmark,
   Package,
   SlidersHorizontal,
@@ -18,6 +19,7 @@ import { href, type Route } from '../router';
 
 export interface MenuItem {
   key:
+    | 'dashboard'
     | 'staff'
     | 'counters'
     | 'shopSettings'
@@ -45,7 +47,8 @@ export interface MenuItem {
   screens: readonly Route['screen'][];
 }
 
-export type GroupKey = 'sales' | 'catalog' | 'purchasing' | 'stock' | 'accounting' | 'reports' | 'settings';
+export type GroupKey =
+  'dashboard' | 'sales' | 'catalog' | 'purchasing' | 'stock' | 'accounting' | 'reports' | 'settings';
 
 export interface MenuGroup {
   group: GroupKey;
@@ -54,6 +57,13 @@ export interface MenuGroup {
 }
 
 export const MENU: readonly MenuGroup[] = [
+  {
+    // The owner's dashboard (W2-06, D-118): the first row, and so the owner's first screen after sign-in (D-114's
+    // rule). Only the owner holds dashboard.view; everyone else's menu is unchanged.
+    group: 'dashboard',
+    icon: LayoutDashboard,
+    items: [{ key: 'dashboard', href: href.dashboard, needs: ['dashboard.view'], screens: ['dashboard'] }],
+  },
   {
     // Customers (W1-22, D-109): who buys on account, at which tier, and what they owe. One entry, so a direct link.
     group: 'sales',

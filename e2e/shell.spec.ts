@@ -3,7 +3,7 @@ import { account, signOut } from './backoffice';
 import { expect, test } from './counter-test';
 import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
 
-// W1-28 plan: the owner lands on Customers, folds the menu into a rail, opens Stock → Transfers from it, finds the
+// W1-28 plan: the owner lands on the Dashboard (W2-06, D-118; Customers before it), folds the menu into a rail, opens Stock → Transfers from it, finds the
 // rail again after a reload, reaches Trace a bill by the search (Ctrl K), and signs out from the account menu. Back
 // office only, in a browser context of its own so the folded menu stays out of the other flows; after counter.spec,
 // which gives the owner their own password.
@@ -22,7 +22,7 @@ test('the owner folds the menu into a rail, opens a screen from it, and finds an
   await page.getByRole('button', { name: bo.login.submit }).click();
 
   const nav = page.getByRole('navigation', { name: bo.nav.menu });
-  await expect(nav.getByRole('link', { name: bo.nav.customers })).toHaveAttribute('aria-current', 'page');
+  await expect(nav.getByRole('link', { name: bo.nav.dashboard })).toHaveAttribute('aria-current', 'page');
   await expect(account(page)).toContainText(OWNER.fullName);
 
   await page.getByRole('button', { name: bo.nav.collapse }).click();

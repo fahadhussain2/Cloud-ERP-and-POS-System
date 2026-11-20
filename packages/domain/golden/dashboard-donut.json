@@ -1,0 +1,105 @@
+{
+  "description": "Where the month's gross profit went (W2-06 owner answer 4; D-118): net profit, the two biggest expense categories by name, and the rest as other, each as a share of the gross profit. In a loss month the ring is the expenses only and the net is negative. Shares in basis points, half away from zero; ties by name.",
+  "cases": [
+    {
+      "name": "a month with profit",
+      "input": {
+        "grossProfit": 238640000,
+        "expenses": [
+          { "name": "Electricity", "amount": 9640000 },
+          { "name": "Salaries", "amount": 52000000 },
+          { "name": "Transport and delivery", "amount": 6420000 },
+          { "name": "Rent", "amount": 28000000 },
+          { "name": "Everything else", "amount": 15800000 }
+        ]
+      },
+      "expected": {
+        "loss": false,
+        "net": 126780000,
+        "base": 238640000,
+        "keptBp": 5313,
+        "slices": [
+          { "kind": "net", "name": null, "amount": 126780000, "bp": 5313 },
+          { "kind": "expense", "name": "Salaries", "amount": 52000000, "bp": 2179 },
+          { "kind": "expense", "name": "Rent", "amount": 28000000, "bp": 1173 },
+          { "kind": "other", "name": null, "amount": 31860000, "bp": 1335 }
+        ]
+      }
+    },
+    {
+      "name": "a loss month: the ring is the expenses",
+      "input": {
+        "grossProfit": 50000000,
+        "expenses": [
+          { "name": "Salaries", "amount": 52000000 },
+          { "name": "Rent", "amount": 28000000 },
+          { "name": "Electricity", "amount": 9640000 }
+        ]
+      },
+      "expected": {
+        "loss": true,
+        "net": -39640000,
+        "base": 89640000,
+        "keptBp": null,
+        "slices": [
+          { "kind": "expense", "name": "Salaries", "amount": 52000000, "bp": 5801 },
+          { "kind": "expense", "name": "Rent", "amount": 28000000, "bp": 3124 },
+          { "kind": "other", "name": null, "amount": 9640000, "bp": 1075 }
+        ]
+      }
+    },
+    {
+      "name": "one expense category: no other",
+      "input": { "grossProfit": 10000000, "expenses": [{ "name": "Rent", "amount": 4000000 }] },
+      "expected": {
+        "loss": false,
+        "net": 6000000,
+        "base": 10000000,
+        "keptBp": 6000,
+        "slices": [
+          { "kind": "net", "name": null, "amount": 6000000, "bp": 6000 },
+          { "kind": "expense", "name": "Rent", "amount": 4000000, "bp": 4000 }
+        ]
+      }
+    },
+    {
+      "name": "break-even: nothing kept, no net slice",
+      "input": { "grossProfit": 8000000, "expenses": [{ "name": "Salaries", "amount": 8000000 }] },
+      "expected": {
+        "loss": false,
+        "net": 0,
+        "base": 8000000,
+        "keptBp": 0,
+        "slices": [{ "kind": "expense", "name": "Salaries", "amount": 8000000, "bp": 10000 }]
+      }
+    },
+    {
+      "name": "two categories of the same size: by name",
+      "input": {
+        "grossProfit": 30000000,
+        "expenses": [
+          { "name": "Rent", "amount": 5000000 },
+          { "name": "Electricity", "amount": 5000000 },
+          { "name": "Water", "amount": 1000000 }
+        ]
+      },
+      "expected": {
+        "loss": false,
+        "net": 19000000,
+        "base": 30000000,
+        "keptBp": 6333,
+        "slices": [
+          { "kind": "net", "name": null, "amount": 19000000, "bp": 6333 },
+          { "kind": "expense", "name": "Electricity", "amount": 5000000, "bp": 1667 },
+          { "kind": "expense", "name": "Rent", "amount": 5000000, "bp": 1667 },
+          { "kind": "other", "name": null, "amount": 1000000, "bp": 333 }
+        ]
+      }
+    },
+    {
+      "name": "nothing yet this month",
+      "input": { "grossProfit": 0, "expenses": [] },
+      "expected": { "loss": false, "net": 0, "base": 0, "keptBp": null, "slices": [] }
+    }
+  ]
+}

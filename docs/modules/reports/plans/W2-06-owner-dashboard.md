@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | [#198](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/198) |
 | **Module** | reports (a back-office screen and one read endpoint) |
-| **Status** | Accepted (owner, 2026-11-20): the design on the prototype, and questions 1–6 as recommended |
+| **Status** | Accepted (owner, 2026-11-20): the design on the prototype, and questions 1–6 as recommended. Built, waiting for review |
 | **Refs** | RPT-18 (new); CLAUDE.md rules 1, 4, 5, 10; D-066, D-067 (the look), D-110 (reports read the ledgers), D-114 (the frame, the first screen), D-116 (the reports), D-117 (the business date), D-118 (this dashboard) |
 | **Depends on** | W2-01 to W2-04 (every figure's report and the report frame's filters in the address), W2-03 (the chart components), W1-20 (overrides, voids and returns, exceptions) |
 | **Size** | about 3 days: domain golden files ½; extracting the report queries and the endpoint with integration tests 1; the screen and two new chart pieces 1; e2e and docs ½ |
@@ -161,6 +161,20 @@ The design is the agreed prototype (layout A, *today first*). It is a private de
 
 - `pnpm check`, `pnpm test:integration`, `pnpm e2e`.
 - On staging with the pilot's documents, the owner compares the dashboard with the reports it opens for Today, 7 days and 30 days, in light and dark mode, on a laptop and a phone.
+
+## Changes during the build
+
+| Change | Why |
+|---|---|
+| **The dashboard's sales are read in one pass** (`salesSets`: totals, categories, salesmen, items, days and bills by grouping sets over the reports' own `LINES`), once for the period and once (twice for Today) for the comparison | Seven separate passes took 1.8 s on the generated year |
+| **Four groups are read in parallel**, each in its own tenant transaction: sales (two connections), stock, customers and suppliers, the books. At most six of the pool's ten connections, so the counters' sync isn't starved | The plan's mitigation for a slow read: one transaction took 2.3 s on the generated year; now under 1.5 s (the integration test's limit) |
+| **We owe suppliers shows the total, overdue and due in the next 7 days**, without the next three due dates. Due in 7 days = not yet due today − not yet due in 7 days, from the supplier outstanding report's own buckets (RPT-06) | The ageing rule settles the oldest bills first; listing the next due dates would need a second rule beside it |
+| **For Today, discounts compare with last week to the same minute; price approvals, returns and voids with the whole of last week's day** | Approvals, returns and voids are read from their reports' queries, which are by date only |
+| **Sold below list is (list − price) × quantity of the approved lines**; the overrides query also returns the line's quantity and the approver's id (for *approved by you*) | The overrides report shows prices, not quantities |
+| **Negative stock counts items below zero across every location**; the reorder list and dead stock (no sale in 90 days, *dead* and *not sold since go-live*) are their reports' | As the stock report and the stock reports |
+| **An unknown period is `invalid_preset`** (a 400), not a new error code | It is the same kind of mistake as an unknown report preset |
+| **No migration for `dashboard.view`**: roles keep their permissions as a list of names, and the owner's is `*` | Nothing in the database lists permissions |
+| **The shell's e2e flow** now expects the owner to land on the Dashboard | D-118 amends D-114's first screen for the owner |
 
 ## Order
 

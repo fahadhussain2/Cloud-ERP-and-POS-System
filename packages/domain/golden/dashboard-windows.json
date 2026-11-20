@@ -1,0 +1,60 @@
+{
+  "description": "The dashboard's period and what it is compared with (W2-06 owner answer 2; D-118): Today against the same weekday last week up to the same minute of the business day; 7 and 30 days against the days just before. The comparison is flagged when it reaches before the shop's first business day.",
+  "cases": [
+    {
+      "name": "today at 10:30 against last Friday to 10:30",
+      "input": { "period": "today", "today": "2027-01-15", "minute": 390, "firstDay": "2027-01-01" },
+      "expected": {
+        "current": { "from": "2027-01-15", "to": "2027-01-15" },
+        "comparison": { "from": "2027-01-08", "to": "2027-01-08" },
+        "upToMinute": 390,
+        "beforeFirstDay": false
+      }
+    },
+    {
+      "name": "the last 7 days against the 7 before",
+      "input": { "period": "7d", "today": "2027-01-20", "minute": 600, "firstDay": "2027-01-01" },
+      "expected": {
+        "current": { "from": "2027-01-14", "to": "2027-01-20" },
+        "comparison": { "from": "2027-01-07", "to": "2027-01-13" },
+        "upToMinute": null,
+        "beforeFirstDay": false
+      }
+    },
+    {
+      "name": "the last 30 days across a year end",
+      "input": { "period": "30d", "today": "2027-01-10", "minute": 0, "firstDay": "2026-10-01" },
+      "expected": {
+        "current": { "from": "2026-12-12", "to": "2027-01-10" },
+        "comparison": { "from": "2026-11-12", "to": "2026-12-11" },
+        "upToMinute": null,
+        "beforeFirstDay": false
+      }
+    },
+    {
+      "name": "a comparison before go-live is flagged",
+      "input": { "period": "7d", "today": "2027-01-05", "minute": 120, "firstDay": "2027-01-01" },
+      "expected": {
+        "current": { "from": "2026-12-30", "to": "2027-01-05" },
+        "comparison": { "from": "2026-12-23", "to": "2026-12-29" },
+        "upToMinute": null,
+        "beforeFirstDay": true
+      }
+    },
+    {
+      "name": "no business day yet",
+      "input": { "period": "today", "today": "2027-01-01", "minute": 60, "firstDay": null },
+      "expected": {
+        "current": { "from": "2027-01-01", "to": "2027-01-01" },
+        "comparison": { "from": "2026-12-25", "to": "2026-12-25" },
+        "upToMinute": 60,
+        "beforeFirstDay": true
+      }
+    },
+    {
+      "name": "an unknown period",
+      "input": { "period": "year", "today": "2027-01-15", "minute": 0, "firstDay": "2027-01-01" },
+      "error": "invalid_preset"
+    }
+  ]
+}

@@ -334,3 +334,11 @@ export {
   type ReversibleType,
   type VoucherView,
 } from './accounting';
+export { DASHBOARD_PERIOD_VIEWS } from './dashboard';
+export type {
+  DashboardAttentionView,
+  DashboardChipView,
+  DashboardCountView,
+  DashboardPeriodView,
+  DashboardView,
+} from './dashboard';

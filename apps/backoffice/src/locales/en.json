@@ -31,8 +31,10 @@
     "contains_username": "Do not put your username in your password."
   },
   "nav": {
+    "dashboard": "Dashboard",
     "menu": "Menu",
     "groups": {
+      "dashboard": "Dashboard",
       "sales": "Sales",
       "reports": "Reports",
       "catalog": "Catalog",
@@ -2257,5 +2259,158 @@
         "reprinted_log": "Reprinted on the counter"
       }
     }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "loading": "Loading the figures…",
+    "openSince": "business day open since {{time}}",
+    "updated": "updated {{time}}",
+    "period": "Period",
+    "periods": {
+      "today": "Today",
+      "7d": "7 days",
+      "30d": "30 days"
+    },
+    "compared": {
+      "today": "Compared with last week, same day and time",
+      "7d": "Compared with the 7 days before",
+      "30d": "Compared with the 30 days before"
+    },
+    "beforeGoLive": "The comparison reaches before go-live",
+    "before": "Before: {{amount}}",
+    "keyFigures": "Key figures",
+    "none": "Nothing yet in this period.",
+    "kpi": {
+      "sales": "Net sales",
+      "salesSoFar": "Net sales so far",
+      "profit": "Gross profit",
+      "cash": "Cash",
+      "bank": "Bank",
+      "owed": "Customers owe us",
+      "today": " today",
+      "in30": " in 30 days",
+      "margin": "margin {{margin}}",
+      "marginWas": "Margin before: {{margin}}",
+      "bills_one": "{{count}} bill · average {{average}}",
+      "bills_other": "{{count}} bills · average {{average}}",
+      "drawers_one": "Drawers {{amount}} ({{count}} open)",
+      "drawers_other": "Drawers {{amount}} ({{count}} open)",
+      "safe": "Safe {{amount}}",
+      "transit": "Cash in transit {{amount}}",
+      "dayStart": "When the day began: {{amount}}",
+      "cards": "Card money not yet in the bank: {{amount}}",
+      "customers_one": "{{count}} customer owes us",
+      "customers_other": "{{count}} customers owe us",
+      "ago30": "30 days ago: {{amount}}",
+      "received": "Received today: {{amount}}"
+    },
+    "trend": {
+      "byHour": "Sales by hour",
+      "byDay": "Sales by day",
+      "now": {
+        "today": "Today",
+        "7d": "These 7 days",
+        "30d": "These 30 days"
+      },
+      "before": {
+        "today": "Same day last week",
+        "7d": "The 7 days before",
+        "30d": "The 30 days before"
+      }
+    },
+    "attention": {
+      "title": "Needs attention",
+      "none": "Nothing needs you right now.",
+      "tone": {
+        "bad": "Serious",
+        "warn": "Check",
+        "info": "For your information"
+      },
+      "exceptions_one": "{{count}} high-severity exception is open",
+      "exceptions_other": "{{count}} high-severity exceptions are open",
+      "negativeStock_one": "{{count}} item is in negative stock",
+      "negativeStock_other": "{{count}} items are in negative stock",
+      "counterUnseen": "{{name}} not seen for {{minutes}} minutes",
+      "atMinimum_one": "{{count}} item is at or below its minimum",
+      "atMinimum_other": "{{count}} items are at or below their minimum",
+      "overLimit_one": "{{count}} customer is over their credit limit",
+      "overLimit_other": "{{count}} customers are over their credit limit",
+      "openSessions_one": "{{count}} cash session is open",
+      "openSessions_other": "{{count}} cash sessions are open"
+    },
+    "busy": {
+      "title": "Busy hours",
+      "sub": "Bills per hour, average of the last {{weeks}} weeks",
+      "link": "Sales over time",
+      "bills_one": "{{count}} bill",
+      "bills_other": "{{count}} bills"
+    },
+    "categories": {
+      "title": "Top categories",
+      "link": "Sales and profit",
+      "none": "No category",
+      "rest": "Everything else"
+    },
+    "leak": {
+      "title": "Discounts, returns and voids",
+      "link": "Details",
+      "discounts": "Discounts given",
+      "belowList": "Sold below list",
+      "returns": "Returns",
+      "voids": "Voids and reissues",
+      "usual": "{{times}}× usual",
+      "approved": "Approved by others {{others}}, by you {{you}}",
+      "reason": "Most common reason: {{reason}}",
+      "reissued_one": "{{count}} reissued",
+      "reissued_other": "{{count}} reissued"
+    },
+    "donut": {
+      "title": "Expenses and net profit",
+      "sub": "This month · where gross profit went",
+      "link": "Profit and loss",
+      "net": "Net profit",
+      "other": "Other expenses",
+      "kept": "kept as profit",
+      "loss": "net loss",
+      "netLoss": "Net loss",
+      "gross": "Gross profit",
+      "slice": "{{name}}: {{amount}}, {{share}} of gross profit"
+    },
+    "owe": {
+      "title": "What customers owe us",
+      "link": "Customer balances",
+      "count_one": "{{count}} customer with a balance",
+      "count_other": "{{count}} customers with a balance",
+      "most": "Who owes the most",
+      "rest_one": "{{count}} other customer",
+      "rest_other": "{{count}} other customers"
+    },
+    "suppliers": {
+      "title": "We owe suppliers",
+      "link": "Supplier balances",
+      "overdue": "Overdue",
+      "due7": "Due in 7 days"
+    },
+    "stock": {
+      "title": "Stock",
+      "link": "Stock reports",
+      "value": "Value in the books",
+      "atMinimum": "At or below minimum",
+      "negative": "Negative stock",
+      "dead": "No sale in 90 days",
+      "items_one": "{{count}} item",
+      "items_other": "{{count}} items"
+    },
+    "items": {
+      "title": "Best-selling items",
+      "link": "Sales and profit"
+    },
+    "salesmen": {
+      "title": "Salesmen",
+      "link": "Sales and profit",
+      "row_one": "{{name}} · {{count}} bill",
+      "row_other": "{{name}} · {{count}} bills"
+    },
+    "footer": "Every card opens its report with the same filters. Only the owner sees the dashboard. Sales and profit follow the period; cash, bank, balances and stock show the position now."
   }
 }

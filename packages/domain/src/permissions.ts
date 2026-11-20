@@ -55,6 +55,8 @@ export const PERMISSIONS = [
   'cost.view',
   'reports.view',
   'reports.financial',
+  // The owner's dashboard (W2-06, D-118): only the owner's template holds it (through '*').
+  'dashboard.view',
   // Marks an exception reviewed or dismissed, with a note (owner answer 5 to W1-20): owner and manager.
   'exceptions.review',
   // Trace a bill (PLT-12, owner answer 1 to W1-20): the owner's only.

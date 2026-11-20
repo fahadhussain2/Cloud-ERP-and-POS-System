@@ -32,6 +32,8 @@
 | **Stock turnover** | Cost of sales ÷ the average stock value (opening and closing) over a period: how many times the stock was sold through |
 | **Gross profit** | Sales (what customers paid, after every discount) − their cost in the books (the average cost when sold); over a period it equals gross profit on the profit and loss (RPT-07) |
 | **Margin** | Gross profit ÷ sales, as a percentage |
+| **Key figure** | One of the five cards at the top of the owner's dashboard: net sales, gross profit, cash, bank and what customers owe, each with its change against the comparison (W2-06, D-118) |
+| **Needs attention** | The dashboard's list of what the owner should look at now, the most serious first: open high-severity exceptions, negative stock, a counter not seen for 10 minutes while its session is open, items at or below their minimum, customers over their limit, open cash sessions (W2-06) |
 | **Discount given** | List price × quantity − what the customer paid: a line's own discount and its share of the bill discount together; a price above the list is a negative discount (W2-03) |
 | **Net rate** | A purchase's or sale's value after the line and bill discounts, per unit; an average rate is the total value ÷ the total quantity (RPT-09) |
 | **Spread** | An item's average net sale rate − its average net purchase rate, and as a share of the sale rate (RPT-09) |
