@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Module** | devops |
-| **Status** | Plan: waiting for the owner |
+| **Status** | Plan accepted (2026-11-20), with deploys on the PC until the minutes reset |
 | **Refs** | W0-02 (CI), W0-04 (deploys), D-063, D-075, D-080, D-087 (no paid services); new **D-119** |
 | **Depends on** | Docker Desktop on the owner's PC (already used by `pnpm db:up`) |
 | **Size** | about half a day, plus the owner's two short steps |
