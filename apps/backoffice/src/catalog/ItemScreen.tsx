@@ -300,7 +300,7 @@ function DetailsPart({
 
   return (
     <Part title={t('catalog.item.details')} onSubmit={submit}>
-      <fieldset disabled={!can} className="m-0 grid gap-3.5 border-0 p-0 md:grid-cols-3">
+      <fieldset disabled={!can} className="m-0 grid grid-cols-1 gap-3.5 border-0 p-0 md:grid-cols-3">
         <TextField
           label={t('catalog.fields.name')}
           value={f.name}
@@ -698,7 +698,7 @@ function PricesPart({
   return (
     <Part title={t('catalog.item.prices')} onSubmit={submit}>
       {!can && <p className="m-0 text-sm text-muted-foreground">{t('catalog.item.pricesOwnerOnly')}</p>}
-      <fieldset disabled={!can} className="m-0 grid gap-3.5 border-0 p-0 md:grid-cols-4">
+      <fieldset disabled={!can} className="m-0 grid grid-cols-1 gap-3.5 border-0 p-0 md:grid-cols-4">
         {lookups.tiers.map((x) => (
           <TextField
             key={x.code}
@@ -726,7 +726,7 @@ function PricesPart({
         <p className="m-0 text-sm text-warn">{t('catalog.problems.floor_above_retail')}</p>
       )}
       {can && goesDown && (
-        <div className="grid gap-3.5 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
           <div className="flex flex-col gap-1.5">
             <label htmlFor={reasonId} className={LABEL_CLASS}>
               {t('catalog.item.reason')}
@@ -754,7 +754,7 @@ function PricesPart({
         </p>
       )}
       {detail.cost && (
-        <dl className="m-0 grid gap-1 text-sm md:grid-cols-4">
+        <dl className="m-0 grid grid-cols-1 gap-1 text-sm md:grid-cols-4">
           <div>
             <dt className={LABEL_CLASS}>{t('catalog.cost.average')}</dt>
             <dd className="m-0 tabular-nums">{show(detail.cost.avgCost)}</dd>

@@ -282,7 +282,7 @@ function MoneyDialog({
       busy={busy}
       onSubmit={() => void submit()}
     >
-      <div className="grid gap-3.5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         {kind === 'receipt' && (
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <span className={LABEL_CLASS}>{t('accounting.fields.customer')}</span>
@@ -445,7 +445,7 @@ export function DocumentScreen({ api, type, id }: { api: Api; type: string; id: 
           )
         }
       />
-      <Panel className="grid gap-2 p-3.5 sm:grid-cols-4">
+      <Panel className="grid grid-cols-1 gap-2 p-3.5 sm:grid-cols-4">
         <Fact label={t('accounting.fields.date')} value={doc.date} />
         <Fact label={t('accounting.fields.amount')} value={formatMoney(doc.amount, m)} />
         <Fact label={t('accounting.fields.reference')} value={doc.reference ?? '—'} />

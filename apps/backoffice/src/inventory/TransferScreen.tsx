@@ -353,7 +353,7 @@ function TransferForm({
         </Alert>
       )}
       <Panel>
-        <fieldset disabled={!canEdit} className="m-0 grid gap-3.5 border-0 p-3.5 md:grid-cols-4">
+        <fieldset disabled={!canEdit} className="m-0 grid grid-cols-1 gap-3.5 border-0 p-3.5 md:grid-cols-4">
           {(['from', 'to'] as const).map((side) => (
             <div key={side} className="flex flex-col gap-1.5">
               <label htmlFor={ids[side]} className={LABEL_CLASS}>

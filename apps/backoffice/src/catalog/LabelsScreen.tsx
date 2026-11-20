@@ -362,7 +362,7 @@ function TemplateDialog({
       busy={busy}
       onSubmit={() => void submit()}
     >
-      <div className="grid gap-3.5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
         <TextField
           label={t('labels.template.width')}
           inputMode="decimal"

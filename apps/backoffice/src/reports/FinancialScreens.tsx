@@ -75,7 +75,7 @@ export function ReportsHomeScreen({
         />
       </header>
       {reports.length === 0 && <p className="text-muted-foreground">{t('reports.home.none')}</p>}
-      <div className="grid gap-2.5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
         {REPORT_SECTIONS.map((section) => {
           const inSection = reports.filter((r) => r.section === section);
           if (inSection.length === 0) return null;

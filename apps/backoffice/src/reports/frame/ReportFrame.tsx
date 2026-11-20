@@ -202,7 +202,7 @@ export function ReportPage({
 function Field({ label, children }: { label: string; children: (id: string) => ReactNode }) {
   const id = useId();
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex max-w-full min-w-0 flex-col gap-1">
       <label htmlFor={id} className={LABEL_CLASS}>
         {label}
       </label>
@@ -211,7 +211,8 @@ function Field({ label, children }: { label: string; children: (id: string) => R
   );
 }
 
-const SELECT = 'h-9 rounded-md border border-input bg-surface-2 px-2 text-base';
+// A long choice (an account name) is cut to the screen's width on a phone rather than widening the page.
+const SELECT = 'h-9 max-w-full rounded-md border border-input bg-surface-2 px-2 text-base';
 
 /** A choice from a short list. */
 export function ChoiceFilter({

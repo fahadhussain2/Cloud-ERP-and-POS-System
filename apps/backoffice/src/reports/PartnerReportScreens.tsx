@@ -118,7 +118,7 @@ function StatementHeading({
 }) {
   const { t } = useTranslation();
   return (
-    <Panel className="grid gap-4 p-3.5 sm:grid-cols-2">
+    <Panel className="grid grid-cols-1 gap-4 p-3.5 sm:grid-cols-2">
       <div className="flex flex-col">
         <span className="font-semibold">{header.name}</span>
         {header.address && <span>{header.address}</span>}
