@@ -21,7 +21,7 @@ import { ReturnScreen, ReturnsScreen } from './purchasing/ReturnScreen';
 import { SupplierScreen, SuppliersScreen } from './purchasing/SuppliersScreen';
 import { CustomerScreen, CustomersScreen } from './customers/CustomersScreen';
 import { allowed, MENU, needsOf, Shell } from './layout/Shell';
-import { useRoute, type Route } from './router';
+import { navigate, useRoute, type Route } from './router';
 import { CountersScreen } from './screens/CountersScreen';
 import { ShopSettingsScreen } from './screens/ShopSettingsScreen';
 import { LoginScreen } from './screens/LoginScreen';
@@ -128,7 +128,13 @@ export function App({ api }: { api: Api }) {
   }, [api, seesReports, route]);
 
   if (me === undefined) return <p className="p-6 text-muted-foreground">{t('app.loading')}</p>;
-  if (me === null) return <LoginScreen api={api} onSignedIn={setMe} />;
+  // A sign-in opens the person's first screen (the owner's Dashboard, D-118), not the screen the address still names
+  // from before signing out; a reload while signed in keeps its place.
+  const signedIn = (m: Me) => {
+    navigate('');
+    setMe(m);
+  };
+  if (me === null) return <LoginScreen api={api} onSignedIn={signedIn} />;
   if (me.mustChangePassword) return <PasswordScreen api={api} onChanged={() => void loadMe()} />;
 
   const signOut = async () => {

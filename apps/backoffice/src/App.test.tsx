@@ -113,7 +113,8 @@ const goTo = (hash: string) =>
   });
 
 // Most tests start on Staff. The fixture's owner holds only admin rights, and user activity (admin.users, W2-04) puts
-// the Reports row first in the menu's order for them; a real owner holds every permission and opens on Customers.
+// the Reports row first in the menu's order for them; a real owner holds every permission and opens on the Dashboard
+// (W2-06). A sign-in opens the first screen, whatever the address named.
 beforeEach(() => {
   window.location.hash = '#/staff';
 });
@@ -149,7 +150,10 @@ describe('signing in', () => {
     type(en.password.new, 'a much longer one');
     type(en.password.repeat, 'a much longer one');
     fireEvent.click(screen.getByRole('button', { name: en.password.submit }));
-    expect(await screen.findByRole('heading', { name: en.staff.title })).toBeDefined();
+    // Then the first screen they may open (the address before sign-in is not kept).
+    expect(await screen.findByRole('navigation', { name: en.nav.menu })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: en.password.title })).toBeNull();
+    expect(window.location.hash).toBe('');
     expect(calls.find((c) => c.route === 'POST /api/auth/login')?.body).toEqual({
       tenantCode: 'delux',
       username: 'fahad',

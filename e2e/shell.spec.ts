@@ -3,10 +3,11 @@ import { account, signOut } from './backoffice';
 import { expect, test } from './counter-test';
 import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
 
-// W1-28 plan: the owner lands on the Dashboard (W2-06, D-118; Customers before it), folds the menu into a rail, opens Stock → Transfers from it, finds the
-// rail again after a reload, reaches Trace a bill by the search (Ctrl K), and signs out from the account menu. Back
-// office only, in a browser context of its own so the folded menu stays out of the other flows; after counter.spec,
-// which gives the owner their own password.
+// W1-28 plan: the owner lands on the Dashboard (W2-06, D-118; Customers before it), folds the menu into a rail, opens
+// Stock → Transfers from it, finds the rail again after a reload, reaches Trace a bill by the search (Ctrl K), and signs
+// out from the account menu; signing in again opens the Dashboard, not Trace still in the address. Back office only, in
+// a browser context of its own so the folded menu stays out of the other flows; after counter.spec, which gives the
+// owner their own password.
 
 const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
 
@@ -42,6 +43,14 @@ test('the owner folds the menu into a rail, opens a screen from it, and finds an
   await expect(page).toHaveURL(/#\/support\/trace$/);
   await expect(page.getByRole('heading', { name: bo.support.trace.title })).toBeVisible();
 
+  await signOut(page);
+  await expect(page).toHaveURL(/#\/support\/trace$/);
+  await page.getByLabel(bo.login.shopCode).fill(SHOP);
+  await page.getByLabel(bo.login.username).fill(OWNER.username);
+  await page.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
+  await page.getByRole('button', { name: bo.login.submit }).click();
+  await expect(nav.getByRole('link', { name: bo.nav.dashboard })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('heading', { name: bo.dashboard.title, level: 1 })).toBeVisible();
   await signOut(page);
   await office.close();
 });
