@@ -67,20 +67,6 @@ jobs:
     if: github.event.action != 'labeled' || github.event.label.name == 'deploy:staging'
     runs-on: ${{ fromJSON(vars.CHECKS_RUNS_ON || '["self-hosted","erp-pc"]') }}
     timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: erp
-          POSTGRES_PASSWORD: erp
-          POSTGRES_DB: erp_test
-        # Any free port: two jobs on one PC can't both take 5432.
-        ports: ['5432']
-        options: >-
-          --health-cmd "pg_isready -U erp -d erp_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,31 +77,18 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Throwaway database inside the CI runner, not a secret. On the PC the runner is itself a container, so the
-      # database's port is on the Docker host.
-      - name: Database address
-        run: echo "DATABASE_URL=postgres://erp:erp@${{ runner.environment == 'self-hosted' && 'host.docker.internal' || 'localhost' }}:${{ job.services.postgres.ports['5432'] }}/erp_test" >> "$GITHUB_ENV"
+      - name: Start the database
+        uses: ./.github/actions/postgres
       - run: pnpm test:integration
+      - name: Remove the database
+        if: always()
+        run: if [[ -n ${PG_CONTAINER:-} ]]; then docker rm -f "$PG_CONTAINER" >/dev/null; fi
 
   e2e:
     name: End-to-end flows (Chromium)
     if: github.event.action != 'labeled' || github.event.label.name == 'deploy:staging'
     runs-on: ${{ fromJSON(vars.CHECKS_RUNS_ON || '["self-hosted","erp-pc"]') }}
     timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: erp
-          POSTGRES_PASSWORD: erp
-          POSTGRES_DB: erp_test
-        # Any free port: two jobs on one PC can't both take 5432.
-        ports: ['5432']
-        options: >-
-          --health-cmd "pg_isready -U erp -d erp_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -126,12 +99,13 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Throwaway database inside the CI runner, not a secret. On the PC the runner is itself a container, so the
-      # database's port is on the Docker host.
-      - name: Database address
-        run: echo "DATABASE_URL=postgres://erp:erp@${{ runner.environment == 'self-hosted' && 'host.docker.internal' || 'localhost' }}:${{ job.services.postgres.ports['5432'] }}/erp_test" >> "$GITHUB_ENV"
+      - name: Start the database
+        uses: ./.github/actions/postgres
       - run: pnpm --filter @erp/e2e exec playwright install --with-deps chromium
       - run: pnpm e2e
+      - name: Remove the database
+        if: always()
+        run: if [[ -n ${PG_CONTAINER:-} ]]; then docker rm -f "$PG_CONTAINER" >/dev/null; fi
 
   deploy:
     name: Deploy

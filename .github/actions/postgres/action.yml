@@ -1,0 +1,25 @@
+# A throwaway PostgreSQL 17 for one job, on any free port; sets DATABASE_URL (D-119).
+# Not `services:`: the runner refuses service containers when it runs inside a container, as on the owner's PC.
+# Pair it with the "Remove the database" step (`docker rm -f "$PG_CONTAINER"`, if: always()).
+name: PostgreSQL for a job
+description: Starts PostgreSQL 17 in Docker and exports DATABASE_URL and PG_CONTAINER.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        # On the PC the runner is itself a container, so the database's port is on the Docker host.
+        PG_HOST: ${{ runner.environment == 'self-hosted' && 'host.docker.internal' || 'localhost' }}
+      run: |
+        name="ci-pg-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB"
+        # Throwaway database inside the CI runner, not a secret.
+        docker run -d --name "$name" -p 5432 \
+          -e POSTGRES_USER=erp -e POSTGRES_PASSWORD=erp -e POSTGRES_DB=erp_test postgres:17 >/dev/null
+        echo "PG_CONTAINER=$name" >> "$GITHUB_ENV"
+        for _ in $(seq 1 60); do
+          docker exec "$name" pg_isready -U erp -d erp_test -h 127.0.0.1 >/dev/null 2>&1 && break
+          sleep 1
+        done
+        docker exec "$name" pg_isready -U erp -d erp_test -h 127.0.0.1
+        port=$(docker port "$name" 5432/tcp | head -1 | sed 's/.*://')
+        echo "DATABASE_URL=postgres://erp:erp@$PG_HOST:$port/erp_test" >> "$GITHUB_ENV"

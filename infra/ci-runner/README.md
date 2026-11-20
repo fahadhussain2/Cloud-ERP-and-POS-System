@@ -23,10 +23,11 @@ sign in" setting). Each keeps its registration; no new token is needed.
 
 **How it works**
 
-- GitHub's runner image (`ghcr.io/actions/actions-runner`) plus `shellcheck` and `docker compose` (`Dockerfile`).
+- GitHub's runner image (`ghcr.io/actions/actions-runner`) plus `shellcheck`, `docker compose` and `libatomic1` for pnpm (`Dockerfile`).
   Dependabot bumps the image monthly; the runner also updates itself.
-- The runners share Docker Desktop's socket, so `services: postgres` and `docker run` start next to them. The database
-  is reached at `host.docker.internal` on a random port (`ci.yml`, "Database address").
+- The runners share Docker Desktop's socket, so `docker run` starts containers next to them. The runner refuses
+  `services:` inside a container, so each job starts its own PostgreSQL (`.github/actions/postgres`) on a random port,
+  reached at `host.docker.internal`.
 - Each runner's work folder (`/srv/ci-runner/<name>/_work`) has the same path inside the runner and on the Docker host,
   so `docker run -v "$PWD/…"` in a job finds its files.
 - The check jobs get no secrets. A deploy on the PC removes its key and images when it ends.
