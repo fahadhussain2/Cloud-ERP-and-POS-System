@@ -116,8 +116,11 @@ export interface GpDonut {
   slices: DonutSlice[];
 }
 
+/** By name, character by character (no locale: the same order everywhere). */
+const byName = (a: { name: string }, b: { name: string }) =>
+  Number(a.name > b.name) - Number(a.name < b.name);
 const byAmountThenName = <T extends { name: string; amount: number }>(a: T, b: T) =>
-  b.amount - a.amount || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  b.amount - a.amount || byName(a, b);
 
 /** Net profit, the two biggest expense categories by name, and the rest as other; never more than four slices. */
 export function gpDonut(i: {
@@ -207,7 +210,7 @@ export function attentionList(i: AttentionInput): AttentionItem[] {
     count > 0 ? [{ kind, tone, count, name: null, minutes: null }] : [];
   const counters = i.unseenCounters
     .slice()
-    .sort((a, b) => b.minutes - a.minutes || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+    .sort((a, b) => b.minutes - a.minutes || byName(a, b))
     .map((c): AttentionItem => ({
       kind: 'counterUnseen',
       tone: 'warn',
