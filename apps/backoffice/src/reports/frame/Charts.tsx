@@ -407,7 +407,7 @@ export function StatCard({
     >
       <span
         aria-hidden="true"
-        className={cn('absolute inset-y-0 start-0 w-[5px]', tone === 1 ? 'bg-chart-1' : 'bg-chart-2')}
+        className={cn('absolute inset-y-0 start-0 w-1', tone === 1 ? 'bg-chart-1' : 'bg-chart-2')}
       />
       <span className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-muted-foreground">{label}</span>

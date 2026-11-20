@@ -113,7 +113,8 @@ const goTo = (hash: string) =>
   });
 
 // Most tests start on Staff. The fixture's owner holds only admin rights, and user activity (admin.users, W2-04) puts
-// the Reports row first in the menu's order for them; a real owner holds every permission and opens on Customers.
+// the Reports row first in the menu's order for them; a real owner holds every permission and opens on the Dashboard
+// (W2-06). A sign-in opens the first screen, whatever the address named.
 beforeEach(() => {
   window.location.hash = '#/staff';
 });
@@ -149,12 +150,43 @@ describe('signing in', () => {
     type(en.password.new, 'a much longer one');
     type(en.password.repeat, 'a much longer one');
     fireEvent.click(screen.getByRole('button', { name: en.password.submit }));
-    expect(await screen.findByRole('heading', { name: en.staff.title })).toBeDefined();
+    // Then the first screen they may open (the address before sign-in is not kept).
+    expect(await screen.findByRole('navigation', { name: en.nav.menu })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: en.password.title })).toBeNull();
+    expect(window.location.hash).toBe('');
     expect(calls.find((c) => c.route === 'POST /api/auth/login')?.body).toEqual({
       tenantCode: 'delux',
       username: 'fahad',
       password: 'first password',
     });
+  });
+
+  it('opens the first screen after signing in, whatever the address still names: the Dashboard for the owner', async () => {
+    // Bug: signing out on Customers left #/sales/customers in the address, so the owner's next sign-in opened Customers
+    // instead of their Dashboard (W2-06; D-118).
+    window.location.hash = '#/sales/customers';
+    let me: unknown = null;
+    const owner = { ...OWNER, permissions: [...OWNER.permissions, 'cust.edit', 'dashboard.view'] };
+    const { api } = fakeApi({
+      ...signedIn(),
+      'GET /api/auth/me': () => (me ? { status: 200, body: me } : { status: 401, body: {} }),
+      'POST /api/auth/login': () => ((me = owner), { status: 200, body: me }),
+    });
+    show(api);
+    await screen.findByRole('heading', { name: en.login.title });
+    type(en.login.shopCode, 'delux');
+    type(en.login.username, 'fahad');
+    type(en.login.password, 'a password');
+    fireEvent.click(screen.getByRole('button', { name: en.login.submit }));
+    const menu = await screen.findByRole('navigation', { name: en.nav.menu });
+    await waitFor(() =>
+      expect(within(menu).getByRole('link', { name: en.nav.dashboard }).getAttribute('aria-current')).toBe(
+        'page',
+      ),
+    );
+    expect(
+      within(menu).getByRole('link', { name: en.nav.customers }).getAttribute('aria-current'),
+    ).toBeNull();
   });
 
   it('shows a failed sign-in without saying which part was wrong', async () => {
