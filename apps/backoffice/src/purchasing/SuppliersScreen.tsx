@@ -384,7 +384,7 @@ function SupplierDialog({
       busy={busy}
       onSubmit={() => void submit()}
     >
-      <div className="grid gap-3.5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         {!supplier && (
           <TextField
             label={t('purchasing.fields.code')}
@@ -654,7 +654,7 @@ function PayDialog({
       busy={busy}
       onSubmit={() => void submit()}
     >
-      <div className="grid gap-3.5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={bankId} className={LABEL_CLASS}>
             {t('purchasing.pay.bank')}

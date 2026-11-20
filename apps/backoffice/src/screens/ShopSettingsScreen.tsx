@@ -104,7 +104,7 @@ function ShopForm({ api, shop }: { api: Api; shop: ShopSettingsView }) {
           <AlertDescription>{message.text}</AlertDescription>
         </Alert>
       )}
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Panel className="flex flex-col gap-3 p-3.5">
           <p className="m-0 text-sm text-muted-foreground">{t('shop.branch', { name: shop.branchName })}</p>
           <TextField

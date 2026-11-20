@@ -138,7 +138,7 @@ export function RolePicker({
     <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
       <legend className={LABEL_CLASS}>{t('staff.roles')}</legend>
       <p className="m-0 text-xs text-muted-foreground">{t('staff.rolesHelp')}</p>
-      <div className="grid gap-1.5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
         {roles.map((r) => {
           const held = value.filter((a) => a.roleId === r.id);
           return (
@@ -247,7 +247,7 @@ export function AddPersonDialog({
         )
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <TextField
           label={t('staff.fullName')}
           value={fullName}

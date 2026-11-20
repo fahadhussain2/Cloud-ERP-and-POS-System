@@ -83,7 +83,7 @@ export function NewItemScreen({ api }: { api: Api }) {
       <PageHeader eyebrow={back} title={t('catalog.newItem.title')} help={t('catalog.newItem.help')} />
       <Panel>
         <form className="flex flex-col gap-3.5 p-3.5" onSubmit={(e) => void submit(e)}>
-          <div className="grid gap-3.5 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
             <TextField
               label={t('catalog.fields.code')}
               hint={t('catalog.newItem.codeHint')}
@@ -134,7 +134,7 @@ export function NewItemScreen({ api }: { api: Api }) {
             </div>
           </div>
           {can ? (
-            <div className="grid gap-3.5 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
               {lookups.tiers.map((x) => (
                 <TextField
                   key={x.code}

@@ -1,5 +1,5 @@
 import { cn, Panel, Tooltip, TooltipContent, TooltipTrigger } from '@erp/ui';
-import { useState, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 
 // The reports' first charts (W2-03 plan, owner answer 5): a trend over time, the busy hours of the week and a bar list,
 // drawn as SVG and HTML by us (no chart library). Colours are the theme's chart tokens (this period, the comparison),
@@ -246,7 +246,9 @@ export function HourGridChart({
   const span = Array.from({ length: hours.last - hours.first + 1 }, (_, i) => hours.first + i);
   const max = Math.max(1, ...values.flat());
   return (
-    <div className="overflow-x-auto">
+    // Scrolls inside its card. Relative, so the cells' screen-reader figures (absolutely placed) stay inside it too:
+    // otherwise they stretch the page past a phone's width and the phone zooms the whole page out.
+    <div className="relative overflow-x-auto">
       <table aria-label={label} className="border-separate border-spacing-0.5 text-xs">
         <thead>
           <tr>
@@ -403,7 +405,7 @@ export function StatCard({
   const card = (
     <a
       href={href}
-      className="relative flex min-w-0 flex-col gap-2.5 overflow-hidden rounded-xl border border-line bg-surface py-3.5 ps-[21px] pe-4 text-ink no-underline hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-focus"
+      className="@container relative flex min-w-0 flex-col gap-2.5 overflow-hidden rounded-xl border border-line bg-surface py-3.5 ps-[21px] pe-4 text-ink no-underline hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-focus"
     >
       <span
         aria-hidden="true"
@@ -415,7 +417,12 @@ export function StatCard({
           {icon}
         </span>
       </span>
-      <span className="font-display text-[32px] leading-none font-bold whitespace-nowrap tabular-nums">
+      {/* 32px when it fits; a long figure (Rs 14,428,000) shrinks to the card's width rather than being cut off. A
+          condensed figure is about half an em a character. */}
+      <span
+        className="font-display text-[min(32px,calc(100cqi/(var(--chars)*0.52)))] leading-none font-bold whitespace-nowrap tabular-nums"
+        style={{ '--chars': value.length } as CSSProperties}
+      >
         {value}
       </span>
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1">

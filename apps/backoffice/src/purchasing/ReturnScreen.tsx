@@ -284,7 +284,7 @@ function ReturnForm({
         </Alert>
       )}
       <Panel>
-        <fieldset disabled={!can} className="m-0 grid gap-3.5 border-0 p-3.5 md:grid-cols-4">
+        <fieldset disabled={!can} className="m-0 grid grid-cols-1 gap-3.5 border-0 p-3.5 md:grid-cols-4">
           <div className="flex flex-col gap-1.5 md:col-span-2">
             <label htmlFor={ids.supplier} className={LABEL_CLASS}>
               {t('purchasing.fields.supplier')}

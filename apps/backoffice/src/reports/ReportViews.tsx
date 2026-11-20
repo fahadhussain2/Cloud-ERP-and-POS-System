@@ -1225,7 +1225,7 @@ export function TraceScreen({ api, number }: { api: Api; number: string | null }
           <Panel title={t('support.trace.timeline')} className="pb-2">
             <ol className="m-0 flex list-none flex-col gap-2 px-3.5 py-1">
               {trace.steps.map((s, i) => (
-                <li key={i} className="grid gap-x-3 sm:grid-cols-[11rem_7rem_1fr]">
+                <li key={i} className="grid grid-cols-1 gap-x-3 sm:grid-cols-[11rem_7rem_1fr]">
                   <span className="text-sm text-muted-foreground tabular-nums">
                     {new Date(s.at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' })}
                   </span>

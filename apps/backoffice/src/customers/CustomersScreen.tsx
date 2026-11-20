@@ -529,7 +529,7 @@ export function CustomerDialog({
           </select>
         </div>
       ) : (
-        <div className="grid gap-3.5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           {!customer && (
             <TextField
               label={t('customers.fields.code')}
@@ -579,7 +579,7 @@ export function CustomerDialog({
           {t('customers.phoneUsed', { code: twin.code, name: twin.name })}
         </p>
       )}
-      <fieldset className="m-0 grid gap-3.5 border-0 p-0 sm:grid-cols-2" disabled={!canTerms}>
+      <fieldset className="m-0 grid grid-cols-1 gap-3.5 border-0 p-0 sm:grid-cols-2" disabled={!canTerms}>
         <legend className="mb-1 text-sm font-semibold">{t('customers.fields.credit')}</legend>
         {!canTerms && (
           <p className="m-0 text-sm text-muted-foreground sm:col-span-2">

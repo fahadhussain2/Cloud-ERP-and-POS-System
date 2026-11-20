@@ -472,13 +472,16 @@ export function DashboardScreen({ api }: { api: Api }) {
     <>
       {header}
       <div className="flex flex-col gap-4">
-        <section aria-label={t('dashboard.keyFigures')} className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <section
+          aria-label={t('dashboard.keyFigures')}
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5"
+        >
           {kpis.map(({ key, ...k }) => (
             <StatCard key={key} {...k} />
           ))}
         </section>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <ChartPanel
             title={trendLabel}
             legend={[
@@ -541,7 +544,7 @@ export function DashboardScreen({ api }: { api: Api }) {
           </Card>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card
             id="dash-busy"
             title={t('dashboard.busy.title')}
@@ -632,7 +635,7 @@ export function DashboardScreen({ api }: { api: Api }) {
           </Card>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {d.donut && <DonutCard d={d.donut} m={m} t={t} />}
           <Card
             id="dash-owe"
@@ -692,7 +695,7 @@ export function DashboardScreen({ api }: { api: Api }) {
           </Card>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card
             id="dash-stock"
             title={t('dashboard.stock.title')}

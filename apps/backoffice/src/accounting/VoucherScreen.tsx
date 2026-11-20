@@ -206,7 +206,7 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
           )
         }
       />
-      <Panel className="grid gap-3.5 p-3.5 sm:grid-cols-[12rem_1fr]">
+      <Panel className="grid grid-cols-1 gap-3.5 p-3.5 sm:grid-cols-[12rem_1fr]">
         <TextField
           label={t('accounting.fields.date')}
           type="date"

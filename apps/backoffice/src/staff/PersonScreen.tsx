@@ -81,7 +81,7 @@ export function PersonScreen({
         </Alert>
       )}
 
-      <div className="grid items-start gap-2.5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-2.5 lg:grid-cols-2">
         {canAdmin && (
           <DetailsPanel
             key={`${person.fullName}|${person.shortCode}|${person.email}`}

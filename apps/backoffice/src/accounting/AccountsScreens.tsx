@@ -195,7 +195,7 @@ function NewAccountDialog({
       busy={busy}
       onSubmit={() => void submit()}
     >
-      <div className="grid gap-3.5 sm:grid-cols-[8rem_1fr]">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-[8rem_1fr]">
         <TextField
           label={t('accounting.accounts.code')}
           value={code}
@@ -424,7 +424,7 @@ function CategoryDialog({
       busy={busy}
       onSubmit={() => void submit()}
     >
-      <div className="grid gap-3.5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <TextField
           label={t('accounting.accounts.code')}
           value={code}
