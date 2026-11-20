@@ -51,15 +51,8 @@ test('every screen fits a phone with no sideways scroll; the side menu stays put
   const page = await (
     await browser.newContext({ viewport: PHONE, isMobile: true, hasTouch: true })
   ).newPage();
-  await page.goto(BACKOFFICE);
-  await page.getByLabel(bo.login.shopCode).fill(SHOP);
-  await page.getByLabel(bo.login.username).fill(OWNER.username);
-  await page.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
-  await page.getByRole('button', { name: bo.login.submit }).click();
-  const nav = page.getByRole('navigation', { name: bo.nav.menu });
-  await expect(nav).toBeVisible();
-
-  // The dashboard as a busy shop sees it: Delux-sized figures (millions, a negative bank) and a long day of hours.
+  // The dashboard as a busy shop sees it: Delux-sized figures (millions, a negative bank) and a long day of hours;
+  // before signing in, which opens the dashboard.
   await page.route('**/api/dashboard?*', async (route) => {
     const view = (await (await route.fetch()).json()) as DashboardView;
     const big = (now: number) => ({ now, chip: { amount: now, bp: 10_000, direction: 'up', good: true } });
@@ -72,6 +65,14 @@ test('every screen fits a phone with no sideways scroll; the side menu stays put
     view.busyHours.bills = Array.from({ length: 7 }, () => Array.from({ length: 24 }, (_, h) => h));
     await route.fulfill({ json: view });
   });
+
+  await page.goto(BACKOFFICE);
+  await page.getByLabel(bo.login.shopCode).fill(SHOP);
+  await page.getByLabel(bo.login.username).fill(OWNER.username);
+  await page.getByLabel(bo.login.password).fill(OWNER_PASSWORD);
+  await page.getByRole('button', { name: bo.login.submit }).click();
+  const nav = page.getByRole('navigation', { name: bo.nav.menu });
+  await expect(nav).toBeVisible();
 
   const problems: Record<string, unknown> = {};
   for (const screen of SCREENS) {
