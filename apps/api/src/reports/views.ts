@@ -101,6 +101,7 @@ export async function overrideRows(c: pg.ClientBase, r: Range) {
     approved_by: string;
     reason_code: string;
     note: string | null;
+    approver_id: string;
     qty: string | null;
     list_price: string | null;
     unit_price: string | null;
@@ -109,7 +110,7 @@ export async function overrideRows(c: pg.ClientBase, r: Range) {
     `SELECT o.id, o.kind, coalesce(d.number, sv.sale_number) AS bill_number,
        coalesce(d.business_date, sv.business_date)::text AS business_date, o.at_device AS at,
        i.code AS item_code, i.name AS item_name, rq.full_name AS requested_by, ap.full_name AS approved_by,
-       o.reason_code, o.note, (l.qty * 1000)::bigint::text AS qty, l.list_price, l.unit_price,
+       o.reason_code, o.note, o.approved_by_user_id AS approver_id, (l.qty * 1000)::bigint::text AS qty, l.list_price, l.unit_price,
        l.floor_price_at_sale AS floor_price
      FROM erp.overrides o
      LEFT JOIN erp.sales_documents d ON d.id = o.document_id

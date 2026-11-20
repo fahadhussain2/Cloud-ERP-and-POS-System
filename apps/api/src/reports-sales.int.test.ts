@@ -4,7 +4,14 @@ import {
   signCanonical,
   TenantSpec,
   uuidv7,
+  type AgeingView,
+  type DashboardView,
+  type DeadStockView,
   type DocumentFamily,
+  type OverridesView,
+  type ProfitLossView,
+  type ReorderView,
+  type VoidsReturnsView,
   type PurchaseRegisterView,
   type PushDocument,
   type PushRequest,
@@ -889,6 +896,114 @@ describe('sales over time (RPT-15, owner answers 5 and 6)', () => {
   });
 });
 
+describe("the owner's dashboard (W2-06; RPT-18, D-118)", () => {
+  const dash = (period = 'today', who = 'fahad', shop?: string) =>
+    view<DashboardView>(`/api/dashboard?period=${period}`, who, shop);
+
+  it('every figure is its report’s: sales, profit, discounts, returns, voids, balances, stock, the donut', async () => {
+    const d = await dash();
+    const t = today();
+    const sales = await view<SalesProfitView>(`/api/reports/sales-profit?from=${t}&to=${t}&compare=none`);
+    expect(d.current).toEqual({ from: t, to: t });
+    expect(d.comparison).toEqual({ from: daysAgo(7), to: daysAgo(7) });
+    expect(d.netSales.now).toBe(sales.total.cells.sales);
+    expect(d.netSales.bills).toBe(sales.total.cells.bills);
+    expect(d.grossProfit.now).toBe(sales.total.cells.profit);
+    expect(d.grossProfit.marginBp).toBe(sales.total.cells.marginBp);
+    expect(d.trend.step).toBe('hour');
+    expect(d.trend.points.reduce((s, p) => s + (p.now ?? 0), 0)).toBe(d.netSales.now);
+    expect(d.topCategories.rows.reduce((s, r) => s + r.sales, 0) + d.topCategories.rest).toBe(d.netSales.now);
+
+    const vr = await view<VoidsReturnsView>(`/api/reports/voids-returns?from=${t}&to=${t}`);
+    expect(d.leak.voids.count).toBe(vr.voids.length);
+    expect(d.leak.voids.amount).toBe(vr.voids.reduce((s, v) => s + (v.saleTotal ?? 0), 0));
+    expect(d.leak.returns.count).toBe(vr.returns.length);
+    expect(d.leak.returns.amount).toBe(vr.returns.reduce((s, r) => s + r.amount, 0));
+    const ov = await view<OverridesView>(`/api/reports/overrides?from=${t}&to=${t}`);
+    expect(d.leak.belowList.count).toBe(
+      ov.overrides.filter((o) => ['below_list', 'below_floor'].includes(o.kind)).length,
+    );
+    expect(d.leak.belowList.count).toBeGreaterThan(0);
+    expect(d.leak.discounts.amount).toBe(sales.total.cells.discount);
+
+    const ar = await view<AgeingView>('/api/reports/ageing?side=customers');
+    expect(d.customersOwe.now).toBe(ar.totals.balance);
+    expect(d.owe.total).toBe(ar.totals.balance);
+    expect(d.owe.top.map((x) => x.name)).toEqual(
+      ar.rows
+        .filter((r) => r.balance > 0)
+        .sort((a, b) => b.balance - a.balance || (a.name < b.name ? -1 : 1))
+        .slice(0, 5)
+        .map((r) => r.name),
+    );
+    const ap = await view<AgeingView>('/api/reports/ageing?side=suppliers');
+    expect(d.suppliers.total).toBe(ap.totals.balance);
+    expect(d.suppliers.overdue).toBe(ap.totals.balance - ap.totals.notDue);
+
+    const reorder = await view<ReorderView>('/api/reports/reorder');
+    expect(d.stock.atMinimum).toBe(reorder.total.count);
+    const dead = await view<DeadStockView>('/api/reports/dead-stock?days=90');
+    expect(d.stock.dead.count).toBe(dead.totals.dead.count + dead.totals.notSoldSinceGoLive.count);
+
+    const pl = await view<ProfitLossView>('/api/reports/profit-loss?preset=thisMonth&compare=none');
+    expect(d.donut!.grossProfit).toBe(pl.grossProfit[0]);
+    expect(d.donut!.net).toBe(pl.netProfit[0]);
+    expect(d.donut!.slices.reduce((s, x) => s + x.amount, 0)).toBe(d.donut!.base);
+
+    const busy = await view<SalesOverTimeView>(
+      `/api/reports/sales-over-time?from=${daysAgo(27)}&to=${t}&compare=none`,
+    );
+    expect(d.busyHours.bills).toEqual(busy.grid.bills);
+  });
+
+  it('cash and bank are the books’ balances; the chip compares with the start of the business day', async () => {
+    const d = await dash();
+    const [cash] = await q<{ now: string; start: string }>(
+      `SELECT coalesce(sum(l.debit - l.credit) FILTER (WHERE e.entry_date <= $1), 0)::text AS now,
+         coalesce(sum(l.debit - l.credit) FILTER (WHERE e.entry_date < $1), 0)::text AS start
+       FROM erp.journal_lines l JOIN erp.journal_entries e ON e.id = l.entry_id
+       JOIN erp.accounts a ON a.id = l.account_id
+       WHERE a.system_role IN ('CASH_DRAWER', 'CASH_SAFE', 'CASH_IN_TRANSIT')`,
+      [today()],
+    );
+    expect(d.cash.now).toBe(Number(cash!.now));
+    expect(d.cash.atDayStart).toBe(Number(cash!.start));
+    expect(d.cash.drawers + d.cash.safe + d.cash.inTransit).toBe(d.cash.now);
+    expect(d.cash.chip.amount).toBe(d.cash.now - d.cash.atDayStart);
+    expect(d.bank.accounts.reduce((s, a) => s + a.balance, 0)).toBe(d.bank.now);
+  });
+
+  it('7 and 30 days against the days before; figures before go-live are flagged', async () => {
+    const d = await dash('30d');
+    const now = await view<SalesProfitView>(
+      `/api/reports/sales-profit?from=${daysAgo(29)}&to=${today()}&compare=none`,
+    );
+    const before = await view<SalesProfitView>(
+      `/api/reports/sales-profit?from=${daysAgo(59)}&to=${daysAgo(30)}&compare=none`,
+    );
+    expect(d.trend.step).toBe('day');
+    expect(d.trend.points).toHaveLength(30);
+    expect(d.netSales.now).toBe(now.total.cells.sales);
+    expect(d.netSales.before).toBe(before.total.cells.sales);
+    expect(d.netSales.chip.amount).toBe(now.total.cells.sales - before.total.cells.sales);
+    expect(d.beforeGoLive).toBe(true);
+    const w = await dash('7d');
+    expect(w.current).toEqual({ from: daysAgo(6), to: today() });
+    expect(w.comparison).toEqual({ from: daysAgo(13), to: daysAgo(7) });
+  });
+
+  it('only the owner may read it; another shop sees only its own; an unknown period is refused', async () => {
+    expect((await send('GET', '/api/dashboard', 'tariq')).statusCode).toBe(403);
+    expect((await send('GET', '/api/dashboard', 'noor')).statusCode).toBe(403);
+    expect((await send('GET', '/api/dashboard', 'kashif')).statusCode).toBe(403);
+    expect((await send('GET', '/api/dashboard?period=year', 'fahad')).statusCode).toBe(400);
+    const other = await dash('30d', 'fahad', OTHER);
+    expect(other.netSales.now).toBe(0);
+    expect(other.owe.total).toBe(0);
+    expect(other.leak.voids.count).toBe(0);
+  });
+});
+
 describe('a year of sales', () => {
   it('answers each report for 19,500 items and 300 lines a day in under 2 s', async () => {
     // A year of a busy counter, straight into the other shop's bills and stock ledger: 60 bills a day of 5 lines.
@@ -977,6 +1092,10 @@ describe('a year of sales', () => {
     const byItem = await timed<SalesProfitView>(`/api/reports/sales-profit?${year}&group=item`);
     const overTime = await timed<SalesOverTimeView>(`/api/reports/sales-over-time?${year}`);
     const rates = await timed<RatesView>(`/api/reports/rates?itemId=${byItem.body.rows[0]!.key}&${year}`);
+    // The owner's dashboard reads much of the same data at once (W2-06 plan): under 1.5 s.
+    const dashboard = await timed<DashboardView>('/api/dashboard?period=30d');
+    expect(dashboard.body.netSales.now).toBeGreaterThan(0);
+    expect(dashboard.ms < 1500, `the dashboard took ${Math.round(dashboard.ms)} ms`).toBe(true);
     expect(byCategory.body.total.cells).toMatchObject({
       bills: 365 * 60,
       qty: lines * 1000,

@@ -382,6 +382,73 @@ export async function overTime(c: Client, p: Period, q: Query): Promise<OverTime
   };
 }
 
+/** Every sum the owner's dashboard reads for a period, in one pass over the same lines (W2-06; D-118). */
+export interface SalesSets {
+  total: Sums;
+  /** Keyed as KEYS: '' for no category. */
+  categories: Sums[];
+  /** With each salesman's bills. */
+  salesmen: Sums[];
+  items: Sums[];
+  days: Sums[];
+  /** Each bill once: its business date, its hour on the counter's clock, what was paid and the same at list. */
+  bills: { date: string; hour: number; sales: number; listSales: number }[];
+}
+
+/** The period's lines (up to a minute of the business day, if given) by every dashboard grouping at once. */
+export async function salesSets(c: Client, p: Period, upToMinute: number | null = null): Promise<SalesSets> {
+  const params: unknown[] = [p.from, p.to];
+  const where = untilMinute('', params, upToMinute);
+  const { rows } = await c.query<{
+    kind: 'category' | 'salesman' | 'item' | 'day' | 'bill' | 'total';
+    key: string | null;
+    day: string | null;
+    hour: number | null;
+    bills: number;
+    qty: string;
+    sales: string;
+    cost: string;
+    list_sales: string;
+  }>(
+    `WITH ${LINES}
+     SELECT CASE WHEN grouping(doc_id) = 0 THEN 'bill' WHEN grouping(${KEYS.category}) = 0 THEN 'category'
+              WHEN grouping(salesman_id) = 0 THEN 'salesman' WHEN grouping(item_id) = 0 THEN 'item'
+              WHEN grouping(business_date) = 0 THEN 'day' ELSE 'total' END AS kind,
+       coalesce(${KEYS.category}, salesman_id::text, item_id::text, doc_id::text) AS key,
+       business_date::text AS day,
+       extract(hour FROM created_at_device AT TIME ZONE (SELECT timezone FROM erp.tenants))::int AS hour,
+       count(DISTINCT doc_id)::int AS bills,
+       sum(qty)::text AS qty, sum(sales)::text AS sales, sum(cost)::text AS cost, sum(list_sales)::text AS list_sales
+     FROM ln ${where}
+     GROUP BY GROUPING SETS ((${KEYS.category}), (salesman_id), (item_id), (business_date),
+       (doc_id, business_date, created_at_device), ())`,
+    params,
+  );
+  const sums = (key: string, r: (typeof rows)[number]): Sums => ({
+    key,
+    bills: r.bills,
+    qty: Number(r.qty ?? 0),
+    sales: Number(r.sales ?? 0),
+    cost: Number(r.cost ?? 0),
+    listSales: Number(r.list_sales ?? 0),
+  });
+  const of = (kind: (typeof rows)[number]['kind']) => rows.filter((r) => r.kind === kind);
+  const total = of('total')[0];
+  return {
+    total: total ? sums('', total) : NONE,
+    categories: of('category').map((r) => sums(r.key ?? '', r)),
+    salesmen: of('salesman').map((r) => sums(r.key ?? '', r)),
+    items: of('item').map((r) => sums(r.key ?? '', r)),
+    days: of('day').map((r) => sums(r.day!, r)),
+    bills: of('bill').map((r) => ({
+      date: r.day!,
+      hour: r.hour!,
+      sales: Number(r.sales),
+      listSales: Number(r.list_sales),
+    })),
+  };
+}
+
 /** Groups by time or bill read in date order; the others largest sales first, then by name. */
 const CHRONOLOGICAL: SalesGroup[] = ['bill', 'day', 'month'];
 
