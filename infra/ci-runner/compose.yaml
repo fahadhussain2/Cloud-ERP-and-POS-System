@@ -1,0 +1,32 @@
+# Three CI runners on the owner's PC (D-119): a run's three check jobs side by side. Started by start.ps1.
+name: erp-ci-runner
+
+x-runner: &runner
+  build: .
+  image: erp-ci-runner:local
+  restart: unless-stopped
+  # The Docker socket belongs to root's group: the runner user joins it to start service containers.
+  group_add: ['0']
+  environment: &env
+    REPO_URL: https://github.com/fahadhussain2/Cloud-ERP-and-POS-System
+    RUNNER_TOKEN: ${RUNNER_TOKEN:-}
+
+services:
+  erp-pc-1:
+    <<: *runner
+    environment: { <<: *env, RUNNER_NAME: erp-pc-1 }
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /srv/ci-runner/erp-pc-1:/srv/ci-runner/erp-pc-1
+  erp-pc-2:
+    <<: *runner
+    environment: { <<: *env, RUNNER_NAME: erp-pc-2 }
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /srv/ci-runner/erp-pc-2:/srv/ci-runner/erp-pc-2
+  erp-pc-3:
+    <<: *runner
+    environment: { <<: *env, RUNNER_NAME: erp-pc-3 }
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /srv/ci-runner/erp-pc-3:/srv/ci-runner/erp-pc-3
