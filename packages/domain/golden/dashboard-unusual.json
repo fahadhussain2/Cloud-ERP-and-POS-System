@@ -1,0 +1,13 @@
+{
+  "description": "When a discount, return or void figure is unusual (W2-06 owner answer 3): at least 1.5 times the comparison's count and at least 3. The result is how many times, in tenths (25 = 2.5×), rounded half away from zero; null when it is not unusual or there is nothing to compare with.",
+  "cases": [
+    { "name": "5 against 2", "input": { "count": 5, "usual": 2 }, "expected": 25 },
+    { "name": "2 against 1: fewer than 3", "input": { "count": 2, "usual": 1 }, "expected": null },
+    { "name": "3 against 2: exactly 1.5 times", "input": { "count": 3, "usual": 2 }, "expected": 15 },
+    { "name": "4 against 3: under 1.5 times", "input": { "count": 4, "usual": 3 }, "expected": null },
+    { "name": "21 against 13", "input": { "count": 21, "usual": 13 }, "expected": 16 },
+    { "name": "7 against 3 rounds", "input": { "count": 7, "usual": 3 }, "expected": 23 },
+    { "name": "against zero: nothing to compare", "input": { "count": 5, "usual": 0 }, "expected": null },
+    { "name": "nothing now", "input": { "count": 0, "usual": 4 }, "expected": null }
+  ]
+}

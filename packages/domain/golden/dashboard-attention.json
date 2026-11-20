@@ -1,0 +1,71 @@
+{
+  "description": "What needs the owner's attention (W2-06 owner answer 5; D-118): up to six lines, the most serious first (high-severity exceptions, negative stock; then unseen counters, longest first, items at or below minimum, customers over their limit; then open cash sessions). Nothing to report leaves a line out.",
+  "cases": [
+    {
+      "name": "one of everything",
+      "input": {
+        "highExceptions": 3,
+        "negativeStock": 2,
+        "unseenCounters": [{ "name": "Counter 2", "minutes": 18 }],
+        "atMinimum": 7,
+        "overLimit": 4,
+        "openSessions": 1
+      },
+      "expected": [
+        { "kind": "exceptions", "tone": "bad", "count": 3, "name": null, "minutes": null },
+        { "kind": "negativeStock", "tone": "bad", "count": 2, "name": null, "minutes": null },
+        { "kind": "counterUnseen", "tone": "warn", "count": 1, "name": "Counter 2", "minutes": 18 },
+        { "kind": "atMinimum", "tone": "warn", "count": 7, "name": null, "minutes": null },
+        { "kind": "overLimit", "tone": "warn", "count": 4, "name": null, "minutes": null },
+        { "kind": "openSessions", "tone": "info", "count": 1, "name": null, "minutes": null }
+      ]
+    },
+    {
+      "name": "all quiet",
+      "input": {
+        "highExceptions": 0,
+        "negativeStock": 0,
+        "unseenCounters": [],
+        "atMinimum": 0,
+        "overLimit": 0,
+        "openSessions": 0
+      },
+      "expected": []
+    },
+    {
+      "name": "three counters unseen: longest first, and six lines at most",
+      "input": {
+        "highExceptions": 1,
+        "negativeStock": 0,
+        "unseenCounters": [
+          { "name": "Counter 1", "minutes": 12 },
+          { "name": "Counter 3", "minutes": 40 },
+          { "name": "Counter 2", "minutes": 25 }
+        ],
+        "atMinimum": 3,
+        "overLimit": 2,
+        "openSessions": 2
+      },
+      "expected": [
+        { "kind": "exceptions", "tone": "bad", "count": 1, "name": null, "minutes": null },
+        { "kind": "counterUnseen", "tone": "warn", "count": 1, "name": "Counter 3", "minutes": 40 },
+        { "kind": "counterUnseen", "tone": "warn", "count": 1, "name": "Counter 2", "minutes": 25 },
+        { "kind": "counterUnseen", "tone": "warn", "count": 1, "name": "Counter 1", "minutes": 12 },
+        { "kind": "atMinimum", "tone": "warn", "count": 3, "name": null, "minutes": null },
+        { "kind": "overLimit", "tone": "warn", "count": 2, "name": null, "minutes": null }
+      ]
+    },
+    {
+      "name": "only an open session",
+      "input": {
+        "highExceptions": 0,
+        "negativeStock": 0,
+        "unseenCounters": [],
+        "atMinimum": 0,
+        "overLimit": 0,
+        "openSessions": 2
+      },
+      "expected": [{ "kind": "openSessions", "tone": "info", "count": 2, "name": null, "minutes": null }]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "description": "A key figure's change chip (W2-06; D-118): the change against the comparison (amount and basis points of the earlier figure's size, null when it was 0), its direction, and whether that is good: up is good for sales, profit and cash, bad for what customers owe.",
+  "cases": [
+    {
+      "name": "sales up",
+      "input": { "now": 426000000, "before": 379000000, "goodWhenUp": true },
+      "expected": { "amount": 47000000, "bp": 1240, "direction": "up", "good": true }
+    },
+    {
+      "name": "profit down",
+      "input": { "now": 90000000, "before": 100000000, "goodWhenUp": true },
+      "expected": { "amount": -10000000, "bp": -1000, "direction": "down", "good": false }
+    },
+    {
+      "name": "what customers owe rises: bad",
+      "input": { "now": 186430000, "before": 179100000, "goodWhenUp": false },
+      "expected": { "amount": 7330000, "bp": 409, "direction": "up", "good": false }
+    },
+    {
+      "name": "what customers owe falls: good",
+      "input": { "now": 150000000, "before": 160000000, "goodWhenUp": false },
+      "expected": { "amount": -10000000, "bp": -625, "direction": "down", "good": true }
+    },
+    {
+      "name": "unchanged",
+      "input": { "now": 5000000, "before": 5000000, "goodWhenUp": true },
+      "expected": { "amount": 0, "bp": 0, "direction": "flat", "good": null }
+    },
+    {
+      "name": "nothing before",
+      "input": { "now": 5000000, "before": 0, "goodWhenUp": true },
+      "expected": { "amount": 5000000, "bp": null, "direction": "up", "good": true }
+    },
+    {
+      "name": "half a basis point rounds away from zero",
+      "input": { "now": 20001, "before": 20000, "goodWhenUp": true },
+      "expected": { "amount": 1, "bp": 1, "direction": "up", "good": true }
+    }
+  ]
+}
