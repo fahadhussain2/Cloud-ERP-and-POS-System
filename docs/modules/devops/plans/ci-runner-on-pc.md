@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Module** | devops |
-| **Status** | Plan accepted (2026-11-20), with deploys on the PC until the minutes reset |
+| **Status** | **Dropped** (2026-11-21). Built and tried in PRs #203 (merged, then reverted) and #204 (closed); the owner's PC was too slow and its connection too slow for the checks (Results). The owner made the repository **public** instead, so GitHub's machines run CI free and without a monthly limit (D-119). |
 | **Refs** | W0-02 (CI), W0-04 (deploys), D-063, D-075, D-080, D-087 (no paid services); new **D-119** |
 | **Depends on** | Docker Desktop on the owner's PC (already used by `pnpm db:up`) |
 | **Size** | about half a day, plus the owner's two short steps |
@@ -42,11 +42,11 @@ A run takes 14–18 minutes across its three jobs; almost all of it is the tests
 
 | Choice | Why |
 |---|---|
-| **GitHub's own runner image** (`ghcr.io/actions/actions-runner`, pinned), in **Docker Desktop**, with a small `infra/ci-runner/Dockerfile` that adds what the jobs use and the image lacks: `shellcheck` and the Docker Compose plugin (it already has `python3`, `ssh`, `jq` and `sudo`). Chromium's system libraries are installed by the job's `playwright install --with-deps` as today; the runners are kept between jobs, so only the first run pays for it. | Service containers (`services: postgres`) need a Linux runner with Docker (GitHub docs). Docker Desktop already runs Linux containers here; nothing new to install on Windows. |
-| **Three runner containers** (`erp-pc-1` to `3`), so a run's three jobs still run side by side, as they do today. | A run then takes about as long as now (about 6–10 minutes). Docker has 8 of the PC's 16 GB and 8 CPU threads. If the rehearsal shows the PC struggling, two runners: a run then takes longer, nothing else changes. |
-| **The Docker socket is shared with the runners** (Docker-outside-of-Docker): service containers and the `docker run` checks start next to the runners, not inside them. | The standard way to run the runner image with services. |
+| **GitHub's own runner image** (`ghcr.io/actions/actions-runner`, pinned), in **Docker Desktop**, with a small `infra/ci-runner/Dockerfile` that adds what the jobs use and the image lacks: `shellcheck`, the Docker Compose plugin and `libatomic1` (pnpm's binary needs it; it already has `python3`, `ssh`, `jq` and `sudo`). Chromium's system libraries are installed by the job's `playwright install --with-deps` as today; the runners are kept between jobs, so only the first run pays for it. | Jobs that start containers need a Linux runner with Docker. Docker Desktop already runs Linux containers here; nothing new to install on Windows. |
+| **One runner container** (`erp-pc-1`): a run's three jobs take turns, about 15 minutes a run. | First tried three side by side: on PR #204 Docker (8 of the PC's 16 GB) killed `pnpm check` for lack of memory (exit 137), and two timed integration tests missed their 2 s limits (3.2 s, 2.006 s) while competing for the CPU. |
+| **The Docker socket is shared with the runners** (Docker-outside-of-Docker): the database and the `docker run` checks start next to the runners, not inside them. | The standard way to run the runner image with Docker. |
 | **The work folder has the same path inside and outside** (`/srv/ci-runner/<runner>/_work`, a bind at an identical path). | "Check edge and app config" runs `docker run -v "$PWD/…"`; with a shared socket, Docker reads that path on the Docker host, so it must be the same path there. |
-| **PostgreSQL on a random host port** (`ports: ['5432']`) and `DATABASE_URL` built from `job.services.postgres.ports['5432']`; the host is `host.docker.internal` on the PC and `localhost` on GitHub (`runner.environment`). | Two jobs on one PC can't both take port 5432. The same workflow still works on GitHub's machines (the fallback below). |
+| **Each job starts its own PostgreSQL** (`.github/actions/postgres`, `docker run -p 5432`, removed when the job ends) on a random host port and exports `DATABASE_URL`. Not `services:`: the runner refuses service containers when it runs inside a container (found on this PR's first run); the host is `host.docker.internal` on the PC and `localhost` on GitHub (`runner.environment`). | Two jobs on one PC can't both take port 5432. The same workflow still works on GitHub's machines (the fallback below). |
 | **The runners restart with Docker** (`restart: unless-stopped`) and keep their registration in a volume. Auto-update stays on (GitHub refuses runners more than 63 days behind). | After a reboot or sleep the runners come back on their own. |
 | **Labels** `self-hosted`, `linux`, `erp-pc`. | |
 
@@ -80,7 +80,7 @@ A run takes 14–18 minutes across its three jobs; almost all of it is the tests
 ## Order
 
 1. **First, prove that GitHub starts jobs on a self-hosted runner while the minutes are used up.** GitHub's docs don't say. One runner by hand from the image and a throwaway workflow on a throwaway branch with a single `echo` job (`runs-on: [self-hosted, erp-pc]`). **If GitHub refuses it, stop here** and come back to you: the choices are then making the repository public or waiting for the reset. The throwaway runner is removed and the branch deleted either way.
-2. The image and the three runners; `start.ps1`, `stop.ps1`, `remove.ps1`.
+2. The image and the runner; `start.ps1`, `stop.ps1`, `remove.ps1`.
 3. `ci.yml` and `deploy.yml`. The plan PR's own CI run is the rehearsal (below).
 4. Docs and D-119. PR to `staging`.
 
@@ -101,14 +101,21 @@ A run takes 14–18 minutes across its three jobs; almost all of it is the tests
 |---|---|
 | **GitHub blocks self-hosted jobs too** while the minutes are used up | Step 1 tests it before anything else is built. |
 | **The PC is off, asleep or without Docker** | Jobs wait in the queue for up to 24 hours (GitHub docs), then fail; they start as soon as the runners are back. For a longer absence, `CHECKS_RUNS_ON = "ubuntu-latest"` (uses minutes again). |
-| **The PC is busy during a run** (about 5–10 minutes of heavy CPU per run) | Three runners at most; two if it's too much. |
+| **The PC is busy during a run** (about 5–10 minutes of heavy CPU per run) | One runner: one job at a time. |
 | **Code from a pull request runs on the PC**, and with the Docker socket it can reach what Docker Desktop can, including the PC's drives | The repository is private; pull requests come only from you, me and Dependabot (whose updates `pnpm install` also runs locally). The check jobs get no secrets. Deploy secrets reach the PC only if you choose so above. |
 | **Daily backup check and drill reminder** stay blocked until the reset (about 1 Dec) | They need GitHub's minutes (about 25 a month, fine after the reset). Grafana's three backup alerts (WAL not archived, no base backup in 26 hours, status not updated) still run in the meantime. |
 | The runner image falls behind | Auto-update stays on; Dependabot bumps the pinned image. |
 
 ## Results
 
+**Why it was dropped:** each failure was fixed in turn (service containers inside a container, `libatomic1`, memory with three runners, pnpm downloads), but the last run on one runner still had two timing-sensitive tests over their limits on the laptop's CPU, and the browser's system packages failed to download over the shop's connection (about 330–415 KB/s). Loosening tests to fit one machine was not worth it.
+
 | Check | Result |
 |---|---|
+| Secret scan before and after going public, 21 Nov | No dump, legacy-report or real `.env` file was ever committed (the `infra/*.env` files hold sizing only). gitleaks v8.24.3 over all 478 commits: 1 finding, a made-up password in `tools/legacy-import/src/stage.int.test.ts` (the test proves the importer never stages passwords). ID-card and mobile-number patterns in the history: test values only (`0300-1234567`, `42101-1234567-1`, …). |
+| PR #204, third run, one runner, pnpm in the image ([run 44830594188](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/actions/runs/44830594188)) | pnpm and the install worked. Red: an integration test's setup over its 10 s limit (`posting.int.test.ts`), a back-office test waiting 1.3 s for a 1 s limit (`App.test.tsx`, Counters), and `playwright install --with-deps` failing in apt (exit 100). |
 | Step 1, 20 Nov | GitHub ran a job on a temporary PC runner while its own machines were blocked ([run 44790254933](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/actions/runs/44790254933)). The runner unregistered itself; the throwaway branch was deleted. |
+| First CI run on the PC, 20 Nov ([run 44796009347](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/actions/runs/44796009347)) | Red before any check ran: *"Container feature is not supported when runner is already running inside container"* (integration, e2e) and pnpm missing `libatomic.so.1` (check). Fixed: a database step instead of `services:`, and `libatomic1` in the image. |
+| PR #204, second run, one runner | All three jobs red in pnpm's setup: the 47 MB pnpm download over the shop's connection (about 330–415 KB/s, measured in Docker and on Windows) failed partway. Changed: pnpm comes with the image (at `package.json`'s version) and its store stays in the runner; on the PC the jobs skip `pnpm/action-setup` and GitHub's dependency cache. |
+| PR #204, first run, three runners | End-to-end green on `erp-pc-3`. `pnpm check` killed for memory (exit 137) on `erp-pc-1`; two timed integration tests over 2 s on `erp-pc-2`. Changed to one runner. |
 | Probe, 20 Nov | From inside the runner image: Docker works once the runner joins group 0 (the socket's group); a nested `docker run -v` reads a file at an identical path; Postgres on a random port answers at `host.docker.internal`. |

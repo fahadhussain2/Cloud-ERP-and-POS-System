@@ -1126,16 +1126,16 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Trade-off:** one more endpoint that reads much of the shop's data on every load (timed in the plan). Other roles get nothing new until custom roles exist.
 - **Status:** Accepted (owner, 2026-11-20): the design on the prototype, and the [W2-06 plan](modules/reports/plans/W2-06-owner-dashboard.md) with its questions 1–6 as recommended (cash = drawers, safe and cash in transit; bank = bank and wallet accounts; Today compared with the same weekday last week to the same time; *unusual* at 1.5 times and at least 3; the donut names the two biggest expenses and shows a loss in red; a counter needs attention after 10 minutes unseen with its session open; figures re-read every 5 minutes while visible). Issue [#198](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/198). Amends D-114 (the first screen after sign-in, for the owner).
 
-### D-119 CI checks run on runners on the owner's PC (2026-11-20)
-- **Context:** on 20 Nov 2026 GitHub stopped starting jobs: the free plan's 2,000 Actions minutes a month for private repositories were used up (1–20 Nov: about 1,845 minutes counted, 1,780 of them CI). A CI run takes 14–18 runner-minutes, not the 4 W0-02 planned. Reusing a pull request's checks after its merge would save only about 350 a month. Paid minutes are out (D-087).
-- **Decision:**
-  - The three check jobs run on **three self-hosted runners in Docker Desktop on the owner's PC** (`infra/ci-runner`), GitHub's own runner image plus `shellcheck` and `docker compose`. Self-hosted runners are free and don't use the included minutes; a test on 20 Nov showed GitHub starts them while its own machines are blocked.
-  - **Repository variables choose the machine** without editing workflows: `CHECKS_RUNS_ON` (default the PC) and `DEPLOY_RUNS_ON` (default GitHub). Deploys run on the PC only while GitHub's minutes are used up (now until the reset, about 1 Dec).
-  - Scheduled jobs (backup check, restore-drill reminder) stay on GitHub's machines.
-- **Alternatives:** making the repository public (free, unlimited minutes, but code and history become public); trimming CI only (still over 2,000 at this pace); waiting for each month's reset.
-- **Why:** free and unlimited, with the same checks as before, and a switch back to GitHub's machines when needed.
-- **Trade-off:** checks run only while the PC is on and Docker Desktop runs (jobs wait up to 24 hours); a run keeps the PC busy for 5–10 minutes; pull-request code runs on the PC with access to Docker (private repository; pull requests only from the owner, Claude and Dependabot).
-- **Status:** Accepted (owner, 2026-11-20), with deploys on the PC until the minutes reset. [Plan](modules/devops/plans/ci-runner-on-pc.md). Amends D-063 (where CI runs) and W0-02.
+### D-119 The repository is public, so CI runs free on GitHub's machines (2026-11-21)
+- **Context:** on 20 Nov 2026 GitHub stopped starting jobs: the free plan's 2,000 Actions minutes a month for private repositories were used up (1–20 Nov: about 1,845 minutes counted, 1,780 of them CI; about 2,770 a month at that pace). A CI run takes 14–18 runner-minutes, not the 4 W0-02 planned. Paid minutes are out (D-087).
+- **Decision:** the owner made the repository **public** (2026-11-21). Standard GitHub-hosted runners are free and unlimited for public repositories; CI and deploys are unchanged.
+- **Alternatives:**
+  - **Runners on the owner's PC** ([plan](modules/devops/plans/ci-runner-on-pc.md)): built and tried in PRs #203 and #204, then dropped and reverted. GitHub ran jobs there while its own machines were blocked, but the laptop's CPU pushed timing-sensitive tests past their limits, and its connection (about 330–415 KB/s) broke downloads.
+  - **Trimming CI** (reuse a pull request's checks after its merge): about 350 minutes a month saved, still over 2,000 at this pace.
+  - **Waiting for each month's reset:** no CI or deploys for the rest of a busy month.
+- **Why:** free, unlimited and fast, with no change to how CI works.
+- **Trade-off:** the code, docs and full git history are readable by anyone. Before going public the history was checked for committed dumps, reports and `.env` files (none); a full secret scan of the history followed (result in the plan). Pull requests from forks need the owner's approval before their CI runs (GitHub's default for first-time contributors), and they never get the repository's secrets.
+- **Status:** Accepted (owner, 2026-11-21). Supersedes the PC-runner plan; amends W0-02's minutes risk.
 
 ### D-120 Each back-office user's theme is kept on the server, System by default; paper always light (2026-11-21)
 - **Context:** PLT-13 and D-067 asked for Light / Dark / System per user in the back office; the account menu showed the buttons, System only, since W1-28. The owner reviewed a prototype of both themes on 21 Nov.

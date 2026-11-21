@@ -37,9 +37,7 @@ permissions:
 jobs:
   deploy:
     name: Deploy to ${{ inputs.environment || 'prod' }}
-    # GitHub's machines; the repository variable DEPLOY_RUNS_ON = ["self-hosted","erp-pc"] sends deploys to the
-    # owner's PC while GitHub's free minutes are used up (D-119).
-    runs-on: ${{ fromJSON(vars.DEPLOY_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     # One deploy per environment at a time, and a running deploy is never cancelled.
     concurrency:
@@ -204,12 +202,3 @@ jobs:
       - name: Roll back after a failed internet check
         if: failure() && steps.deploy.outcome == 'success'
         run: ssh erp "rollback $ENVIRONMENT"
-
-      # The PC's runner is kept between jobs: leave no deploy key and no images behind.
-      - name: Clean up the PC runner
-        if: always() && runner.environment == 'self-hosted'
-        env:
-          TAG: ${{ steps.gate.outputs.tag }}
-        run: |
-          rm -f ~/.ssh/deploy ~/.ssh/config
-          docker image rm "erp-api:$TAG" "erp-worker:$TAG" "erp-web:$TAG" 2>/dev/null || true
