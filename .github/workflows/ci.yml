@@ -1,8 +1,6 @@
 # Checks every pull request and every push to staging/main (W0-02, D-063).
 # After the checks pass on a push, deploys: staging → staging, main → prod (W0-04, D-075).
 # Actions are pinned to commit SHAs; Dependabot keeps them current.
-# The three checks run on the owner's PC (infra/ci-runner, D-119): free, since GitHub's 2,000 minutes a month ran out.
-# The repository variable CHECKS_RUNS_ON = "ubuntu-latest" moves them back to GitHub's machines.
 name: CI
 
 on:
@@ -30,7 +28,7 @@ jobs:
   check:
     name: Format, lint, typecheck, test, build
     if: github.event.action != 'labeled' || github.event.label.name == 'deploy:staging'
-    runs-on: ${{ fromJSON(vars.CHECKS_RUNS_ON || '["self-hosted","erp-pc"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,12 +43,11 @@ jobs:
       - run: pnpm check
       # Server and edge config (W0-03). shellcheck and Docker come with the runner.
       - name: Check server scripts
-        run: shellcheck -x infra/server/*.sh infra/server/files/bin/erp-deploy infra/edge/*.sh infra/db/*.sh infra/db/bin/erp-db infra/db/bin/erp-tenant infra/observability/*.sh infra/observability/bin/erp-obs infra/ci-runner/entrypoint.sh
+        run: shellcheck -x infra/server/*.sh infra/server/files/bin/erp-deploy infra/edge/*.sh infra/db/*.sh infra/db/bin/erp-db infra/db/bin/erp-tenant infra/observability/*.sh infra/observability/bin/erp-obs
       - name: Check edge and app config
         run: |
           docker compose -f infra/edge/compose.yaml config -q
           docker compose -f infra/observability/compose.yaml config -q
-          docker compose -f infra/ci-runner/compose.yaml config -q
           docker run --rm -v "$PWD/infra/observability:/cfg:ro" grafana/alloy:v1.20.1 fmt /cfg/config.alloy >/dev/null
           for env in prod staging; do
             IMAGE_TAG=check docker compose --env-file "infra/app/$env.env" -f infra/app/compose.yaml config -q
@@ -65,7 +62,7 @@ jobs:
   integration:
     name: Integration tests (PostgreSQL 17)
     if: github.event.action != 'labeled' || github.event.label.name == 'deploy:staging'
-    runs-on: ${{ fromJSON(vars.CHECKS_RUNS_ON || '["self-hosted","erp-pc"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
       postgres:
@@ -74,13 +71,15 @@ jobs:
           POSTGRES_USER: erp
           POSTGRES_PASSWORD: erp
           POSTGRES_DB: erp_test
-        # Any free port: two jobs on one PC can't both take 5432.
-        ports: ['5432']
+        ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U erp -d erp_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
+    env:
+      # Throwaway database inside the CI runner, not a secret.
+      DATABASE_URL: postgres://erp:erp@localhost:5432/erp_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,16 +90,12 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Throwaway database inside the CI runner, not a secret. On the PC the runner is itself a container, so the
-      # database's port is on the Docker host.
-      - name: Database address
-        run: echo "DATABASE_URL=postgres://erp:erp@${{ runner.environment == 'self-hosted' && 'host.docker.internal' || 'localhost' }}:${{ job.services.postgres.ports['5432'] }}/erp_test" >> "$GITHUB_ENV"
       - run: pnpm test:integration
 
   e2e:
     name: End-to-end flows (Chromium)
     if: github.event.action != 'labeled' || github.event.label.name == 'deploy:staging'
-    runs-on: ${{ fromJSON(vars.CHECKS_RUNS_ON || '["self-hosted","erp-pc"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
       postgres:
@@ -109,13 +104,15 @@ jobs:
           POSTGRES_USER: erp
           POSTGRES_PASSWORD: erp
           POSTGRES_DB: erp_test
-        # Any free port: two jobs on one PC can't both take 5432.
-        ports: ['5432']
+        ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U erp -d erp_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
+    env:
+      # Throwaway database inside the CI runner, not a secret.
+      DATABASE_URL: postgres://erp:erp@localhost:5432/erp_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -126,10 +123,6 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Throwaway database inside the CI runner, not a secret. On the PC the runner is itself a container, so the
-      # database's port is on the Docker host.
-      - name: Database address
-        run: echo "DATABASE_URL=postgres://erp:erp@${{ runner.environment == 'self-hosted' && 'host.docker.internal' || 'localhost' }}:${{ job.services.postgres.ports['5432'] }}/erp_test" >> "$GITHUB_ENV"
       - run: pnpm --filter @erp/e2e exec playwright install --with-deps chromium
       - run: pnpm e2e
 
