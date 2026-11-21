@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | to be opened when the plan is accepted |
 | **Module** | platform (PLT-13), touching the back office's frame, `packages/ui` and the auth API |
-| **Status** | Draft, for the owner's review |
+| **Status** | Accepted (owner, 2026-11-21, PR #205): answers 1, 2, 4 and 5 as recommended; answer 3 the other way, **icons only**, as drawn in W1-28 |
 | **Refs** | PLT-13; D-066 (shadcn/ui on the prototype's tokens), D-067 (light and dark, a switcher), D-114 (the account at the foot of the side menu); W1-28 (the theme buttons' place, shown as System only); CLAUDE.md rules 5, 10; prototype [Back-office light and dark themes](https://claude.ai/artifact/UkXzx1dm35yEboZxSZcf5W) (private canvas, sample figures) |
 | **Depends on** | W1-28 (the account menu), W2-06 (the dashboard, whose charts are on the chart tokens) |
 | **Size** | about 1½ days: API and table ¼, switcher and theme code ½, the dark pass over every screen ½, tests ¼ |
@@ -20,7 +20,7 @@ The counter (POS) gets its own task after this one: there the theme is set **per
 
 The canvas draws the real frame (Tijara side menu, top bar, account at the foot) on the dashboard (D-118) and the Items list, each in light and dark, with the switcher working:
 
-- The account menu keeps its place (beside the side menu, D-114): **Theme** with the current choice named beside it, then three buttons **System · Light · Dark**, each an **icon and a word**, then Sign out. With System chosen, a line under the buttons says what the computer's setting is now ("Follows this computer's setting, now dark").
+- The account menu keeps its place (beside the side menu, D-114): **Theme** with the current choice named beside it, then three buttons **System · Light · Dark** (drawn first with an icon and a word; icons only since the owner's answer 3), then Sign out. With System chosen, a line under the buttons says what the computer's setting is now ("Follows this computer's setting, now dark").
 - A choice applies at once to the whole screen, menus and tooltips included.
 - Colours are the existing token values, unchanged. The only new token is **`--bad-ink`**, the text on a solid red (`--bad`): the count beside a menu entry is `text-white` today (`Sidebar.tsx:66`), which is only **2.7:1** on the dark red `#f2786c`. In dark it becomes `#1b0f08` (6.8:1); in light it stays white. That pill is the only hard-coded colour in `apps/backoffice/src` (search on 2026-11-21: `text-white`, `bg-white`, `text-black`, hex values in class names).
 
@@ -42,7 +42,9 @@ The canvas draws the real frame (Tijara side menu, top bar, account at the foot)
    *Recommended:* **paper always uses the light colours**: the dark values apply on screen only, so a report printed or saved as PDF from a dark screen looks exactly like one printed from a light screen (PLT-13 "printed bills, labels and PDFs are always light"). Labels are already black on white whatever the theme.
    *Otherwise:* nothing extra (today's print rules force a white page and black body text, but grey text, lines and chart colours would keep their dark-theme values on paper).
 
-## Design (with answers 1–5 as recommended)
+**Owner's answers (2026-11-21):** 1 on the server, per user; 2 System; **3 icons only**; 4 the browser's last choice, else System; 5 paper always light.
+
+## Design (with the owner's answers)
 
 | What | How |
 |---|---|
@@ -52,7 +54,7 @@ The canvas draws the real frame (Tijara side menu, top bar, account at the foot)
 | **Tokens** | `packages/ui/src/theme.css`: the dark block moves inside **`@media screen`**, so print always takes the light values (answer 5); `--bad-ink` added to both sets and mapped as `--color-bad-ink`. The POS uses the same file and never sets dark yet, so it is unchanged |
 | **Applying it** | New `apps/backoffice/src/theme.ts`: `resolveTheme(choice, prefersDark)`; `applyTheme(choice)` sets `data-theme` on `<html>` to `light` or `dark` (System resolved through `matchMedia('(prefers-color-scheme: dark)')`, followed live while System is chosen); the browser copy under `erp.backoffice.theme`, every read and write in `try/catch` (a private window or blocked storage just means System). On `<html>`, so the Radix menus, tooltips and dialogs, which render outside the app's root, follow too |
 | **No flash on load** | A few lines in `apps/backoffice/index.html`'s `<head>` read the browser copy and set `data-theme` before the page paints; after `/auth/me` answers, the server's value wins and refreshes the copy (answer 4: the sign-in screen uses the copy) |
-| **Switcher** | `Account.tsx`: the three buttons enabled, each an icon and its word (answer 3), `aria-pressed` on the chosen one, the chosen name beside "Theme", the System line from the prototype. A press applies at once, then saves with `PUT /api/users/me/settings`; if the save fails the choice still holds in this browser and a short message says it wasn't saved for other computers. `App.tsx` passes `me.theme` and the save down through `Shell` and `Sidebar` |
+| **Switcher** | `Account.tsx`: the three buttons enabled, **icons only** as today (answer 3), each named by `aria-label` and its tooltip (`title`, now without "comes with the theme switcher"), `aria-pressed` on the chosen one, the chosen name beside "Theme", the System line from the prototype. A press applies at once, then saves with `PUT /api/users/me/settings`; if the save fails the choice still holds in this browser and a short message says it wasn't saved for other computers. `App.tsx` passes `me.theme` and the save down through `Shell` and `Sidebar` |
 | **Messages** | New keys under `nav.themes` (`followsSystem` "Follows this computer's setting, now {{mode}}", `notSaved`); `nav.themeLater` removed (rule 10) |
 | **The menu's count** | `Sidebar.tsx`: `text-white` → `text-bad-ink` |
 | **The dark pass** | Every screen the menu opens, every report and every dialog, looked at in dark at desktop and phone width (the verifier, screenshots in the PR). Anything unreadable is fixed in this task by using the right token, never by a second colour set; the W1-28 note that the Items table's names didn't show in dark is re-checked here (the colours there have changed since) |
@@ -66,7 +68,7 @@ The canvas draws the real frame (Tijara side menu, top bar, account at the foot)
   - another user of the same shop still gets `system`; a user of another shop can't see or change the row (RLS, rule 5);
   - `{theme: 'blue'}` and `{}` → `400`; without a session → `401`; while a password change is due → `403 password_change_required`.
 - **Unit** (`theme.test.ts`): `resolveTheme` for the six cases; `applyTheme` sets `data-theme` on `<html>`; with System chosen, a `matchMedia` change event flips it, and stops once Light is chosen; the browser copy is read and written, and a `localStorage` that throws leaves System in place without an error.
-- **Component** (`layout/Shell.test.tsx`, the W1-28 case "System chosen until the switcher comes" replaced): the three buttons are enabled and named System, Light, Dark; pressing Dark marks it pressed, names it beside "Theme", sets `data-theme="dark"` and calls the save with `{theme: 'dark'}`; a failed save shows the message and keeps Dark; with System chosen the line names the computer's mode.
+- **Component** (`layout/Shell.test.tsx`, the W1-28 case "System chosen until the switcher comes" replaced): the three buttons are enabled, named System, Light, Dark by their labels and show no text; pressing Dark marks it pressed, names it beside "Theme", sets `data-theme="dark"` and calls the save with `{theme: 'dark'}`; a failed save shows the message and keeps Dark; with System chosen the line names the computer's mode.
 - **Guard:** `colours.test.ts`, above; it fails today on `Sidebar.tsx:66`.
 - **Schema mirror:** the existing test that compares `schema.ts` with the migrations covers the new table.
 - **e2e** (`e2e/shell.spec.ts`): the owner picks Dark, the page is dark, a reload keeps it, and after signing out the sign-in screen is dark; a second user signing in on the same browser gets their own (System); the owner signing in again on a fresh browser context gets Dark from the server. With `page.emulateMedia({ media: 'print' })` on a dark report, the muted text has the light value (answer 5).
