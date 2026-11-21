@@ -69,7 +69,7 @@ Every pull request, and every push to `staging` and `main`, is checked automatic
 
 | Risk | Mitigation |
 |---|---|
-| **The free plan has 2,000 Actions minutes a month for private repos** | About 4 minutes a run, so about 400 runs a month. Docs skip CI, and cancelled runs stop early. Usage is checked at the end of November. |
+| **The free plan has 2,000 Actions minutes a month for private repos** | About 4 minutes a run, so about 400 runs a month. Docs skip CI, and cancelled runs stop early. Usage is checked at the end of November. **Update 21 Nov:** runs grew to 14–18 minutes and the minutes ran out on 20 Nov; the repository was made public, so GitHub's standard runners are free without a limit (D-119). |
 | A flaky Postgres start makes runs randomly red | The service has a `pg_isready` health check, so the job waits until the database is ready. |
 | CI and the PC drift apart | Both run the same `pnpm check`; Node comes from `.nvmrc` and pnpm from `packageManager`. |
 

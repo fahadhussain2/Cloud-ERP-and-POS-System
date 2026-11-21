@@ -1125,3 +1125,14 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** the owner sees the day, the money and what needs them on one screen, and each figure opens the report that explains it. Since the figures come from the same queries, the dashboard can't disagree with the reports.
 - **Trade-off:** one more endpoint that reads much of the shop's data on every load (timed in the plan). Other roles get nothing new until custom roles exist.
 - **Status:** Accepted (owner, 2026-11-20): the design on the prototype, and the [W2-06 plan](modules/reports/plans/W2-06-owner-dashboard.md) with its questions 1–6 as recommended (cash = drawers, safe and cash in transit; bank = bank and wallet accounts; Today compared with the same weekday last week to the same time; *unusual* at 1.5 times and at least 3; the donut names the two biggest expenses and shows a loss in red; a counter needs attention after 10 minutes unseen with its session open; figures re-read every 5 minutes while visible). Issue [#198](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/198). Amends D-114 (the first screen after sign-in, for the owner).
+
+### D-119 The repository is public, so CI runs free on GitHub's machines (2026-11-21)
+- **Context:** on 20 Nov 2026 GitHub stopped starting jobs: the free plan's 2,000 Actions minutes a month for private repositories were used up (1–20 Nov: about 1,845 minutes counted, 1,780 of them CI; about 2,770 a month at that pace). A CI run takes 14–18 runner-minutes, not the 4 W0-02 planned. Paid minutes are out (D-087).
+- **Decision:** the owner made the repository **public** (2026-11-21). Standard GitHub-hosted runners are free and unlimited for public repositories; CI and deploys are unchanged.
+- **Alternatives:**
+  - **Runners on the owner's PC** ([plan](modules/devops/plans/ci-runner-on-pc.md)): built and tried in PRs #203 and #204, then dropped and reverted. GitHub ran jobs there while its own machines were blocked, but the laptop's CPU pushed timing-sensitive tests past their limits, and its connection (about 330–415 KB/s) broke downloads.
+  - **Trimming CI** (reuse a pull request's checks after its merge): about 350 minutes a month saved, still over 2,000 at this pace.
+  - **Waiting for each month's reset:** no CI or deploys for the rest of a busy month.
+- **Why:** free, unlimited and fast, with no change to how CI works.
+- **Trade-off:** the code, docs and full git history are readable by anyone. Before going public the history was checked for committed dumps, reports and `.env` files (none); a full secret scan of the history followed (result in the plan). Pull requests from forks need the owner's approval before their CI runs (GitHub's default for first-time contributors), and they never get the repository's secrets.
+- **Status:** Accepted (owner, 2026-11-21). Supersedes the PC-runner plan; amends W0-02's minutes risk.
