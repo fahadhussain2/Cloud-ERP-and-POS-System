@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-07, W0-09, W0-10, W0-11 done; counter side of PLT-03/PLT-04 built with W1-02; staff and user admin (PLT-04, PLT-05 assign) built with W1-04 (in review); the back-office frame redesigned with W1-28 (D-114); back-office documents on the shop's business date with W2-05 (D-117) |
+| **Status** | In progress: W0-07, W0-09, W0-10, W0-11 done; counter side of PLT-03/PLT-04 built with W1-02; staff and user admin (PLT-04, PLT-05 assign) built with W1-04 (in review); the back-office frame redesigned with W1-28 (D-114); back-office documents on the shop's business date with W2-05 (D-117); the back office's light and dark themes with W2-07 (D-120, PLT-13) |
 | **Requirements** | 13 (PLT-01…PLT-13) |
 | **Feature spec needed** | Yes: device enrollment + PIN security |
 
@@ -93,6 +93,14 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 - **Every back-office document form** defaults to it and goes no later than it; none reads the browser's calendar.
 - **Report screens** start on it: `GET /api/shop/today` (any signed-in user) and `useShopToday` (`apps/backoffice/src/shopDay.ts`).
 - **On post**, `dateRefusal` (`apps/api/src/lock.ts`) refuses a purchasing or stock document dated after it (`date_in_future`) or on or before the lock date (`date_locked`, D-108); accounting documents check the same with `checkDocumentDate`.
+
+## Light and dark themes (W2-07, D-120)
+
+- **The switcher** is in the account menu at the foot of the side menu: System · Light · Dark, icons only. A press applies at once and saves for the person (`PUT /api/users/me/settings`); `/api/auth/me` returns `theme`.
+- **Kept** in `erp.user_settings` (tenant RLS, not synced, not audited); no row = System.
+- **On screen** `apps/backoffice/src/theme.ts` sets `data-theme` on `<html>`, follows the computer while System is chosen and keeps a browser copy (`erp.backoffice.theme`) that `index.html` reads before the first paint.
+- **Paper** always uses the light colours: the dark values in `packages/ui/src/theme.css` apply under `@media screen` only.
+- **New screens** use the tokens only; `colours.test.ts` fails on a fixed white, black or hex colour in a class name.
 
 ## Related
 

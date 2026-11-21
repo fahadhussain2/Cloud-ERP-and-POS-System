@@ -335,13 +335,24 @@ describe('the account', () => {
     openMenu(account());
     const theme = screen.getByRole('group', { name: en.nav.theme });
     for (const name of [en.nav.themes.system, en.nav.themes.light, en.nav.themes.dark]) {
-      const b = within(theme).getByRole('button', { name }) as HTMLButtonElement;
+      const b = within(theme).getByRole<HTMLButtonElement>('button', { name });
       expect(b.disabled).toBe(false);
       expect(b.textContent).toBe('');
       expect(b.title).toBe(name);
     }
     fireEvent.click(within(theme).getByRole('button', { name: en.nav.themes.dark }));
     expect(onTheme).toHaveBeenCalledWith('dark');
+  });
+
+  it('says what System follows now', () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({
+      matches: q.includes('dark'),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    show({ theme: 'system' });
+    openMenu(account());
+    expect(screen.getByText(en.nav.themes.followsSystem.replace('{{mode}}', 'dark'))).toBeDefined();
   });
 
   it('says when a choice could not be saved for other computers', () => {

@@ -1136,3 +1136,16 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** free and unlimited, with the same checks as before, and a switch back to GitHub's machines when needed.
 - **Trade-off:** checks run only while the PC is on and Docker Desktop runs (jobs wait up to 24 hours); a run keeps the PC busy for 5–10 minutes; pull-request code runs on the PC with access to Docker (private repository; pull requests only from the owner, Claude and Dependabot).
 - **Status:** Accepted (owner, 2026-11-20), with deploys on the PC until the minutes reset. [Plan](modules/devops/plans/ci-runner-on-pc.md). Amends D-063 (where CI runs) and W0-02.
+
+### D-120 Each back-office user's theme is kept on the server, System by default; paper always light (2026-11-21)
+- **Context:** PLT-13 and D-067 asked for Light / Dark / System per user in the back office; the account menu showed the buttons, System only, since W1-28. The owner reviewed a prototype of both themes on 21 Nov.
+- **Decision:**
+  - Each person's choice is kept **on the server** in `erp.user_settings` (tenant RLS; **not synced, not audited**, so `erp.users` and the counters are untouched), returned by `/api/auth/me` and saved with `PUT /api/users/me/settings`. No row = **System**, for new and existing users.
+  - A **copy in the browser** opens the page, and the sign-in screen, in the last theme chosen there before the server answers; the server's choice wins once the person is known.
+  - The buttons stay **icons only** (System, Light, Dark), as drawn in W1-28, each named for screen readers and in its tooltip.
+  - The dark token values apply **on screen only** (`@media screen`): a report printed or saved as PDF from a dark screen uses the light colours.
+  - One new token, `--bad-ink`, for text on a solid red (the menu's count): white in light, dark in dark.
+- **Alternatives:** the browser alone (people sharing the shop PC would share the last choice); Light as the default; an icon and a word on each button (prototype; owner chose icons only).
+- **Why:** the choice follows the person to any computer, nobody's screen changes on the day it ships unless their computer is already dark, and paper never depends on the screen.
+- **Trade-off:** one small table and one route; a new browser shows the copy's theme (or System) for a moment until the server answers.
+- **Status:** Accepted (owner, 2026-11-21, PR #205). [Plan](modules/platform/plans/W2-07-theme-switcher-back-office.md). Amends D-067 (where the choice lives, printing). The counter's per-counter theme is W2-08.

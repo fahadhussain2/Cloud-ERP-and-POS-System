@@ -10,7 +10,7 @@ import {
 import { ChevronRight, LogOut, Monitor, Moon, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import type { Theme } from '../theme';
+import { systemPrefersDark, type Theme } from '../theme';
 
 // The account at the foot of the side menu (W1-28, owner after the mockup review): the person's name and username;
 // its menu opens beside the side menu with the theme buttons and Sign out. The buttons are the theme switcher (W2-07,
@@ -111,7 +111,8 @@ export function Account({
                   onClick={() => onTheme(key)}
                   className={cn(
                     'grid h-7 w-9 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground hover:text-ink',
-                    chosen && 'bg-surface text-ink shadow-[0_1px_2px_rgb(0_0_0/0.14)]',
+                    // The line ring keeps the chosen button visible in dark, where the surface is darker than the track.
+                    chosen && 'bg-surface text-ink shadow-[0_1px_2px_rgb(0_0_0/0.14),0_0_0_1px_var(--line)]',
                   )}
                 >
                   <Icon className="size-4" aria-hidden="true" />
@@ -119,6 +120,13 @@ export function Account({
               );
             })}
           </div>
+          {theme === 'system' && (
+            <p className="mx-2.5 mb-2.5 text-xs text-muted-foreground">
+              {t('nav.themes.followsSystem', {
+                mode: t(`nav.themes.${systemPrefersDark() ? 'dark' : 'light'}`).toLocaleLowerCase(),
+              })}
+            </p>
+          )}
           {themeNotSaved && (
             <p role="status" className="mx-2.5 mb-2.5 text-xs text-warn">
               {t('nav.themeNotSaved')}
