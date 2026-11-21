@@ -79,6 +79,8 @@ export const KEPT_TABLES = [
   'tenant_directory',
   'users',
   'user_login_state',
+  // Each person's theme (W2-07, D-120): a preference, kept with the people.
+  'user_settings',
   'roles',
   'user_roles',
   'sessions',
