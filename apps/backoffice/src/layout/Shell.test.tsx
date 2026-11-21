@@ -316,17 +316,56 @@ describe('the account', () => {
     expect(within(account()).getByText('fahad')).toBeDefined();
   });
 
-  it('opens a menu with the theme buttons, System chosen until the switcher comes, and Sign out', () => {
+  it('opens a menu with the theme buttons, the person’s choice pressed, and Sign out', () => {
     const onSignOut = vi.fn();
-    show({ onSignOut });
+    show({ onSignOut, theme: 'light' });
     openMenu(account());
     const theme = screen.getByRole('group', { name: en.nav.theme });
     const choice = (name: string) => within(theme).getByRole('button', { name });
-    expect(choice(en.nav.themes.system).getAttribute('aria-pressed')).toBe('true');
-    expect((choice(en.nav.themes.light) as HTMLButtonElement).disabled).toBe(true);
-    expect((choice(en.nav.themes.dark) as HTMLButtonElement).disabled).toBe(true);
+    expect(choice(en.nav.themes.light).getAttribute('aria-pressed')).toBe('true');
+    expect(choice(en.nav.themes.system).getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(screen.getByRole('menuitem', { name: en.nav.signOut }));
     expect(onSignOut).toHaveBeenCalledOnce();
+  });
+
+  // W2-07 (PLT-13, owner answer 3): System · Light · Dark, icons only, each named; a press asks for that theme.
+  it('lets the person choose System, Light or Dark, icons only', () => {
+    const onTheme = vi.fn();
+    show({ theme: 'system', onTheme });
+    openMenu(account());
+    const theme = screen.getByRole('group', { name: en.nav.theme });
+    for (const name of [en.nav.themes.system, en.nav.themes.light, en.nav.themes.dark]) {
+      const b = within(theme).getByRole<HTMLButtonElement>('button', { name });
+      expect(b.disabled).toBe(false);
+      expect(b.textContent).toBe('');
+      expect(b.title).toBe(name);
+    }
+    fireEvent.click(within(theme).getByRole('button', { name: en.nav.themes.dark }));
+    expect(onTheme).toHaveBeenCalledWith('dark');
+  });
+
+  it('says what System follows now', () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({
+      matches: q.includes('dark'),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    show({ theme: 'system' });
+    openMenu(account());
+    expect(screen.getByText(en.nav.themes.followsSystem.replace('{{mode}}', 'dark'))).toBeDefined();
+  });
+
+  it('says when a choice could not be saved for other computers', () => {
+    show({ theme: 'dark', themeNotSaved: true });
+    openMenu(account());
+    expect(screen.getByText(en.nav.themeNotSaved)).toBeDefined();
+  });
+
+  it('shows the dark pill text on the count, not white (--bad-ink)', () => {
+    show({ badges: { reports: 3 } });
+    const pill = screen.getByLabelText(badge(3));
+    expect(pill.className).toContain('text-bad-ink');
+    expect(pill.className).not.toContain('text-white');
   });
 
   it('is there for someone who may open no screen, so they can sign out', () => {

@@ -1,4 +1,10 @@
-import { ChangePasswordRequest, LoginRequest, type MeResponse } from '@erp/contracts';
+import {
+  ChangePasswordRequest,
+  LoginRequest,
+  type MeResponse,
+  type Theme,
+  UpdateSettingsRequest,
+} from '@erp/contracts';
 import { withTenant } from '@erp/db';
 import {
   can,
@@ -75,13 +81,22 @@ export async function loadGrants(c: pg.ClientBase, userId: string): Promise<Role
   return rows.map((r) => ({ permissions: r.permissions, limits: r.limits, branchId: r.branch_id }));
 }
 
-const me = (a: Omit<AuthContext, 'sessionId'>, shopName: string): MeResponse => ({
+/** The person's theme (W2-07, D-120): their row in erp.user_settings, System without one. */
+async function themeOf(c: pg.PoolClient, userId: string): Promise<Theme> {
+  const { rows } = await c.query<{ theme: Theme }>('SELECT theme FROM erp.user_settings WHERE user_id = $1', [
+    userId,
+  ]);
+  return rows[0]?.theme ?? 'system';
+}
+
+const me = (a: Omit<AuthContext, 'sessionId'>, shopName: string, theme: Theme): MeResponse => ({
   tenantId: a.tenantId,
   user: { id: a.userId, username: a.username, fullName: a.fullName },
   permissions: expandPermissions(a.grants, null),
   limits: effectiveLimits(a.grants, null),
   mustChangePassword: a.mustChangePassword,
   shopName,
+  theme,
 });
 
 /** Registers the auth routes on `scope` and returns `requireAuth` for other routes in it. */
@@ -256,6 +271,7 @@ export async function registerAuth(
               mustChangePassword: user.must_change_password,
             },
             shop.rows[0]!.name,
+            await themeOf(c, user.id),
           ),
         };
       });
@@ -289,11 +305,30 @@ export async function registerAuth(
   // The shop's name comes with it: the reports print it in their header (W2-01).
   scope.get('/auth/me', { preHandler: requireSession }, async (req) => {
     const a = req.auth!;
-    const shopName = await withTenant(pool, { tenantId: a.tenantId, requestId: req.id }, async (_db, c) => {
-      const { rows } = await c.query<{ name: string }>('SELECT name FROM erp.tenants');
-      return rows[0]!.name;
+    const { shopName, theme } = await withTenant(
+      pool,
+      { tenantId: a.tenantId, requestId: req.id },
+      async (_db, c) => {
+        const { rows } = await c.query<{ name: string }>('SELECT name FROM erp.tenants');
+        return { shopName: rows[0]!.name, theme: await themeOf(c, a.userId) };
+      },
+    );
+    return me(a, shopName, theme);
+  });
+
+  // Your own settings (W2-07, D-120): for now the theme. Refused while a password change is due (requireAuth, D-083).
+  scope.put('/users/me/settings', { preHandler: requireAuth }, async (req, reply) => {
+    const body = UpdateSettingsRequest.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'invalid_request' });
+    const a = req.auth!;
+    await withTenant(pool, { tenantId: a.tenantId, userId: a.userId, requestId: req.id }, async (_db, c) => {
+      await c.query(
+        `INSERT INTO erp.user_settings (user_id, tenant_id, theme, updated_at) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (user_id) DO UPDATE SET theme = EXCLUDED.theme, updated_at = EXCLUDED.updated_at`,
+        [a.userId, a.tenantId, body.data.theme, now()],
+      );
     });
-    return me(a, shopName);
+    return reply.code(204).send();
   });
 
   // Change your own password (D-083): needs the current one; ends your other sessions.

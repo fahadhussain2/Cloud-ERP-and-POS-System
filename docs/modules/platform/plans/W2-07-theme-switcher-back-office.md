@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Issue** | to be opened when the plan is accepted |
+| **Issue** | [#207](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/207) |
 | **Module** | platform (PLT-13), touching the back office's frame, `packages/ui` and the auth API |
-| **Status** | Accepted (owner, 2026-11-21, PR #205): answers 1, 2, 4 and 5 as recommended; answer 3 the other way, **icons only**, as drawn in W1-28 |
+| **Status** | Accepted (owner, 2026-11-21, PR #205): answers 1, 2, 4 and 5 as recommended; answer 3 the other way, **icons only**, as drawn in W1-28. Built (2026-11-21) on `w2-07-theme-switcher` |
 | **Refs** | PLT-13; D-066 (shadcn/ui on the prototype's tokens), D-067 (light and dark, a switcher), D-114 (the account at the foot of the side menu); W1-28 (the theme buttons' place, shown as System only); CLAUDE.md rules 5, 10; prototype [Back-office light and dark themes](https://claude.ai/artifact/UkXzx1dm35yEboZxSZcf5W) (private canvas, sample figures) |
 | **Depends on** | W1-28 (the account menu), W2-06 (the dashboard, whose charts are on the chart tokens) |
 | **Size** | about 1½ days: API and table ¼, switcher and theme code ½, the dark pass over every screen ½, tests ¼ |

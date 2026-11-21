@@ -55,9 +55,10 @@
     "themes": {
       "system": "System",
       "light": "Light",
-      "dark": "Dark"
+      "dark": "Dark",
+      "followsSystem": "Follows this computer's setting, now {{mode}}."
     },
-    "themeLater": "Comes with the theme switcher",
+    "themeNotSaved": "Not saved for your other computers. It still applies here.",
     "staff": "Staff",
     "counters": "Counters",
     "shopSettings": "Shop and bill",
