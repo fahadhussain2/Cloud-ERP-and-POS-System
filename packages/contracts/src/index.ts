@@ -1,5 +1,5 @@
 // Zod schemas for REST DTOs, versioned sync payloads and bill code payloads, and the shared wire formats.
-export { ChangePasswordRequest, LoginRequest, MeResponse } from './auth';
+export { ChangePasswordRequest, LoginRequest, MeResponse, Theme, UpdateSettingsRequest } from './auth';
 export { canonicalJson } from './canonical';
 export {
   exportPublicKey,

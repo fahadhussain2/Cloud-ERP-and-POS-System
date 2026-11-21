@@ -123,6 +123,14 @@ export const userLoginState = erp.table('user_login_state', {
   pinFailures: smallint('pin_failures').notNull(),
 });
 
+/** Each back-office user's own settings (W2-07, D-120): the theme; no row = System. Not synced, not audited. */
+export const userSettings = erp.table('user_settings', {
+  userId: uuid('user_id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  theme: text('theme', { enum: ['system', 'light', 'dark'] }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
 export const roles = erp.table('roles', {
   id: uuid('id').primaryKey(),
   tenantId: uuid('tenant_id').notNull(),

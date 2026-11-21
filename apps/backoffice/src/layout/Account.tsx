@@ -10,9 +10,11 @@ import {
 import { ChevronRight, LogOut, Monitor, Moon, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import type { Theme } from '../theme';
+
 // The account at the foot of the side menu (W1-28, owner after the mockup review): the person's name and username;
-// its menu opens beside the side menu with the theme buttons and Sign out. The buttons show System until the theme
-// switcher comes (PLT-13, Wave 2); Light and Dark can't be chosen yet. The shop's name is left out (owner answer 2).
+// its menu opens beside the side menu with the theme buttons and Sign out. The buttons are the theme switcher (W2-07,
+// PLT-13): System, Light, Dark, icons only (owner answer 3), each named. The shop's name is left out (owner answer 2).
 
 /** Up to two initials for the avatar, e.g. "FH" for Fahad Hussain. */
 const initials = (name: string) =>
@@ -35,12 +37,18 @@ export function Account({
   rail,
   side,
   onSignOut,
+  theme,
+  onTheme,
+  themeNotSaved,
 }: {
   fullName: string;
   username: string;
   rail: boolean;
   side: 'left' | 'right';
   onSignOut: () => void;
+  theme: Theme;
+  onTheme: (theme: Theme) => void;
+  themeNotSaved: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -92,19 +100,17 @@ export function Account({
             className="mx-2.5 mb-2.5 inline-flex gap-0.5 rounded-[9px] border border-line bg-surface-2 p-[3px]"
           >
             {THEMES.map(({ key, icon: Icon }) => {
-              const chosen = key === 'system';
+              const chosen = key === theme;
               return (
                 <button
                   key={key}
                   type="button"
                   aria-label={t(`nav.themes.${key}`)}
-                  title={
-                    chosen ? t(`nav.themes.${key}`) : `${t(`nav.themes.${key}`)}: ${t('nav.themeLater')}`
-                  }
+                  title={t(`nav.themes.${key}`)}
                   aria-pressed={chosen}
-                  disabled={!chosen}
+                  onClick={() => onTheme(key)}
                   className={cn(
-                    'grid h-7 w-9 place-items-center rounded-md border-0 bg-transparent text-muted-foreground disabled:cursor-not-allowed',
+                    'grid h-7 w-9 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground hover:text-ink',
                     chosen && 'bg-surface text-ink shadow-[0_1px_2px_rgb(0_0_0/0.14)]',
                   )}
                 >
@@ -113,6 +119,11 @@ export function Account({
               );
             })}
           </div>
+          {themeNotSaved && (
+            <p role="status" className="mx-2.5 mb-2.5 text-xs text-warn">
+              {t('nav.themeNotSaved')}
+            </p>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={onSignOut} className="h-8.5 cursor-pointer px-2.5 text-sm">
             <LogOut aria-hidden="true" />

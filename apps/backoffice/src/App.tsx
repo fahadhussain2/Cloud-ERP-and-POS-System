@@ -72,6 +72,7 @@ import {
 import { CashVarianceScreen, DayReconciliationScreen } from './screens/ReportsScreens';
 import { PersonScreen } from './staff/PersonScreen';
 import { StaffScreen } from './staff/StaffScreen';
+import { applyTheme, type Theme } from './theme';
 
 // The back office: sign in, the forced password change (W1-02), then the layout with its menu and the screen named by
 // the address (W1-04 plan).
@@ -83,6 +84,8 @@ export interface Me {
   mustChangePassword: boolean;
   /** For the reports' print header (W2-01). */
   shopName?: string;
+  /** The person's theme, kept on the server (W2-07, D-120). */
+  theme?: Theme;
 }
 
 /** The screen to show: the one addressed if this person may open it, otherwise the first one they may. */
@@ -127,6 +130,13 @@ export function App({ api }: { api: Api }) {
     };
   }, [api, seesReports, route]);
 
+  // The person's theme wins over this browser's copy once they are known (W2-07); signed out, the copy stays.
+  const theme = me?.theme;
+  useEffect(() => {
+    if (theme) applyTheme(theme);
+  }, [theme]);
+  const [themeNotSaved, setThemeNotSaved] = useState(false);
+
   if (me === undefined) return <p className="p-6 text-muted-foreground">{t('app.loading')}</p>;
   // A sign-in opens the person's first screen (the owner's Dashboard, D-118), not the screen the address still names
   // from before signing out; a reload while signed in keeps its place.
@@ -141,6 +151,13 @@ export function App({ api }: { api: Api }) {
     await api('POST', '/api/auth/logout');
     setMe(null);
   };
+  // A choice shows at once and is then saved for the person's other computers; a failed save keeps it here (W2-07).
+  const chooseTheme = async (next: Theme) => {
+    applyTheme(next);
+    setMe({ ...me, theme: next });
+    const r = await api('PUT', '/api/users/me/settings', { theme: next });
+    setThemeNotSaved(r.status !== 204);
+  };
   const shown = screenFor(route, me.permissions);
   const badges = { reports: seesReports ? openHigh : 0 };
 
@@ -153,6 +170,9 @@ export function App({ api }: { api: Api }) {
         route={shown ?? route}
         onSignOut={() => void signOut()}
         badges={badges}
+        theme={me.theme ?? 'system'}
+        onTheme={(next) => void chooseTheme(next)}
+        themeNotSaved={themeNotSaved}
       >
         {shown === null ? (
           <PageHeader title={t('app.title')} help={t('home.nothing')} />
