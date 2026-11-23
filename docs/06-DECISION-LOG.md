@@ -1148,4 +1148,12 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Alternatives:** the browser alone (people sharing the shop PC would share the last choice); Light as the default; an icon and a word on each button (prototype; owner chose icons only).
 - **Why:** the choice follows the person to any computer, nobody's screen changes on the day it ships unless their computer is already dark, and paper never depends on the screen.
 - **Trade-off:** one small table and one route; a new browser shows the copy's theme (or System) for a moment until the server answers.
-- **Status:** Accepted (owner, 2026-11-21, PR #205). [Plan](modules/platform/plans/W2-07-theme-switcher-back-office.md). Amends D-067 (where the choice lives, printing). The counter's per-counter theme is W2-08.
+- **Status:** Accepted (owner, 2026-11-21, PR #205). [Plan](modules/platform/plans/W2-07-theme-switcher-back-office.md). Amends D-067 (where the choice lives, printing). The counter's per-counter theme was W2-08, dropped by D-121.
+
+### D-121 The counters stay Light: no theme switcher on the POS for now (2026-11-23)
+- **Context:** PLT-13 and D-067 asked for a per-counter theme on the POS, set by a manager, default Light. W2-08's plan (PR #210) proposed it after the back office's switcher (D-120).
+- **Decision:** **no theme switching on the counters or the cash desk for now.** The POS stays Light; nothing sets `data-theme` there. The back office keeps its switcher (D-120).
+- **Alternatives:** a per-counter theme set by a manager in the back office (the plan); set on the counter by whoever is signed in; each person's own theme on the counter.
+- **Why:** the owner sees no value in dark on the shop floor; Light suits it, and the work is better spent elsewhere before go-live.
+- **Trade-off:** none today. The POS already draws with the shared tokens, so a switcher can be added later without a redesign.
+- **Status:** Accepted (owner, 2026-11-23). Amends D-067 and PLT-13 (the POS part). W2-08 is dropped: [its plan](modules/platform/plans/W2-08-theme-per-counter.md) is kept as a record.
