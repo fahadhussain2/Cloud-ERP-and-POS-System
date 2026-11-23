@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | to be opened when the plan is accepted |
 | **Module** | platform (PLT-13), touching the POS, the sync pull of the counter's own row and the back office's Counters screen |
-| **Status** | Draft, for the owner's review |
+| **Status** | **Dropped** (owner, 2026-11-23, D-121): no theme switching on the counters for now; they stay Light. Kept as a record if it comes back |
 | **Refs** | PLT-13; D-067 (POS: **per counter, set by a manager, default Light**), D-120 (the back office's switcher, paper always light); W2-07 (tokens, `--bad-ink`, `@media screen`); CLAUDE.md rules 5, 6, 7, 9, 10, 12; sync skill (pull datasets, local migrations) |
 | **Depends on** | W2-07 (merged: the tokens and the dark values on screen only) |
 | **Size** | about 1 day: table, sync and back office ¼, the counter ¼, the dark pass on the counter and the cash desk ¼, tests ¼ |
