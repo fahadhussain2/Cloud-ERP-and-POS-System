@@ -8,7 +8,15 @@ import {
 } from '@erp/contracts';
 import { setupTenant, withTenant } from '@erp/db';
 import { createTestDatabase, seedCatalog, type TestDatabase } from '@erp/db/testing';
-import { buildSaleDocument, money, type Bill, type Qty } from '@erp/domain';
+import {
+  buildSaleDocument,
+  buildVoidDocument,
+  money,
+  ROLE_TEMPLATES,
+  type Bill,
+  type Qty,
+  type SaleDocument,
+} from '@erp/domain';
 import { checkRebuild, KEPT_TABLES, markLive, WIPED_TABLES, WipeRefused, wipePilot } from '@erp/posting';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -31,6 +39,7 @@ let admin: pg.Client;
 let tenantId: string;
 let branchId: string;
 let seller: string;
+let owner: string;
 let retail: string;
 let pads: string;
 let counter: {
@@ -91,7 +100,7 @@ async function enroll() {
 }
 
 /** A cash sale of one brake pad at Rs 4,500, pushed; the counter had `outbox` documents before this push. */
-async function pushSale(seq: number, outbox: number) {
+async function pushSale(seq: number, outbox: number): Promise<SaleDocument> {
   const bill: Bill = {
     version: 1,
     sellerId: seller,
@@ -132,6 +141,12 @@ async function pushSale(seq: number, outbox: number) {
       clientVersion: '0.7.0',
     },
   });
+  await push({ id: doc.id, family: 'S', seq, payload: doc }, outbox);
+  return doc;
+}
+
+/** One document pushed by the counter, which reports `outbox` documents still waiting. */
+async function push(d: { id: string; family: 'S' | 'V'; seq: number; payload: object }, outbox: number) {
   const body: PushRequest = {
     clientVersion: '0.7.0',
     schemaVersion: 6,
@@ -145,15 +160,7 @@ async function pushSale(seq: number, outbox: number) {
       storageQuota: 2,
       lastPullAt: null,
     },
-    documents: [
-      {
-        id: doc.id,
-        family: 'S',
-        seq,
-        payload: doc,
-        signature: await signCanonical(counter.keys.privateKey, doc),
-      },
-    ],
+    documents: [{ ...d, signature: await signCanonical(counter.keys.privateKey, d.payload) }],
     events: [],
   };
   const res = await app().inject({
@@ -180,6 +187,7 @@ beforeAll(async () => {
   await withTenant(pool, { tenantId }, async (_db, c) => {
     const one = async (sql: string) => (await c.query<{ id: string }>(sql)).rows[0]!.id;
     branchId = await one('SELECT id FROM erp.branches');
+    owner = await one("SELECT id FROM erp.users WHERE username = 'fahad'");
     retail = await one("SELECT id FROM erp.price_tiers WHERE code = 'RETAIL'");
     const role = await one(`SELECT id FROM erp.roles WHERE template_key = 'salesman'`);
     seller = (
@@ -228,14 +236,52 @@ describe('the pilot wipe', () => {
   });
 
   it('removes the documents and everything derived from them; keeps the masters, staff and settings', async () => {
-    await pushSale(2, 1);
-    expect(await count('postings')).toBe(2);
+    const second = await pushSale(2, 1);
+    // A voided bill points at its void and the void at the bill (0013): the wipe must remove both (staging, 24 Nov).
+    const v = buildVoidDocument({
+      bill: {
+        id: second.id,
+        number: second.number,
+        deviceId: second.deviceId,
+        businessDate: second.businessDate,
+        total: second.amounts.total,
+        cashDue: second.cashDue,
+        status: 'finalized',
+        payments: second.payments,
+      },
+      answers: Object.fromEntries(second.payments.map((p) => [p.method, 'not_arrived' as const])),
+      deviceId: counter.deviceId,
+      branchId,
+      deskStatus: 'pending',
+      approverId: owner,
+      approverGrants: [{ ...ROLE_TEMPLATES.owner, branchId: null }],
+      reason: 'wrong_price',
+      note: null,
+      userId: seller,
+      context: {
+        id: uuidv7(),
+        seq: 1,
+        deviceId: counter.deviceId,
+        deviceCode: counter.code,
+        branchId,
+        createdAtMs: Date.now() - 500,
+        timeZone: 'Asia/Karachi',
+        cutoffHour: 4,
+        clientVersion: '0.7.0',
+      },
+    });
+    await push({ id: v.id, family: 'V', seq: 1, payload: v }, 0);
+    expect(await count('sales_voids')).toBe(1);
+    const voided = await admin.query("SELECT 1 FROM erp.sales_documents WHERE status = 'voided'");
+    expect(voided.rowCount).toBe(1);
+    expect(await count('postings')).toBeGreaterThanOrEqual(2);
     const keptBefore = await Promise.all(['items', 'item_prices', 'users', 'accounts', 'parties'].map(count));
     const report = await wipePilot(db.ownerUrl, tenantId, { userId: null, now: new Date() });
     for (const table of [
       'sales_documents',
       'sales_lines',
       'sales_payments',
+      'sales_voids',
       'sync_inbox',
       'device_series',
       'postings',
