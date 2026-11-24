@@ -171,6 +171,24 @@ export async function wipePilot(
 
     const removed: Record<string, number> = {};
     for (const table of DOCUMENT_TABLES) {
+      if (table === 'sales_voids') continue; // removed with its bills, below
+      if (table === 'sales_documents') {
+        // A voided bill points at its void and the void at the bill (0013), and a voided bill must keep its void, so
+        // neither table can go first: one statement removes both, and the foreign keys are checked at its end.
+        for (const t of ['sales_voids', 'sales_documents'])
+          await c.query(`ALTER TABLE erp.${t} DISABLE TRIGGER refuse_delete`);
+        const both = await c.query<{ voids: string; bills: string }>(
+          `WITH v AS (DELETE FROM erp.sales_voids WHERE tenant_id = $1 RETURNING 1),
+                d AS (DELETE FROM erp.sales_documents WHERE tenant_id = $1 RETURNING 1)
+           SELECT (SELECT count(*) FROM v) AS voids, (SELECT count(*) FROM d) AS bills`,
+          [tenantId],
+        );
+        removed['sales_voids'] = Number(both.rows[0]!.voids);
+        removed['sales_documents'] = Number(both.rows[0]!.bills);
+        for (const t of ['sales_voids', 'sales_documents'])
+          await c.query(`ALTER TABLE erp.${t} ENABLE TRIGGER refuse_delete`);
+        continue;
+      }
       if (SYNCED.has(table)) await c.query(`ALTER TABLE erp.${table} DISABLE TRIGGER refuse_delete`);
       removed[table] =
         (await c.query(`DELETE FROM erp.${table} WHERE tenant_id = $1`, [tenantId])).rowCount ?? 0;
