@@ -16,9 +16,10 @@
 #                                                        refused when a posting is on or before the lock date;
 #                                                        bills wait to post while it runs: after shop hours only
 #   sudo erp-tenant wipe-pilot prod <shop>               the cutover (W1-14, D-101): removes the pilot's documents
-#                                                        and ledgers, keeps masters, staff and settings, revokes the
-#                                                        counters; asks for the shop code again; refused once live or
-#                                                        while a counter has unsynced bills. Back up first.
+#                                                        and ledgers, keeps masters, staff and settings, removes every
+#                                                        counter (D-123: enrol each PC again); asks for the shop
+#                                                        code again; refused once live or while a counter has
+#                                                        unsynced bills. Back up first.
 #   sudo erp-tenant go-live <env> <shop> <lock-date>     the final run's last step: the shop is live (no more wipes)
 #                                                        and the books up to <lock-date> are locked
 #   sudo erp-tenant list                                 the specs on this server
