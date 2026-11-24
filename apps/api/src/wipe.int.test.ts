@@ -59,13 +59,18 @@ const httpPost = (url: string, payload: unknown, cookie?: string) =>
     ...(cookie ? { cookies: { erp_session: cookie } } : {}),
   });
 
-async function enroll() {
+/** The owner's back-office session. */
+async function signIn() {
   const login = await httpPost('/api/auth/login', {
     tenantCode: 'delux',
     username: 'fahad',
     password: PASSWORD,
   });
-  const cookie = login.cookies.find((x) => x.name === 'erp_session')!.value;
+  return login.cookies.find((x) => x.name === 'erp_session')!.value;
+}
+
+async function enroll() {
+  const cookie = await signIn();
   const code = (await httpPost('/api/devices/enrollment-codes', { branchId, kind: 'counter' }, cookie)).json<{
     code: string;
   }>().code;
@@ -236,6 +241,10 @@ describe('the pilot wipe', () => {
   });
 
   it('removes the documents and everything derived from them; keeps the masters, staff and settings', async () => {
+    // A second counter, revoked before the wipe (staging, 24 Nov: revoked with documents waiting, then re-enabled).
+    const old = await enroll();
+    const cookie = await signIn();
+    expect((await httpPost(`/api/devices/${old.deviceId}/revoke`, {}, cookie)).statusCode).toBe(204);
     const second = await pushSale(2, 1);
     // A voided bill points at its void and the void at the bill (0013): the wipe must remove both (staging, 24 Nov).
     const v = buildVoidDocument({
@@ -293,7 +302,16 @@ describe('the pilot wipe', () => {
     ])
       expect(await count(table), table).toBe(0);
     expect(report.removed['sales_documents']).toBe(2);
-    expect(report.devicesRevoked).toEqual([counter.code]);
+    // Every counter is removed, the revoked one too (D-123): no Re-enable, no token, and its code is never reused.
+    expect(report.devicesRemoved).toEqual([counter.code, old.code].sort());
+    for (const d of [counter, old]) {
+      expect((await httpPost(`/api/devices/${d.deviceId}/reenable`, {}, cookie)).statusCode).toBe(404);
+      const ch = await httpPost('/api/devices/challenge', { tenantId, deviceId: d.deviceId });
+      expect(ch.json()).toEqual({ error: 'device_refused' });
+    }
+    const removed = await admin.query('SELECT 1 FROM erp.devices WHERE deleted_at IS NOT NULL');
+    expect(removed.rowCount).toBe(2);
+    expect((await enroll()).code).toBe('C03');
     const stock = await admin.query<{ qty: string }>('SELECT qty::text FROM erp.stock_balances');
     expect(stock.rows.every((r) => Number(r.qty) === 0)).toBe(true);
     expect(await Promise.all(['items', 'item_prices', 'users', 'accounts', 'parties'].map(count))).toEqual(
