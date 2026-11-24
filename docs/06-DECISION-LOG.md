@@ -1157,3 +1157,11 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** the owner sees no value in dark on the shop floor; Light suits it, and the work is better spent elsewhere before go-live.
 - **Trade-off:** none today. The POS already draws with the shared tokens, so a switcher can be added later without a redesign.
 - **Status:** Accepted (owner, 2026-11-23). Amends D-067 and PLT-13 (the POS part). W2-08 is dropped: [its plan](modules/platform/plans/W2-08-theme-per-counter.md) is kept as a record.
+
+### D-123 The pilot wipe removes every counter, as a soft delete (2026-11-24)
+- **Context:** on staging the owner revoked the cash desk while it still had documents waiting, ran the wipe, and re-enabled the desk; it pushed its old pilot documents into the wiped books. The wipe revoked only active counters, and Re-enable can't tell a wipe's revocation from a mistake.
+- **Decision:** **the wipe marks every counter deleted** (`devices.deleted_at`), active or already revoked, in its one transaction. A deleted counter can't sign in, sync or be re-enabled and is hidden from every screen; each PC is cleared and enrolled again. Codes keep counting (deleted counters included), so go-live counters follow the pilot's (C04, D02 after C01–C03, D01) and a pilot bill number on paper never matches a go-live bill.
+- **Alternatives:** a hard delete (codes would restart at C01 and match pilot bills on paper; the audit log would point at nothing); refusing Re-enable for counters the wipe revoked (a new column, the old counters stay on screen).
+- **Why:** the old PCs are locked out using checks that already exist, and history and bill numbers stay unambiguous.
+- **Trade-off:** go-live counters aren't numbered from C01.
+- **Status:** Accepted (owner, 2026-11-24). Amends D-101 (revoke becomes delete). [Plan](modules/migration/plans/W1-14-wipe-removes-counters.md).
