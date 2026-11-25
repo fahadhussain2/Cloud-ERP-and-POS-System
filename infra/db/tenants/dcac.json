@@ -1,0 +1,167 @@
+{
+  "code": "dcac",
+  "name": "Delux City Auto Corner",
+  "legalName": null,
+  "baseCurrency": "PKR",
+  "currencyMinorUnits": 2,
+  "timezone": "Asia/Karachi",
+  "locale": "en-PK",
+  "fiscalYearStartMonth": 1,
+  "taxMode": "none",
+  "cashRoundingIncrement": 100,
+  "dayCutoffHour": 4,
+  "closingTime": "20:00",
+  "cashHandoverMode": "required",
+  "branch": {
+    "code": "MAIN",
+    "name": "Delux City Auto Corner",
+    "receiptHeader": {}
+  },
+  "locations": [
+    {
+      "code": "SHOP",
+      "name": "Shop",
+      "kind": "shop",
+      "isSellable": true
+    },
+    {
+      "code": "GODOWN",
+      "name": "Godown",
+      "kind": "storage",
+      "isSellable": false
+    },
+    {
+      "code": "DAMAGED",
+      "name": "Damaged",
+      "kind": "damaged",
+      "isSellable": false
+    }
+  ],
+  "chartTemplate": "retail",
+  "bankAccounts": [
+    {
+      "code": "soneri",
+      "name": "Bank: Soneri",
+      "kind": "bank",
+      "accountCode": "1150"
+    },
+    {
+      "code": "hbl",
+      "name": "Bank: HBL",
+      "kind": "bank",
+      "accountCode": "1160"
+    },
+    {
+      "code": "jazzcash",
+      "name": "Wallet: JazzCash",
+      "kind": "wallet",
+      "accountCode": "1170"
+    },
+    {
+      "code": "easypaisa",
+      "name": "Wallet: Easypaisa",
+      "kind": "wallet",
+      "accountCode": "1171"
+    },
+    {
+      "code": "card",
+      "name": "Card settlement clearing",
+      "kind": "card_clearing",
+      "accountCode": "1180"
+    }
+  ],
+  "paymentMethods": [
+    {
+      "code": "cash",
+      "name": "Cash",
+      "bankAccount": null
+    },
+    {
+      "code": "bank_transfer",
+      "name": "Bank transfer",
+      "bankAccount": "hbl"
+    },
+    {
+      "code": "raast",
+      "name": "Raast",
+      "bankAccount": "hbl"
+    },
+    {
+      "code": "jazzcash",
+      "name": "JazzCash",
+      "bankAccount": "jazzcash"
+    },
+    {
+      "code": "easypaisa",
+      "name": "Easypaisa",
+      "bankAccount": "easypaisa"
+    },
+    {
+      "code": "card",
+      "name": "Card",
+      "bankAccount": "card"
+    },
+    {
+      "code": "on_account",
+      "name": "On account",
+      "bankAccount": null
+    }
+  ],
+  "priceTiers": [
+    {
+      "code": "RETAIL",
+      "name": "Retail",
+      "isDefault": true
+    },
+    {
+      "code": "MECHANIC",
+      "name": "Mechanic",
+      "isDefault": false
+    },
+    {
+      "code": "WHOLESALE",
+      "name": "Wholesale",
+      "isDefault": false
+    }
+  ],
+  "taxCodes": [
+    {
+      "code": "ZERO",
+      "name": "No tax",
+      "rateBp": 0
+    }
+  ],
+  "expenseCategories": [
+    {
+      "code": "SALARIES",
+      "name": "Salaries",
+      "accountCode": "6110"
+    },
+    {
+      "code": "UTILITIES",
+      "name": "Utilities",
+      "accountCode": "6210"
+    },
+    {
+      "code": "GENERAL",
+      "name": "General expenses",
+      "accountCode": "6310"
+    },
+    {
+      "code": "MISC",
+      "name": "Miscellaneous",
+      "accountCode": "6410"
+    }
+  ],
+  "printProfile": {
+    "name": "A5 landscape dot matrix",
+    "paperFormat": "a5",
+    "codeType": "barcode",
+    "copies": 1,
+    "templateOptions": {}
+  },
+  "owner": {
+    "username": "fahad",
+    "fullName": "Fahad Hussain"
+  }
+}
