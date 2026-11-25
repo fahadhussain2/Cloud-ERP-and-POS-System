@@ -909,7 +909,8 @@ describe("the owner's dashboard (W2-06; RPT-18, D-118)", () => {
     expect(d.comparison).toEqual({ from: daysAgo(7), to: daysAgo(7) });
     expect(d.netSales.now).toBe(sales.total.cells.sales);
     expect(d.netSales.bills).toBe(sales.total.cells.bills);
-    expect(d.grossProfit.now).toBe(sales.total.cells.profit);
+    // Gross profit in the books: the bills' and any cost corrections (D-124).
+    expect(d.grossProfit.now).toBe(sales.corrections!.profit);
     expect(d.grossProfit.marginBp).toBe(sales.total.cells.marginBp);
     expect(d.trend.step).toBe('hour');
     expect(d.trend.points.reduce((s, p) => s + (p.now ?? 0), 0)).toBe(d.netSales.now);
@@ -1159,6 +1160,16 @@ describe('stock sold before it arrived (W2-09, D-124)', () => {
     expect(
       (await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}`, 'noor')).corrections,
     ).toBeNull();
+
+    // The dashboard's gross profit is the books', corrections included; its margin from the same profit.
+    const t = today();
+    const todays = await view<SalesProfitView>(`/api/reports/sales-profit?from=${t}&to=${t}&compare=none`);
+    const d = await view<DashboardView>('/api/dashboard?period=today');
+    expect(todays.corrections!.cost).toBe(250000);
+    expect(d.grossProfit.now).toBe(todays.corrections!.profit);
+    expect(d.grossProfit.marginBp).toBe(
+      Math.round((todays.corrections!.profit * 10000) / todays.total.cells.sales),
+    );
 
     // The CSV ends with each item's correction, their total and the profit in the books.
     const csv = await send('GET', `/api/reports/sales-profit?${ALL()}&format=csv`, 'fahad');
