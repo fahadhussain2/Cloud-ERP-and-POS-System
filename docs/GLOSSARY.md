@@ -30,7 +30,7 @@
 | **ABC class** | A for the items making the first 80% of sales (or gross profit), B the next 15%, C the last 5% (RPT-14) |
 | **Days of cover** | How many days the stock on hand lasts at the rate it sold over a period |
 | **Stock turnover** | Cost of sales ÷ the average stock value (opening and closing) over a period: how many times the stock was sold through |
-| **Gross profit** | Sales (what customers paid, after every discount) − their cost in the books (the average cost when sold); over a period it equals gross profit on the profit and loss (RPT-07) |
+| **Gross profit** | Sales (what customers paid, after every discount) − their cost in the books (the average cost when sold); over a period it equals gross profit on the profit and loss (RPT-07), once the period's cost corrections are taken off (D-124) |
 | **Margin** | Gross profit ÷ sales, as a percentage |
 | **Key figure** | One of the five cards at the top of the owner's dashboard: net sales, gross profit, cash, bank and what customers owe, each with its change against the comparison (W2-06, D-118) |
 | **Needs attention** | The dashboard's list of what the owner should look at now, the most serious first: open high-severity exceptions, negative stock, a counter not seen for 10 minutes while its session is open, items at or below their minimum, customers over their limit, open cash sessions (W2-06) |

@@ -27,7 +27,7 @@ import { requirePermission } from '../auth/routes';
 import { balancesAt, chart, dayBefore, periodSums, shop } from './financial';
 import { limitRows, moneyRegister } from './partners';
 import { moneyOf } from './routes';
-import { namesOf, overTime, salesSets, salesSince, type SalesSets, type Sums } from './sales';
+import { correctionsOf, namesOf, overTime, salesSets, salesSince, type SalesSets, type Sums } from './sales';
 import { deadStockRows, reorderListed, sinceOf as stockSince, stockAt } from './stock';
 import { ageingOf, openExceptions, overrideRows, voidsAndReturns } from './views';
 
@@ -117,8 +117,13 @@ async function salesPart(run: Run, x: Context) {
       return [full, until, busy] as const;
     }),
   ]);
-  const nowFig = salesFigures(cur.total);
-  const beforeFig = salesFigures(cmpUpTo.total);
+  // Gross profit in the books (D-124): the bills' cost plus the period's cost corrections, as Sales and gross profit.
+  // A correction has a date, not a time, so Today's comparison counts the whole of last week's day.
+  const corrected = async (p: Period) =>
+    x.values ? (await run((c) => correctionsOf(c, p, {}))).reduce((t, i) => t + i.cost, 0) : 0;
+  const [fixNow, fixBefore] = await Promise.all([corrected(w.current), corrected(w.comparison)]);
+  const nowFig = salesFigures({ ...cur.total, cost: cur.total.cost + fixNow });
+  const beforeFig = salesFigures({ ...cmpUpTo.total, cost: cmpUpTo.total.cost + fixBefore });
 
   // The trend: by hour for Today (in the business day's order), else by day.
   let trend: DashboardView['trend'];

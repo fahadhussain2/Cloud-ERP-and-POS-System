@@ -32,7 +32,7 @@ The design is the agreed prototype (layout A, *today first*). It is a private de
 |---|---|---|
 | **Header** | *Dashboard*, the business date, when the business day opened and when the figures were read. *Compared with …* beside the period switch: **Today · 7 days · 30 days** | |
 | **Net sales** | Net sales in the period and the change against the comparison. Details: the comparison's figure, the number of bills and the average bill | Sales and gross profit (RPT-07), same period |
-| **Gross profit** | Gross profit with its margin, and the change. Details: the comparison's figure and margin | Profit and loss, same period |
+| **Gross profit** | Gross profit with its margin, and the change. Details: the comparison's figure and margin. Since W2-09 (D-124) it includes the period's cost corrections for stock sold before it arrived: Sales and gross profit's *Gross profit in the books* | Profit and loss, same period |
 | **Cash** | Cash now, and the change since the business day began (question 1). Details: the open drawers and the cash in the safe | Cash book |
 | **Bank** | Bank and wallet balances now, and the change today. Details: each account | Cash book (the bank accounts) |
 | **Customers owe us** | What customers owe now, and the change over 30 days, in red when it rises. Details: the number of customers and what was received today | Customer outstanding (RPT-06) |

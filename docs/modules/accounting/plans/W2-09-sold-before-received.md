@@ -96,7 +96,7 @@ Built as planned, with these details settled while building:
 - **`schema.ts` needed no change.** It mirrors columns, not checks, and no column changed; only migration `0025_cost_correction.sql` relaxes the check.
 - **Stock movement report:** a correction counts with the **sales** bucket (value only), since it is cost of goods sold; the stock ledger and stock card call it *Cost correction: sold before it arrived*.
 - **Sales and gross profit:** line costs leave corrections out; `corrections` lists them by item with their total and gross profit in the books, under the item filters; none with a salesman or customer filter; null without cost.view. The CSV ends with the items' lines, `cost_corrections` and `profit_in_books`. The screen shows the list under the table and a *Gross profit in the books* figure when there is a correction.
-- **Not changed:** the dashboard's profit figure still counts the bills only. A correction is rare and it can follow if the owner wants it.
+- **The dashboard's gross profit includes the corrections** (owner, 2026-11-25, after the PR opened): it is *Gross profit in the books*, and its margin is from that profit. A correction has a date, not a time, so Today's comparison with the same time last week counts the whole of last week's day.
 
 Checks (2026-11-25, local, Node 24):
 
