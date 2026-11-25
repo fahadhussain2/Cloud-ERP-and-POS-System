@@ -1165,3 +1165,11 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** the old PCs are locked out using checks that already exist, and history and bill numbers stay unambiguous.
 - **Trade-off:** go-live counters aren't numbered from C01.
 - **Status:** Accepted (owner, 2026-11-24). Amends D-101 (revoke becomes delete). [Plan](modules/migration/plans/W1-14-wipe-removes-counters.md).
+
+### D-124 Stock sold before it arrived is settled to cost of goods sold when it comes in (2026-11-25)
+- **Context:** a part sold while the shop has none (borrowed from another shop, or not yet received) is costed at the item's average, or at 0 when it was never bought. When the stock then comes in, nothing corrects that cost: Inventory keeps value with nothing on hand, and the bill's profit is overstated by the difference.
+- **Decision:** stock that comes in while an item's tenant-wide on-hand is below zero **first covers the shortfall**. The difference between what the covering units cost and the average they were sold at (0 when none was known) is posted Dr COGS / Cr INVENTORY (or the reverse) in the same posting, as its own stock movement with no quantity. The average stays as it is while on-hand stays below zero and becomes the incoming cost when it reaches 0 or above. It applies to goods receipts, returned lines, voids and opening stock; the sale itself is never changed (rule 3). Sales and gross profit shows the corrections on their own line, by item, in the period the stock came in (owner answer 1).
+- **Alternatives:** leave it to journal vouchers (by hand, every time); re-cost the original sales (changes finalized postings and closed periods); value the shortfall separately per item (a new cost column for the same result).
+- **Why:** borrowing between shops is routine; without this the books carry stock that isn't there and profit is overstated from the first week after go-live.
+- **Trade-off:** a stock movement may now have value and no quantity; a partial delivery of an item never bought keeps it at no cost until the shortfall is covered.
+- **Status:** Accepted (owner, 2026-11-25). Amends INV-02 and posting rules §5.1. [Plan](modules/accounting/plans/W2-09-sold-before-received.md).
