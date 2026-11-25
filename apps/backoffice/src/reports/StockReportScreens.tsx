@@ -407,7 +407,13 @@ export function StockLedgerScreen({ api }: { api: Api }) {
         return to ? <a href={to}>{l.number}</a> : l.number;
       },
     },
-    { key: 'kind', label: s(t, 'ledger.kind'), sort: (l) => l.kind, cell: (l) => s(t, `kinds.${l.kind}`) },
+    {
+      key: 'kind',
+      label: s(t, 'ledger.kind'),
+      sort: (l) => l.kind,
+      // D-124: value with no quantity is a cost correction, for stock sold before it arrived.
+      cell: (l) => (l.qty === 0 ? s(t, 'kinds.costCorrection') : s(t, `kinds.${l.kind}`)),
+    },
     { key: 'location', label: s(t, 'location'), sort: (l) => l.locationCode, cell: (l) => l.locationCode },
     { key: 'in', label: s(t, 'ledger.in'), end: true, cell: (l) => (l.qty > 0 ? qtyText(l.qty) : '') },
     { key: 'out', label: s(t, 'ledger.out'), end: true, cell: (l) => (l.qty < 0 ? qtyText(-l.qty) : '') },

@@ -134,6 +134,7 @@ const PROFIT: SalesProfitView = {
       profitChange: { amount: 20000, bp: 4000 },
     },
   },
+  corrections: { cost: 0, profit: 70000, items: [] },
 };
 
 describe('the sales report addresses', () => {
@@ -182,6 +183,44 @@ describe('sales and gross profit', () => {
     expect(untranslated()).toEqual([]);
   });
 
+  it('shows stock sold before it arrived on its own lines, then gross profit in the books (D-124)', async () => {
+    window.location.hash = href.salesProfit;
+    const { api } = fakeApi({
+      'GET /api/reports/sales-profit': {
+        ...PROFIT,
+        corrections: {
+          cost: 250000,
+          profit: -180000,
+          items: [{ itemId: 'i9', code: 'LAMP001', name: 'HEAD LAMP', cost: 250000 }],
+        },
+      } satisfies SalesProfitView,
+      ...CHOICES,
+    });
+    show(<SalesProfitScreen api={api} />);
+    const table = await screen.findByRole('table', { name: r.corrections.title });
+    expect(plain(within(table).getByText('LAMP001 HEAD LAMP').closest('tr')!.textContent)).toContain('2,500');
+    expect(plain(within(table).getAllByRole('row').at(-1)!.textContent)).toContain('2,500');
+    const inBooks = screen.getByText(
+      (_, el) => el?.tagName === 'P' && (el.textContent ?? '').startsWith(r.corrections.profit),
+    );
+    expect(plain(inBooks.textContent)).toContain('1,800');
+    expect(plain(screen.getByLabelText(en.reports.frame.figures).textContent)).toContain(
+      r.corrections.profit,
+    );
+    expect(untranslated()).toEqual([]);
+  });
+
+  it('leaves the corrections out when there are none', async () => {
+    window.location.hash = href.salesProfit;
+    const { api } = fakeApi({ 'GET /api/reports/sales-profit': PROFIT, ...CHOICES });
+    show(<SalesProfitScreen api={api} />);
+    await screen.findByRole('table', { name: en.nav.salesProfit });
+    expect(screen.queryByRole('table', { name: r.corrections.title })).toBeNull();
+    expect(plain(screen.getByLabelText(en.reports.frame.figures).textContent)).not.toContain(
+      r.corrections.profit,
+    );
+  });
+
   it('puts the grouping, the comparison and the filters in the address', async () => {
     window.location.hash = href.salesProfit;
     const { api } = fakeApi({ 'GET /api/reports/sales-profit': PROFIT, ...CHOICES });
@@ -219,6 +258,7 @@ describe('sales and gross profit', () => {
           },
         ],
         total: { count: 1, cells: noCost, before: null },
+        corrections: null,
       } satisfies SalesProfitView,
       ...CHOICES,
     });

@@ -83,6 +83,21 @@ export interface SalesProfitView {
   /** More rows than the screen shows; the total and the CSV count them all. */
   truncated: boolean;
   total: { count: number; cells: SalesCells; before: SalesBefore | null };
+  /**
+   * Stock sold before it arrived, settled when it came in (D-124): cost of goods sold on no bill, by item, in the
+   * period the stock came in, under the same item filters. None with a salesman or customer filter (it belongs to
+   * neither); null without cost.view.
+   */
+  corrections: SalesCorrections | null;
+}
+
+export interface SalesCorrections {
+  /** Σ of the items' corrections: above 0 is more cost. */
+  cost: number;
+  /** The bills' profit less the corrections: gross profit in the books. */
+  profit: number;
+  /** The largest first. */
+  items: { itemId: string; code: string; name: string; cost: number }[];
 }
 
 // ---- The purchase register (RPT-09) ----

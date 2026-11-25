@@ -643,6 +643,75 @@
         "context": { "withoutRoles": ["OPENING_BALANCE_EQUITY"] }
       },
       "expected": { "ok": false, "error": { "code": "role_unmapped", "role": "OPENING_BALANCE_EQUITY" } }
+    },
+    {
+      "name": "into stock already sold below zero at no cost (pilot sales first): 2 of the 5 cover it, 620,000 to COGS, the rest to equity (D-124)",
+      "input": {
+        "opening": {
+          "id": "opening-1",
+          "label": "final",
+          "branchId": "br-main",
+          "businessDate": "2027-01-01",
+          "stock": [
+            {
+              "id": "ol-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qty": 5000,
+              "unitCost": 310000,
+              "lastPurchase": null
+            }
+          ],
+          "parties": [],
+          "accounts": []
+        },
+        "state": {
+          "costs": { "item-pads": { "avgCost": null, "onHand": -2000 } },
+          "balances": { "loc-shop": { "item-pads": -2000 } }
+        }
+      },
+      "expected": {
+        "ok": true,
+        "posting": {
+          "entryDate": "2027-01-01",
+          "journal": {
+            "branchId": "br-main",
+            "memo": "Opening final",
+            "lines": [
+              { "accountId": "1300", "partyId": null, "debit": 930000, "credit": 0 },
+              { "accountId": "5100", "partyId": null, "debit": 620000, "credit": 0 },
+              { "accountId": "3300", "partyId": null, "debit": 0, "credit": 1550000 }
+            ]
+          },
+          "movements": [
+            {
+              "sourceLineId": "ol-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 5000,
+              "unitCost": 310000,
+              "valueDelta": 1550000,
+              "avgCostAfter": 310000
+            },
+            {
+              "sourceLineId": "ol-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 0,
+              "unitCost": 0,
+              "valueDelta": -620000,
+              "avgCostAfter": 310000
+            }
+          ],
+          "partyEntries": [],
+          "exceptions": [],
+          "state": {
+            "costs": { "item-pads": { "avgCost": 310000, "onHand": 3000 } },
+            "balances": { "loc-shop": { "item-pads": 3000 } }
+          },
+          "lastPurchases": []
+        }
+      }
     }
   ]
 }

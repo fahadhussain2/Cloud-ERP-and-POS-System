@@ -1,0 +1,206 @@
+{
+  "description": "Stock that comes in while on-hand is below zero first covers the shortfall (D-124, posting rules §5.1, W2-09)",
+  "notes": "Amounts in paisa, quantities in thousandths. The units that cover it, n = min(−on hand, qty), were already sold at the average (0 when none was known); correction = their real cost (value × n ÷ qty, half away from zero; the whole value when n = qty) − n × the average. A positive correction is Dr COGS / Cr INVENTORY. The average stays while on-hand stays below zero; at 0 or above it is the incoming cost, as before.",
+  "cases": [
+    {
+      "name": "sold 1 at Rs 3,000, received 1 at Rs 3,200: Rs 200 more cost",
+      "input": {
+        "state": {
+          "avgCost": 300000,
+          "onHand": -1000
+        },
+        "receipt": {
+          "qty": 1000,
+          "value": 320000
+        }
+      },
+      "expected": {
+        "after": {
+          "avgCost": 320000,
+          "onHand": 0
+        },
+        "correction": 20000
+      }
+    },
+    {
+      "name": "sold 1 never bought (cost 0), received 1 at Rs 3,200: the whole cost",
+      "input": {
+        "state": {
+          "avgCost": null,
+          "onHand": -1000
+        },
+        "receipt": {
+          "qty": 1000,
+          "value": 320000
+        }
+      },
+      "expected": {
+        "after": {
+          "avgCost": 320000,
+          "onHand": 0
+        },
+        "correction": 320000
+      }
+    },
+    {
+      "name": "3 short at Rs 3,000, 5 in for Rs 16,000: 3 × Rs 200, and 2 left at Rs 3,200",
+      "input": {
+        "state": {
+          "avgCost": 300000,
+          "onHand": -3000
+        },
+        "receipt": {
+          "qty": 5000,
+          "value": 1600000
+        }
+      },
+      "expected": {
+        "after": {
+          "avgCost": 320000,
+          "onHand": 2000
+        },
+        "correction": 60000
+      }
+    },
+    {
+      "name": "3 short at Rs 3,000, 1 in at Rs 2,900: Rs 100 less cost; still short, the average stays",
+      "input": {
+        "state": {
+          "avgCost": 300000,
+          "onHand": -3000
+        },
+        "receipt": {
+          "qty": 1000,
+          "value": 290000
+        }
+      },
+      "expected": {
+        "after": {
+          "avgCost": 300000,
+          "onHand": -2000
+        },
+        "correction": -10000
+      }
+    },
+    {
+      "name": "then 2 in at Rs 3,100: Rs 200 more cost, back to 0 at Rs 3,100",
+      "input": {
+        "state": {
+          "avgCost": 300000,
+          "onHand": -2000
+        },
+        "receipt": {
+          "qty": 2000,
+          "value": 620000
+        }
+      },
+      "expected": {
+        "after": {
+          "avgCost": 310000,
+          "onHand": 0
+        },
+        "correction": 20000
+      }
+    },
+    {
+      "name": "never bought, 3 short, 1 in: its whole cost; still short, still no cost known",
+      "input": {
+        "state": {
+          "avgCost": null,
+          "onHand": -3000
+        },
+        "receipt": {
+          "qty": 1000,
+          "value": 320000
+        }
+      },
+      "expected": {
+        "after": {
+          "avgCost": null,
+          "onHand": -2000
+        },
+        "correction": 320000
+      }
+    },
+    {
+      "name": "stock on hand: no correction, the average as before",
+      "input": {
+        "state": {
+          "avgCost": 300000,
+          "onHand": 2000
+        },
+        "receipt": {
+          "qty": 1000,
+          "value": 330000
+        }
+      },
+      "expected": {
+        "after": {
+          "avgCost": 310000,
+          "onHand": 3000
+        },
+        "correction": 0
+      }
+    },
+    {
+      "name": "nothing on hand: no correction, the incoming cost",
+      "input": {
+        "state": {
+          "avgCost": 300000,
+          "onHand": 0
+        },
+        "receipt": {
+          "qty": 1000,
+          "value": 330000
+        }
+      },
+      "expected": {
+        "after": {
+          "avgCost": 330000,
+          "onHand": 1000
+        },
+        "correction": 0
+      }
+    },
+    {
+      "name": "1.5 m of hose short at Rs 450, 2 m in for Rs 1,000: 1.5 × Rs 500 − 1.5 × Rs 450",
+      "input": {
+        "state": {
+          "avgCost": 45000,
+          "onHand": -1500
+        },
+        "receipt": {
+          "qty": 2000,
+          "value": 100000
+        }
+      },
+      "expected": {
+        "after": {
+          "avgCost": 50000,
+          "onHand": 500
+        },
+        "correction": 7500
+      }
+    },
+    {
+      "name": "a value that does not divide: 1 short at Rs 1,000, 3 in for Rs 1,000; the covering unit really cost Rs 333.33",
+      "input": {
+        "state": {
+          "avgCost": 100000,
+          "onHand": -1000
+        },
+        "receipt": {
+          "qty": 3000,
+          "value": 100000
+        }
+      },
+      "expected": {
+        "after": {
+          "avgCost": 33333,
+          "onHand": 2000
+        },
+        "correction": -66667
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { add, money, negate, qty, sum, type Money } from '@erp/domain';
 
-import { averageAfterReceipt, costOf } from './cost';
+import { averageAfterReceipt, costOf, shortfallCorrection } from './cost';
 import { entryDateOf } from './dates';
 import type {
   CostState,
@@ -49,6 +49,7 @@ export function postOpening(
     balances[loc]?.[item] ?? state.balances[loc]?.[item] ?? qty(0);
   const movements: StockMovement[] = [];
   const noCost = new Set<string>();
+  let corrections = money(0);
   for (const l of opening.stock) {
     if (l.qty === 0) continue;
     const before = costNow(l.itemId);
@@ -73,6 +74,20 @@ export function postOpening(
       valueDelta: costOf(l.qty, unit),
       avgCostAfter: after.avgCost,
     });
+    // D-124: stock already sold below zero (pilot sales before the opening) is settled at the opening cost.
+    const correction = shortfallCorrection(before, { qty: l.qty, value: costOf(l.qty, unit) });
+    if (correction !== 0) {
+      corrections = add(corrections, correction);
+      movements.push({
+        sourceLineId: l.id,
+        itemId: l.itemId,
+        locationId: l.locationId,
+        qtyDelta: qty(0),
+        unitCost: money(0),
+        valueDelta: negate(correction),
+        avgCostAfter: after.avgCost,
+      });
+    }
   }
 
   // `net` > 0 debits the account, < 0 credits it.
@@ -82,6 +97,11 @@ export function postOpening(
     const inventory = role('INVENTORY');
     if (inventory === null) return missing('INVENTORY');
     legs.push({ accountId: inventory, partyId: null, net: stockValue });
+  }
+  if (corrections !== 0) {
+    const cogs = role('COGS');
+    if (cogs === null) return missing('COGS');
+    legs.push({ accountId: cogs, partyId: null, net: corrections });
   }
   const partyEntries: PartyEntry[] = [];
   for (const r of ['customer', 'supplier'] as const) {

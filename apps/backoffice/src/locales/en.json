@@ -824,7 +824,8 @@
         "purchase_return": "Purchase return",
         "stock_transfer": "Transfer",
         "stock_transfer_receipt": "Transfer received",
-        "stock_adjustment": "Adjustment"
+        "stock_adjustment": "Adjustment",
+        "costCorrection": "Cost correction: sold before it arrived"
       },
       "reorder": {
         "help": "Items whose stock in the Shop and the Godown is at or below their minimum, with the quantity that brings them up to the maximum, by supplier. Filter one supplier to print their list.",
@@ -922,6 +923,11 @@
       "changeSales": "Sales change",
       "total": "Total",
       "truncated": "Only the first 2,000 rows are shown, but every total counts them all. Narrow the filters or download the CSV to see the rest.",
+      "corrections": {
+        "title": "Cost corrections: stock sold before it arrived",
+        "help": "Parts sold before the shop had them (borrowed, or not yet received) were costed at the average then, or at nothing if never bought. When the stock came in, the difference to what it really cost went to cost of goods sold here, in the period it came in. Each bill keeps the profit it showed on the day.",
+        "profit": "Gross profit in the books"
+      },
       "beforeGoLive": "The comparison starts before {{since}}, when the system began: it holds only what was sold since then.",
       "register": {
         "kind": "Type",
@@ -1973,6 +1979,7 @@
       "balance": "Balance",
       "total": "Total",
       "older": "Older movements",
+      "costCorrection": "Cost correction: sold before it arrived",
       "kinds": {
         "sale": "Sale",
         "sales_void": "Void",

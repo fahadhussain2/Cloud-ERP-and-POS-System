@@ -22,7 +22,7 @@ import type {
 
 const context = (lockDate: string | null = null): PostingContext => ({
   accounts: {
-    roles: { INVENTORY: '1300', AP_CONTROL: '2100', PURCHASE_PRICE_VARIANCE: '5300' },
+    roles: { INVENTORY: '1300', AP_CONTROL: '2100', COGS: '5100', PURCHASE_PRICE_VARIANCE: '5300' },
     methods: {},
     targets: { 'bank-hbl': '1160' },
   },

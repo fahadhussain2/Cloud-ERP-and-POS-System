@@ -140,6 +140,12 @@ A handover always posts the bill's **cash due** (or refund amount). The salesman
 - If on_hand > 0: `new_avg = (on_hand × avg + qty × net_unit_cost) / (on_hand + qty)`, rounded to minor units.
 - If on_hand ≤ 0 before the receipt: `new_avg = net_unit_cost`.
 
+**Stock sold before it arrived (D-124, W2-09).** While an item's tenant-wide on-hand is below zero, the average stays as it is, so every unit short was sold at it. Stock that comes in meanwhile (a goods receipt, a returned line, a void bringing stock back, opening stock) first covers the shortfall: with on-hand *h* < 0 and *q* units of value *V* coming in, *n* = min(−*h*, *q*) units cover it, and
+
+`correction = V × n ÷ q (half away from zero; V when n = q) − n × avg (0 when none was known)`
+
+is posted in the same entry: above 0 `Dr COGS / Cr INVENTORY`, below 0 the reverse. It is also its own stock movement, with no quantity (`qty_delta` 0, `unit_cost` 0, `value_delta` −correction), on the same source, line and location as the movement that brought the stock in, so Σ `value_delta` stays equal to Inventory. The average becomes the incoming cost only when on-hand reaches 0 or above. Transfers and adjustments never need it (they don't change the on-hand, or come in at the average). The sale itself is never changed.
+
 **As built (W1-16, D-105):** `postGoodsReceipt` posts each line's exact net value (the bill discount already in it) and computes the average from that value; paid by bank adds `Dr AP_CONTROL / Cr <bank>` in the same entry. A cash purchase is paid at the desk (§4.5).
 
 ### 5.2 Purchase return (debit note)

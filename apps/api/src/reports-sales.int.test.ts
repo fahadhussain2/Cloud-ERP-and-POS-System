@@ -19,6 +19,7 @@ import {
   type SalesChoicesView,
   type SalesOverTimeView,
   type SalesProfitView,
+  type StockAtView,
 } from '@erp/contracts';
 import { setupTenant, withTenant } from '@erp/db';
 import { createTestDatabase, seedCatalog, type TestDatabase } from '@erp/db/testing';
@@ -908,7 +909,8 @@ describe("the owner's dashboard (W2-06; RPT-18, D-118)", () => {
     expect(d.comparison).toEqual({ from: daysAgo(7), to: daysAgo(7) });
     expect(d.netSales.now).toBe(sales.total.cells.sales);
     expect(d.netSales.bills).toBe(sales.total.cells.bills);
-    expect(d.grossProfit.now).toBe(sales.total.cells.profit);
+    // Gross profit in the books: the bills' and any cost corrections (D-124).
+    expect(d.grossProfit.now).toBe(sales.corrections!.profit);
     expect(d.grossProfit.marginBp).toBe(sales.total.cells.marginBp);
     expect(d.trend.step).toBe('hour');
     expect(d.trend.points.reduce((s, p) => s + (p.now ?? 0), 0)).toBe(d.netSales.now);
@@ -1110,4 +1112,70 @@ describe('a year of sales', () => {
     for (const [name, t] of Object.entries({ byCategory, byItem, overTime, rates }))
       expect([name, t.ms < 2000], `${name} took ${Math.round(t.ms)} ms`).toEqual([name, true]);
   }, 600_000);
+});
+
+// Last, so the figures above don't move: a lamp sold before it arrived (never bought, so at no cost), then received.
+describe('stock sold before it arrived (W2-09, D-124)', () => {
+  it('settles its cost when it comes in, on a line of its own; the books and the stock still match', async () => {
+    Object.assign(
+      items,
+      await withTenant(pool, { tenantId }, (_db, c) =>
+        seedCatalog(c, tenantId, [{ code: 'LAMP001', name: 'HEAD LAMP', category: 'LAMPS' }]),
+      ),
+    );
+    await push([sale(sara, [line('l1', 'LAMP001', 1, 300000)])]);
+    await receive(oilCo, today(), 'LAMP001', 1000, 250000);
+    await postPending(pool, tenantId, { now: () => new Date() });
+
+    const r = await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}`);
+    expect(r.corrections).toEqual({
+      cost: 250000,
+      profit: r.total.cells.sales - r.total.cells.cost! - 250000,
+      items: [{ itemId: items['LAMP001'], code: 'LAMP001', name: 'HEAD LAMP', cost: 250000 }],
+    });
+    // The bills' cost and the corrections together are cost of goods sold in the books.
+    expect(r.total.cells.cost! + r.corrections!.cost).toBe(await books(['COGS'], D0(), today()));
+    // The lamp's line on its bill keeps the cost it had on the day (none).
+    const byItem = await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}&group=item`);
+    expect(byItem.rows.find((x) => x.code === 'LAMP001')!.cells.cost).toBe(0);
+
+    // Nothing left of the lamp: 0 on hand and 0 in the books.
+    const [lamp] = await q<{ qty: string; value: string }>(
+      'SELECT sum(qty_delta)::text AS qty, sum(value_delta)::text AS value FROM erp.stock_movements WHERE item_id = $1',
+      [items['LAMP001']],
+    );
+    expect([Number(lamp!.qty), Number(lamp!.value)]).toEqual([0, 0]);
+    expect((await view<StockAtView>('/api/reports/stock-at')).total.value).toBe(
+      await books(['INVENTORY'], '2000-01-01', today()),
+    );
+
+    // Filtered to another category, or to a salesman, there are none; without cost.view, none either.
+    const oil = (await q<{ id: string }>("SELECT id FROM erp.categories WHERE name = 'OIL'"))[0]!.id;
+    expect(
+      (await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}&categoryId=${oil}`)).corrections,
+    ).toMatchObject({ cost: 0, items: [] });
+    expect(
+      (await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}&salesmanId=${sara}`)).corrections,
+    ).toMatchObject({ cost: 0, items: [] });
+    expect(
+      (await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}`, 'noor')).corrections,
+    ).toBeNull();
+
+    // The dashboard's gross profit is the books', corrections included; its margin from the same profit.
+    const t = today();
+    const todays = await view<SalesProfitView>(`/api/reports/sales-profit?from=${t}&to=${t}&compare=none`);
+    const d = await view<DashboardView>('/api/dashboard?period=today');
+    expect(todays.corrections!.cost).toBe(250000);
+    expect(d.grossProfit.now).toBe(todays.corrections!.profit);
+    expect(d.grossProfit.marginBp).toBe(
+      Math.round((todays.corrections!.profit * 10000) / todays.total.cells.sales),
+    );
+
+    // The CSV ends with each item's correction, their total and the profit in the books.
+    const csv = await send('GET', `/api/reports/sales-profit?${ALL()}&format=csv`, 'fahad');
+    const tail = csv.body.trim().split('\n').slice(-3);
+    expect(tail[0]).toMatch(/^LAMP001,HEAD LAMP,/);
+    expect(tail[1]).toMatch(/^,cost_corrections,/);
+    expect(tail[2]).toMatch(/^,profit_in_books,/);
+  });
 });

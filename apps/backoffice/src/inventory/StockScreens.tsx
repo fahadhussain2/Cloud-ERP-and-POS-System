@@ -165,6 +165,12 @@ export function StockCardScreen({ api, itemId }: { api: Api; itemId: string | nu
                         ) : (
                           <span className="font-mono">{label}</span>
                         )}
+                        {v.qty === 0 && (
+                          // D-124: value with no quantity, for stock sold before it arrived.
+                          <span className="ms-2 text-xs text-muted-foreground">
+                            {t('inventory.card.costCorrection')}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>{name(v.locationId)}</TableCell>
                       <TableCell className="text-end tabular-nums">
@@ -175,7 +181,7 @@ export function StockCardScreen({ api, itemId }: { api: Api; itemId: string | nu
                       </TableCell>
                       {lookups.can.viewCost && (
                         <TableCell className="text-end tabular-nums">
-                          {v.unitCost === null ? '—' : formatMoney(v.unitCost, m)}
+                          {v.qty === 0 ? '' : v.unitCost === null ? '—' : formatMoney(v.unitCost, m)}
                         </TableCell>
                       )}
                       {lookups.can.viewCost && (

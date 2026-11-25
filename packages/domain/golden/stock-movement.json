@@ -422,6 +422,30 @@
       }
     },
     {
+      "name": "below zero, then a receipt that settles it (D-124): the cost correction has no quantity and counts with the sales, as cost of goods sold",
+      "input": {
+        "opening": { "qty": -1500, "value": -15000 },
+        "moves": [
+          { "source": "goods_receipt", "qty": 3000, "value": 33000 },
+          { "source": "goods_receipt", "qty": 0, "value": -1500 }
+        ]
+      },
+      "expected": {
+        "opening": { "qty": -1500, "value": -15000 },
+        "buckets": {
+          "openings": { "qty": 0, "value": 0 },
+          "purchases": { "qty": 3000, "value": 33000 },
+          "purchaseReturns": { "qty": 0, "value": 0 },
+          "sales": { "qty": 0, "value": -1500 },
+          "salesReturns": { "qty": 0, "value": 0 },
+          "adjustments": { "qty": 0, "value": 0 },
+          "transfersIn": { "qty": 0, "value": 0 },
+          "transfersOut": { "qty": 0, "value": 0 }
+        },
+        "closing": { "qty": 1500, "value": 16500 }
+      }
+    },
+    {
       "name": "no movements: the closing is the opening",
       "input": {
         "opening": {
