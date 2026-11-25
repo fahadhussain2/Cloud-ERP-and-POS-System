@@ -19,6 +19,7 @@ const ROLES: Partial<Record<PostingRole, string>> = {
   INVENTORY: '1300',
   AP_CONTROL: '2100',
   OPENING_BALANCE_EQUITY: '3300',
+  COGS: '5100',
 };
 
 interface Input {

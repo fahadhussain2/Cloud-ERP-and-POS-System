@@ -154,6 +154,40 @@
         "avgCost": 225000,
         "onHand": 4000
       }
+    },
+    {
+      "name": "still below zero after the receipt: the average stays, so the units still short keep the cost they were sold at (D-124)",
+      "input": {
+        "state": {
+          "avgCost": 300000,
+          "onHand": -3000
+        },
+        "receipt": {
+          "qty": 1000,
+          "netUnitCost": 290000
+        }
+      },
+      "expected": {
+        "avgCost": 300000,
+        "onHand": -2000
+      }
+    },
+    {
+      "name": "still below zero and no cost known: the average stays unknown (D-124)",
+      "input": {
+        "state": {
+          "avgCost": null,
+          "onHand": -3000
+        },
+        "receipt": {
+          "qty": 1000,
+          "netUnitCost": 320000
+        }
+      },
+      "expected": {
+        "avgCost": null,
+        "onHand": -2000
+      }
     }
   ]
 }
