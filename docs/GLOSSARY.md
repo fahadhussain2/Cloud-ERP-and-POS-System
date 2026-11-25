@@ -43,3 +43,4 @@
 | **Cash flow** | Money into and out of cash and bank by what it was for (sales, customers, suppliers, expenses, the owner), month by month; moves between the shop's own cash and bank accounts are left out (ACC-07) |
 | **User activity** | Who did what: the audit log's sign-ins, edits and events, and the documents each person made (RPT-17) |
 | **Wave** | A build-order block of the MVP (Wave 0 foundations, Wave 1 critical path, Wave 2 rest of MVP) |
+| **Cost correction** | A stock movement of value with no quantity: when stock sold before it arrived (borrowed from another shop, or not yet received) comes in, the difference between what it really cost and the average it was sold at goes to cost of goods sold. Shown on the stock card and on its own line in Sales and gross profit (D-124, W2-09) |

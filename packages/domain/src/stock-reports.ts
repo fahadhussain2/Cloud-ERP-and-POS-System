@@ -40,6 +40,12 @@ export type MovementBucket = (typeof MOVEMENT_BUCKETS)[number];
  * of one location and into another.
  */
 export function bucketOf(source: string, qty: number): MovementBucket {
+  const bucket = bySource(source, qty);
+  // A cost correction (D-124): value with no quantity, for stock sold before it arrived, so cost of goods sold.
+  return qty === 0 ? 'sales' : bucket;
+}
+
+function bySource(source: string, qty: number): MovementBucket {
   switch (source) {
     case 'opening':
       return 'openings';

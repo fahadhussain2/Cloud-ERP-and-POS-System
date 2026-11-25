@@ -62,7 +62,7 @@ The reports are designed the modern way: one frame for all of them (filters at t
 | Inventory analysis | ABC by sales and by profit, turnover, days of cover | none | RPT-14 | W2-02 (last) | Built |
 | **Sales and purchases** | | | | | |
 | Sales register | Every bill of a day or range, totals by salesman, counter and tender | Daily Sales Register (bill-wise) | RPT-01 | W1-20 | Built, on the frame (W2-04 answer 8) |
-| Sales and gross profit | Sales, cost and profit by item, category, brand, salesman, customer or period | Daily Sales Register (item list, bill-wise P&L) | RPT-07 | W2-03 | Built; equals net sales and cost of goods sold in the books |
+| Sales and gross profit | Sales, cost and profit by item, category, brand, salesman, customer or period | Daily Sales Register (item list, bill-wise P&L) | RPT-07 | W2-03 | Built; equals net sales and cost of goods sold in the books, with the cost corrections for stock sold before it arrived on a line of their own (D-124, W2-09) |
 | Purchase register | Every goods receipt and return in a range, by supplier | none | RPT-09 | W2-03 | Built |
 | Purchase and sale rates | For an item or a party: every purchase and sale with its rate, and the spread | Item Purchase and Sale Rate Analysis (four variants become one report) | RPT-09 | W2-03 | Built; up to a year (W2-03 answer 4) |
 | Sales over time | Daily trend, hour × weekday, top and bottom items, discounts | none | RPT-15 | W2-03 (last) | Built; the first charts |

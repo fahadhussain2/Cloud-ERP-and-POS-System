@@ -189,6 +189,7 @@ export type {
   SalesCells,
   SalesChoicesView,
   SalesCompare,
+  SalesCorrections,
   SalesGroup,
   SalesOverTimeView,
   SalesProfitView,

@@ -350,6 +350,31 @@ describe('reading the stock', () => {
     expect(within(plain).queryByText(/Rs/)).toBeNull();
   });
 
+  it('marks a movement of value with no quantity as a cost correction, with no unit cost (D-124)', async () => {
+    const correction = {
+      seq: 4,
+      date: '2026-11-09',
+      kind: 'goods_receipt',
+      documentId: 'g1',
+      number: 'GR000001',
+      locationId: 'shop',
+      qty: 0,
+      unitCost: 0,
+      value: -20000,
+      balance: 5000,
+      total: 10000,
+    };
+    const f = fakeApi(lookups(), {
+      'GET /api/inventory/items/i1/card': { status: 200, body: { ...CARD, movements: [correction] } },
+    });
+    show(<StockCardScreen api={f.api} itemId="i1" />);
+    const table = await screen.findByRole('table', { name: en.inventory.card.movements });
+    const row = within(table).getByText(en.inventory.card.costCorrection).closest('tr')!;
+    expect(within(row).getByRole('link', { name: 'GR000001' }).getAttribute('href')).toBe(href.receipt('g1'));
+    expect(within(row).getAllByText(/Rs/)).toHaveLength(1);
+    expect(within(row).getByText(/200/)).toBeTruthy();
+  });
+
   it('Transfer needed lists the short items and opens a transfer for them', async () => {
     const f = fakeApi(lookups(), {
       'GET /api/inventory/transfer-needed': {

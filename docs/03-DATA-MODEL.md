@@ -230,7 +230,7 @@ Held bills are **device-local only** and never sent to the server.
 
 **Built in W1-08 (migration 0009):** the ledgers below, written only by `packages/posting` ([accounting spec](modules/accounting/spec.md)). Every row has the `posting_seq` of its posting.
 
-**stock_movements**† (append-only ledger): `item_id, location_id, qty_delta, unit_cost, value_delta, avg_cost_after, source_type, source_id, source_line_id, business_date (the entry date), posted_at`
+**stock_movements**† (append-only ledger): `item_id, location_id, qty_delta, unit_cost, value_delta, avg_cost_after, source_type, source_id, source_line_id, business_date (the entry date), posted_at`. A movement moves a quantity, except a **cost correction** (D-124): `qty_delta` 0, `unit_cost` 0 and a value, for stock sold before it arrived (posting rules §5.1).
 
 **stock_balances**†: `item_id, location_id, qty`. PK `(tenant_id, item_id, location_id)`. Synced to devices.
 

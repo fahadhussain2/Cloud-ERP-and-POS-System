@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | to open after the plan is accepted |
 | **Module** | accounting (`packages/posting`: the cost rule), with inventory (the stock card) and reports (sales and gross profit) |
-| **Status** | Accepted (owner, 2026-11-25, in chat): question 1 as recommended |
+| **Status** | Built (2026-11-25) on branch `fix/sold-before-received`, waiting for review; accepted by the owner the same day, question 1 as recommended |
 | **Refs** | INV-02 (average cost), INV-03 (negative stock allowed), ACC-02 (the rebuild), RPT-07 (sales and gross profit); posting rules §5.1; data model §7; CLAUDE.md rules 1, 3, 4; D-015, D-017, D-101; D-124 (new, below) |
 | **Depends on** | W1-08 (the engine), W1-16 (goods receipts), W1-13 (returns), W2-02 and W2-03 (the stock and sales reports) |
 | **Size** | about 2 days: the cost rule and golden files ¾; the migration and the ledger writer ¼; the stock card and the gross profit report ½; integration tests, rebuild on staging and docs ½ |
@@ -89,4 +89,19 @@ The ledgers are derived (rule 4), so the rebuild check on staging will report di
 
 ## Results
 
-To fill in after the build.
+Built as planned, with these details settled while building:
+
+- **One rule, four callers.** `shortfallCorrection` and `settleShortfall` in `cost.ts`; the average freezes inside `averageAfterReceipt` and `averageAfterValue`, so every caller gets it. Goods receipts, returned lines, voids and opening stock post the correction; a void reverses a correction its sale carried as it was.
+- **Load order.** A posting's movements now load with a correction after its line's movement (`ORDER BY line_no, qty_delta = 0, id`), so a void replays the same way live and in the rebuild.
+- **`schema.ts` needed no change.** It mirrors columns, not checks, and no column changed; only migration `0025_cost_correction.sql` relaxes the check.
+- **Stock movement report:** a correction counts with the **sales** bucket (value only), since it is cost of goods sold; the stock ledger and stock card call it *Cost correction: sold before it arrived*.
+- **Sales and gross profit:** line costs leave corrections out; `corrections` lists them by item with their total and gross profit in the books, under the item filters; none with a salesman or customer filter; null without cost.view. The CSV ends with the items' lines, `cost_corrections` and `profit_in_books`. The screen shows the list under the table and a *Gross profit in the books* figure when there is a correction.
+- **Not changed:** the dashboard's profit figure still counts the bills only. A correction is rare and it can follow if the owner wants it.
+
+Checks (2026-11-25, local, Node 24):
+
+- `pnpm check`: format, lint, typecheck, 2,724 tests in 140 files with coverage, builds: all passed.
+- `pnpm test:integration` (PostgreSQL 17.9): 549 tests in 50 files passed, including the new lamp case (the bills' cost plus the corrections equal COGS; the stock report equals Inventory; the lamp leaves 0 on hand and 0 value).
+- `pnpm e2e` (Edge): 81 passed.
+
+After the deploy to staging: run `posting-check`, then `posting-rebuild` for both shops, and confirm the stock report equals Inventory in the books.
