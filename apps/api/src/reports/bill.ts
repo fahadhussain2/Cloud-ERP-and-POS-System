@@ -1,11 +1,21 @@
-import type { BillApprovalView, BillLineView, BillView } from '@erp/contracts';
+import type {
+  BillApprovalView,
+  BillLineView,
+  BillListRow,
+  BillListView,
+  BillView,
+  ReturnListRow,
+  ReturnListView,
+} from '@erp/contracts';
 import { withTenant } from '@erp/db';
-import { can, salesFigures, type Permission } from '@erp/domain';
-import type { FastifyInstance, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
+import { can, periodOf, RETURN_REASONS, salesFigures, type Permission } from '@erp/domain';
+import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
 import type pg from 'pg';
 
 import { requirePermission } from '../auth/routes';
-import { moneyOf } from './routes';
+import { BadRequest, LIST_DAYS, rangeOf, shop } from './financial';
+import { csv, moneyOf, sendCsv, type Cell } from './routes';
+import { STOCK_ROWS } from './stock';
 
 // Bill details (W2-10 plan, D-125): one bill, read only, for anyone with reports.view. Found by its number, as Trace
 // a bill finds it (the first received, should a number repeat). A line's cost and sales are Sales and gross profit's
@@ -14,6 +24,7 @@ import { moneyOf } from './routes';
 
 interface Deps {
   pool: pg.Pool;
+  now: () => Date;
   requireAuth: preHandlerAsyncHookHandler;
 }
 
@@ -296,8 +307,261 @@ async function billOf(
   };
 }
 
-export function registerBill(scope: FastifyInstance, { pool, requireAuth }: Deps) {
+// ---- Bills and Returns (W2-11 plan, D-126): the sales documents as lists, opening today, up to 92 days ----
+
+type Query = Record<string, string | undefined>;
+type Shop = { today: string; startMonth: number };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** A LIKE pattern's own %, _ and \ taken literally (as the sales reports' search). */
+const likeEscape = (s: string) => s.replace(/[\\%_]/g, (x) => `\\${x}`);
+
+/** The filters both lists share: the period, the search and the salesman, as SQL parameters $1 to $4. */
+function sharedFilters(q: Query, s: Shop) {
+  const p = rangeOf(q, periodOf('today', s.today, s.startMonth), LIST_DAYS, s);
+  const text = (q['q'] ?? '').trim();
+  const salesman = q['salesmanId'] || null;
+  if (salesman !== null && !UUID.test(salesman)) throw new BadRequest('bad_request');
+  if (text.length > 80) throw new BadRequest('bad_request');
+  return { p, params: [p.from, p.to, text === '' ? null : `%${likeEscape(text)}%`, salesman] as unknown[] };
+}
+function choice<T extends string>(q: Query, key: string, choices: readonly T[]): T | null {
+  const v = q[key] || null;
+  if (v !== null && !(choices as readonly string[]).includes(v)) throw new BadRequest('bad_request');
+  return v as T | null;
+}
+/** The search and salesman conditions, on documents `d` with their customer `p`. */
+const SHARED = `d.deleted_at IS NULL AND d.business_date BETWEEN $1 AND $2
+  AND ($3::text IS NULL OR d.number ILIKE $3 OR p.name ILIKE $3 OR p.code ILIKE $3 OR d.walkin_phone ILIKE $3)
+  AND ($4::uuid IS NULL OR d.salesperson_user_id = $4)`;
+const customerOf = (r: { party_id: string | null; party_code: string | null; party_name: string | null }) =>
+  r.party_id === null ? null : { id: r.party_id, code: r.party_code ?? '', name: r.party_name ?? '' };
+/** Finalized documents only: a voided one is listed and left out. */
+function totalOf(rows: { status: string; total: number }[]) {
+  const done = rows.filter((r) => r.status === 'finalized');
+  return { count: done.length, amount: done.reduce((t, r) => t + r.total, 0) };
+}
+
+async function billsOf(c: Client, q: Query, s: Shop) {
+  const { p, params } = sharedFilters(q, s);
+  const method = q['method'] || null;
+  if (method !== null && !/^[a-z_]{1,30}$/.test(method)) throw new BadRequest('bad_request');
+  const status = choice(q, 'status', ['finalized', 'voided'] as const);
+  const { rows } = await c.query<{
+    id: string;
+    number: string;
+    at: Date;
+    party_id: string | null;
+    party_code: string | null;
+    party_name: string | null;
+    walkin_phone: string | null;
+    items: number;
+    total: string;
+    paid_by: string[] | null;
+    status: 'finalized' | 'voided';
+    void_number: string | null;
+  }>(
+    `SELECT d.id, d.number, d.created_at_device AS at, p.id AS party_id, p.code AS party_code, p.name AS party_name,
+       d.walkin_phone, d.total, d.status, d.void_number,
+       (SELECT count(*)::int FROM erp.sales_lines l WHERE l.document_id = d.id AND l.deleted_at IS NULL) AS items,
+       (SELECT array_agg(pm.name ORDER BY sp.line_no) FROM erp.sales_payments sp
+        JOIN erp.payment_methods pm ON pm.id = sp.method_id
+        WHERE sp.document_id = d.id AND sp.deleted_at IS NULL) AS paid_by
+     FROM erp.sales_documents d LEFT JOIN erp.parties p ON p.id = d.customer_party_id
+     WHERE d.kind = 'sale' AND ${SHARED}
+       AND ($5::text IS NULL OR EXISTS (SELECT 1 FROM erp.sales_payments sp
+         JOIN erp.payment_methods pm ON pm.id = sp.method_id
+         WHERE sp.document_id = d.id AND sp.deleted_at IS NULL AND pm.code = $5))
+       AND ($6::text IS NULL OR d.status = $6)
+     ORDER BY d.business_date DESC, d.created_at_device DESC, d.number DESC`,
+    [...params, method, status],
+  );
+  const all: BillListRow[] = rows.map((r) => ({
+    id: r.id,
+    number: r.number,
+    at: iso(r.at)!,
+    customer: customerOf(r),
+    walkinPhone: r.walkin_phone,
+    items: r.items,
+    total: Number(r.total),
+    paidBy: [...new Set(r.paid_by ?? [])],
+    status: r.status,
+    voidNumber: r.void_number,
+  }));
+  const methods = (
+    await c.query<{ code: string; name: string }>(
+      'SELECT code, name FROM erp.payment_methods WHERE is_active ORDER BY sort, code',
+    )
+  ).rows;
+  return { p, all, methods };
+}
+
+async function returnsOf(c: Client, q: Query, s: Shop) {
+  const { p, params } = sharedFilters(q, s);
+  const kind = choice(q, 'kind', ['return', 'exchange'] as const);
+  const reason = choice(q, 'reason', RETURN_REASONS);
+  const { rows } = await c.query<{
+    id: string;
+    number: string;
+    at: Date;
+    kind: 'return' | 'exchange';
+    original: string | null;
+    party_id: string | null;
+    party_code: string | null;
+    party_name: string | null;
+    walkin_phone: string | null;
+    items_back: string;
+    reasons: (string | null)[] | null;
+    total: string;
+    handover_status: string;
+    desk: string | null;
+    status: 'finalized' | 'voided';
+  }>(
+    `SELECT d.id, d.number, d.created_at_device AS at, d.kind, d.return_of_number AS original, p.id AS party_id,
+       p.code AS party_code, p.name AS party_name, d.walkin_phone, d.total, d.handover_status, d.status,
+       (SELECT (coalesce(-sum(l.qty), 0) * 1000)::bigint FROM erp.sales_lines l
+        WHERE l.document_id = d.id AND l.qty < 0 AND l.deleted_at IS NULL) AS items_back,
+       (SELECT array_agg(DISTINCT l.return_reason_code) FROM erp.sales_lines l
+        WHERE l.document_id = d.id AND l.qty < 0 AND l.deleted_at IS NULL) AS reasons,
+       (SELECT v.code FROM erp.cash_handovers h JOIN erp.devices v ON v.id = h.device_id
+        WHERE h.sales_document_id = d.id AND h.kind = 'payout' ORDER BY h.at_device LIMIT 1) AS desk
+     FROM erp.sales_documents d LEFT JOIN erp.parties p ON p.id = d.customer_party_id
+     WHERE d.kind IN ('return', 'exchange') AND ${SHARED}
+       AND ($5::text IS NULL OR d.kind = $5)
+       AND ($6::text IS NULL OR EXISTS (SELECT 1 FROM erp.sales_lines l WHERE l.document_id = d.id
+         AND l.qty < 0 AND l.deleted_at IS NULL AND l.return_reason_code = $6))
+     ORDER BY d.business_date DESC, d.created_at_device DESC, d.number DESC`,
+    [...params, kind, reason],
+  );
+  const all: ReturnListRow[] = rows.map((r) => {
+    const total = Number(r.total);
+    const reasons = (r.reasons ?? []).filter((x): x is string => x !== null);
+    const refund: ReturnListRow['refund'] =
+      r.handover_status === 'paid_out'
+        ? 'paid'
+        : r.handover_status === 'pending' && total < 0
+          ? 'pending'
+          : 'none';
+    return {
+      id: r.id,
+      number: r.number,
+      at: iso(r.at)!,
+      kind: r.kind,
+      originalBill: r.original,
+      customer: customerOf(r),
+      walkinPhone: r.walkin_phone,
+      itemsBack: Number(r.items_back),
+      reason: reasons.length === 1 ? reasons[0]! : reasons.length === 0 ? 'other' : 'several',
+      total,
+      refund,
+      refundDesk: refund === 'paid' ? r.desk : null,
+      status: r.status,
+    };
+  });
+  return { p, all };
+}
+
+export function registerBill(scope: FastifyInstance, { pool, now, requireAuth }: Deps) {
   const allowed = (req: FastifyRequest, p: Permission) => can(req.auth!.grants, p, null);
+  const view = requirePermission(requireAuth, 'reports.view');
+  const run = async <T>(
+    req: FastifyRequest,
+    reply: FastifyReply,
+    fn: (c: Client, s: Shop) => Promise<T>,
+  ): Promise<T | FastifyReply> => {
+    try {
+      return await withTenant(
+        pool,
+        { tenantId: req.auth!.tenantId, userId: req.auth!.userId, requestId: req.id },
+        async (_db, c) => fn(c, await shop(c, now())),
+      );
+    } catch (err) {
+      if (err instanceof BadRequest) return reply.code(400).send({ error: err.error });
+      throw err;
+    }
+  };
+  const query = (req: FastifyRequest) => req.query as Query;
+  const wantsCsv = (req: FastifyRequest) => query(req)['format'] === 'csv';
+  const who = (r: { customer: { code: string; name: string } | null; walkinPhone: string | null }) =>
+    r.customer ? `${r.customer.name} (${r.customer.code})` : (r.walkinPhone ?? '');
+
+  scope.get('/sales/bills', { preHandler: view }, async (req, reply) =>
+    run(req, reply, async (c, s) => {
+      const { p, all, methods } = await billsOf(c, query(req), s);
+      if (wantsCsv(req))
+        return sendCsv(
+          reply,
+          `bills-${p.from}-${p.to}.csv`,
+          csv(
+            ['number', 'at', 'customer', 'items', 'total', 'paid_by', 'status', 'void_number'],
+            all.map((r): Cell[] => [
+              r.number,
+              r.at,
+              who(r),
+              r.items,
+              r.total / 100,
+              r.paidBy.join(' + '),
+              r.status,
+              r.voidNumber,
+            ]),
+          ),
+        );
+      const out: BillListView = {
+        money: await moneyOf(c),
+        ...p,
+        methods,
+        rows: all.slice(0, STOCK_ROWS),
+        truncated: all.length > STOCK_ROWS,
+        total: totalOf(all),
+      };
+      return out;
+    }),
+  );
+
+  scope.get('/sales/returns', { preHandler: view }, async (req, reply) =>
+    run(req, reply, async (c, s) => {
+      const { p, all } = await returnsOf(c, query(req), s);
+      if (wantsCsv(req))
+        return sendCsv(
+          reply,
+          `returns-${p.from}-${p.to}.csv`,
+          csv(
+            [
+              'number',
+              'at',
+              'type',
+              'original_bill',
+              'customer',
+              'items_back',
+              'reason',
+              'total',
+              'refund',
+              'status',
+            ],
+            all.map((r): Cell[] => [
+              r.number,
+              r.at,
+              r.kind,
+              r.originalBill,
+              who(r),
+              r.itemsBack / 1000,
+              r.reason,
+              r.total / 100,
+              r.refundDesk ? `${r.refund} ${r.refundDesk}` : r.refund,
+              r.status,
+            ]),
+          ),
+        );
+      const out: ReturnListView = {
+        money: await moneyOf(c),
+        ...p,
+        rows: all.slice(0, STOCK_ROWS),
+        truncated: all.length > STOCK_ROWS,
+        total: totalOf(all),
+      };
+      return out;
+    }),
+  );
+
   scope.get<{ Params: { number: string } }>(
     '/sales/bills/:number',
     { preHandler: requirePermission(requireAuth, 'reports.view') },

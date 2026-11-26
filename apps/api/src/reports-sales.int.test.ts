@@ -1431,6 +1431,10 @@ describe('the Bills and Returns lists (W2-11, D-126)', () => {
     expect(back.body.trim().split('\n')).toHaveLength(1 + 3);
     expect((await send('GET', '/api/sales/bills', 'kashif')).statusCode).toBe(403);
     expect((await send('GET', '/api/sales/returns', 'kashif')).statusCode).toBe(403);
-    expect((await view<BillListView>(`/api/sales/bills?${ALL()}`, 'fahad', OTHER)).rows).toEqual([]);
+    // The other shop (a generated year of its own) lists none of this shop's bills.
+    const theirs = (await view<BillListView>(`/api/sales/bills?${ALL()}`, 'fahad', OTHER)).rows.map(
+      (x) => x.number,
+    );
+    for (const key of ['b1', 'b2', 'b3', 'b4']) expect(theirs).not.toContain(bills[key]);
   });
 });
