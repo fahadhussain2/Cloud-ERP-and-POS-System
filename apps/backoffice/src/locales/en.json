@@ -115,7 +115,8 @@
     "overLimit": "Customers near their limit",
     "collections": "Collections and payments",
     "userActivity": "User activity",
-    "cashFlow": "Cash flow"
+    "cashFlow": "Cash flow",
+    "bills": "Bill details"
   },
   "home": {
     "nothing": "There is nothing here for your role yet."
@@ -2420,5 +2421,136 @@
       "row_other": "{{name}} · {{count}} bills"
     },
     "footer": "Every card opens its report with the same filters. Only the owner sees the dashboard. Sales and profit follow the period; cash, bank, balances and stock show the position now."
+  },
+  "billDetails": {
+    "title": "Bill details",
+    "help": "One bill from the counter: its items, prices, discounts, payments and what happened to it. Read only.",
+    "number": "Bill number",
+    "find": "Open",
+    "notFound": "No bill {{number}} in this shop.",
+    "back": "Sales register",
+    "trace": "Trace this bill",
+    "print": "Print",
+    "printTitle": "Bill {{number}}",
+    "status": {
+      "finalized": "Finalized",
+      "voided": "Voided"
+    },
+    "kind": {
+      "sale": "Sale",
+      "return": "Return",
+      "exchange": "Exchange"
+    },
+    "meta": "{{at}} · Counter {{device}} · {{tier}} price",
+    "who": "Who and where",
+    "salesman": "Salesman",
+    "customer": "Customer",
+    "walkIn": "Walk-in",
+    "walkInPhone": "Walk-in, {{phone}}",
+    "handover": "Cash handover",
+    "handoverStates": {
+      "not_applicable": "Paid without cash",
+      "pending": "Not handed over yet",
+      "received": "{{number}} at {{desk}} by {{cashier}}, {{at}}",
+      "paid_out": "Refund paid at {{desk}} by {{cashier}}, {{at}}"
+    },
+    "businessDate": "Business date",
+    "items": "Items",
+    "lineCount_one": "{{count}} line",
+    "lineCount_other": "{{count}} lines",
+    "col": {
+      "no": "#",
+      "item": "Item",
+      "qty": "Qty",
+      "list": "List price",
+      "price": "Price",
+      "discount": "Discount",
+      "amount": "Amount",
+      "cost": "Cost",
+      "profit": "Profit"
+    },
+    "approval": {
+      "below_list": "Below list price, approved by {{by}}",
+      "below_floor": "Below floor price, approved by {{by}}"
+    },
+    "noCost": "No cost yet: sold before it was received",
+    "returnedFrom": "Returned from",
+    "noReceipt": "Returned without a receipt",
+    "returnReasons": {
+      "wrong_part": "Wrong part",
+      "unused_option": "Unused option",
+      "defective": "Defective",
+      "changed_mind": "Changed mind",
+      "other": "Other"
+    },
+    "conditions": {
+      "resellable": "Resellable (to Shop)",
+      "defective": "Defective (to Damaged)"
+    },
+    "totals": "Totals",
+    "linesTotal": "Lines",
+    "billDiscount": "Bill discount",
+    "approvedBy": "{{reason}}, approved by {{by}}",
+    "rounding": "Rounding",
+    "tax": "Tax",
+    "total": "Total",
+    "paid": "Paid",
+    "cashDetail": "received {{received}}, change {{change}}",
+    "reference": "ref {{reference}}",
+    "costProfit": "Cost and profit",
+    "cost": "Cost (average when sold)",
+    "profit": "Gross profit",
+    "noCostNote_one": "{{count}} line had no cost yet when sold. Its cost is settled when the stock is received, on Sales and gross profit's cost corrections.",
+    "noCostNote_other": "{{count}} lines had no cost yet when sold. Their cost is settled when the stock is received, on Sales and gross profit's cost corrections.",
+    "related": "Related",
+    "returns": "Returned on",
+    "returnOf": "This bill returns",
+    "reissueOf": "This bill reissues",
+    "approvals": "Other approvals",
+    "journal": "Posted to the books as journal {{number}}",
+    "notPosted": "Not posted to the books yet",
+    "nothingRelated": "Nothing else.",
+    "readOnly": "Read only: a finalized bill is never changed. Corrections are a void and reissue, or a return, on the counter.",
+    "voided": "Voided on {{number}}, {{at}}. Reason: {{reason}}. Approved by {{by}}.",
+    "reissuedAs": "Reissued as",
+    "approvalKinds": {
+      "below_list": "Below list",
+      "below_floor": "Below floor",
+      "credit_limit": "Over the credit limit",
+      "offline_cap": "Over the day's offline cap",
+      "no_receipt_return": "Return without a receipt",
+      "return_permission": "Return",
+      "return_outside_policy": "Return outside policy",
+      "void": "Void",
+      "reprint": "Reprint",
+      "refund_transfer": "Refund by transfer"
+    },
+    "reasons": {
+      "customer_bargain": "Customer bargain",
+      "old_stock": "Old or slow stock",
+      "market_price": "Matching a market price",
+      "regular_customer": "Regular customer",
+      "other": "Other",
+      "pay_soon": "Customer will pay soon",
+      "owner_instruction": "Owner’s instruction",
+      "wrong_item": "Wrong item",
+      "wrong_quantity": "Wrong quantity",
+      "wrong_price": "Wrong price or discount",
+      "wrong_customer_or_payment": "Wrong customer or payment",
+      "duplicate_bill": "Duplicate bill",
+      "customer_cancelled": "Customer cancelled",
+      "manufacturer_defect": "Manufacturer defect",
+      "lost_bill": "Lost bill",
+      "before_go_live": "Bought before go-live"
+    },
+    "voidReasons": {
+      "wrong_item": "Wrong item",
+      "wrong_quantity": "Wrong quantity",
+      "wrong_price": "Wrong price or discount",
+      "wrong_customer_or_payment": "Wrong customer or payment",
+      "duplicate_bill": "Duplicate bill",
+      "customer_cancelled": "Customer cancelled",
+      "other": "Other"
+    }
   }
 }

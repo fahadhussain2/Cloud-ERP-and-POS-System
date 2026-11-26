@@ -28,6 +28,7 @@ export interface MenuItem {
     | 'categories'
     | 'labels'
     | 'customers'
+    | 'bills'
     | 'suppliers'
     | 'receipts'
     | 'purchaseReturns'
@@ -75,6 +76,8 @@ export const MENU: readonly MenuGroup[] = [
         needs: ['cust.edit', 'cust.terms.edit'],
         screens: ['customers', 'customer'],
       },
+      // A bill's details (W2-10, D-125): anyone who reads the reports.
+      { key: 'bills', href: href.bill(), needs: ['reports.view'], screens: ['bill'] },
     ],
   },
   {

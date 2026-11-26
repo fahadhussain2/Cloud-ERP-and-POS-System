@@ -343,7 +343,7 @@ describe('the stock ledger', () => {
       '#/purchasing/receipts/g1',
     );
     expect(within(table).getByRole('link', { name: 'C1-S000001' }).getAttribute('href')).toBe(
-      href.trace('C1-S000001'),
+      href.bill('C1-S000001'),
     );
     expect(within(table).getByText(r.kinds.goods_receipt)).toBeDefined();
     expect(plain(screen.getByLabelText(en.reports.frame.figures).textContent)).toContain(r.ledger.closing);

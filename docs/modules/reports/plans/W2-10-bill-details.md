@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | to open after the plan is accepted |
 | **Module** | reports (a back-office screen and its API, read only), with platform (Trace a bill links to it) |
-| **Status** | Accepted (owner, 2026-11-26, in chat): questions 1–3 as recommended |
+| **Status** | Built (2026-11-26) on branch `plan/w2-10-bill-details`, waiting for review; accepted by the owner the same day, questions 1–3 as recommended |
 | **Refs** | RPT-01 (the sales register), RPT-07 (sales and gross profit), PLT-12 (Trace a bill); data model §5 (sales documents, lines, payments, overrides); CLAUDE.md rules 1, 3, 5, 10; D-093 (reprint at the counter), D-124 (cost corrections); D-125 (new, below) |
 | **Depends on** | W1-07 (bills on the server), W1-12 (voids, reissues), W1-13 (returns, exchanges), W1-20 (the sales register, Trace a bill), W2-03 (sales and gross profit's line figures) |
 | **Size** | about 1½ days: the API with integration tests ½; the screen and its links ¾; print, e2e and docs ¼ |
@@ -82,4 +82,17 @@ A short line at the foot: a finalized bill is never changed; corrections are a v
 
 ## Results
 
-To fill in after the build.
+Built as planned, with these details settled while building:
+
+- **The API** is `GET /api/sales/bills/:number` (`apps/api/src/reports/bill.ts`), `reports.view`; `BillView` in `packages/contracts`. A line's cost is −its stock movements' value with `qty_delta <> 0`, its sales figure `line_total` (after its bill-discount share); *Amount* on screen is qty × price, before the bill discount.
+- **The integration tests** are in `apps/api/src/reports-sales.int.test.ts`, not a new file: its seeded bills already have a bill discount, a below-list line, a void, a return, a no-receipt return and a part sold before it was received.
+- **The menu:** Sales is now a group of two, *Customers* and *Bill details* (it was a direct link to Customers).
+- **Links:** every bill number in the back office opens its details: the sales register, overrides, voids and returns, exceptions, sales and gross profit by bill, purchase and sale rates, journal lines (ledgers, the partner ledger), the stock ledger and the stock card; Trace a bill's number too. A void's number on a journal line still opens the trace.
+- **The journal entry** shows as its number: the back office has no page for a single journal entry yet.
+- **Print** uses the report frame's print header (shop, *Bill {number}*, *Printed by … on …*).
+
+Checks (2026-11-26, local, Node 24):
+
+- `pnpm check`: format, lint, typecheck, 2,729 tests in 141 files with coverage, builds: all passed.
+- `pnpm test:integration` (PostgreSQL 17.9): 555 tests in 50 files passed, the six new bill-details cases among them.
+- `pnpm e2e` (Edge): 81 passed. The first run had four flows still expecting a bill number to open Trace (updated) and two counter flows (sync, till) that failed once and passed on the rerun with no change.

@@ -173,7 +173,7 @@ describe('the partner ledger and the statement', () => {
     expect(plain(rows[1]!.textContent)).toContain(r.kinds.sale);
     expect(within(rows[2]!).getByText(r.voided)).toBeTruthy();
     expect(within(table).getByRole('link', { name: 'C01-S000012' }).getAttribute('href')).toBe(
-      href.trace('C01-S000012'),
+      href.bill('C01-S000012'),
     );
     const figures = plain(screen.getByLabelText(en.reports.frame.figures).textContent);
     expect(figures).toContain('2,400');

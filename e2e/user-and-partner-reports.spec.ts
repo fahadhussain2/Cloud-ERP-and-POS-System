@@ -4,7 +4,7 @@ import { expect, test } from './counter-test';
 
 // W2-04 plan (RPT-16, RPT-17, ACC-07; D-116): the owner reads customers, suppliers, control and the cash flow on the
 // report frame. After the counter's bills on Khan Motors' account (counter.spec), the desk's collection from Khan Motors
-// and its void (till.spec): the ledger for this month shows the bills and the payment and opens a bill's trace, and
+// and its void (till.spec): the ledger for this month shows the bills and the payment and opens a bill's details (D-125), and
 // prints as a statement; the month's statements; the balance trend; overdue; money received; user activity with the
 // void and the sign-ins; the cash flow, printed and downloaded. Reads only. This file's name sorts after till.spec, so
 // the desk's documents are there.
@@ -13,7 +13,7 @@ const r = bo.reports.partnerReports;
 
 test.describe.configure({ mode: 'serial' });
 
-test("Khan Motors' ledger for this month: the bills and the desk's payment, a bill's trace, and the statement", async ({
+test("Khan Motors' ledger for this month: the bills and the desk's payment, a bill's details, and the statement", async ({
   page,
 }) => {
   await signIn(page);
@@ -39,9 +39,10 @@ test("Khan Motors' ledger for this month: the bills and the desk's payment, a bi
   await expect(page.locator('[data-slot="print-header"]')).toContainText('Khan Motors (C0042)');
   await page.emulateMedia({ media: 'screen' });
 
-  // A bill opens its trace.
+  // A bill opens its details (D-125).
   await table.getByRole('row').filter({ hasText: r.kinds.sale }).first().getByRole('link').click();
-  await expect(page).toHaveURL(/#\/support\/trace\//);
+  await expect(page).toHaveURL(/#\/sales\/bills\//);
+  await expect(page.getByRole('table', { name: bo.billDetails.items })).toBeVisible();
 });
 
 test("this month's statements include Khan Motors, one to a page", async ({ page }) => {

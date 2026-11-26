@@ -237,7 +237,7 @@ describe('sales and gross profit', () => {
     });
   });
 
-  it('by bill, a bill opens its trace; without cost.view there is no cost, profit or margin', async () => {
+  it('by bill, a bill opens its details (D-125); without cost.view there is no cost, profit or margin', async () => {
     window.location.hash = `${href.salesProfit}?group=bill`;
     const noCost = { ...cells(120000, null), qty: 1000 };
     const { api } = fakeApi({
@@ -268,7 +268,7 @@ describe('sales and gross profit', () => {
       within(table)
         .getByRole('link', { name: /C01-S000001/ })
         .getAttribute('href'),
-    ).toBe('#/support/trace/C01-S000001');
+    ).toBe('#/sales/bills/C01-S000001');
     expect(
       within(table)
         .getAllByRole('columnheader')
@@ -420,7 +420,7 @@ describe('purchase and sale rates', () => {
     show(<RatesScreen api={api} />);
     const sales = await screen.findByRole('table', { name: r.rates.sales });
     expect(within(sales).getByRole('link', { name: 'C01-S000001' }).getAttribute('href')).toBe(
-      '#/support/trace/C01-S000001',
+      '#/sales/bills/C01-S000001',
     );
     expect(plain(sales.textContent)).toContain(r.walkIn);
     expect(screen.getByRole('table', { name: r.rates.purchases })).toBeDefined();

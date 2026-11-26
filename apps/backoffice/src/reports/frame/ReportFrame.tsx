@@ -40,6 +40,8 @@ export interface PrintInfo {
 
 const PrintContext = createContext<PrintInfo>({ shopName: '', userName: '' });
 export const PrintProvider = PrintContext.Provider;
+/** Who prints, for a page drawn without ReportPage (a bill's details, W2-10). */
+export const usePrintInfo = () => useContext(PrintContext);
 
 // ---- Fetching ----
 
