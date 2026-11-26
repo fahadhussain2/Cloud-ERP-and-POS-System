@@ -4,7 +4,7 @@
 |---|---|
 | **Issue** | to open after the plan is accepted |
 | **Module** | reports (back-office screens and their API, read only), with platform (the menu) |
-| **Status** | Accepted (owner, 2026-11-26, in chat): questions 1–3 as recommended |
+| **Status** | Built (2026-11-26) on branch `plan/w2-11-bills-returns`, waiting for review; accepted by the owner the same day, questions 1–3 as recommended |
 | **Refs** | RPT-01 (the sales register), PLT-12; CLAUDE.md rules 1, 5, 10; D-116 (the report frame), D-125 (bill details), D-126 (new, below) |
 | **Depends on** | W2-10 (the bill details page, its API and its links), W2-01 (the report frame) |
 | **Size** | about 1 day: the two list queries with integration tests ⅓; the two screens on the report frame, the menu and the routes ½; e2e and docs ⅙ |
@@ -100,4 +100,15 @@ Key figures: returns and the total refunded (finalized only). Filters: the perio
 
 ## Results
 
-To fill in after the build.
+Built as planned, with these details settled while building:
+
+- **The API** is in `apps/api/src/reports/bill.ts` beside the bill's details: `GET /api/sales/bills` and `GET /api/sales/returns`. Bills' answer also carries the shop's payment methods, for the filter. A return's *Refund paid* is *paid* when the desk paid it out, *pending* when a refund is still waiting, else *none*; a return with no reason on its lines counts as *other*.
+- **The screens** are `apps/backoffice/src/reports/SalesDocumentScreens.tsx` (`BillsScreen`, `SalesReturnsScreen`: Purchasing already has a `ReturnsScreen`). The payment methods stay in their filter while the list reloads after a change.
+- **The bill page** lost its lookup box (the lists' search does it) and its back link goes to Bills or Returns by kind.
+- **A regression from W2-09 fixed on the way:** the dashboard's cost corrections (D-124) scanned the whole stock ledger in two extra transactions, so W2-06's timing test (under 1.5 s on a generated year) failed at 1.6–1.8 s, on staging's code too. Migration `0026_cost_correction_index.sql` adds a partial index on movements with no quantity, and the dashboard reads them on its two existing connections; the test passes again. Its own commit, the existing test locked during the fix.
+
+Checks (2026-11-26, local, Node 24):
+
+- `pnpm check`: format, lint, typecheck, 2,734 tests in 142 files with coverage, builds: all passed.
+- `pnpm test:integration` (PostgreSQL 17.9): 559 tests in 50 files passed, the four new list cases among them (with an exchange added to the seed).
+- `pnpm e2e` (Edge): 81 passed. The first run failed four: the new step's *To* date matched the search box's label (*Bill number, customer or phone*), fixed with an exact match; sync, till and the partner ledger (which uses till's payment) were the flaky counter flows seen in W2-10 and passed on the rerun with no change.
