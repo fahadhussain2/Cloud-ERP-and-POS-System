@@ -13,7 +13,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
 } from '@erp/ui';
 import type { TFunction } from 'i18next';
 import { Activity, Printer } from 'lucide-react';
@@ -22,7 +21,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { qtyText } from '../catalog/data';
-import { href, navigate } from '../router';
+import { href } from '../router';
 import { usePrintInfo } from './frame/ReportFrame';
 
 // Bill details (W2-10 plan, D-125; the owner's mockup): one bill, read only, for anyone with reports.view. The header,
@@ -34,8 +33,8 @@ const s = (t: TFunction, key: string, o?: Record<string, unknown>) => t(`billDet
 const when = (at: string | null) =>
   at === null ? '' : new Date(at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 
-function useBill(api: Api, number: string | null) {
-  const url = number ? `/api/sales/bills/${encodeURIComponent(number)}` : null;
+function useBill(api: Api, number: string) {
+  const url: string | null = `/api/sales/bills/${encodeURIComponent(number)}`;
   const [state, setState] = useState<{ url: string | null; bill: BillView | null; missing: boolean }>({
     url: null,
     bill: null,
@@ -80,10 +79,9 @@ const Row = ({ label, value, strong }: { label: ReactNode; value: string; strong
   </div>
 );
 
-export function BillScreen({ api, number }: { api: Api; number: string | null }) {
+export function BillScreen({ api, number }: { api: Api; number: string }) {
   const { t } = useTranslation();
   const who = usePrintInfo();
-  const [typed, setTyped] = useState(number ?? '');
   const { bill, missing } = useBill(api, number);
   const [printedAt, setPrintedAt] = useState(() => new Date());
   useEffect(() => {
@@ -106,9 +104,16 @@ export function BillScreen({ api, number }: { api: Api; number: string | null })
       <div className="print:hidden">
         <PageHeader
           eyebrow={
-            <a href={href.salesRegister} className="underline-offset-4 hover:underline">
-              ← {s(t, 'back')}
-            </a>
+            // Back to the list it belongs to (W2-11, D-126): Bills for a sale, Returns for a return or exchange.
+            bill?.bill.kind === 'return' || bill?.bill.kind === 'exchange' ? (
+              <a href={href.returns} className="underline-offset-4 hover:underline">
+                ← {t('nav.returns')}
+              </a>
+            ) : (
+              <a href={href.bills} className="underline-offset-4 hover:underline">
+                ← {t('nav.bills')}
+              </a>
+            )
           }
           title={bill ? `${s(t, 'title')}: ${bill.bill.number}` : s(t, 'title')}
           help={s(t, 'help')}
@@ -131,24 +136,10 @@ export function BillScreen({ api, number }: { api: Api; number: string | null })
             )
           }
         />
-        <Panel className="p-3.5">
-          <form
-            className="flex flex-wrap items-end gap-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (typed.trim()) navigate(href.bill(typed.trim()));
-            }}
-          >
-            <TextField label={s(t, 'number')} value={typed} onChange={(e) => setTyped(e.target.value)} />
-            <Button type="submit" variant="outline">
-              {s(t, 'find')}
-            </Button>
-          </form>
-        </Panel>
       </div>
       {missing && (
         <Alert variant="destructive">
-          <AlertDescription>{s(t, 'notFound', { number: number ?? '' })}</AlertDescription>
+          <AlertDescription>{s(t, 'notFound', { number })}</AlertDescription>
         </Alert>
       )}
       {bill && <Bill view={bill} />}

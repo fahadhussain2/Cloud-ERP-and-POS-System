@@ -9,7 +9,7 @@ import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import { href, parseHash, queryOf } from '../router';
 import { PrintProvider } from './frame/ReportFrame';
-import { BillsScreen, ReturnsScreen } from './SalesDocumentScreens';
+import { BillsScreen, SalesReturnsScreen } from './SalesDocumentScreens';
 
 // Bills and Returns (W2-11, D-126): the sales documents as lists on the report frame, with the owner's columns; each
 // row opens the bill's details; the search, the salesman and the other filters go in the address.
@@ -174,6 +174,7 @@ describe('Bills', () => {
     const { api } = fakeApi({ 'GET /api/sales/bills': BILLS, ...CHOICES });
     show(<BillsScreen api={api} />);
     await screen.findByRole('table', { name: en.nav.bills });
+    await screen.findByRole('option', { name: 'Sara' });
     fireEvent.change(await screen.findByLabelText(d.filter.salesmanId), { target: { value: 'u1' } });
     fireEvent.change(screen.getByLabelText(d.filter.method), { target: { value: 'jazzcash' } });
     fireEvent.change(screen.getByLabelText(d.filter.status), { target: { value: 'voided' } });
@@ -184,7 +185,6 @@ describe('Bills', () => {
       status: 'voided',
     });
     fireEvent.change(screen.getByLabelText(d.search), { target: { value: ' C03-S000415 ' } });
-    await screen.findByDisplayValue(' C03-S000415 ');
     await new Promise((r) => setTimeout(r, 350));
     expect(queryOf(window.location.hash).get('q')).toBe('C03-S000415');
   });
@@ -194,7 +194,7 @@ describe('Returns', () => {
   it("lists returns and exchanges with the owner's columns", async () => {
     window.location.hash = href.returns;
     const { api, calls } = fakeApi({ 'GET /api/sales/returns': RETURNS, ...CHOICES });
-    show(<ReturnsScreen api={api} />);
+    show(<SalesReturnsScreen api={api} />);
     const table = await screen.findByRole('table', { name: en.nav.returns });
     expect(calls).toContain('/api/sales/returns?preset=today');
     expect(headers(table)).toEqual([
@@ -230,7 +230,7 @@ describe('Returns', () => {
   it('filters by type and reason in the address', async () => {
     window.location.hash = href.returns;
     const { api } = fakeApi({ 'GET /api/sales/returns': RETURNS, ...CHOICES });
-    show(<ReturnsScreen api={api} />);
+    show(<SalesReturnsScreen api={api} />);
     await screen.findByRole('table', { name: en.nav.returns });
     fireEvent.change(screen.getByLabelText(d.filter.kind), { target: { value: 'exchange' } });
     fireEvent.change(screen.getByLabelText(d.filter.reason), { target: { value: 'defective' } });

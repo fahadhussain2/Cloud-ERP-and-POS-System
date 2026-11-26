@@ -648,7 +648,7 @@ export function VoidsReturnsScreen({ api }: { api: Api; permissions?: readonly s
  * A text the server searches (beyond the lines a list can hold): typed here, put in the address once typing stops,
  * and back to the address's on Back.
  */
-function SearchFilter({
+export function SearchFilter({
   label,
   value,
   onChange,

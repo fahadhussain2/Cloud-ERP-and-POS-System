@@ -2426,10 +2426,7 @@
   "billDetails": {
     "title": "Bill details",
     "help": "One bill from the counter: its items, prices, discounts, payments and what happened to it. Read only.",
-    "number": "Bill number",
-    "find": "Open",
     "notFound": "No bill {{number}} in this shop.",
-    "back": "Sales register",
     "trace": "Trace this bill",
     "print": "Print",
     "printTitle": "Bill {{number}}",
