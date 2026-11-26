@@ -4,7 +4,7 @@ import { expect, test } from './counter-test';
 
 // W2-01 plan (ACC-07, RPT-11, D-116): the owner reads the books on the report frame. After the counter's sales
 // (counter.spec) and the electricity bill (ledger.spec), this year's trial balance balances; Sales opens its ledger and
-// a line opens the bill's trace; the profit and loss month by month; the balance sheet balances; the trial balance
+// a line opens the bill's details (D-125); the profit and loss month by month; the balance sheet balances; the trial balance
 // downloads as CSV; and on paper the menu and filters go while a header names the shop. Back office only, read only.
 
 const r = bo.reports;
@@ -32,8 +32,8 @@ test('the trial balance balances; Sales opens its ledger and a line opens the bi
   const lines = page.getByRole('table', { name: bo.accounting.ledger.lines });
   await expect(lines.getByRole('row')).not.toHaveCount(1);
   await lines.getByRole('link').first().click();
-  await expect(page).toHaveURL(/#\/support\/trace\//);
-  await expect(page.getByText(/^Made on /)).toBeVisible();
+  await expect(page).toHaveURL(/#\/sales\/bills\//);
+  await expect(page.getByRole('table', { name: bo.billDetails.items })).toBeVisible();
 });
 
 test('the profit and loss month by month, and the balance sheet balances', async ({ page }) => {

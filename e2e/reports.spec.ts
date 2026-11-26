@@ -8,7 +8,7 @@ import { expect, test } from './counter-test';
 import { BACKOFFICE_PORT, MANAGER, OWNER, OWNER_PASSWORD, POS_PORT, SALESMAN, SHOP } from './fixtures';
 
 // W1-20 plan (D-110): a manager sends the counter's diagnostics after their PIN; the owner finds a counter bill in the
-// sales register, traces it from the counter to the server, reviews an exception on it, and sees the diagnostics on
+// sales register, opens its details (W2-10), traces it from the counter to the server, reviews an exception on it, and sees the diagnostics on
 // the counter's page. Runs after counter.spec, whose counter, people and bills it uses.
 
 const BACKOFFICE = `http://localhost:${BACKOFFICE_PORT}`;
@@ -69,6 +69,27 @@ test('the owner finds a counter bill in the register, traces it, reviews an exce
   await page.getByLabel(r.frame.from).fill(bill!.day);
   await page.getByLabel(r.frame.to).fill(bill!.day);
   await expect(page.getByRole('table', { name: r.register.list })).toContainText(bill!.number);
+
+  // Its number opens the bill's details (W2-10, D-125): its lines as stored, Print, and the way to its trace.
+  await page.getByRole('table', { name: r.register.list }).getByRole('link', { name: bill!.number }).click();
+  const [lines] = await sql<{ n: number }>(
+    'SELECT count(*)::int AS n FROM erp.sales_lines WHERE document_id = $1 AND deleted_at IS NULL',
+    [bill!.id],
+  );
+  await expect(page.getByRole('table', { name: bo.billDetails.items }).getByRole('row')).toHaveCount(
+    lines!.n + 1,
+  );
+  await page.evaluate(() => {
+    const w = window as unknown as { printed: number };
+    w.printed = 0;
+    window.print = () => {
+      w.printed += 1;
+    };
+  });
+  await page.getByRole('button', { name: bo.billDetails.print }).click();
+  expect(await page.evaluate(() => (window as unknown as { printed: number }).printed)).toBe(1);
+  await page.getByRole('link', { name: bo.billDetails.trace }).click();
+  await expect(page.getByText(/^Made on /)).toBeVisible();
 
   // Its trace: made on the counter, accepted by the server, posted.
   await report(page, bo.nav.trace);

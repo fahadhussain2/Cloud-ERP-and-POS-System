@@ -125,26 +125,18 @@ function Totals({
   );
 }
 
-/** A counter bill's number, opening its trace for someone who may trace bills (PLT-12). */
-function BillNumber({ number, permissions }: { number: string; permissions: readonly string[] }) {
-  return permissions.includes('support.trace') ? (
-    <a href={href.trace(number)} className="underline-offset-4 hover:underline">
+/** A counter bill's number, opening its details (W2-10, D-125): every report reader may open a bill. */
+function BillNumber({ number }: { number: string }) {
+  return (
+    <a href={href.bill(number)} className="underline-offset-4 hover:underline">
       {number}
     </a>
-  ) : (
-    <>{number}</>
   );
 }
 
 // ---- Sales register (RPT-01, owner answer 3) ----
 
-export function SalesRegisterScreen({
-  api,
-  permissions = [],
-}: {
-  api: Api;
-  permissions?: readonly string[];
-}) {
+export function SalesRegisterScreen({ api }: { api: Api; permissions?: readonly string[] }) {
   const { t } = useTranslation();
   const days = useDays(api, 'salesRegister', []);
   const url = days.dates ? `/api/reports/sales-register?${apiQuery(days.dates)}` : null;
@@ -161,7 +153,7 @@ export function SalesRegisterScreen({
             return (
               <span className="font-mono">
                 <span className={voided ? 'line-through' : undefined}>
-                  <BillNumber number={b.number} permissions={permissions} />
+                  <BillNumber number={b.number} />
                 </span>
                 {b.kind !== 'sale' && (
                   <span className="ms-2 inline-block">
@@ -309,7 +301,7 @@ export function SalesRegisterScreen({
 
 // ---- Overrides (RPT-03) ----
 
-export function OverridesScreen({ api, permissions = [] }: { api: Api; permissions?: readonly string[] }) {
+export function OverridesScreen({ api }: { api: Api; permissions?: readonly string[] }) {
   const { t } = useTranslation();
   const days = useDays(api, 'overridesReport', []);
   const url = days.dates ? `/api/reports/overrides?${apiQuery(days.dates)}` : null;
@@ -335,7 +327,7 @@ export function OverridesScreen({ api, permissions = [] }: { api: Api; permissio
           sort: (o) => o.billNumber,
           cell: (o) => (
             <span className="font-mono">
-              <BillNumber number={o.billNumber} permissions={permissions} />
+              <BillNumber number={o.billNumber} />
             </span>
           ),
         },
@@ -444,7 +436,7 @@ const kindName = (t: TFunction, kind: string) => t(`reports.ovr.kinds.${kind}`, 
 
 // ---- Voids and returns (RPT-04) ----
 
-export function VoidsReturnsScreen({ api, permissions = [] }: { api: Api; permissions?: readonly string[] }) {
+export function VoidsReturnsScreen({ api }: { api: Api; permissions?: readonly string[] }) {
   const { t } = useTranslation();
   const days = useDays(api, 'voidsReturns', []);
   const url = days.dates ? `/api/reports/voids-returns?${apiQuery(days.dates)}` : null;
@@ -452,7 +444,7 @@ export function VoidsReturnsScreen({ api, permissions = [] }: { api: Api; permis
   const m = report?.money;
   const bill = (number: string) => (
     <span className="font-mono">
-      <BillNumber number={number} permissions={permissions} />
+      <BillNumber number={number} />
     </span>
   );
   const voidColumns: ListColumn<VoidRow>[] = m
@@ -996,9 +988,7 @@ export function ExceptionsScreen({ api, permissions }: { api: Api; permissions: 
       label: t('reports.exc.document'),
       sort: (e) => e.documentNumber ?? '',
       cell: (e) => (
-        <span className="font-mono">
-          {e.documentNumber ? <BillNumber number={e.documentNumber} permissions={permissions} /> : '—'}
-        </span>
+        <span className="font-mono">{e.documentNumber ? <BillNumber number={e.documentNumber} /> : '—'}</span>
       ),
     },
     {
@@ -1212,7 +1202,12 @@ export function TraceScreen({ api, number }: { api: Api; number: string | null }
       {trace && (
         <>
           <Panel className="flex flex-wrap gap-6 p-3.5">
-            <span className="font-mono text-lg font-semibold">{trace.bill.number}</span>
+            <a
+              href={href.bill(trace.bill.number)}
+              className="font-mono text-lg font-semibold underline-offset-4 hover:underline"
+            >
+              {trace.bill.number}
+            </a>
             <span>{t(`reports.kind.${trace.bill.kind}`)}</span>
             <span>{trace.bill.businessDate}</span>
             <span>{trace.bill.deviceCode}</span>

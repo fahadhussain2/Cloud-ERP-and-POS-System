@@ -29,7 +29,8 @@ import { inventoryRefusal, locationName, useInventoryLookups } from './data';
 // stock settings (owner answers 3 and 4).
 
 /** Where a movement's document opens, when it is one of the back office's. */
-function documentHref(kind: string, id: string): string | null {
+function documentHref(kind: string, id: string, number: string | null): string | null {
+  if (kind === 'sale' && number) return href.bill(number);
   if (kind === 'stock_transfer' || kind === 'stock_transfer_receipt') return href.transfer(id);
   if (kind === 'stock_adjustment') return href.adjustment(id);
   if (kind === 'goods_receipt') return href.receipt(id);
@@ -149,7 +150,7 @@ export function StockCardScreen({ api, itemId }: { api: Api; itemId: string | nu
               </TableHeader>
               <TableBody>
                 {movements.map((v, i) => {
-                  const link = documentHref(v.kind, v.documentId);
+                  const link = documentHref(v.kind, v.documentId, v.number);
                   const label = v.number ?? t(`inventory.card.kinds.${v.kind}`, { defaultValue: v.kind });
                   return (
                     <TableRow key={`${v.seq}-${i}`}>

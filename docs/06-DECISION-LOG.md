@@ -1173,3 +1173,11 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** borrowing between shops is routine; without this the books carry stock that isn't there and profit is overstated from the first week after go-live.
 - **Trade-off:** a stock movement may now have value and no quantity; a partial delivery of an item never bought keeps it at no cost until the shortfall is covered.
 - **Status:** Accepted (owner, 2026-11-25). Amends INV-02 and posting rules §5.1. [Plan](modules/accounting/plans/W2-09-sold-before-received.md).
+
+### D-125 A bill's details in the back office, for anyone with reports.view; bill numbers open it (2026-11-26)
+- **Context:** the back office couldn't show one bill with its items; the sales register lists bills and Trace a bill (owner only) shows a bill's story without its lines.
+- **Decision:** a read-only **Bill details** page (`#/sales/bills/<number>`) shows a bill's header, lines, totals, payments, approvals and related documents. Anyone with `reports.view` may open it; cost, profit and margin come only with `cost.view`, left out by the API. **Every bill number in the back office opens it**; it links to Trace a bill for whoever has `support.trace`. *Print* prints the page on A4, headed with who printed it and when, never the counter's A5 bill. No bill view on the POS for now: Return / exchange and Reprint cover the counter (watch during the pilot).
+- **Alternatives:** the owner only, like Trace; numbers keep opening Trace for the owner; an A5 office copy; a bill view on the POS too.
+- **Why:** managers and the accountant answer price and customer questions without asking the counter; one bill page shows the same figures as Sales and gross profit.
+- **Trade-off:** a bill's figures are now readable by every reports role (they already saw totals in the sales register).
+- **Status:** Accepted (owner, 2026-11-26). [Plan](modules/reports/plans/W2-10-bill-details.md).

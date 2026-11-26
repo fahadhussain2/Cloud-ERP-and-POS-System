@@ -44,3 +44,4 @@
 | **User activity** | Who did what: the audit log's sign-ins, edits and events, and the documents each person made (RPT-17) |
 | **Wave** | A build-order block of the MVP (Wave 0 foundations, Wave 1 critical path, Wave 2 rest of MVP) |
 | **Cost correction** | A stock movement of value with no quantity: when stock sold before it arrived (borrowed from another shop, or not yet received) comes in, the difference between what it really cost and the average it was sold at goes to cost of goods sold. Shown on the stock card and on its own line in Sales and gross profit (D-124, W2-09) |
+| **Bill details** | The back office's read-only page for one bill: its items, prices, discounts, payments, approvals, void and returns, with cost and profit for those who may see costs. Every bill number in the back office opens it (W2-10, D-125) |

@@ -71,6 +71,8 @@ const ENTRIES: Record<string, { href: string; needs: string[] }> = {
   categories: { href: href.categories, needs: ['cat.item.edit', 'cat.price.edit'] },
   labels: { href: href.labels, needs: ['cat.label.print'] },
   customers: { href: href.customers, needs: ['cust.edit', 'cust.terms.edit'] },
+  // A bill's details (W2-10, D-125): Sales becomes a group of two.
+  bills: { href: href.bill(), needs: ['reports.view'] },
   suppliers: { href: href.suppliers, needs: ['pur.receive', 'acc.payment.create'] },
   receipts: { href: href.receipts, needs: ['pur.receive'] },
   purchaseReturns: { href: href.purchaseReturns, needs: ['pur.receive'] },
@@ -137,7 +139,7 @@ describe('the menu', () => {
   it('shows seven rows for an owner, Settings last', () => {
     show();
     expect(rows()).toEqual([
-      en.nav.customers,
+      en.nav.groups.sales,
       en.nav.groups.catalog,
       en.nav.groups.purchasing,
       en.nav.groups.stock,
@@ -245,8 +247,7 @@ describe('the collapsed menu', () => {
     show({ route: { screen: 'items' }, badges: { reports: 2 } });
     fireEvent.click(screen.getByRole('button', { name: en.nav.collapse }));
     expect(link(en.nav.items)).toBeNull();
-    expect(link(en.nav.customers)?.getAttribute('aria-label')).toBe(en.nav.customers);
-    for (const name of ['catalog', 'purchasing', 'stock', 'accounting', 'settings'] as const)
+    for (const name of ['sales', 'catalog', 'purchasing', 'stock', 'accounting', 'settings'] as const)
       expect(group(en.nav.groups[name]).getAttribute('aria-haspopup')).toBe('menu');
     expect(link(en.nav.reports)?.getAttribute('aria-describedby')).toBeTruthy();
 

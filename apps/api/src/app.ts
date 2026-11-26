@@ -19,6 +19,7 @@ import { registerFinancialReports } from './reports/financial';
 import { registerReports } from './reports/routes';
 import { registerDashboard } from './reports/dashboard';
 import { registerPartnerReports } from './reports/partners';
+import { registerBill } from './reports/bill';
 import { registerSalesReports } from './reports/sales';
 import { registerStockReports } from './reports/stock';
 import { registerReportViews } from './reports/views';
@@ -103,6 +104,7 @@ export function buildApp({
         registerFinancialReports(api, { pool, now, requireAuth });
         registerStockReports(api, { pool, now, requireAuth });
         registerSalesReports(api, { pool, now, requireAuth });
+        registerBill(api, { pool, requireAuth });
         registerPartnerReports(api, { pool, now, requireAuth });
         registerDashboard(api, { pool, now, requireAuth });
         registerSupport(api, { pool, now, requireAuth, requireDevice });

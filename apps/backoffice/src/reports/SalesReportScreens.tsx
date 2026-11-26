@@ -178,7 +178,7 @@ function drillOf(group: SalesGroup, row: SalesRow, base: Filters): string | null
     case 'item':
       return to({ group: 'bill', itemId: row.key });
     case 'bill':
-      return row.code ? href.trace(row.code) : null;
+      return row.code ? href.bill(row.code) : null;
     case 'day':
       return to({ group: 'bill', preset: '', from: row.key, to: row.key });
     case 'month': {

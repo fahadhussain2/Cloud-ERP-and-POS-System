@@ -7,7 +7,7 @@ import { SHOP } from './fixtures';
 
 // W2-03 plan (RPT-07, RPT-09, RPT-15; D-116): the owner reads sales and purchases on the report frame. After the
 // counter's sales (counter.spec) and the supplier's bill (purchasing.spec): sales and gross profit for today, by
-// category, opens a category's items and an item's bills, and a bill its trace; the purchase register lists the
+// category, opens a category's items and an item's bills, and a bill its details (D-125); the purchase register lists the
 // supplier's receipt and opens it; the rates show BRPD001's sale and what Naveed Glass was paid; sales over time draws
 // its charts, prints them, and downloads as CSV. Reads only.
 
@@ -51,13 +51,14 @@ test('sales and gross profit for today, by category, opens the items, their bill
   await expect(table).toBeVisible();
   await expect(page.getByLabel(bo.reports.frame.figures)).toContainText(`${r.bills}${bills}`);
 
-  // The category opens its items, BRPD001 its bills, a bill its trace.
+  // The category opens its items, BRPD001 its bills, a bill its details (D-125).
   await table.getByRole('link', { name: category, exact: true }).click();
   await expect(page).toHaveURL(/group=item/);
   await table.getByRole('link', { name: /BRPD001/ }).click();
   await expect(page).toHaveURL(/group=bill/);
   await table.getByRole('link').first().click();
-  await expect(page).toHaveURL(/#\/support\/trace\//);
+  await expect(page).toHaveURL(/#\/sales\/bills\//);
+  await expect(page.getByRole('table', { name: bo.billDetails.items })).toBeVisible();
 });
 
 test("the purchase register lists the supplier's receipt and opens it", async ({ page }) => {
