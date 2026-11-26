@@ -36,6 +36,7 @@ import {
   VoidsReturnsScreen,
 } from './reports/ReportViews';
 import { BillScreen } from './reports/BillScreen';
+import { BillsScreen, SalesReturnsScreen } from './reports/SalesDocumentScreens';
 import {
   BalanceSheetScreen,
   CashBookScreen,
@@ -268,8 +269,12 @@ export function App({ api }: { api: Api }) {
             source={shown.source}
             permissions={me.permissions}
           />
+        ) : shown.screen === 'bills' ? (
+          <BillsScreen api={api} />
+        ) : shown.screen === 'returns' ? (
+          <SalesReturnsScreen api={api} />
         ) : shown.screen === 'bill' ? (
-          <BillScreen key={shown.number ?? ''} api={api} number={shown.number} />
+          <BillScreen key={shown.number} api={api} number={shown.number} />
         ) : shown.screen === 'customers' ? (
           <CustomersScreen api={api} />
         ) : shown.screen === 'customer' ? (

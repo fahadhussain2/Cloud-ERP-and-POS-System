@@ -104,7 +104,7 @@ export function buildApp({
         registerFinancialReports(api, { pool, now, requireAuth });
         registerStockReports(api, { pool, now, requireAuth });
         registerSalesReports(api, { pool, now, requireAuth });
-        registerBill(api, { pool, requireAuth });
+        registerBill(api, { pool, now, requireAuth });
         registerPartnerReports(api, { pool, now, requireAuth });
         registerDashboard(api, { pool, now, requireAuth });
         registerSupport(api, { pool, now, requireAuth, requireDevice });

@@ -1,5 +1,5 @@
 import type { BillView } from '@erp/contracts';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -168,7 +168,8 @@ describe('bill details', () => {
   it('has its own address, and a bill number opens it', () => {
     expect(href.bill('C03-S000415')).toBe('#/sales/bills/C03-S000415');
     expect(parseHash('#/sales/bills/C03-S000415')).toEqual({ screen: 'bill', number: 'C03-S000415' });
-    expect(parseHash('#/sales/bills')).toEqual({ screen: 'bill', number: null });
+    // Without a number, the address is the Bills list (W2-11, D-126).
+    expect(parseHash('#/sales/bills')).toEqual({ screen: 'bills' });
   });
 
   it('shows the header, the items with their approvals, the totals, the payments and what is related', async () => {
@@ -278,13 +279,18 @@ describe('bill details', () => {
     expect(plain(items.textContent)).toContain(en.billDetails.returnReasons.wrong_part);
   });
 
-  it('opens a typed or scanned number; an unknown number says so', async () => {
-    const { api } = fakeApi({});
-    show(<BillScreen api={api} number={null} />);
-    fireEvent.change(screen.getByLabelText(b.number), { target: { value: ' C03-S000415 ' } });
-    fireEvent.submit(screen.getByLabelText(b.number).closest('form')!);
-    expect(window.location.hash).toBe(href.bill('C03-S000415'));
+  it('goes back to Bills for a sale and to Returns for a return (W2-11); an unknown number says so', async () => {
+    const back = (name: string) => screen.getByRole('link', { name: new RegExp(name) }).getAttribute('href');
+    show(<BillScreen api={fakeApi({ [at('C03-S000415')]: BILL }).api} number="C03-S000415" />);
+    await screen.findByRole('table', { name: b.items });
+    expect(back(en.nav.bills)).toBe(href.bills);
     cleanup();
+    const ret = { ...BILL, bill: { ...BILL.bill, kind: 'return' as const } };
+    show(<BillScreen api={fakeApi({ [at('C03-S000415')]: ret }).api} number="C03-S000415" />);
+    await screen.findByRole('table', { name: b.items });
+    expect(back(en.nav.returns)).toBe(href.returns);
+    cleanup();
+    const { api } = fakeApi({});
     show(<BillScreen api={api} number="C99-S000001" />);
     expect(await screen.findByText(i18n.t('billDetails.notFound', { number: 'C99-S000001' }))).toBeTruthy();
   });

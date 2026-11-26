@@ -107,21 +107,22 @@ async function salesPart(run: Run, x: Context) {
   const { w, today } = x;
   const upTo = w.upToMinute;
   const busyFrom = addDays(today, -(BUSY_WEEKS * 7 - 1));
+  // Gross profit in the books (D-124): the bills' cost plus the period's cost corrections, as Sales and gross profit.
+  // A correction has a date, not a time, so Today's comparison counts the whole of last week's day. Read on the same
+  // connection as its period's sales, from the corrections' own index (migration 0026), so the dashboard waits for no
+  // extra transaction (W2-06's 1.5 s).
+  const corrected = async (c: Client, p: Period) =>
+    x.values ? (await correctionsOf(c, p, {})).reduce((t, i) => t + i.cost, 0) : 0;
   // Two connections at most: this period, and the comparison with the busy hours (the 30 days already hold them).
-  const [cur, [cmp, cmpUpTo, busyBills]] = await Promise.all([
-    run((c) => salesSets(c, w.current)),
+  const [[cur, fixNow], [cmp, cmpUpTo, busyBills, fixBefore]] = await Promise.all([
+    run(async (c) => [await salesSets(c, w.current), await corrected(c, w.current)] as const),
     run(async (c) => {
       const full = await salesSets(c, w.comparison);
       const until = upTo === null ? full : await salesSets(c, w.comparison, upTo);
       const busy = x.period === '30d' ? null : (await overTime(c, { from: busyFrom, to: today }, {})).bills;
-      return [full, until, busy] as const;
+      return [full, until, busy, await corrected(c, w.comparison)] as const;
     }),
   ]);
-  // Gross profit in the books (D-124): the bills' cost plus the period's cost corrections, as Sales and gross profit.
-  // A correction has a date, not a time, so Today's comparison counts the whole of last week's day.
-  const corrected = async (p: Period) =>
-    x.values ? (await run((c) => correctionsOf(c, p, {}))).reduce((t, i) => t + i.cost, 0) : 0;
-  const [fixNow, fixBefore] = await Promise.all([corrected(w.current), corrected(w.comparison)]);
   const nowFig = salesFigures({ ...cur.total, cost: cur.total.cost + fixNow });
   const beforeFig = salesFigures({ ...cmpUpTo.total, cost: cmpUpTo.total.cost + fixBefore });
 

@@ -331,6 +331,75 @@ export interface BillView {
   };
 }
 
+// ---- Bills and Returns: the sales documents as lists (W2-11, D-126) ----
+
+/** A bill's or return's customer: a customer on file, else none (the walk-in's phone, if given, is beside it). */
+export interface SalesDocumentCustomer {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface BillListRow {
+  id: string;
+  number: string;
+  /** On the counter's clock. */
+  at: string;
+  customer: SalesDocumentCustomer | null;
+  walkinPhone: string | null;
+  /** The number of lines. */
+  items: number;
+  total: number;
+  /** Each method's name, in bill order. */
+  paidBy: string[];
+  status: 'finalized' | 'voided';
+  voidNumber: string | null;
+}
+
+export interface BillListView {
+  money: ReportMoney;
+  from: string;
+  to: string;
+  /** The shop's payment methods, for the filter. */
+  methods: { code: string; name: string }[];
+  /** The first 2,000; the total and the CSV count them all. */
+  rows: BillListRow[];
+  truncated: boolean;
+  /** Finalized bills only: a voided bill is listed and left out. */
+  total: { count: number; amount: number };
+}
+
+export interface ReturnListRow {
+  id: string;
+  number: string;
+  at: string;
+  kind: 'return' | 'exchange';
+  /** The bill it returns; null: no receipt. */
+  originalBill: string | null;
+  customer: SalesDocumentCustomer | null;
+  walkinPhone: string | null;
+  /** Thousandths, above 0. */
+  itemsBack: number;
+  /** The returned lines' reason, or `several` when they differ. */
+  reason: string;
+  /** The document's total: below 0 a refund; an exchange's net. */
+  total: number;
+  /** A cash refund paid at the desk, not yet, or nothing to pay in cash. */
+  refund: 'paid' | 'pending' | 'none';
+  refundDesk: string | null;
+  status: 'finalized' | 'voided';
+}
+
+export interface ReturnListView {
+  money: ReportMoney;
+  from: string;
+  to: string;
+  rows: ReturnListRow[];
+  truncated: boolean;
+  /** Finalized only. */
+  total: { count: number; amount: number };
+}
+
 // ---- Send diagnostics (PLT-12) ----
 
 export const DiagnosticEvent = z.strictObject({

@@ -1181,3 +1181,11 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** managers and the accountant answer price and customer questions without asking the counter; one bill page shows the same figures as Sales and gross profit.
 - **Trade-off:** a bill's figures are now readable by every reports role (they already saw totals in the sales register).
 - **Status:** Accepted (owner, 2026-11-26). [Plan](modules/reports/plans/W2-10-bill-details.md).
+
+### D-126 Sales lists its documents: Bills and Returns, each opening the bill's details (2026-11-26)
+- **Context:** W2-10 (D-125) put *Bill details* in the Sales menu as a box to type or scan a number. The owner: the menu should hold the documents themselves, as Purchasing lists its goods receipts and purchase returns.
+- **Decision:** the Sales menu is **Customers · Bills · Returns**. *Bills* lists sales bills (voided ones marked, left out of the total), *Returns* lists returns and exchanges; both on the report frame, opening today, up to 92 days, searched on the server by number, customer or walk-in phone, with salesman as a filter. Columns are the owner's: Bills: number, date and time, customer, items, total, paid by, status; Returns: number, date and time, type, original bill, customer, items back, reason, refund or due, refund paid, status. Every row opens the bill's details page (D-125), which stays; its menu entry goes. No profit column for now.
+- **Alternatives:** keep the lookup box; one list for every sales document; exchanges in both lists.
+- **Why:** a list is where people start; the shop's documents are found the way the purchasing documents already are.
+- **Trade-off:** none: the sales register stays under Reports as the day report.
+- **Status:** Accepted (owner, 2026-11-26). Amends D-125 (the menu entry). [Plan](modules/reports/plans/W2-11-bills-returns-lists.md).

@@ -82,6 +82,8 @@ A short line at the foot: a finalized bill is never changed; corrections are a v
 
 ## Results
 
+**Since W2-11 (D-126):** the *Bill details* menu entry and its lookup box are gone. Sales lists **Bills** and **Returns** ([plan](W2-11-bills-returns-lists.md)); each row opens this page, whose back link goes to the list by the document's kind.
+
 Built as planned, with these details settled while building:
 
 - **The API** is `GET /api/sales/bills/:number` (`apps/api/src/reports/bill.ts`), `reports.view`; `BillView` in `packages/contracts`. A line's cost is −its stock movements' value with `qty_delta <> 0`, its sales figure `line_total` (after its bill-discount share); *Amount* on screen is qty × price, before the bill discount.
