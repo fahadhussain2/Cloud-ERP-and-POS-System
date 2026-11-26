@@ -228,6 +228,109 @@ export interface BillTraceView {
   steps: TraceStep[];
 }
 
+// ---- Bill details (W2-10, D-125): one bill, read only, for anyone with reports.view ----
+
+/** An approval on a bill or one of its lines (PLT-07). */
+export interface BillApprovalView {
+  kind: string;
+  reason: string;
+  approvedBy: string;
+  at: string;
+}
+
+export interface BillLineView {
+  lineNo: number;
+  itemId: string;
+  code: string;
+  name: string;
+  /** The location's code, e.g. SHOP. */
+  location: string | null;
+  /** Thousandths: below 0 for a returned line. */
+  qty: number;
+  allowsFraction: boolean;
+  listPrice: number | null;
+  unitPrice: number;
+  /** List amount − amount: what the line price took off the list price. */
+  lineDiscount: number;
+  /** qty × unit price, signed: what the line came to before the bill discount. */
+  amount: number;
+  /** The line's share of the bill discount. */
+  billShare: number;
+  /** amount − bill share: the line's sales figure, as Sales and gross profit counts it. */
+  lineTotal: number;
+  approvals: BillApprovalView[];
+  /** A returned line: why, in what condition, and the bill it came from (null: no receipt). */
+  returned: { reason: string; condition: string; note: string | null; billNumber: string | null } | null;
+  /** Only with cost.view: −its stock movements' value (cost corrections left out, D-124), and lineTotal − cost. */
+  cost: number | null;
+  profit: number | null;
+  /** It left (or came back) with no cost known (no_cost). */
+  noCost: boolean;
+}
+
+export interface BillPaymentView {
+  method: string;
+  name: string;
+  amount: number;
+  cashReceived: number | null;
+  change: number | null;
+  reference: string | null;
+}
+
+export interface BillView {
+  money: ReportMoney;
+  /** cost.view: cost, profit and margin are in the answer. */
+  values: boolean;
+  /** support.trace: the page links to Trace a bill. */
+  canTrace: boolean;
+  bill: {
+    id: string;
+    number: string;
+    kind: 'sale' | 'return' | 'exchange';
+    status: 'finalized' | 'voided';
+    businessDate: string;
+    /** On the counter's clock. */
+    createdAt: string;
+    device: string;
+    priceTier: string;
+    salesman: string;
+    customer: { id: string; code: string; name: string } | null;
+    walkinPhone: string | null;
+  };
+  /** The cash handover at the desk, or null when none (paid without cash, or not yet). */
+  handover: {
+    status: 'not_applicable' | 'pending' | 'received' | 'paid_out';
+    number: string | null;
+    desk: string | null;
+    cashier: string | null;
+    at: string | null;
+  };
+  /** Only for a voided bill. */
+  void: {
+    number: string | null;
+    at: string | null;
+    reason: string | null;
+    approvedBy: string | null;
+    reissue: string | null;
+  } | null;
+  lines: BillLineView[];
+  totals: { lines: number; billDiscount: number; rounding: number; tax: number; total: number };
+  /** The bill discount's approval, if it needed one. */
+  billApprovals: BillApprovalView[];
+  payments: BillPaymentView[];
+  /** Only with cost.view. */
+  cost: { cost: number; profit: number; marginBp: number | null; noCostLines: number } | null;
+  related: {
+    /** Returns made against this bill, in order. */
+    returns: { number: string; date: string; status: 'finalized' | 'voided'; total: number }[];
+    returnOf: string | null;
+    reissueOf: string | null;
+    /** Other approvals on the bill: a credit limit, a no-receipt return, a void, a reprint… */
+    approvals: BillApprovalView[];
+    journal: string | null;
+  };
+}
+
 // ---- Send diagnostics (PLT-12) ----
 
 export const DiagnosticEvent = z.strictObject({

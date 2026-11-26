@@ -5,6 +5,7 @@ import {
   TenantSpec,
   uuidv7,
   type AgeingView,
+  type BillView,
   type DashboardView,
   type DeadStockView,
   type DocumentFamily,
@@ -1177,5 +1178,111 @@ describe('stock sold before it arrived (W2-09, D-124)', () => {
     expect(tail[0]).toMatch(/^LAMP001,HEAD LAMP,/);
     expect(tail[1]).toMatch(/^,cost_corrections,/);
     expect(tail[2]).toMatch(/^,profit_in_books,/);
+  });
+});
+
+describe('bill details (W2-10, D-125)', () => {
+  const bill = (number: string, who = 'fahad') =>
+    view<BillView>(`/api/sales/bills/${encodeURIComponent(number)}`, who);
+
+  it("shows a bill's header, lines, approvals, totals, payments and returns, as stored", async () => {
+    const b = await bill(bills['b2']!);
+    expect(b.bill).toMatchObject({
+      number: bills['b2'],
+      kind: 'sale',
+      status: 'finalized',
+      salesman: 'Imran',
+      priceTier: 'Retail',
+      customer: { code: 'KHAN', name: 'Khan Motors' },
+    });
+    expect(b.lines.map((l) => [l.lineNo, l.code, l.qty, l.listPrice, l.unitPrice, l.amount])).toEqual([
+      [1, 'OIL001', 1000, 120000, 120000, 120000],
+      [2, 'BELT001', 1000, 30000, 30000, 30000],
+    ]);
+    for (const l of b.lines) expect(l.lineTotal).toBe(l.amount - l.billShare);
+    expect(b.lines.reduce((s, l) => s + l.billShare, 0)).toBe(5000);
+    expect(b.totals).toEqual({ lines: 150000, billDiscount: 5000, rounding: 0, tax: 0, total: 145000 });
+    expect(b.billApprovals.map((a) => [a.kind, a.reason, a.approvedBy])).toEqual([
+      ['below_list', 'regular_customer', 'Tariq'],
+    ]);
+    expect(b.payments.map((p) => [p.method, p.amount])).toEqual([['cash', 145000]]);
+    expect(b.related.returns.map((r) => [r.number, r.status])).toEqual([[bills['b5'], 'finalized']]);
+    expect(b.related.journal).toMatch(/^J\d{6}$/);
+    expect(b.void).toBeNull();
+    expect(b.canTrace).toBe(true);
+  });
+
+  it('a line below list shows its approval; its discount is list − price', async () => {
+    const b = await bill(bills['b3']!);
+    const below = b.lines.find((l) => l.lineNo === 2)!;
+    expect([below.qty, below.unitPrice, below.lineDiscount]).toEqual([2000, 110000, 20000]);
+    expect(below.approvals.map((a) => [a.kind, a.reason, a.approvedBy])).toEqual([
+      ['below_list', 'customer_bargain', 'Tariq'],
+    ]);
+    expect(b.lines.find((l) => l.lineNo === 1)!.approvals).toEqual([]);
+  });
+
+  it("costs and profit are Sales and gross profit's for the same bill", async () => {
+    const byBill = await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}&group=bill`);
+    for (const key of ['b1', 'b2', 'b3', 'b5']) {
+      const b = await bill(bills[key]!);
+      const row = byBill.rows.find((r) => r.key === b.bill.id)!;
+      expect([key, b.cost!.cost, b.cost!.profit, b.cost!.marginBp]).toEqual([
+        key,
+        row.cells.cost,
+        row.cells.profit,
+        row.cells.marginBp,
+      ]);
+      expect(b.lines.reduce((s, l) => s + l.cost!, 0)).toBe(b.cost!.cost);
+      for (const l of b.lines) expect(l.profit).toBe(l.lineTotal - l.cost!);
+    }
+  });
+
+  it('a voided bill shows its void; a return shows where its lines came from', async () => {
+    const voided = await bill(bills['b4']!);
+    expect(voided.bill.status).toBe('voided');
+    expect(voided.void).toMatchObject({ reason: 'wrong_price', approvedBy: 'Tariq' });
+    expect(voided.void!.number).toMatch(/-V\d{6}$/);
+
+    const back = await bill(bills['b5']!);
+    expect(back.bill.kind).toBe('return');
+    expect(back.related.returnOf).toBe(bills['b2']);
+    expect(back.lines.map((l) => [l.code, l.qty, l.returned])).toEqual([
+      [
+        'OIL001',
+        -1000,
+        { reason: 'wrong_part', condition: 'resellable', note: null, billNumber: bills['b2'] },
+      ],
+    ]);
+
+    const noReceipt = await bill(bills['b6']!);
+    expect(noReceipt.lines[0]!.returned).toMatchObject({ reason: 'changed_mind', billNumber: null });
+    expect(noReceipt.related.approvals.map((a) => [a.kind, a.approvedBy])).toEqual([
+      ['no_receipt_return', 'Tariq'],
+    ]);
+  });
+
+  it('a part sold before it was received is a line with no cost yet', async () => {
+    const [lamp] = await q<{ number: string }>(
+      `SELECT d.number FROM erp.sales_documents d JOIN erp.sales_lines l ON l.document_id = d.id
+       JOIN erp.items i ON i.id = l.item_id WHERE i.code = 'LAMP001' AND l.qty > 0`,
+    );
+    const b = await bill(lamp!.number);
+    expect(b.lines[0]).toMatchObject({ code: 'LAMP001', cost: 0, noCost: true });
+    expect(b.cost!.noCostLines).toBe(1);
+  });
+
+  it('without cost.view no cost or profit; a manager may not trace; others are refused', async () => {
+    const plain = await bill(bills['b2']!, 'noor');
+    expect(plain.values).toBe(false);
+    expect(plain.cost).toBeNull();
+    expect(plain.lines.every((l) => l.cost === null && l.profit === null)).toBe(true);
+    expect(plain.canTrace).toBe(false);
+    expect((await bill(bills['b2']!, 'tariq')).canTrace).toBe(false);
+    expect((await send('GET', `/api/sales/bills/${bills['b2']}`, 'kashif')).statusCode).toBe(403);
+    expect((await send('GET', '/api/sales/bills/C99-S000001', 'fahad')).statusCode).toBe(404);
+    expect((await send('GET', `/api/sales/bills/${bills['b2']}`, 'fahad', undefined, OTHER)).statusCode).toBe(
+      404,
+    );
   });
 });
