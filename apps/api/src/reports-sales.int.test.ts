@@ -5,6 +5,7 @@ import {
   TenantSpec,
   uuidv7,
   type AgeingView,
+  type BillListView,
   type BillView,
   type DashboardView,
   type DeadStockView,
@@ -12,6 +13,7 @@ import {
   type OverridesView,
   type ProfitLossView,
   type ReorderView,
+  type ReturnListView,
   type VoidsReturnsView,
   type PurchaseRegisterView,
   type PushDocument,
@@ -92,6 +94,8 @@ let counter: Device;
 let items: Record<string, string> = {};
 const loc: Record<string, string> = {};
 const bills: Record<string, string> = {};
+/** The seeded sale documents themselves, for a later exchange of their lines (W2-11). */
+const docs: Record<string, SaleDocument> = {};
 const cookies: Record<string, string> = {};
 const app = () => buildApp({ pool, now: () => new Date() });
 const today = () => businessDate(Date.now(), 'Asia/Karachi', 4);
@@ -548,6 +552,7 @@ beforeAll(async () => {
   const b5 = returnOf(b2, 1);
   const b6 = oilBack();
   await push([b5, b6]);
+  Object.assign(docs, { b1, b2, b3 });
   Object.assign(bills, {
     b1: b1.number,
     b2: b2.number,
@@ -1284,5 +1289,148 @@ describe('bill details (W2-10, D-125)', () => {
     expect((await send('GET', `/api/sales/bills/${bills['b2']}`, 'fahad', undefined, OTHER)).statusCode).toBe(
       404,
     );
+  });
+});
+describe('the Bills and Returns lists (W2-11, D-126)', () => {
+  let exchange = '';
+  beforeAll(async () => {
+    // An exchange today: one of each of b3's two oil lines back, for different reasons, and a fan belt sold.
+    const b3 = docs['b3']!;
+    let bill = addReturn(emptyBill(sara, retail), {
+      source: {
+        kind: 'bill',
+        id: b3.id,
+        number: b3.number,
+        businessDate: b3.businessDate,
+        customerId: null,
+      },
+      lines: b3.lines.map((l, i) => ({
+        id: `r${i}`,
+        itemId: l.itemId,
+        qty: qty(1000),
+        allowsFraction: false,
+        reason: i === 0 ? ('wrong_part' as const) : ('changed_mind' as const),
+        note: null,
+        condition: 'resellable' as const,
+        original: { line: l, returned: { qty: qty(0), refund: money(0) } },
+        price: null,
+        suggested: null,
+      })),
+      needs: [],
+      approval: null,
+    });
+    bill = { ...bill, lines: [line('s0', 'BELT001', 1, 30000)] };
+    const refund = (bill.returns?.lines ?? []).reduce((t, l) => t + l.refund, 0);
+    const doc = buildReturnDocument({
+      bill,
+      tender: {
+        payments: [{ method: 'cash', amount: money(30000 - refund), reference: null }],
+        cashReceived: null,
+      },
+      methods: METHODS,
+      sellerMaxDiscountBp: 0,
+      customer: { id: null, walkinPhone: null },
+      credit: null,
+      creditApproval: null,
+      refundApproval: null,
+      context: { ...context(counter, 'S'), increment: money(100) },
+    });
+    expect(doc.kind).toBe('exchange');
+    await push([doc]);
+    exchange = doc.number;
+  });
+
+  const listOfBills = (query = ALL(), who = 'fahad') => view<BillListView>(`/api/sales/bills?${query}`, who);
+  const listOfReturns = (query = ALL(), who = 'fahad') =>
+    view<ReturnListView>(`/api/sales/returns?${query}`, who);
+
+  it('Bills lists the sales, newest first, as stored; a voided bill is marked and left out of the total', async () => {
+    const r = await listOfBills();
+    const numbers = r.rows.map((x) => x.number);
+    for (const key of ['b1', 'b2', 'b3', 'b4']) expect(numbers).toContain(bills[key]);
+    for (const key of ['b5', 'b6']) expect(numbers).not.toContain(bills[key]);
+    expect(numbers).not.toContain(exchange);
+    expect(numbers.indexOf(bills['b3']!)).toBeLessThan(numbers.indexOf(bills['b1']!));
+    expect(r.rows.find((x) => x.number === bills['b2'])).toMatchObject({
+      customer: { code: 'KHAN', name: 'Khan Motors' },
+      items: 2,
+      total: 145000,
+      paidBy: ['Cash'],
+      status: 'finalized',
+      voidNumber: null,
+    });
+    const voided = r.rows.find((x) => x.number === bills['b4'])!;
+    expect(voided.status).toBe('voided');
+    expect(voided.voidNumber).toMatch(/-V\d{6}$/);
+    const finalized = r.rows.filter((x) => x.status === 'finalized');
+    expect(r.total).toEqual({
+      count: finalized.length,
+      amount: finalized.reduce((t, x) => t + x.total, 0),
+    });
+    expect(r.truncated).toBe(false);
+  });
+
+  it('opens on today; filters by search, salesman, payment method and status', async () => {
+    const todays = await view<BillListView>('/api/sales/bills');
+    expect([todays.from, todays.to]).toEqual([today(), today()]);
+    expect(todays.rows.map((x) => x.number)).not.toContain(bills['b1']);
+    expect((await listOfBills(`${ALL()}&q=khan`)).rows.map((x) => x.number)).toEqual([bills['b2']]);
+    expect((await listOfBills(`${ALL()}&q=${bills['b3']}`)).rows.map((x) => x.number)).toEqual([bills['b3']]);
+    expect((await listOfBills(`${ALL()}&q=${encodeURIComponent('%')}`)).rows).toEqual([]);
+    expect((await listOfBills(`${ALL()}&salesmanId=${imran}`)).rows.map((x) => x.number)).toEqual([
+      bills['b2'],
+    ]);
+    expect((await listOfBills(`${ALL()}&status=voided`)).rows.map((x) => x.number)).toEqual([bills['b4']]);
+    expect((await listOfBills(`${ALL()}&method=cash`)).rows.length).toBe((await listOfBills()).rows.length);
+    expect((await listOfBills(`${ALL()}&method=jazzcash`)).rows).toEqual([]);
+  });
+
+  it('Returns lists returns and exchanges: type, original bill, units back, reason, refund, refund paid', async () => {
+    const r = await listOfReturns();
+    const row = (n: string) => r.rows.find((x) => x.number === n)!;
+    expect(r.rows.map((x) => x.number).sort()).toEqual([bills['b5'], bills['b6'], exchange].sort());
+    expect(row(bills['b5']!)).toMatchObject({
+      kind: 'return',
+      originalBill: bills['b2'],
+      itemsBack: 1000,
+      reason: 'wrong_part',
+      status: 'finalized',
+      refund: 'pending',
+    });
+    expect(row(bills['b5']!).total).toBeLessThan(0);
+    expect(row(bills['b6']!)).toMatchObject({
+      originalBill: null,
+      reason: 'changed_mind',
+    });
+    expect(row(exchange)).toMatchObject({
+      kind: 'exchange',
+      originalBill: bills['b3'],
+      itemsBack: 2000,
+      reason: 'several',
+    });
+    expect(r.total).toEqual({
+      count: 3,
+      amount: r.rows.reduce((t, x) => t + x.total, 0),
+    });
+    expect((await listOfReturns(`${ALL()}&kind=exchange`)).rows.map((x) => x.number)).toEqual([exchange]);
+    expect((await listOfReturns(`${ALL()}&reason=changed_mind`)).rows.map((x) => x.number).sort()).toEqual(
+      [bills['b6'], exchange].sort(),
+    );
+    expect((await listOfReturns(`${ALL()}&q=${bills['b5']}`)).rows.map((x) => x.number)).toEqual([
+      bills['b5'],
+    ]);
+  });
+
+  it('refuses more than 92 days; the CSV has every row; reports.view only; another shop sees none', async () => {
+    const res = await send('GET', `/api/sales/bills?from=${daysAgo(120)}&to=${today()}`, 'fahad');
+    expect(res.statusCode).toBe(400);
+    const csv = await send('GET', `/api/sales/bills?${ALL()}&format=csv`, 'fahad');
+    expect(csv.statusCode).toBe(200);
+    expect(csv.body.trim().split('\n')).toHaveLength(1 + (await listOfBills()).rows.length);
+    const back = await send('GET', `/api/sales/returns?${ALL()}&format=csv`, 'fahad');
+    expect(back.body.trim().split('\n')).toHaveLength(1 + 3);
+    expect((await send('GET', '/api/sales/bills', 'kashif')).statusCode).toBe(403);
+    expect((await send('GET', '/api/sales/returns', 'kashif')).statusCode).toBe(403);
+    expect((await view<BillListView>(`/api/sales/bills?${ALL()}`, 'fahad', OTHER)).rows).toEqual([]);
   });
 });

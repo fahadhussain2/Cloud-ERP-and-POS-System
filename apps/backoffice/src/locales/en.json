@@ -116,7 +116,8 @@
     "collections": "Collections and payments",
     "userActivity": "User activity",
     "cashFlow": "Cash flow",
-    "bills": "Bill details"
+    "bills": "Bills",
+    "returns": "Returns"
   },
   "home": {
     "nothing": "There is nothing here for your role yet."
@@ -2552,5 +2553,59 @@
       "customer_cancelled": "Customer cancelled",
       "other": "Other"
     }
+  },
+  "salesDocuments": {
+    "help": {
+      "bills": "Sales bills from the counters, newest first. A voided bill is listed, marked, and left out of the total. Open a bill to see its items.",
+      "returns": "Returns and exchanges from the counters, newest first, with the bill they came from. Open one to see its items."
+    },
+    "search": "Bill number, customer or phone",
+    "col": {
+      "number": "Bill number",
+      "returnNumber": "Return number",
+      "at": "Date and time",
+      "customer": "Customer",
+      "items": "Items",
+      "total": "Total",
+      "paidBy": "Paid by",
+      "status": "Status",
+      "type": "Type",
+      "originalBill": "Original bill",
+      "itemsBack": "Items back",
+      "reason": "Reason",
+      "refund": "Refund / due",
+      "refundPaid": "Refund paid"
+    },
+    "filter": {
+      "salesmanId": "Salesman",
+      "method": "Paid by",
+      "status": "Status",
+      "kind": "Type",
+      "reason": "Reason"
+    },
+    "any": "All",
+    "statuses": {
+      "finalized": "Finalized",
+      "voided": "Voided"
+    },
+    "kind": {
+      "return": "Return",
+      "exchange": "Exchange"
+    },
+    "finalized": "Finalized",
+    "voided": "Voided ({{number}})",
+    "walkIn": "Walk-in",
+    "walkInPhone": "Walk-in, {{phone}}",
+    "noReceipt": "No receipt",
+    "several": "Several",
+    "paidAt": "Paid at {{desk}}",
+    "notYet": "Not yet",
+    "figures": {
+      "bills": "Bills",
+      "total": "Total",
+      "returns": "Returns",
+      "refunded": "Refunded"
+    },
+    "truncated": "Only the first 2,000 are shown, but the total and the CSV count them all. Narrow the dates or search."
   }
 }

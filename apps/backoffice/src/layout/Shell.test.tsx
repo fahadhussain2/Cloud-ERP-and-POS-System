@@ -71,8 +71,9 @@ const ENTRIES: Record<string, { href: string; needs: string[] }> = {
   categories: { href: href.categories, needs: ['cat.item.edit', 'cat.price.edit'] },
   labels: { href: href.labels, needs: ['cat.label.print'] },
   customers: { href: href.customers, needs: ['cust.edit', 'cust.terms.edit'] },
-  // A bill's details (W2-10, D-125): Sales becomes a group of two.
-  bills: { href: href.bill(), needs: ['reports.view'] },
+  // The sales documents as lists (W2-11, D-126): Sales is Customers, Bills and Returns.
+  bills: { href: href.bills, needs: ['reports.view'] },
+  returns: { href: href.returns, needs: ['reports.view'] },
   suppliers: { href: href.suppliers, needs: ['pur.receive', 'acc.payment.create'] },
   receipts: { href: href.receipts, needs: ['pur.receive'] },
   purchaseReturns: { href: href.purchaseReturns, needs: ['pur.receive'] },
