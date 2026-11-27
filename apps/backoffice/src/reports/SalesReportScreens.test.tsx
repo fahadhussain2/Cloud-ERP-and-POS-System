@@ -7,7 +7,7 @@ import type {
   SalesProfitView,
   StockChoicesView,
 } from '@erp/contracts';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -18,6 +18,7 @@ import en from '../locales/en.json';
 import { href, parseHash, queryOf } from '../router';
 import { ReportsHomeScreen } from './FinancialScreens';
 import { PrintProvider } from './frame/ReportFrame';
+import { chooseValue } from '../ui/testing/choose';
 import {
   PurchaseRegisterScreen,
   RatesScreen,
@@ -226,9 +227,9 @@ describe('sales and gross profit', () => {
     const { api } = fakeApi({ 'GET /api/reports/sales-profit': PROFIT, ...CHOICES });
     show(<SalesProfitScreen api={api} />);
     await screen.findByRole('table', { name: en.nav.salesProfit });
-    fireEvent.change(screen.getByLabelText(r.groupBy), { target: { value: 'salesman' } });
-    fireEvent.change(screen.getByLabelText(en.reports.pl.compare), { target: { value: 'last-year' } });
-    fireEvent.change(await screen.findByLabelText(r.filter.customerId), { target: { value: 'walk-in' } });
+    await chooseValue(r.groupBy, 'salesman');
+    await chooseValue(en.reports.pl.compare, 'last-year');
+    await waitFor(() => chooseValue(r.filter.customerId, 'walk-in'));
     expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({
       preset: 'thisMonth',
       group: 'salesman',
@@ -504,7 +505,7 @@ describe('sales over time', () => {
     expect(within(discounts).getByRole('link', { name: '1' }).getAttribute('href')).toBe(
       href.overridesReport,
     );
-    fireEvent.change(screen.getByLabelText(r.overTime.measure), { target: { value: 'sales' } });
+    await chooseValue(r.overTime.measure, 'sales');
     expect(queryOf(window.location.hash).get('measure')).toBe('sales');
     expect(untranslated()).toEqual([]);
   });

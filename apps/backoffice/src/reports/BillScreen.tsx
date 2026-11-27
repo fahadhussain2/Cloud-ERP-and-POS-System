@@ -2,7 +2,6 @@ import type { BillLineView, BillView } from '@erp/contracts';
 import {
   Alert,
   AlertDescription,
-  Button,
   formatMoney,
   PageHeader,
   Panel,
@@ -20,6 +19,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { Button } from '../ui';
 import { qtyText } from '../catalog/data';
 import { href } from '../router';
 import { usePrintInfo } from './frame/ReportFrame';

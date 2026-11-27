@@ -1,8 +1,9 @@
-import { Button, TextField } from '@erp/ui';
+import { KeyRound } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { Button, TextInput } from '../ui';
 import { CardScreen } from './CardScreen';
 
 /** The forced password change (W0-11, D-083): until it is done, the API allows nothing else. */
@@ -31,7 +32,7 @@ export function PasswordScreen({ api, onChanged }: { api: Api; onChanged: () => 
   return (
     <CardScreen title={t('password.title')} help={t('password.help')}>
       <form className="flex flex-col gap-3" onSubmit={(e) => void submit(e)}>
-        <TextField
+        <TextInput
           label={t('password.current')}
           type="password"
           value={current}
@@ -39,7 +40,7 @@ export function PasswordScreen({ api, onChanged }: { api: Api; onChanged: () => 
           autoComplete="current-password"
           required
         />
-        <TextField
+        <TextInput
           label={t('password.new')}
           type="password"
           value={next}
@@ -47,7 +48,7 @@ export function PasswordScreen({ api, onChanged }: { api: Api; onChanged: () => 
           autoComplete="new-password"
           required
         />
-        <TextField
+        <TextInput
           label={t('password.repeat')}
           type="password"
           value={repeat}
@@ -56,7 +57,7 @@ export function PasswordScreen({ api, onChanged }: { api: Api; onChanged: () => 
           required
           error={error ?? undefined}
         />
-        <Button type="submit" size="lg" disabled={busy}>
+        <Button type="submit" icon={KeyRound} className="w-full" disabled={busy}>
           {t('password.submit')}
         </Button>
       </form>

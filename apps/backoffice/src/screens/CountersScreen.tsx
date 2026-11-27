@@ -1,16 +1,6 @@
 import {
-  Alert,
-  AlertDescription,
-  Button,
-  LABEL_CLASS,
-  Label,
   PageHeader,
   Panel,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   StatusChip,
   Table,
   TableBody,
@@ -18,16 +8,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
   type ChipTone,
 } from '@erp/ui';
-import { useCallback, useEffect, useId, useState, type FormEvent } from 'react';
+import { Ban, Download, KeyRound, RotateCcw, Stethoscope } from 'lucide-react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { DiagnosticsRow } from '@erp/contracts';
 
 import type { Api } from '../api';
 import { ConfirmDialog } from '../staff/dialogs';
+import { Button, IconButton, notify, Select, TextInput } from '../ui';
 
 interface Branch {
   id: string;
@@ -78,7 +69,10 @@ export function healthTones(h: DeviceHealth, nowMs: number) {
   };
 }
 
-/** Counters (POS spec §4, W0-10): one-time setup codes, and the list of counters with revoke. Restyled in W1-04. */
+/**
+ * Counters (POS spec §4, W0-10): one-time setup codes, and the list of counters with revoke. Restyled in W1-04, and
+ * on the back office's own controls in W2-15 (D-127): icon row actions, results and refusals as toasts.
+ */
 export function CountersScreen({ api }: { api: Api }) {
   const { t, i18n } = useTranslation();
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -91,9 +85,6 @@ export function CountersScreen({ api }: { api: Api }) {
   const [reenabling, setReenabling] = useState<Device | null>(null);
   const [looking, setLooking] = useState<Device | null>(null);
   const [loadedAt, setLoadedAt] = useState(0);
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
-  const branchLabel = useId();
-  const kindLabel = useId();
 
   const fetchLists = useCallback(async () => {
     const [b, d] = await Promise.all([api('GET', '/api/branches'), api('GET', '/api/devices')]);
@@ -123,14 +114,13 @@ export function CountersScreen({ api }: { api: Api }) {
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
-    setMessage(null);
     const r = await api('POST', '/api/devices/enrollment-codes', {
       branchId,
       kind,
       ...(name.trim() ? { name: name.trim() } : {}),
     });
     if (r.status === 201) setCode(r.body as { code: string; expiresAt: string });
-    else setMessage({ text: t('app.error'), error: true });
+    else notify.problem(t('app.error'));
   };
 
   return (
@@ -138,48 +128,28 @@ export function CountersScreen({ api }: { api: Api }) {
       <PageHeader title={t('counters.title')} help={t('counters.help')} />
       <Panel title={t('counters.newCode')}>
         <form className="flex flex-wrap items-end gap-3 px-3.5 pb-3.5" onSubmit={(e) => void create(e)}>
-          <div className="flex flex-col gap-1.5">
-            <Label id={branchLabel} className={LABEL_CLASS}>
-              {t('counters.branch')}
-            </Label>
-            <Select value={branchId} onValueChange={setBranchId}>
-              <SelectTrigger aria-labelledby={branchLabel} className="h-11 w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label id={kindLabel} className={LABEL_CLASS}>
-              {t('counters.kind')}
-            </Label>
-            <Select value={kind} onValueChange={(v) => setKind(v as (typeof KINDS)[number])}>
-              <SelectTrigger aria-labelledby={kindLabel} className="h-11 w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {KINDS.map((k) => (
-                  <SelectItem key={k} value={k}>
-                    {t(`counters.kinds.${k}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <TextField
+          <Select
+            label={t('counters.branch')}
+            wrapperClassName="w-full sm:w-56"
+            value={branchId}
+            onValueChange={setBranchId}
+            options={branches.map((b) => ({ value: b.id, label: b.name }))}
+          />
+          <Select
+            label={t('counters.kind')}
+            wrapperClassName="w-full sm:w-48"
+            value={kind}
+            onValueChange={(v) => setKind(v as (typeof KINDS)[number])}
+            options={KINDS.map((k) => ({ value: k, label: t(`counters.kinds.${k}`) }))}
+          />
+          <TextInput
             label={t('counters.name')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={64}
-            wrapperClassName="w-56"
+            wrapperClassName="w-full sm:w-56"
           />
-          <Button type="submit" size="lg" disabled={!branchId}>
+          <Button type="submit" icon={KeyRound} disabled={!branchId}>
             {t('counters.create')}
           </Button>
         </form>
@@ -190,16 +160,11 @@ export function CountersScreen({ api }: { api: Api }) {
           </div>
         )}
       </Panel>
-      {message && (
-        <Alert variant={message.error ? 'destructive' : 'default'}>
-          <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>
-        </Alert>
-      )}
       <Panel title={t('counters.list')}>
         {devices === null ? (
           <p className="px-3.5 pb-3.5 text-muted-foreground">{t('app.loading')}</p>
         ) : (
-          <div className="px-1.5 pb-2.5">
+          <div className="overflow-x-auto px-1.5 pb-2.5">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -230,23 +195,29 @@ export function CountersScreen({ api }: { api: Api }) {
                       </StatusChip>
                     </TableCell>
                     <HealthCells health={d.health ?? null} time={time} nowMs={loadedAt} />
-                    <TableCell className="flex justify-end gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setLooking(looking?.id === d.id ? null : d)}
-                      >
-                        {t('counters.diagnostics.show')}
-                      </Button>
-                      {d.status === 'active' ? (
-                        <Button size="sm" variant="outline" onClick={() => setRevoking(d)}>
-                          {t('counters.revoke')}
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="outline" onClick={() => setReenabling(d)}>
-                          {t('counters.reenable')}
-                        </Button>
-                      )}
+                    <TableCell className="w-0">
+                      <span className="flex justify-end gap-0.5">
+                        <IconButton
+                          icon={Stethoscope}
+                          label={`${t('counters.diagnostics.show')} ${d.code}`}
+                          aria-pressed={looking?.id === d.id}
+                          onClick={() => setLooking(looking?.id === d.id ? null : d)}
+                        />
+                        {d.status === 'active' ? (
+                          <IconButton
+                            icon={Ban}
+                            tone="danger"
+                            label={`${t('counters.revoke')} ${d.code}`}
+                            onClick={() => setRevoking(d)}
+                          />
+                        ) : (
+                          <IconButton
+                            icon={RotateCcw}
+                            label={`${t('counters.reenable')} ${d.code}`}
+                            onClick={() => setReenabling(d)}
+                          />
+                        )}
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -265,8 +236,9 @@ export function CountersScreen({ api }: { api: Api }) {
           text={t('counters.confirmHelp')}
           actionLabel={t('counters.confirmRevoke')}
           call={['POST', `/api/devices/${revoking.id}/revoke`]}
+          tone="danger"
           onDone={() => {
-            setMessage({ text: t('counters.revoked', { code: revoking.code }), error: false });
+            notify.done(t('counters.revoked', { code: revoking.code }));
             setRevoking(null);
             void load();
           }}
@@ -282,7 +254,7 @@ export function CountersScreen({ api }: { api: Api }) {
           actionLabel={t('counters.confirmReenable')}
           call={['POST', `/api/devices/${reenabling.id}/reenable`]}
           onDone={() => {
-            setMessage({ text: t('counters.reenabled', { code: reenabling.code }), error: false });
+            notify.done(t('counters.reenabled', { code: reenabling.code }));
             setReenabling(null);
             void load();
           }}
@@ -347,7 +319,7 @@ function DiagnosticsPanel({
                 </TableCell>
                 <TableCell>{t('counters.diagnostics.events', { count: row.eventCount })}</TableCell>
                 <TableCell className="text-end">
-                  <Button size="sm" variant="outline" onClick={() => void download(row)}>
+                  <Button size="sm" variant="outline" icon={Download} onClick={() => void download(row)}>
                     {t('counters.diagnostics.download')}
                   </Button>
                 </TableCell>

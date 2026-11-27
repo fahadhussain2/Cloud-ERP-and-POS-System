@@ -8,6 +8,7 @@ import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import {
   Button,
+  buttonClass,
   Checkbox,
   ConfirmDialog,
   FormDialog,
@@ -53,6 +54,11 @@ describe('Button', () => {
       expect(screen.getByRole('button', { name }).className).not.toContain('bg-primary');
   });
 
+  it('gives a link that looks like a button the same layout: its icon beside the word', () => {
+    const cls = buttonClass('outline');
+    for (const c of ['inline-flex', 'items-center', 'whitespace-nowrap', 'h-9']) expect(cls).toContain(c);
+  });
+
   it('is 36px tall, or 32px when small', () => {
     show(
       <>
@@ -74,6 +80,10 @@ describe('IconButton', () => {
       button.focus();
     });
     expect(await screen.findByRole('tooltip')).toHaveProperty('textContent', 'Edit Khan Motors');
+    // It never takes a click meant for what is under it (a row's icon above).
+    expect(document.querySelector('[data-slot="tooltip-content"]')?.className).toContain(
+      'pointer-events-none',
+    );
   });
 });
 

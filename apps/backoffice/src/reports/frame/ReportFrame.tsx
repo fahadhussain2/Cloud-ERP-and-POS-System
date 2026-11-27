@@ -2,11 +2,8 @@ import { periodOf as presetDates, PERIOD_PRESETS, type PeriodPreset } from '@erp
 import {
   Alert,
   AlertDescription,
-  Button,
   cn,
   formatMoney,
-  Input,
-  LABEL_CLASS,
   PageHeader,
   Panel,
   Table,
@@ -24,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api';
 import { addDays, useShopToday } from '../../shopDay';
+import { Button, buttonClass, FIELD_LABEL, ListPicker, Select, TextBox } from '../../ui';
 import { current, only, useFilters, type Filters } from './filters';
 
 // The report frame (W2-01 plan; D-116): every report from here on is drawn with it. Filters at the top with date
@@ -149,15 +147,12 @@ export function ReportPage({
           actions={
             <>
               {csv && (
-                <Button asChild variant="outline">
-                  <a href={csv}>
-                    <Download aria-hidden="true" className="size-4" />
-                    {t('reports.csv')}
-                  </a>
-                </Button>
+                <a href={csv} className={buttonClass('outline')}>
+                  <Download aria-hidden="true" className="size-4" />
+                  {t('reports.csv')}
+                </a>
               )}
-              <Button variant="outline" onClick={() => window.print()}>
-                <Printer aria-hidden="true" className="size-4" />
+              <Button variant="outline" icon={Printer} onClick={() => window.print()}>
                 {t('reports.frame.print')}
               </Button>
             </>
@@ -166,7 +161,7 @@ export function ReportPage({
       </div>
       <Panel
         aria-label={t('reports.frame.filters')}
-        className="flex flex-wrap items-end gap-4 p-3.5 print:hidden"
+        className="flex flex-wrap items-end gap-3 p-3.5 print:hidden"
       >
         {filters}
       </Panel>
@@ -180,7 +175,7 @@ export function ReportPage({
         <Panel aria-label={t('reports.frame.figures')} className="flex flex-wrap gap-x-8 gap-y-2 p-3.5">
           {figures.map((f) => (
             <span key={f.key} className="flex flex-col">
-              <span className={LABEL_CLASS}>{f.label}</span>
+              <span className={FIELD_LABEL}>{f.label}</span>
               <span
                 className={cn(
                   'text-lg font-semibold tabular-nums',
@@ -204,8 +199,8 @@ export function ReportPage({
 function Field({ label, children }: { label: string; children: (id: string) => ReactNode }) {
   const id = useId();
   return (
-    <div className="flex max-w-full min-w-0 flex-col gap-1">
-      <label htmlFor={id} className={LABEL_CLASS}>
+    <div className="flex max-w-full min-w-0 flex-col gap-1.5">
+      <label htmlFor={id} className={FIELD_LABEL}>
         {label}
       </label>
       {children(id)}
@@ -213,10 +208,15 @@ function Field({ label, children }: { label: string; children: (id: string) => R
   );
 }
 
-// A long choice (an account name) is cut to the screen's width on a phone rather than widening the page.
-const SELECT = 'h-9 max-w-full rounded-md border border-input bg-surface-2 px-2 text-base';
+/** Past this many options a choice is searched, not dropped down (owner answer 3). */
+const SEARCHED_PAST = 15;
+/** "" as an option's value (a dropdown's option can't be empty): the "all" of a filter. */
+const EMPTY = '__all';
 
-/** A choice from a short list. */
+/**
+ * A choice: the kit's dropdown for a short list, a search for a long one (an account, owner answer 3; W2-15). A long
+ * choice is cut to the screen's width on a phone rather than widening the page.
+ */
 export function ChoiceFilter({
   label,
   value,
@@ -228,18 +228,27 @@ export function ChoiceFilter({
   options: { value: string; label: string }[];
   onChange: (v: string) => void;
 }) {
+  if (options.length > SEARCHED_PAST) {
+    const all = options.find((o) => o.value === '');
+    return (
+      <ListPicker
+        className="w-72 max-w-full"
+        label={label}
+        {...(all ? { placeholder: all.label } : {})}
+        options={options.filter((o) => o.value !== '').map((o) => ({ id: o.value, name: o.label }))}
+        value={value}
+        onChange={onChange}
+      />
+    );
+  }
   return (
-    <Field label={label}>
-      {(id) => (
-        <select id={id} className={SELECT} value={value} onChange={(e) => onChange(e.target.value)}>
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      )}
-    </Field>
+    <Select
+      label={label}
+      wrapperClassName="w-auto max-w-full min-w-40"
+      value={value === '' ? EMPTY : value}
+      onValueChange={(v) => onChange(v === EMPTY ? '' : v)}
+      options={options.map((o) => ({ value: o.value === '' ? EMPTY : o.value, label: o.label }))}
+    />
   );
 }
 
@@ -255,10 +264,10 @@ export function DateFilter({
   return (
     <Field label={label}>
       {(id) => (
-        <Input
+        <TextBox
           id={id}
           type="date"
-          className="h-9 w-44"
+          className="w-44"
           value={value}
           onChange={(e) => onChange(e.target.value)}
         />
@@ -432,11 +441,11 @@ export function StatementTable({
   return (
     <Panel className="px-1.5 pb-2.5">
       <div className="flex justify-end p-2 print:hidden">
-        <Input
+        <TextBox
           type="search"
           aria-label={t('reports.frame.search')}
           placeholder={t('reports.frame.search')}
-          className="h-9 w-64"
+          className="w-64 max-w-full"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -550,11 +559,11 @@ export function ListTable<R>({
   return (
     <Panel className="px-1.5 pb-2.5">
       <div className="flex justify-end p-2 print:hidden">
-        <Input
+        <TextBox
           type="search"
           aria-label={t('reports.frame.search')}
           placeholder={t('reports.frame.search')}
-          className="h-9 w-64"
+          className="w-64 max-w-full"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

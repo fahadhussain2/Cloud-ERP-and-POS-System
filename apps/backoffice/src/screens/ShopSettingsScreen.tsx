@@ -5,15 +5,17 @@ import {
   type ShopSettingsView,
 } from '@erp/contracts';
 import { billHeaderLines } from '@erp/print';
-import { Alert, AlertDescription, Button, PageHeader, Panel, TextField } from '@erp/ui';
+import { Alert, AlertDescription, PageHeader, Panel } from '@erp/ui';
+import { Save } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { Button, notify, TextInput } from '../ui';
 
 // The shop's name and bill header (W1-25 plan; PLT-01, POS-09, D-112), the owner's: the name, the branch's address,
 // phone and extra lines, and the policy line, with a preview in the bill's own order (`billHeaderLines`). Counters
-// print the change from their next pull.
+// print the change from their next pull. W2-15 (D-127): the back office's own controls; the result is a toast.
 
 export function ShopSettingsScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
@@ -50,7 +52,6 @@ function ShopForm({ api, shop }: { api: Api; shop: ShopSettingsView }) {
   const [phone, setPhone] = useState(shop.phone);
   const [lines, setLines] = useState(padded(shop.lines));
   const [policy, setPolicy] = useState(shop.policyText);
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
 
   // The same limits the API checks (ShopSettingsRequest), shown as the owner types.
@@ -70,7 +71,6 @@ function ShopForm({ api, shop }: { api: Api; shop: ShopSettingsView }) {
   const header = billHeaderLines({ address, phone, lines, profileLines: shop.profileLines });
   const change = (set: (v: string) => void) => (e: { target: { value: string } }) => {
     set(e.target.value);
-    setMessage(null);
   };
 
   const save = async () => {
@@ -85,12 +85,8 @@ function ShopForm({ api, shop }: { api: Api; shop: ShopSettingsView }) {
     setSaving(true);
     try {
       const res = await api('PUT', '/api/settings/shop', body);
-      if (res.status === 200) setMessage({ text: t('shop.saved'), error: false });
-      else
-        setMessage({
-          text: t(res.status === 403 ? 'shop.refused' : 'shop.failed'),
-          error: true,
-        });
+      if (res.status === 200) notify.done(t('shop.saved'));
+      else notify.problem(t(res.status === 403 ? 'shop.refused' : 'shop.failed'));
     } finally {
       setSaving(false);
     }
@@ -99,34 +95,29 @@ function ShopForm({ api, shop }: { api: Api; shop: ShopSettingsView }) {
   return (
     <>
       <PageHeader title={t('shop.title')} help={t('shop.help')} />
-      {message && (
-        <Alert variant={message.error ? 'destructive' : 'default'} role={message.error ? 'alert' : 'status'}>
-          <AlertDescription>{message.text}</AlertDescription>
-        </Alert>
-      )}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Panel className="flex flex-col gap-3 p-3.5">
           <p className="m-0 text-sm text-muted-foreground">{t('shop.branch', { name: shop.branchName })}</p>
-          <TextField
+          <TextInput
             label={t('shop.fields.name')}
             value={name}
             onChange={change(setName)}
             error={problems.name}
           />
-          <TextField
+          <TextInput
             label={t('shop.fields.address')}
             value={address}
             onChange={change(setAddress)}
             error={problems.address}
           />
-          <TextField
+          <TextInput
             label={t('shop.fields.phone')}
             value={phone}
             onChange={change(setPhone)}
             error={problems.phone}
           />
           {lines.map((line, i) => (
-            <TextField
+            <TextInput
               key={i}
               label={t(`shop.fields.line${i + 1}`)}
               value={line}
@@ -134,7 +125,7 @@ function ShopForm({ api, shop }: { api: Api; shop: ShopSettingsView }) {
               error={problems.lines[i]}
             />
           ))}
-          <TextField
+          <TextInput
             label={t('shop.fields.policy')}
             hint={t('shop.policyHint')}
             value={policy}
@@ -142,7 +133,7 @@ function ShopForm({ api, shop }: { api: Api; shop: ShopSettingsView }) {
             error={problems.policy}
           />
           <div>
-            <Button onClick={() => void save()} disabled={!valid || saving}>
+            <Button icon={Save} onClick={() => void save()} disabled={!valid || saving}>
               {t('shop.save')}
             </Button>
           </div>

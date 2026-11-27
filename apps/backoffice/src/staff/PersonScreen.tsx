@@ -1,16 +1,19 @@
 import type { RoleAssignment, UserSummary } from '@erp/contracts';
-import { Alert, AlertDescription, Button, PageHeader, Panel, StatusChip, TextField } from '@erp/ui';
+import { PageHeader, Panel, StatusChip } from '@erp/ui';
+import { KeyRound, Save, UserCheck, UserX } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { href } from '../router';
+import { Button, notify, TextInput } from '../ui';
 import { refusalText, useStaffData } from './data';
 import { ConfirmDialog, PasswordDialog, RolePicker, TemporaryPinDialog } from './dialogs';
 import { accessChip, pinChip } from './StaffScreen';
 
 // One person (W1-04): details, roles and branch, back-office password, counter PIN, deactivate. Managers see only the
-// PIN; everything else needs admin.users.
+// PIN; everything else needs admin.users. W2-15 (D-127): the back office's own controls; results and refusals are
+// toasts, a duplicate at its field (owner answer 6).
 
 type Dialog = 'pin' | 'password' | 'removePassword' | 'deactivate' | 'reactivate' | null;
 
@@ -28,7 +31,6 @@ export function PersonScreen({
   const { users, roles, branches, reload } = useStaffData(api, canAdmin);
   const person = users?.find((u) => u.id === id) ?? null;
   const [dialog, setDialog] = useState<Dialog>(null);
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
 
   const back = (
     <a
@@ -43,7 +45,7 @@ export function PersonScreen({
 
   const done = (text: string) => {
     setDialog(null);
-    setMessage({ text, error: false });
+    notify.done(text);
     void reload();
   };
   const name = person.fullName;
@@ -65,21 +67,16 @@ export function PersonScreen({
         actions={
           canAdmin &&
           (active ? (
-            <Button variant="outline" onClick={() => setDialog('deactivate')}>
+            <Button variant="outline" icon={UserX} onClick={() => setDialog('deactivate')}>
               {t('staff.deactivate')}
             </Button>
           ) : (
-            <Button variant="outline" onClick={() => setDialog('reactivate')}>
+            <Button variant="outline" icon={UserCheck} onClick={() => setDialog('reactivate')}>
               {t('staff.reactivate')}
             </Button>
           ))
         }
       />
-      {message && (
-        <Alert variant={message.error ? 'destructive' : 'default'}>
-          <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>
-        </Alert>
-      )}
 
       <div className="grid grid-cols-1 items-start gap-2.5 lg:grid-cols-2">
         {canAdmin && (
@@ -99,7 +96,7 @@ export function PersonScreen({
             roles={roles}
             branches={branches}
             onSaved={() => done(t('staff.rolesSaved'))}
-            onError={(text) => setMessage({ text, error: true })}
+            onError={(text) => notify.problem(text)}
           />
         )}
         {canAdmin && (
@@ -110,7 +107,7 @@ export function PersonScreen({
                 {t(person.hasPassword ? 'staff.password.has' : 'staff.password.none', { name })}
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={() => setDialog('password')}>
+                <Button variant="outline" icon={KeyRound} onClick={() => setDialog('password')}>
                   {person.hasPassword ? t('staff.password.reset') : t('staff.password.give')}
                 </Button>
                 {person.hasPassword && (
@@ -130,7 +127,7 @@ export function PersonScreen({
             <p className="m-0 text-muted-foreground">{t('staff.pinHelp')}</p>
             {active && person.canGivePin && (
               <div>
-                <Button variant="outline" onClick={() => setDialog('pin')}>
+                <Button variant="outline" icon={KeyRound} onClick={() => setDialog('pin')}>
                   {t('staff.give')}
                 </Button>
               </div>
@@ -172,6 +169,7 @@ export function PersonScreen({
             text={t('staff.deactivateConfirm', { name })}
             actionLabel={t('staff.deactivate')}
             call={['POST', `/api/users/${person.id}/deactivate`]}
+            tone="danger"
             onDone={() => done(t('staff.deactivated', { name }))}
           />
           <ConfirmDialog
@@ -195,13 +193,14 @@ function DetailsPanel({ api, person, onSaved }: { api: Api; person: UserSummary;
   const [fullName, setFullName] = useState(person.fullName);
   const [shortCode, setShortCode] = useState(person.shortCode ?? '');
   const [email, setEmail] = useState(person.email ?? '');
-  const [error, setError] = useState<string | null>(null);
+  const [problems, setProblems] = useState<Record<string, string | undefined>>({});
   const [busy, setBusy] = useState(false);
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
+    if (fullName.trim() === '') return setProblems({ fullName: t('staff.problems.fullName') });
     setBusy(true);
-    setError(null);
+    setProblems({});
     const r = await api('PATCH', `/api/users/${person.id}`, {
       fullName: fullName.trim(),
       shortCode: shortCode.trim() || null,
@@ -209,36 +208,41 @@ function DetailsPanel({ api, person, onSaved }: { api: Api; person: UserSummary;
     });
     setBusy(false);
     if (r.status === 204) return onSaved();
-    setError(refusalText(t, (k) => i18n.exists(k), r.body));
+    const text = refusalText(t, (k) => i18n.exists(k), r.body);
+    // A duplicate short code or email shows at its field; anything else is a toast.
+    const b = r.body as { error?: string; field?: string } | null;
+    if (b?.error === 'duplicate' && b.field) setProblems({ [b.field]: text });
+    else notify.problem(text);
   };
 
   return (
     <Panel title={t('staff.details')}>
-      <form className="flex flex-col gap-3 px-3.5 pb-3.5" onSubmit={(e) => void save(e)}>
-        <TextField
+      <form className="flex flex-col gap-3 px-3.5 pb-3.5" onSubmit={(e) => void save(e)} noValidate>
+        <TextInput
           label={t('staff.fullName')}
+          error={problems['fullName']}
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
-          required
           maxLength={120}
         />
-        <TextField
+        <TextInput
           label={t('staff.shortCodeField')}
+          error={problems['shortCode']}
           value={shortCode}
           onChange={(e) => setShortCode(e.target.value)}
           maxLength={8}
           className="font-mono"
         />
-        <TextField
+        <TextInput
           label={t('staff.email')}
+          error={problems['email']}
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           maxLength={254}
-          error={error ?? undefined}
         />
         <div>
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" icon={Save} disabled={busy}>
             {t('staff.saveDetails')}
           </Button>
         </div>
@@ -279,7 +283,7 @@ function RolesPanel({
       <div className="flex flex-col gap-3 px-3.5 pb-3.5">
         <RolePicker roles={roles} branches={branches} value={value} onChange={setValue} />
         <div>
-          <Button onClick={() => void save()} disabled={busy}>
+          <Button icon={Save} onClick={() => void save()} disabled={busy}>
             {t('staff.saveRoles')}
           </Button>
         </div>

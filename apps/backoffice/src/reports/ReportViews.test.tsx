@@ -16,6 +16,7 @@ import type { Api } from '../api';
 import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import { href, parseHash, queryOf } from '../router';
+import { chooseValue } from '../ui/testing/choose';
 import {
   AgeingScreen,
   ExceptionsScreen,
@@ -299,7 +300,7 @@ describe('ageing', () => {
         '/api/reports/ageing?side=customers&asOf=2026-11-19',
       ]),
     );
-    fireEvent.change(screen.getByLabelText(r.ageing.side), { target: { value: 'suppliers' } });
+    await chooseValue(r.ageing.side, 'suppliers');
     fireEvent.change(screen.getByLabelText(r.ageing.asOf), { target: { value: '2026-10-31' } });
     expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({
       side: 'suppliers',
@@ -494,7 +495,7 @@ describe('the dates of a W1 report on the frame', () => {
         '/api/reports/sales-register?from=2026-11-19&to=2026-11-19',
       ]),
     );
-    fireEvent.change(screen.getByLabelText(r.frame.period), { target: { value: 'weekToToday' } });
+    await chooseValue(r.frame.period, 'weekToToday');
     expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({ preset: 'weekToToday' });
     await waitFor(() =>
       expect(calledWith(f.calls, '/api/reports/sales-register')).toContain(

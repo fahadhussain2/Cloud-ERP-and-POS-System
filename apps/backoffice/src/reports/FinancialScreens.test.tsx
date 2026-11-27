@@ -25,6 +25,7 @@ import {
   TrialBalanceScreen,
 } from './FinancialScreens';
 import { PrintProvider } from './frame/ReportFrame';
+import { chooseValue } from '../ui/testing/choose';
 
 // The report frame and the financial statements (W2-01 plan): presets and dates in the address, the filters
 // remembered, sorting and search, group subtotals, drill-down links that carry the period, the print header, and no
@@ -149,7 +150,7 @@ describe('the trial balance on the frame', () => {
     const { api } = fakeApi({ 'GET /api/reports/trial-balance': TB });
     show(<TrialBalanceScreen api={api} />);
     await screen.findByRole('table', { name: en.nav.trialBalance });
-    fireEvent.change(screen.getByLabelText(r.frame.period), { target: { value: 'lastMonth' } });
+    await chooseValue(r.frame.period, 'lastMonth');
     expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({
       preset: 'lastMonth',
       level: 'accounts',
@@ -256,7 +257,7 @@ describe('the profit and loss', () => {
     expect(within(table).getByRole('link', { name: 'Sales' }).getAttribute('href')).toBe(
       '#/accounting/accounts/s?from=2027-11-01&to=2027-11-30',
     );
-    fireEvent.change(screen.getByLabelText(r.pl.compare), { target: { value: 'months' } });
+    await chooseValue(r.pl.compare, 'months');
     expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({
       preset: 'thisMonth',
       compare: 'months',
@@ -432,7 +433,7 @@ describe('the cash book, the day book and the expenses', () => {
     expect(journals()).toEqual(['J000001', 'J000002']);
     fireEvent.click(within(table).getByRole('button', { name: r.dayBook.amount }));
     expect(journals()).toEqual(['J000002', 'J000001']);
-    fireEvent.change(screen.getByLabelText(r.dayBook.type), { target: { value: 'expense' } });
+    await chooseValue(r.dayBook.type, 'expense');
     expect(queryOf(window.location.hash).get('type')).toBe('expense');
     expect(untranslated()).toEqual([]);
   });

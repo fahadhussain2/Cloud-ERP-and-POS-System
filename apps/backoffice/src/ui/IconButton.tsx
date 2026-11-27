@@ -43,7 +43,11 @@ export function IconButton({
             <Icon aria-hidden="true" className="size-4" />
           </SharedButton>
         </TooltipTrigger>
-        <TooltipContent sideOffset={4}>{label}</TooltipContent>
+        {/* Never in the way: a tooltip left showing (focus back on a row's icon after a dialog) must not cover and
+            block the icon of the row above (e2e, 2026-11-27). */}
+        <TooltipContent sideOffset={4} className="pointer-events-none">
+          {label}
+        </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );

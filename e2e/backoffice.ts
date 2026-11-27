@@ -42,6 +42,19 @@ export async function choose(scope: Page | Locator, label: string, option: strin
 }
 
 /**
+ * Picks the option whose value is `value` in one of the back office's own dropdowns (W2-15): a report's filter set
+ * by value. An empty value is a filter's "all" (`__all`).
+ */
+export async function chooseValue(scope: Page | Locator, label: string, value: string): Promise<void> {
+  await scope.getByRole('combobox', { name: label, exact: true }).click();
+  const page = 'page' in scope ? scope.page() : scope;
+  await page
+    .locator(`[role="listbox"] [role="option"][data-value="${value === '' ? '__all' : value}"]`)
+    .click();
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+}
+
+/**
  * Picks from one of the back office's searchable pickers (W2-14, owner answer 3: the supplier on a receipt): types
  * `text` and takes the first hit with Enter, once a hit containing `text` is shown.
  */

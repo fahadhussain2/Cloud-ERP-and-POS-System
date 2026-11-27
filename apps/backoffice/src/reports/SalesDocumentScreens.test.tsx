@@ -1,5 +1,5 @@
 import type { BillListView, ReturnListView } from '@erp/contracts';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -10,6 +10,7 @@ import en from '../locales/en.json';
 import { href, parseHash, queryOf } from '../router';
 import { PrintProvider } from './frame/ReportFrame';
 import { BillsScreen, SalesReturnsScreen } from './SalesDocumentScreens';
+import { chooseValue } from '../ui/testing/choose';
 
 // Bills and Returns (W2-11, D-126): the sales documents as lists on the report frame, with the owner's columns; each
 // row opens the bill's details; the search, the salesman and the other filters go in the address.
@@ -174,10 +175,10 @@ describe('Bills', () => {
     const { api } = fakeApi({ 'GET /api/sales/bills': BILLS, ...CHOICES });
     show(<BillsScreen api={api} />);
     await screen.findByRole('table', { name: en.nav.bills });
-    await screen.findByRole('option', { name: 'Sara' });
-    fireEvent.change(await screen.findByLabelText(d.filter.salesmanId), { target: { value: 'u1' } });
-    fireEvent.change(screen.getByLabelText(d.filter.method), { target: { value: 'jazzcash' } });
-    fireEvent.change(screen.getByLabelText(d.filter.status), { target: { value: 'voided' } });
+    // The salesmen arrive after the list: tried until Sara (u1) is offered.
+    await waitFor(() => chooseValue(d.filter.salesmanId, 'u1'));
+    await chooseValue(d.filter.method, 'jazzcash');
+    await chooseValue(d.filter.status, 'voided');
     expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({
       preset: 'today',
       salesmanId: 'u1',
@@ -232,8 +233,8 @@ describe('Returns', () => {
     const { api } = fakeApi({ 'GET /api/sales/returns': RETURNS, ...CHOICES });
     show(<SalesReturnsScreen api={api} />);
     await screen.findByRole('table', { name: en.nav.returns });
-    fireEvent.change(screen.getByLabelText(d.filter.kind), { target: { value: 'exchange' } });
-    fireEvent.change(screen.getByLabelText(d.filter.reason), { target: { value: 'defective' } });
+    await chooseValue(d.filter.kind, 'exchange');
+    await chooseValue(d.filter.reason, 'defective');
     expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({
       preset: 'today',
       kind: 'exchange',

@@ -152,3 +152,9 @@ input[type='checkbox']:not(:disabled) {
     break-inside: avoid;
   }
 }
+
+/* A tooltip never takes a click meant for what it covers: one left showing (focus back on a row's icon after a dialog)
+   sat over the row above's icon and blocked it (e2e, W2-15). The wrapper Radix positions it in included. */
+[data-radix-popper-content-wrapper]:has(> [data-slot='tooltip-content']) {
+  pointer-events: none;
+}

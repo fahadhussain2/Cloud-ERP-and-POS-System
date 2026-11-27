@@ -1,6 +1,5 @@
 import type { LockChecklist, PeriodsView } from '@erp/contracts';
 import {
-  Button,
   formatMoney,
   PageHeader,
   Panel,
@@ -11,14 +10,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
 } from '@erp/ui';
+import { Lock, LockOpen } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
-import { FormDialog } from '../staff/dialogs';
-import { accountingRefusal, ErrorText, useAccountingLookups } from './data';
+import { Button, FormDialog, notify, TextInput } from '../ui';
+import { accountingRefusal, useAccountingLookups } from './data';
 
 // Periods and the lock date (ACC-06, owner answer 5 to W1-19, D-108). The months are worked out from the shop's start
 // month; a month is locked when it ends on or before the lock date. The accountant or the owner locks the next month
@@ -57,7 +56,7 @@ export function PeriodsScreen({ api }: { api: Api }) {
         actions={
           lookups.can.close &&
           periods.next !== null && (
-            <Button onClick={() => setLocking(periods.next)}>
+            <Button icon={Lock} onClick={() => setLocking(periods.next)}>
               {t('accounting.periods.lockTo', { date: periods.next })}
             </Button>
           )
@@ -67,7 +66,7 @@ export function PeriodsScreen({ api }: { api: Api }) {
         .slice()
         .reverse()
         .map((y) => (
-          <Panel key={y.start} className="px-1.5 pb-2.5">
+          <Panel key={y.start} className="overflow-x-auto px-1.5 pb-2.5">
             <h2 className="m-0 px-2 pt-2 text-base font-semibold">
               {t('accounting.periods.year', { label: y.label })}
             </h2>
@@ -98,7 +97,12 @@ export function PeriodsScreen({ api }: { api: Api }) {
                       </TableCell>
                       <TableCell className="text-end">
                         {isLast && lookups.can.reopen && (
-                          <Button size="sm" variant="outline" onClick={() => setReopening(m.start)}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            icon={LockOpen}
+                            onClick={() => setReopening(m.start)}
+                          >
                             {t('accounting.periods.reopen')}
                           </Button>
                         )}
@@ -166,7 +170,6 @@ function LockDialog({
 }) {
   const { t } = useTranslation();
   const [list, setList] = useState<LockChecklist | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
@@ -182,7 +185,7 @@ function LockDialog({
     const r = await api('POST', '/api/accounting/lock', { lockDate, reason: null });
     setBusy(false);
     if (r.status === 200) return onDone();
-    setError(accountingRefusal(t, r.body));
+    notify.problem(accountingRefusal(t, r.body));
   };
   return (
     <FormDialog
@@ -191,6 +194,7 @@ function LockDialog({
       title={t('accounting.periods.lockTitle', { date: lockDate })}
       description={t('accounting.periods.lockHelp')}
       actionLabel={t('accounting.periods.lock')}
+      actionIcon={Lock}
       cancelLabel={t('accounting.cancel')}
       busy={busy || list === null}
       onSubmit={() => void submit()}
@@ -213,7 +217,6 @@ function LockDialog({
           ))}
         </ul>
       )}
-      <ErrorText text={error} />
     </FormDialog>
   );
 }
@@ -231,7 +234,6 @@ function ReopenDialog({
 }) {
   const { t } = useTranslation();
   const [reason, setReason] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Reopening a month moves the lock date to the end of the month before it.
   const before = new Date(`${monthStart}T00:00:00Z`);
@@ -242,7 +244,7 @@ function ReopenDialog({
     const r = await api('POST', '/api/accounting/lock', { lockDate, reason });
     setBusy(false);
     if (r.status === 200) return onDone();
-    setError(accountingRefusal(t, r.body));
+    notify.problem(accountingRefusal(t, r.body));
   };
   return (
     <FormDialog
@@ -251,16 +253,16 @@ function ReopenDialog({
       title={t('accounting.periods.reopenTitle', { date: lockDate })}
       description={t('accounting.periods.reopenHelp')}
       actionLabel={t('accounting.periods.reopen')}
+      actionIcon={LockOpen}
       cancelLabel={t('accounting.cancel')}
       busy={busy}
       onSubmit={() => void submit()}
     >
-      <TextField
+      <TextInput
         label={t('accounting.periods.reason')}
         value={reason}
         onChange={(e) => setReason(e.target.value)}
       />
-      <ErrorText text={error} />
     </FormDialog>
   );
 }

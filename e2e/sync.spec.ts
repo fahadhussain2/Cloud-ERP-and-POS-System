@@ -199,7 +199,7 @@ test('the owner renames the shop and sets the bill header; the counter shows and
     await bop.getByRole('textbox', { name: bo.shop.fields.phone }).fill('021-1234567');
     await bop.getByRole('textbox', { name: bo.shop.fields.line1 }).fill('Dealers in genuine parts');
     await bop.getByRole('button', { name: bo.shop.save }).click();
-    await expect(bop.getByRole('status')).toHaveText(bo.shop.saved);
+    await expect(bop.getByRole('status').filter({ hasText: bo.shop.saved })).toBeVisible();
 
     // The nudge makes the counter pull: the status bar has the new name well inside the minute between pulls.
     await expect(page.getByText('E2E City Auto Corner')).toBeVisible({ timeout: 10_000 });

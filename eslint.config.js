@@ -102,36 +102,10 @@ export default defineConfig(
   },
 
   // The back office's own controls (W2-12, D-127): its screens use apps/backoffice/src/ui, not packages/ui's, which
-  // stay as the POS has them. The screens not yet moved are listed; each screen pass (W2-14, W2-15) takes its own off,
-  // and W2-15 removes the list.
+  // stay as the POS has them. Every screen moved by W2-15; only the kit itself composes the shared ones.
   {
     files: ['apps/backoffice/src/**/*.{ts,tsx}'],
-    ignores: [
-      'apps/backoffice/src/ui/**',
-      '**/*.test.{ts,tsx}',
-      ...[
-        'accounting/AccountsScreens.tsx',
-        'accounting/MoneyScreen.tsx',
-        'accounting/PeriodsScreen.tsx',
-        'accounting/VoucherScreen.tsx',
-        'layout/ScreenSearch.tsx',
-        'reports/BillScreen.tsx',
-        'reports/FinancialScreens.tsx',
-        'reports/PartnerReportScreens.tsx',
-        'reports/ReportViews.tsx',
-        'reports/SalesReportScreens.tsx',
-        'reports/StockReportScreens.tsx',
-        'reports/frame/ReportFrame.tsx',
-        'screens/CountersScreen.tsx',
-        'screens/LoginScreen.tsx',
-        'screens/PasswordScreen.tsx',
-        'screens/ReportsScreens.tsx',
-        'screens/ShopSettingsScreen.tsx',
-        'staff/PersonScreen.tsx',
-        'staff/StaffScreen.tsx',
-        'staff/dialogs.tsx',
-      ].map((f) => `apps/backoffice/src/${f}`),
-    ],
+    ignores: ['apps/backoffice/src/ui/**', '**/*.test.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',

@@ -8,7 +8,7 @@ import type {
   StockMovementCells,
   StockMovementView,
 } from '@erp/contracts';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -19,6 +19,7 @@ import en from '../locales/en.json';
 import { href, parseHash, queryOf } from '../router';
 import { ReportsHomeScreen } from './FinancialScreens';
 import { PrintProvider } from './frame/ReportFrame';
+import { chooseValue } from '../ui/testing/choose';
 import {
   DeadStockScreen,
   InventoryAnalysisScreen,
@@ -178,8 +179,8 @@ describe('stock at a date', () => {
     const { api } = fakeApi({ 'GET /api/reports/stock-at': AT, 'GET /api/reports/stock-choices': CHOICES });
     show(<StockAtScreen api={api} />);
     await screen.findByRole('table', { name: en.nav.stockAt });
-    fireEvent.change(screen.getByLabelText(r.groupBy), { target: { value: 'brand' } });
-    fireEvent.change(await screen.findByLabelText(r.filter.categoryId), { target: { value: 'c1' } });
+    await chooseValue(r.groupBy, 'brand');
+    await waitFor(() => chooseValue(r.filter.categoryId, 'c1'));
     fireEvent.click(screen.getByLabelText(r.at.negative));
     expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({
       group: 'brand',
@@ -261,7 +262,7 @@ describe('stock movement', () => {
     expect(within(table).getByRole('link', { name: 'BRAKE PAD' }).getAttribute('href')).toBe(
       '#/reports/stock-ledger?itemId=i1&from=2027-11-01&to=2027-11-30',
     );
-    fireEvent.change(screen.getByLabelText(r.movement.show), { target: { value: 'value' } });
+    await chooseValue(r.movement.show, 'value');
     expect(queryOf(window.location.hash).get('show')).toBe('value');
     cleanup();
 
@@ -422,7 +423,7 @@ describe('the reorder list', () => {
     expect(screen.getByRole('link', { name: en.reports.csv }).getAttribute('href')).toBe(
       '/api/reports/reorder?format=csv',
     );
-    fireEvent.change(await screen.findByLabelText(r.filter.supplierId), { target: { value: 's1' } });
+    await waitFor(() => chooseValue(r.filter.supplierId, 's1'));
     expect(queryOf(window.location.hash).get('supplierId')).toBe('s1');
     expect(untranslated()).toEqual([]);
   });
@@ -487,7 +488,7 @@ describe('dead and slow stock', () => {
     expect(plain(screen.getByLabelText(en.reports.frame.figures).textContent)).toContain('1 · Rs');
     expect(within(table).getAllByRole('row')).toHaveLength(3);
     expect(within(table).getByText(r.dead.never)).toBeDefined();
-    fireEvent.change(screen.getByLabelText(r.dead.kind), { target: { value: 'slow' } });
+    await chooseValue(r.dead.kind, 'slow');
     expect(queryOf(window.location.hash).get('kind')).toBe('slow');
     expect(untranslated()).toEqual([]);
   });
@@ -500,7 +501,7 @@ describe('dead and slow stock', () => {
     });
     show(<DeadStockScreen api={api} />);
     await screen.findByRole('table', { name: en.nav.deadStock });
-    fireEvent.change(screen.getByLabelText(r.dead.days), { target: { value: '30' } });
+    await chooseValue(r.dead.days, '30');
     expect(queryOf(window.location.hash).get('days')).toBe('30');
   });
 });
