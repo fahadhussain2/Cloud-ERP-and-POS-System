@@ -1,0 +1,6 @@
+/* pos-look.spec.ts: what changes from run to run, hidden while a picture is taken (the clock's times in the status
+   bar). Hidden, not removed, so the layout around them is the same. */
+.status-bar .sync-area > span:last-child,
+.status-bar .offline {
+  visibility: hidden !important;
+}
