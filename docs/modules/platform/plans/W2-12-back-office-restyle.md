@@ -174,3 +174,12 @@ Each is its own branch off `staging` and its own PR.
 - **The dialog's close ✕** sits after the form and has no tooltip, so a dialog opens with focus on its first field and Esc closes the dialog, not a tooltip.
 - **Add customer's "From an existing supplier"** uses the new dropdown for now; it becomes the searchable picker (answer 3) with W2-13, which rebuilds the pickers.
 - **Customers** now also says *added* in a toast after Add (the key existed, unused), and checks a missing name before sending (`customers.problems.name`).
+
+## W2-13 and W2-14 as built (2026-11-27)
+
+- **W2-13:** the kit's `SearchBox` (a combobox: ↑ ↓ PageUp PageDown, Enter takes the highlighted hit, Esc closes only the list) under the item search and the customer/supplier search; Add customer's supplier became a searchable pick.
+- **W2-14:** Suppliers, goods receipts, purchase returns, items, an item, a new item, categories, print labels, the stock card, transfer needed, stock settings, transfers and adjustments are on the kit and off the lint rule's list.
+- **Searched lists (answer 3)** use the kit's `ListPicker` (the whole list is on the screen): the supplier on a receipt or return, the category (item, new item, the items filter), the brand, the default supplier and the vehicle make. Short fixed lists (unit, status, origin, location, reason, paid from, code kind) use the dropdown.
+- **Kit additions:** `TextBox` (a bare box for a table cell), `ListPicker`, and a hidden label on `Checkbox` and `ListPicker` (a box in a row, a filter in a toolbar).
+- **Fixed on the way:** a quiet kit button (ghost, link) kept the shared button's orange fill; the kit now passes its variant through, with a test. Stock settings' limit field no longer overflows a phone.
+- **Standing banners stay** (a transfer's shortfall adjustment, an adjustment awaiting approval or rejected); results and refusals are toasts.

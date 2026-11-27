@@ -9,9 +9,6 @@ import { checkTransfer, isEmptyDraft } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
-  Button,
-  Input,
-  LABEL_CLASS,
   PageHeader,
   Panel,
   StatusChip,
@@ -21,16 +18,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
   type ChipTone,
 } from '@erp/ui';
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { PackageCheck, Plus, Save, Send } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { qtyText, qtyValue } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
-import { carry, href, navigate, takeCarried } from '../router';
+import { href, navigate, takeCarried } from '../router';
+import { Button, buttonClass, notify, Select, TextBox, TextInput } from '../ui';
 import { dateProblem, inventoryRefusal, locationName, problemText, useInventoryLookups } from './data';
 
 // Stock transfers (W1-18, INV-04; owner answers 2 and 4): the storekeeper types one, the owner or the manager posts
@@ -72,9 +70,10 @@ export function TransfersScreen({ api }: { api: Api }) {
         help={t('inventory.transfers.help')}
         actions={
           lookups.can.transfer && (
-            <Button asChild size="lg">
-              <a href={href.transfer('new')}>{t('inventory.transfers.add')}</a>
-            </Button>
+            <a href={href.transfer('new')} className={buttonClass()}>
+              <Plus aria-hidden="true" className="size-4" />
+              {t('inventory.transfers.add')}
+            </a>
           )
         }
       />
@@ -237,12 +236,12 @@ function TransferForm({
   );
   const [received, setReceived] = useState<string[]>(view ? view.lines.map((l) => qtyText(l.qty)) : []);
   const [receivedOn, setReceivedOn] = useState(lookups.today);
-  // A refusal from just before this form opened (a new draft at its own address, or a reload): see `carry`.
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(() => {
-    const text = takeCarried(href.transfer(x?.id ?? 'new'));
-    return text === null ? null : { text, error: true };
-  });
-  const ids = { from: useId(), to: useId() };
+  // A refusal from just before this form opened (a new draft at its own address): see `carry`. A toast, as any
+  // refusal (owner answer 6).
+  const [carried] = useState(() => takeCarried(href.transfer(x?.id ?? 'new')));
+  useEffect(() => {
+    if (carried !== null) notify.problem(carried);
+  }, [carried]);
   const exists = (k: string) => t(k) !== k;
   const set = (k: keyof typeof h, v: string) => setH((s) => ({ ...s, [k]: v }));
   const put = (n: number, patch: Partial<Line>) =>
@@ -282,7 +281,7 @@ function TransferForm({
   const save = async (): Promise<{ id: string; rowVersion: string } | null> => {
     // Nothing on any line is nothing to keep (owner's review of W1-19); the server refuses it too.
     if (isEmptyDraft(body().lines)) {
-      setMessage({ text: t('inventory.errors.empty_draft'), error: true });
+      notify.problem(t('inventory.errors.empty_draft'));
       return null;
     }
     const res = x
@@ -293,7 +292,7 @@ function TransferForm({
       : await api('POST', '/api/inventory/transfers', body());
     if (res.status === 200) return { id: x!.id, rowVersion: (res.body as { rowVersion: string }).rowVersion };
     if (res.status === 201) return res.body as { id: string; rowVersion: string };
-    setMessage({ text: inventoryRefusal(t, exists, res.body), error: true });
+    notify.problem(inventoryRefusal(t, exists, res.body));
     return null;
   };
   const after = (id: string) => {
@@ -306,12 +305,9 @@ function TransferForm({
     const res = await api('POST', `/api/inventory/transfers/${encodeURIComponent(s.id)}/post`, {
       rowVersion: s.rowVersion,
     });
-    // The draft was saved before Post was refused: it opens again, as saved, with the refusal (`carry`).
-    if (res.status !== 200) {
-      const text = inventoryRefusal(t, exists, res.body);
-      setMessage({ text, error: true });
-      carry(href.transfer(s.id), text);
-    }
+    // The draft was saved before Post was refused: it opens again, as saved, and the refusal is a toast, which
+    // outlives the reload or the move to the new draft's own address.
+    if (res.status !== 200) notify.problem(inventoryRefusal(t, exists, res.body));
     after(s.id);
   };
   const receiveIt = async () => {
@@ -320,7 +316,7 @@ function TransferForm({
       receivedOn,
       lines: view!.lines.map((l, i) => ({ lineId: l.id, receivedQty: qtyValue(received[i] ?? '') ?? 0 })),
     });
-    if (res.status !== 200) setMessage({ text: inventoryRefusal(t, exists, res.body), error: true });
+    if (res.status !== 200) notify.problem(inventoryRefusal(t, exists, res.body));
     else onSaved();
   };
 
@@ -337,11 +333,6 @@ function TransferForm({
           </span>
         }
       />
-      {message && (
-        <Alert variant={message.error ? 'destructive' : 'default'}>
-          <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>
-        </Alert>
-      )}
       {view?.shortfallAdjustment && (
         <Alert>
           <AlertDescription>
@@ -355,25 +346,16 @@ function TransferForm({
       <Panel>
         <fieldset disabled={!canEdit} className="m-0 grid grid-cols-1 gap-3.5 border-0 p-3.5 md:grid-cols-4">
           {(['from', 'to'] as const).map((side) => (
-            <div key={side} className="flex flex-col gap-1.5">
-              <label htmlFor={ids[side]} className={LABEL_CLASS}>
-                {t(`inventory.fields.${side}`)}
-              </label>
-              <select
-                id={ids[side]}
-                className="h-11 rounded-md border border-input bg-surface-2 px-2"
-                value={side === 'from' ? h.fromLocationId : h.toLocationId}
-                onChange={(e) => set(side === 'from' ? 'fromLocationId' : 'toLocationId', e.target.value)}
-              >
-                {lookups.locations.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              key={side}
+              label={t(`inventory.fields.${side}`)}
+              disabled={!canEdit}
+              value={side === 'from' ? h.fromLocationId : h.toLocationId}
+              onValueChange={(v) => set(side === 'from' ? 'fromLocationId' : 'toLocationId', v)}
+              options={lookups.locations.map((l) => ({ value: l.id, label: l.name }))}
+            />
           ))}
-          <TextField
+          <TextInput
             label={t('inventory.fields.movedOn')}
             type="date"
             error={locked}
@@ -381,7 +363,7 @@ function TransferForm({
             value={h.movedOn}
             onChange={(e) => set('movedOn', e.target.value)}
           />
-          <TextField
+          <TextInput
             label={t('inventory.fields.note')}
             value={h.note}
             onChange={(e) => set('note', e.target.value)}
@@ -393,7 +375,7 @@ function TransferForm({
           </p>
         )}
       </Panel>
-      <Panel className="px-1.5 pb-2.5">
+      <Panel className="overflow-x-auto px-1.5 pb-2.5">
         <Table aria-label={t('inventory.transfers.lines')}>
           <TableHeader>
             <TableRow>
@@ -437,7 +419,7 @@ function TransferForm({
                     </TableCell>
                   )}
                   <TableCell>
-                    <Input
+                    <TextBox
                       aria-label={t('inventory.line.qtyOf', { row: i + 1 })}
                       className="h-9 w-24"
                       inputMode="decimal"
@@ -448,7 +430,7 @@ function TransferForm({
                   </TableCell>
                   {x?.status === 'in_transit' && (
                     <TableCell>
-                      <Input
+                      <TextBox
                         aria-label={t('inventory.line.receivedOf', { row: i + 1 })}
                         className="h-9 w-24"
                         inputMode="decimal"
@@ -470,7 +452,7 @@ function TransferForm({
         </Table>
         {canEdit && (
           <div className="px-2 pt-2">
-            <Button size="sm" variant="outline" onClick={() => setLines([...lines, blank()])}>
+            <Button size="sm" variant="outline" icon={Plus} onClick={() => setLines([...lines, blank()])}>
               {t('inventory.line.add')}
             </Button>
           </div>
@@ -488,10 +470,11 @@ function TransferForm({
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
+            icon={Save}
             onClick={() =>
               void save().then((s) => {
                 if (s) {
-                  setMessage({ text: t('inventory.saved'), error: false });
+                  notify.done(t('inventory.saved'));
                   after(s.id);
                 }
               })
@@ -500,7 +483,11 @@ function TransferForm({
             {t('inventory.saveDraft')}
           </Button>
           {lookups.can.postTransfer && (
-            <Button onClick={() => void postIt()} disabled={check.problems.length > 0 || locked !== null}>
+            <Button
+              icon={Send}
+              onClick={() => void postIt()}
+              disabled={check.problems.length > 0 || locked !== null}
+            >
               {needsReceiving ? t('inventory.transfers.send') : t('inventory.post')}
             </Button>
           )}
@@ -508,7 +495,7 @@ function TransferForm({
       )}
       {x?.status === 'in_transit' && lookups.can.postTransfer && (
         <Panel className="flex flex-wrap items-end gap-3 p-3.5">
-          <TextField
+          <TextInput
             label={t('inventory.fields.receivedOn')}
             type="date"
             error={receiveLocked}
@@ -516,7 +503,7 @@ function TransferForm({
             value={receivedOn}
             onChange={(e) => setReceivedOn(e.target.value)}
           />
-          <Button onClick={() => void receiveIt()} disabled={receiveLocked !== null}>
+          <Button icon={PackageCheck} onClick={() => void receiveIt()} disabled={receiveLocked !== null}>
             {t('inventory.transfers.receive')}
           </Button>
           <span className="text-sm text-muted-foreground">{t('inventory.transfers.receiveHint')}</span>

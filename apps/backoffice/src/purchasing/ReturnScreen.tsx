@@ -1,12 +1,7 @@
 import type { DocumentRow, PurchasingLookups, ReceiptView, ReturnView } from '@erp/contracts';
 import { checkReturn, isEmptyDraft, money, mulQty, PURCHASE_RETURN_REASONS, qty as qtyOf } from '@erp/domain';
 import {
-  Alert,
-  AlertDescription,
-  Button,
   formatMoney,
-  Input,
-  LABEL_CLASS,
   PageHeader,
   Panel,
   StatusChip,
@@ -16,21 +11,23 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
 } from '@erp/ui';
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { Plus, Save, Send } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { moneyText, moneyValue, qtyText, qtyValue } from '../catalog/data';
-import { carry, href, navigate, takeCarried } from '../router';
+import { href, navigate, takeCarried } from '../router';
+import { Button, buttonClass, ListPicker, notify, Select, TextBox, TextInput } from '../ui';
 import { ItemPicker } from './ItemPicker';
 import { DocumentList } from './ReceiptScreen';
 import { dateProblem, problemText, purchasingRefusal, usePurchasingLookups, type PickedItem } from './data';
 
 // Purchase returns / debit notes (W1-16, PUR-03): goods back to the supplier, from a goods receipt where possible
 // (its lines and net costs offered, no more than it still has), with a reason (owner answer 3). Posting takes the
-// stock out and the supplier's balance down (posting rules §5.2).
+// stock out and the supplier's balance down (posting rules §5.2). W2-14 (D-127): the back office's own controls; the
+// supplier is searched (owner answer 3), and results and refusals are toasts (owner answer 6).
 
 export function ReturnsScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
@@ -53,9 +50,10 @@ export function ReturnsScreen({ api }: { api: Api }) {
         help={t('purchasing.returns.help')}
         actions={
           lookups.can.receive && (
-            <Button asChild size="lg">
-              <a href={href.purchaseReturn('new')}>{t('purchasing.returns.add')}</a>
-            </Button>
+            <a href={href.purchaseReturn('new')} className={buttonClass()}>
+              <Plus aria-hidden="true" className="size-4" />
+              {t('purchasing.returns.add')}
+            </a>
           )
         }
       />
@@ -181,15 +179,15 @@ function ReturnForm({
             },
           ],
   );
-  // A refusal from just before this form opened (a new draft at its own address, or a reload): see `carry`.
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(() => {
-    const text = takeCarried(href.purchaseReturn(r?.id ?? 'new'));
-    return text === null ? null : { text, error: true };
-  });
+  // A refusal from just before this form opened (a new draft at its own address): see `carry`. A toast, as any
+  // refusal (owner answer 6).
+  const [carried] = useState(() => takeCarried(href.purchaseReturn(r?.id ?? 'new')));
+  useEffect(() => {
+    if (carried !== null) notify.problem(carried);
+  }, [carried]);
   const set = (k: keyof typeof h, v: string) => setH((x) => ({ ...x, [k]: v }));
   const put = (n: number, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l, i) => (i === n ? { ...l, ...patch } : l)));
-  const ids = { supplier: useId(), location: useId(), reason: useId() };
   const exists = (k: string) => t(k) !== k;
   const nan = (v: number | null | undefined) => (v === undefined ? Number.NaN : (v ?? 0));
   // Lines from a receipt with no quantity typed are not being returned; a free line not filled in yet is just a line
@@ -232,7 +230,7 @@ function ReturnForm({
   const save = async (): Promise<{ id: string; rowVersion: string } | null> => {
     // Nothing on any line is nothing to keep (owner's review of W1-19); the server refuses it too.
     if (isEmptyDraft(body().lines)) {
-      setMessage({ text: t('purchasing.errors.empty_draft'), error: true });
+      notify.problem(t('purchasing.errors.empty_draft'));
       return null;
     }
     const res = r
@@ -243,7 +241,7 @@ function ReturnForm({
       : await api('POST', '/api/purchasing/returns', body());
     if (res.status === 200) return { id: r!.id, rowVersion: (res.body as { rowVersion: string }).rowVersion };
     if (res.status === 201) return res.body as { id: string; rowVersion: string };
-    setMessage({ text: purchasingRefusal(t, exists, res.body), error: true });
+    notify.problem(purchasingRefusal(t, exists, res.body));
     return null;
   };
   const after = (id: string) => {
@@ -256,12 +254,9 @@ function ReturnForm({
     const res = await api('POST', `/api/purchasing/returns/${encodeURIComponent(s.id)}/post`, {
       rowVersion: s.rowVersion,
     });
-    // The draft was saved before Post was refused: it opens again, as saved, with the refusal (`carry`).
-    if (res.status !== 200) {
-      const text = purchasingRefusal(t, exists, res.body);
-      setMessage({ text, error: true });
-      carry(href.purchaseReturn(s.id), text);
-    }
+    // The draft was saved before Post was refused: it opens again, as saved, and the refusal is a toast, which
+    // outlives the reload or the move to the new draft's own address.
+    if (res.status !== 200) notify.problem(purchasingRefusal(t, exists, res.body));
     after(s.id);
   };
 
@@ -278,50 +273,24 @@ function ReturnForm({
           </span>
         }
       />
-      {message && (
-        <Alert variant={message.error ? 'destructive' : 'default'}>
-          <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>
-        </Alert>
-      )}
       <Panel>
         <fieldset disabled={!can} className="m-0 grid grid-cols-1 gap-3.5 border-0 p-3.5 md:grid-cols-4">
-          <div className="flex flex-col gap-1.5 md:col-span-2">
-            <label htmlFor={ids.supplier} className={LABEL_CLASS}>
-              {t('purchasing.fields.supplier')}
-            </label>
-            <select
-              id={ids.supplier}
-              className="h-11 rounded-md border border-input bg-surface-2 px-2"
-              value={h.supplierId}
-              disabled={h.goodsReceiptId !== null}
-              onChange={(e) => set('supplierId', e.target.value)}
-            >
-              <option value="">—</option>
-              {lookups.suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.code})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={ids.location} className={LABEL_CLASS}>
-              {t('purchasing.fields.location')}
-            </label>
-            <select
-              id={ids.location}
-              className="h-11 rounded-md border border-input bg-surface-2 px-2"
-              value={h.locationId}
-              onChange={(e) => set('locationId', e.target.value)}
-            >
-              {lookups.locations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <TextField
+          <ListPicker
+            className="md:col-span-2"
+            label={t('purchasing.fields.supplier')}
+            options={lookups.suppliers}
+            value={h.supplierId}
+            disabled={h.goodsReceiptId !== null}
+            onChange={(v) => set('supplierId', v)}
+          />
+          <Select
+            label={t('purchasing.fields.location')}
+            disabled={!can}
+            value={h.locationId}
+            onValueChange={(v) => set('locationId', v)}
+            options={lookups.locations.map((l) => ({ value: l.id, label: l.name }))}
+          />
+          <TextInput
             label={t('purchasing.fields.returnedOn')}
             type="date"
             error={locked}
@@ -329,25 +298,15 @@ function ReturnForm({
             value={h.returnedOn}
             onChange={(e) => set('returnedOn', e.target.value)}
           />
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={ids.reason} className={LABEL_CLASS}>
-              {t('purchasing.fields.reason')}
-            </label>
-            <select
-              id={ids.reason}
-              className="h-11 rounded-md border border-input bg-surface-2 px-2"
-              value={h.reason}
-              onChange={(e) => set('reason', e.target.value)}
-            >
-              <option value="">—</option>
-              {PURCHASE_RETURN_REASONS.map((x) => (
-                <option key={x} value={x}>
-                  {t(`purchasing.reasons.${x}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <TextField
+          <Select
+            label={t('purchasing.fields.reason')}
+            disabled={!can}
+            placeholder="—"
+            value={h.reason}
+            onValueChange={(v) => set('reason', v)}
+            options={PURCHASE_RETURN_REASONS.map((x) => ({ value: x, label: t(`purchasing.reasons.${x}`) }))}
+          />
+          <TextInput
             label={t('purchasing.fields.note')}
             value={h.note}
             onChange={(e) => set('note', e.target.value)}
@@ -355,7 +314,7 @@ function ReturnForm({
           />
         </fieldset>
       </Panel>
-      <Panel className="px-1.5 pb-2.5">
+      <Panel className="overflow-x-auto px-1.5 pb-2.5">
         <Table aria-label={t('purchasing.returns.lines')}>
           <TableHeader>
             <TableRow>
@@ -398,7 +357,7 @@ function ReturnForm({
                         ))}
                   </TableCell>
                   <TableCell>
-                    <Input
+                    <TextBox
                       aria-label={t('purchasing.line.qtyOf', { row: i + 1 })}
                       className="h-9 w-24"
                       inputMode="decimal"
@@ -408,7 +367,7 @@ function ReturnForm({
                     />
                   </TableCell>
                   <TableCell>
-                    <Input
+                    <TextBox
                       aria-label={t('purchasing.line.unitCostOf', { row: i + 1 })}
                       className="h-9 w-28"
                       inputMode="decimal"
@@ -430,6 +389,7 @@ function ReturnForm({
             <Button
               size="sm"
               variant="outline"
+              icon={Plus}
               onClick={() =>
                 setLines([
                   ...lines,
@@ -465,10 +425,11 @@ function ReturnForm({
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
+            icon={Save}
             onClick={() =>
               void save().then((s) => {
                 if (s) {
-                  setMessage({ text: t('purchasing.returns.saved'), error: false });
+                  notify.done(t('purchasing.returns.saved'));
                   after(s.id);
                 }
               })
@@ -476,7 +437,11 @@ function ReturnForm({
           >
             {t('purchasing.saveDraft')}
           </Button>
-          <Button onClick={() => void postIt()} disabled={check.problems.length > 0 || locked !== null}>
+          <Button
+            icon={Send}
+            onClick={() => void postIt()}
+            disabled={check.problems.length > 0 || locked !== null}
+          >
             {t('purchasing.post')}
           </Button>
         </div>

@@ -7,7 +7,8 @@
     "cancel": "Cancel",
     "close": "Close",
     "notifications": "Notifications",
-    "noOptions": "Nothing to choose"
+    "noOptions": "Nothing to choose",
+    "searchCodeName": "Type a code or name"
   },
   "login": {
     "title": "Sign in",
@@ -1323,7 +1324,10 @@
       "totalValue": "Stock value of all matches (Shop and Godown)",
       "count": "{{count}} items · page {{page}} of {{pages}}",
       "previous": "Previous",
-      "next": "Next"
+      "next": "Next",
+      "allCategories": "All categories",
+      "allStatuses": "Any status",
+      "allLevels": "Any stock level"
     },
     "fields": {
       "code": "Code",
@@ -1431,7 +1435,8 @@
       "help": "The item's code becomes its barcode, as on the legacy labels.",
       "codeHint": "Letters, digits and dashes, up to 20. It can't be changed later.",
       "ownerPrices": "The owner sets the prices after you save.",
-      "create": "Create item"
+      "create": "Create item",
+      "added": "{{code}} added."
     },
     "categories": {
       "title": "Categories",
@@ -1650,7 +1655,10 @@
       "deactivated": "{{name}} is deactivated.",
       "reactivated": "{{name}} is active again.",
       "deleted": "{{name}} is deleted.",
-      "saved": "{{name}} saved."
+      "saved": "{{name}} saved.",
+      "added": "{{name}} added.",
+      "count_one": "{{count}} supplier",
+      "count_other": "{{count}} suppliers"
     },
     "ledger": {
       "title": "Ledger",
@@ -1723,7 +1731,8 @@
       "returnCost": "Unit cost back",
       "add": "Add a line",
       "remove": "Remove",
-      "results": "Items found"
+      "results": "Items found",
+      "removeOf": "Remove line {{row}}"
     },
     "totals": {
       "subtotal": "Lines",
@@ -1767,7 +1776,8 @@
       "note_required": "Add a note for \"Other\".",
       "more_than_received": "More than the receipt still has.",
       "terms": "Terms are days, 0 to 365.",
-      "amount": "Type an amount above 0."
+      "amount": "Type an amount above 0.",
+      "name": "Type the supplier's name."
     },
     "errors": {
       "stale": "{{by}} changed this in the meantime. Reload it, then make your change again.",
@@ -1911,7 +1921,8 @@
       "note_required": "Add a note for \"Other\".",
       "write_off_not_damaged": "A write-off is out of Damaged: transfer the goods there first.",
       "write_off_gain": "A write-off takes stock out: type it below 0.",
-      "qty_zero": "Type a change other than 0."
+      "qty_zero": "Type a change other than 0.",
+      "amount": "Type an amount of 0 or more."
     },
     "warnings": {
       "below_zero": "More than it has now: it goes below 0. It still posts."
@@ -2016,7 +2027,8 @@
       "routesHelp": "Tick a route when goods spend time on the way (sent, then received). Unticked routes move at once.",
       "to": "To {{name}}",
       "needsReceiving": "{{from}} to {{to}} needs receiving",
-      "save": "Save settings"
+      "save": "Save settings",
+      "saved": "Stock settings saved."
     },
     "unnumbered": "Not posted yet"
   },

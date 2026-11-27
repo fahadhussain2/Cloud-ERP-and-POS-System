@@ -26,9 +26,9 @@ import {
   FIELD_LABEL,
   FormDialog,
   IconButton,
+  ListPicker,
   ListToolbar,
   notify,
-  SearchBox,
   Select,
   TextInput,
 } from '../ui';
@@ -512,8 +512,10 @@ export function CustomerDialog({
         />
       )}
       {fromSupplier ? (
-        <SupplierPick
-          suppliers={lookups.suppliers}
+        // A list that keeps growing gets a search (owner answer 3, W2-13).
+        <ListPicker
+          label={t('customers.source.pick')}
+          options={lookups.suppliers}
           value={f.supplierId}
           onChange={(id) => set('supplierId', id)}
           error={problems.supplierId}
@@ -633,66 +635,6 @@ export function CustomerDialog({
         )}
       </fieldset>
     </FormDialog>
-  );
-}
-
-/**
- * The supplier to make a customer, searched by code or name (owner answer 3: a list that keeps growing gets a search,
- * not a dropdown; W2-13). The suppliers are already in the lookups, so the search runs here.
- */
-function SupplierPick({
-  suppliers,
-  value,
-  onChange,
-  error,
-}: {
-  suppliers: CustomerLookups['suppliers'];
-  value: string;
-  onChange: (id: string) => void;
-  error: string | undefined;
-}) {
-  const { t } = useTranslation();
-  const label = t('customers.source.pick');
-  const picked = suppliers.find((s) => s.id === value);
-  // What was typed since the last pick; null shows the picked supplier.
-  const [typed, setTyped] = useState<string | null>(null);
-  const [closed, setClosed] = useState(false);
-  const q = typed?.trim().toLowerCase() ?? '';
-  const hits =
-    q === '' || closed
-      ? []
-      : suppliers
-          .filter((s) => s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))
-          .slice(0, 20);
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className={FIELD_LABEL}>{label}</span>
-      <SearchBox
-        label={label}
-        listLabel={label}
-        placeholder={t('customers.source.search')}
-        text={typed ?? (picked ? `${picked.code} · ${picked.name}` : '')}
-        onText={(v) => {
-          setTyped(v);
-          setClosed(false);
-          if (value) onChange('');
-        }}
-        hits={hits}
-        hitKey={(s) => s.id}
-        onPick={(s) => {
-          setTyped(null);
-          onChange(s.id);
-        }}
-        onEscape={() => setClosed(true)}
-        error={error}
-      >
-        {(s) => (
-          <>
-            <span className="font-mono text-xs text-muted-foreground">{s.code}</span> {s.name}
-          </>
-        )}
-      </SearchBox>
-    </div>
   );
 }
 

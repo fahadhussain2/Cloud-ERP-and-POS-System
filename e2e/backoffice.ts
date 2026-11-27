@@ -41,6 +41,18 @@ export async function choose(scope: Page | Locator, label: string, option: strin
   await expect(page.getByRole('listbox')).toHaveCount(0);
 }
 
+/**
+ * Picks from one of the back office's searchable pickers (W2-14, owner answer 3: the supplier on a receipt): types
+ * `text` and takes the first hit with Enter, once a hit containing `text` is shown.
+ */
+export async function pick(scope: Page | Locator, label: string, text: string): Promise<void> {
+  const box = scope.getByRole('combobox', { name: label, exact: true });
+  await box.fill(text);
+  const page = 'page' in scope ? scope.page() : scope;
+  await expect(page.getByRole('listbox', { name: label }).getByRole('option').first()).toContainText(text);
+  await box.press('Enter');
+}
+
 /** The account's button at the foot of the side menu, whoever is signed in. */
 export const account = (page: Page) =>
   page.getByRole('button', { name: new RegExp(`^${bo.nav.account.replace('{{name}}', '')}`) });

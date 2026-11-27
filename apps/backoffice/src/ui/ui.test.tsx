@@ -40,6 +40,19 @@ describe('Button', () => {
     expect(button.firstElementChild).toBe(icon);
   });
 
+  it('has no fill when quiet (ghost, link), only the primary is orange', () => {
+    show(
+      <>
+        <Button>Save</Button>
+        <Button variant="ghost">Add a brand</Button>
+        <Button variant="link">More</Button>
+      </>,
+    );
+    expect(screen.getByRole('button', { name: 'Save' }).className).toContain('bg-primary');
+    for (const name of ['Add a brand', 'More'])
+      expect(screen.getByRole('button', { name }).className).not.toContain('bg-primary');
+  });
+
   it('is 36px tall, or 32px when small', () => {
     show(
       <>

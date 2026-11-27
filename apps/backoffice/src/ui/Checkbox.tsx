@@ -11,6 +11,7 @@ export function Checkbox({
   disabled,
   id,
   className,
+  hideLabel = false,
 }: {
   label: ReactNode;
   hint?: ReactNode;
@@ -19,6 +20,8 @@ export function Checkbox({
   disabled?: boolean;
   id?: string;
   className?: string;
+  /** Read by screen readers but not shown: a box in a table row, whose row says what it is. */
+  hideLabel?: boolean;
 }) {
   const own = useId();
   const boxId = id ?? own;
@@ -33,7 +36,7 @@ export function Checkbox({
         className="mt-0.5 size-[18px] rounded-[5px] border-field-line focus-visible:border-focus focus-visible:ring-[3px] focus-visible:ring-glow"
       />
       <div className="flex flex-col gap-0.5">
-        <Label htmlFor={boxId} className="text-sm font-medium text-ink">
+        <Label htmlFor={boxId} className={cn('text-sm font-medium text-ink', hideLabel && 'sr-only')}>
           {label}
         </Label>
         {hint && (

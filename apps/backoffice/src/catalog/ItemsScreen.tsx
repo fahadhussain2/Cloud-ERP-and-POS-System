@@ -1,10 +1,6 @@
 import { ITEM_LEVEL_FILTERS, type ItemList, type ItemRow, type StockLevel } from '@erp/contracts';
 import {
-  Button,
-  Checkbox,
   formatMoney,
-  Input,
-  LABEL_CLASS,
   PageHeader,
   Panel,
   StatusChip,
@@ -16,20 +12,25 @@ import {
   TableRow,
   type ChipTone,
 } from '@erp/ui';
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { ChevronLeft, ChevronRight, Plus, Tag } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { href } from '../router';
+import { Button, buttonClass, Checkbox, ListPicker, ListToolbar, Select } from '../ui';
 import { NONE, qtyText, useLookups } from './data';
 
 // Items (W1-15, CAT-01, CAT-02): one search over code, name, brand and every barcode or OEM number, as on the counter,
 // with category and status filters; 50 a page, from the server (19,552 items). W1-26: one line per item with its unit,
 // average cost, Retail, the quantity in each shop- and storage-kind location (Shop, Godown), the stock value and a
 // level from its minimum; a level filter, sorting by stock and value, and the value of every match. Cost and value
-// only with cost.view; a quantity links to the stock card for those who can open it.
+// only with cost.view; a quantity links to the stock card for those who can open it. W2-14 (D-127): the back office's
+// own controls, the search and filters in the table's toolbar; the category is searched (owner answer 3).
 
 const PAGE = 50;
+/** A filter's "All", as an option (a dropdown's option can't be empty). */
+const ALL = 'all';
 const WAIT_MS = 250;
 
 export const statusTone: Record<string, ChipTone> = {
@@ -62,10 +63,6 @@ export function ItemsScreen({ api }: { api: Api }) {
   const [picked, setPicked] = useState<string[]>([]);
   const pick = (id: string, on: boolean) =>
     setPicked((p) => (on ? (p.includes(id) ? p : [...p, id]) : p.filter((x) => x !== id)));
-  const searchId = useId();
-  const categoryId = useId();
-  const statusId = useId();
-  const levelId = useId();
 
   // Search as you type, a moment after the last key.
   useEffect(() => {
@@ -115,92 +112,81 @@ export function ItemsScreen({ api }: { api: Api }) {
           <span className="flex flex-wrap gap-2">
             {lookups?.can.printLabels &&
               (picked.length > 0 ? (
-                <Button asChild size="lg" variant="outline">
-                  <a href={href.itemLabels(picked)}>{`${t('labels.makeLabels')} (${picked.length})`}</a>
-                </Button>
+                <a href={href.itemLabels(picked)} className={buttonClass('outline')}>
+                  <Tag aria-hidden="true" className="size-4" />
+                  {`${t('labels.makeLabels')} (${picked.length})`}
+                </a>
               ) : (
-                <Button size="lg" variant="outline" disabled>
+                <Button variant="outline" icon={Tag} disabled>
                   {`${t('labels.makeLabels')} (0)`}
                 </Button>
               ))}
             {lookups?.can.editItems && (
-              <Button asChild size="lg">
-                <a href={href.newItem}>{t('catalog.items.add')}</a>
-              </Button>
+              <a href={href.newItem} className={buttonClass()}>
+                <Plus aria-hidden="true" className="size-4" />
+                {t('catalog.items.add')}
+              </a>
             )}
           </span>
         }
       />
-      <Panel className="flex flex-wrap items-end gap-3 p-3.5">
-        <div className="flex min-w-64 flex-1 flex-col gap-1">
-          <label htmlFor={searchId} className={LABEL_CLASS}>
-            {t('catalog.items.search')}
-          </label>
-          <Input
-            id={searchId}
-            type="search"
-            className="h-10"
-            value={text}
-            placeholder={t('catalog.items.searchHint')}
-            onChange={(e) => setText(e.target.value)}
+      <Panel className="overflow-hidden p-0">
+        <ListToolbar
+          search={{
+            label: t('catalog.items.search'),
+            placeholder: t('catalog.items.searchHint'),
+            value: text,
+            onChange: setText,
+          }}
+        >
+          <ListPicker
+            hideLabel
+            className="w-56"
+            label={t('catalog.fields.category')}
+            placeholder={t('catalog.items.allCategories')}
+            options={lookups?.categories ?? []}
+            value={category}
+            onChange={(v) => {
+              setCategory(v);
+              setPage(1);
+            }}
           />
-        </div>
-        <Filter
-          id={categoryId}
-          label={t('catalog.fields.category')}
-          value={category}
-          onChange={(v) => {
-            setCategory(v);
-            setPage(1);
-          }}
-        >
-          <option value={NONE}>{t('catalog.items.all')}</option>
-          {lookups?.categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.code} · {c.name}
-            </option>
-          ))}
-        </Filter>
-        <Filter
-          id={statusId}
-          label={t('catalog.fields.status')}
-          value={status}
-          onChange={(v) => {
-            setStatus(v);
-            setPage(1);
-          }}
-        >
-          <option value={NONE}>{t('catalog.items.all')}</option>
-          {(['active', 'dormant', 'discontinued'] as const).map((s) => (
-            <option key={s} value={s}>
-              {t(`catalog.status.${s}`)}
-            </option>
-          ))}
-        </Filter>
-        <Filter
-          id={levelId}
-          label={t('catalog.items.level')}
-          value={level}
-          onChange={(v) => {
-            setLevel(v);
-            setPage(1);
-          }}
-        >
-          <option value={NONE}>{t('catalog.items.all')}</option>
-          {ITEM_LEVEL_FILTERS.map((l) => (
-            <option key={l} value={l}>
-              {t(`catalog.items.levelFilters.${l}`)}
-            </option>
-          ))}
-        </Filter>
-      </Panel>
-      <Panel>
+          <Select
+            aria-label={t('catalog.fields.status')}
+            wrapperClassName="w-40"
+            value={status || ALL}
+            onValueChange={(v) => {
+              setStatus(v === ALL ? NONE : v);
+              setPage(1);
+            }}
+            options={[
+              { value: ALL, label: t('catalog.items.allStatuses') },
+              ...(['active', 'dormant', 'discontinued'] as const).map((s) => ({
+                value: s,
+                label: t(`catalog.status.${s}`),
+              })),
+            ]}
+          />
+          <Select
+            aria-label={t('catalog.items.level')}
+            wrapperClassName="w-44"
+            value={level || ALL}
+            onValueChange={(v) => {
+              setLevel(v === ALL ? NONE : v);
+              setPage(1);
+            }}
+            options={[
+              { value: ALL, label: t('catalog.items.allLevels') },
+              ...ITEM_LEVEL_FILTERS.map((l) => ({ value: l, label: t(`catalog.items.levelFilters.${l}`) })),
+            ]}
+          />
+        </ListToolbar>
         {list === null || lookups === null ? (
           <p className="p-3.5 text-muted-foreground">{t('app.loading')}</p>
         ) : list.items.length === 0 ? (
           <p className="p-3.5 text-muted-foreground">{t('catalog.items.empty')}</p>
         ) : (
-          <div className="px-1.5 pb-2.5">
+          <div className="overflow-x-auto px-1.5 pb-2.5">
             <Table aria-label={t('catalog.items.title')}>
               <TableHeader>
                 <TableRow>
@@ -230,9 +216,10 @@ export function ItemsScreen({ api }: { api: Api }) {
                     {lookups.can.printLabels && (
                       <TableCell>
                         <Checkbox
-                          aria-label={t('labels.pick', { code: i.code })}
+                          hideLabel
+                          label={t('labels.pick', { code: i.code })}
                           checked={picked.includes(i.id)}
-                          onCheckedChange={(v) => pick(i.id, v === true)}
+                          onCheckedChange={(v) => pick(i.id, v)}
                         />
                       </TableCell>
                     )}
@@ -310,11 +297,18 @@ export function ItemsScreen({ api }: { api: Api }) {
             <span className="me-auto text-sm text-muted-foreground" role="status">
               {t('catalog.items.count', { count: list.total, page, pages })}
             </span>
-            <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            <Button
+              size="sm"
+              variant="outline"
+              icon={ChevronLeft}
+              disabled={page <= 1}
+              onClick={() => setPage(page - 1)}
+            >
               {t('catalog.items.previous')}
             </Button>
             <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => setPage(page + 1)}>
               {t('catalog.items.next')}
+              <ChevronRight aria-hidden="true" className="size-4" />
             </Button>
           </div>
         )}
@@ -357,35 +351,5 @@ function Quantity({ item, qty, link }: { item: ItemRow; qty: number; link: boole
     </a>
   ) : (
     <span className={tone}>{text}</span>
-  );
-}
-
-function Filter({
-  id,
-  label,
-  value,
-  onChange,
-  children,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className={LABEL_CLASS}>
-        {label}
-      </label>
-      <select
-        id={id}
-        className="h-10 rounded-md border border-input bg-surface px-2"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {children}
-      </select>
-    </div>
   );
 }

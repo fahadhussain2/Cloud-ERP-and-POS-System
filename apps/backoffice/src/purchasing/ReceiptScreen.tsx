@@ -1,12 +1,7 @@
 import type { DocumentRow, PurchasingLookups, ReceiptView } from '@erp/contracts';
 import { checkReceipt, isEmptyDraft, receiptTotals } from '@erp/domain';
 import {
-  Alert,
-  AlertDescription,
-  Button,
   formatMoney,
-  Input,
-  LABEL_CLASS,
   PageHeader,
   Panel,
   StatusChip,
@@ -16,14 +11,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
 } from '@erp/ui';
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { Plus, Save, Send, Tag, Trash2, Undo2 } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { moneyText, moneyValue, qtyText, qtyValue } from '../catalog/data';
-import { carry, href, navigate, takeCarried } from '../router';
+import { href, navigate, takeCarried } from '../router';
+import { Button, buttonClass, IconButton, ListPicker, notify, Select, TextBox, TextInput } from '../ui';
 import { ItemPicker } from './ItemPicker';
 import { dateProblem, problemText, purchasingRefusal, usePurchasingLookups, type PickedItem } from './data';
 
@@ -31,7 +27,8 @@ import { dateProblem, problemText, purchasingRefusal, usePurchasingLookups, type
 // checks it with the same rules as the server: the difference from the bill total as printed (posting waits until
 // it is 0), the line problems, and the warnings (a cost more than 10 % off the last one, Retail at or below the new
 // cost). Save keeps a draft; Post makes it final (rule 3). Paid in cash: the cashier pays it at the desk afterwards
-// (owner answer 1).
+// (owner answer 1). W2-14 (D-127): the back office's own controls; the supplier is searched (owner answer 3), and
+// results and refusals are toasts (owner answer 6).
 
 export function ReceiptsScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
@@ -54,9 +51,10 @@ export function ReceiptsScreen({ api }: { api: Api }) {
         help={t('purchasing.receipts.help')}
         actions={
           lookups.can.receive && (
-            <Button asChild size="lg">
-              <a href={href.receipt('new')}>{t('purchasing.receipts.add')}</a>
-            </Button>
+            <a href={href.receipt('new')} className={buttonClass()}>
+              <Plus aria-hidden="true" className="size-4" />
+              {t('purchasing.receipts.add')}
+            </a>
           )
         }
       />
@@ -83,7 +81,7 @@ export function DocumentList({
 }) {
   const { t } = useTranslation();
   return (
-    <Panel className="px-1.5 pb-2.5">
+    <Panel className="overflow-x-auto px-1.5 pb-2.5">
       {list === null ? (
         <p className="p-2 text-muted-foreground">{t('app.loading')}</p>
       ) : list.length === 0 ? (
@@ -145,6 +143,9 @@ interface LineForm {
   unitCost: string;
   lineDiscount: string;
 }
+
+/** "Paid from": on account, as an option (a dropdown's option can't be empty). */
+const ON_ACCOUNT = 'account';
 
 const blankLine = (): LineForm => ({
   item: { id: null, code: null, name: null, allowsFraction: false, lastCost: null, retail: null },
@@ -244,15 +245,15 @@ function ReceiptForm({
         }))
       : [blankLine()],
   );
-  // A refusal from just before this form opened (a new draft at its own address, or a reload): see `carry`.
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(() => {
-    const text = takeCarried(href.receipt(r?.id ?? 'new'));
-    return text === null ? null : { text, error: true };
-  });
+  // A refusal from just before this form opened (a new draft at its own address, or a reload): see `carry`. It is a
+  // toast, as any refusal (owner answer 6).
+  const [carried] = useState(() => takeCarried(href.receipt(r?.id ?? 'new')));
+  useEffect(() => {
+    if (carried !== null) notify.problem(carried);
+  }, [carried]);
   const set = (k: keyof typeof h, v: string) => setH((x) => ({ ...x, [k]: v }));
   const put = (n: number, patch: Partial<LineForm>) =>
     setLines((ls) => ls.map((l, i) => (i === n ? { ...l, ...patch } : l)));
-  const ids = { supplier: useId(), location: useId(), paid: useId() };
 
   // The same check as the server's, as you type (a field that isn't a number counts as an invalid one).
   // Empty counts as 0, not a number as NaN (an invalid value for the check).
@@ -323,7 +324,7 @@ function ReceiptForm({
   const save = async (): Promise<{ id: string; rowVersion: string } | null> => {
     // Nothing on any line is nothing to keep (owner's review of W1-19); the server refuses it too.
     if (isEmptyDraft(body().lines)) {
-      setMessage({ text: t('purchasing.errors.empty_draft'), error: true });
+      notify.problem(t('purchasing.errors.empty_draft'));
       return null;
     }
     const res = r
@@ -334,7 +335,7 @@ function ReceiptForm({
       : await api('POST', '/api/purchasing/receipts', body());
     if (res.status === 200) return { id: r!.id, rowVersion: (res.body as { rowVersion: string }).rowVersion };
     if (res.status === 201) return res.body as { id: string; rowVersion: string };
-    setMessage({ text: purchasingRefusal(t, exists, res.body), error: true });
+    notify.problem(purchasingRefusal(t, exists, res.body));
     return null;
   };
   const saveDraft = async () => {
@@ -342,7 +343,7 @@ function ReceiptForm({
     if (!s) return;
     if (!r) navigate(href.receipt(s.id));
     else {
-      setMessage({ text: t('purchasing.receipts.saved'), error: false });
+      notify.done(t('purchasing.receipts.saved'));
       await onSaved();
     }
   };
@@ -359,16 +360,16 @@ function ReceiptForm({
     }
     // The draft was saved before Post was refused: open it again, as saved, with the refusal.
     const text = purchasingRefusal(t, exists, res.body);
+    // A new draft opens at its own address and shows it there; a toast outlives this form's reload.
     if (!r) return navigate(href.receipt(s.id), text);
-    setMessage({ text, error: true });
-    carry(href.receipt(s.id), text);
+    notify.problem(text);
     await onSaved();
   };
   const remove = async () => {
     if (!r) return;
     const res = await api('DELETE', `/api/purchasing/receipts/${encodeURIComponent(r.id)}`);
     if (res.status === 200) navigate(href.receipts);
-    else setMessage({ text: purchasingRefusal(t, exists, res.body), error: true });
+    else notify.problem(purchasingRefusal(t, exists, res.body));
   };
 
   const header = check.problems.filter(
@@ -397,53 +398,39 @@ function ReceiptForm({
           r && (
             <span className="flex flex-wrap gap-2">
               {/* W1-17: the received pieces' labels (CAT-08). */}
-              <Button asChild variant="outline">
-                <a href={href.receiptLabels(r.id)}>{t('labels.makeLabels')}</a>
-              </Button>
-              <Button asChild variant="outline">
-                <a href={href.purchaseReturn(`new-${r.id}`)}>{t('purchasing.returns.fromReceipt')}</a>
-              </Button>
+              <a href={href.receiptLabels(r.id)} className={buttonClass('outline')}>
+                <Tag aria-hidden="true" className="size-4" />
+                {t('labels.makeLabels')}
+              </a>
+              <a href={href.purchaseReturn(`new-${r.id}`)} className={buttonClass('outline')}>
+                <Undo2 aria-hidden="true" className="size-4" />
+                {t('purchasing.returns.fromReceipt')}
+              </a>
             </span>
           )
         }
       />
-      {message && (
-        <Alert variant={message.error ? 'destructive' : 'default'}>
-          <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>
-        </Alert>
-      )}
       <Panel role="region" aria-label={t('purchasing.receipts.bill')}>
         <fieldset disabled={!can} className="m-0 grid grid-cols-1 gap-3.5 border-0 p-3.5 md:grid-cols-4">
-          <div className="flex flex-col gap-1.5 md:col-span-2">
-            <label htmlFor={ids.supplier} className={LABEL_CLASS}>
-              {t('purchasing.fields.supplier')}
-            </label>
-            <select
-              id={ids.supplier}
-              className="h-11 rounded-md border border-input bg-surface-2 px-2"
-              value={h.supplierId}
-              onChange={(e) => set('supplierId', e.target.value)}
-            >
-              <option value="">—</option>
-              {lookups.suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.code})
-                </option>
-              ))}
-            </select>
-          </div>
-          <TextField
+          <ListPicker
+            className="md:col-span-2"
+            label={t('purchasing.fields.supplier')}
+            options={lookups.suppliers}
+            value={h.supplierId}
+            onChange={(v) => set('supplierId', v)}
+          />
+          <TextInput
             label={t('purchasing.fields.billNo')}
             value={h.billNo}
             onChange={(e) => set('billNo', e.target.value)}
           />
-          <TextField
+          <TextInput
             label={t('purchasing.fields.billDate')}
             type="date"
             value={h.billDate}
             onChange={(e) => set('billDate', e.target.value)}
           />
-          <TextField
+          <TextInput
             label={t('purchasing.fields.receivedOn')}
             type="date"
             error={locked}
@@ -451,44 +438,29 @@ function ReceiptForm({
             value={h.receivedOn}
             onChange={(e) => set('receivedOn', e.target.value)}
           />
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={ids.location} className={LABEL_CLASS}>
-              {t('purchasing.fields.location')}
-            </label>
-            <select
-              id={ids.location}
-              className="h-11 rounded-md border border-input bg-surface-2 px-2"
-              value={h.locationId}
-              onChange={(e) => set('locationId', e.target.value)}
-            >
-              {lookups.locations
-                .filter((l) => l.code !== 'DAMAGED')
-                .map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={ids.paid} className={LABEL_CLASS}>
-              {t('purchasing.fields.paid')}
-            </label>
-            <select
-              id={ids.paid}
-              className="h-11 rounded-md border border-input bg-surface-2 px-2"
-              value={h.paidFrom}
-              onChange={(e) => set('paidFrom', e.target.value)}
-            >
-              <option value="">{t('purchasing.receipts.onAccount')}</option>
-              {lookups.bankAccounts.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {t('purchasing.receipts.paidBy', { bank: b.name })}
-                </option>
-              ))}
-            </select>
-          </div>
-          <TextField
+          <Select
+            label={t('purchasing.fields.location')}
+            disabled={!can}
+            value={h.locationId}
+            onValueChange={(v) => set('locationId', v)}
+            options={lookups.locations
+              .filter((l) => l.code !== 'DAMAGED')
+              .map((l) => ({ value: l.id, label: l.name }))}
+          />
+          <Select
+            label={t('purchasing.fields.paid')}
+            disabled={!can}
+            value={h.paidFrom || ON_ACCOUNT}
+            onValueChange={(v) => set('paidFrom', v === ON_ACCOUNT ? '' : v)}
+            options={[
+              { value: ON_ACCOUNT, label: t('purchasing.receipts.onAccount') },
+              ...lookups.bankAccounts.map((b) => ({
+                value: b.id,
+                label: t('purchasing.receipts.paidBy', { bank: b.name }),
+              })),
+            ]}
+          />
+          <TextInput
             label={t('purchasing.fields.billTotal')}
             hint={t('purchasing.fields.billTotalHint')}
             inputMode="decimal"
@@ -552,7 +524,7 @@ function ReceiptForm({
                   ))}
                 </TableCell>
                 <TableCell>
-                  <Input
+                  <TextBox
                     aria-label={t('purchasing.line.qtyOf', { row: i + 1 })}
                     className="h-9 w-24"
                     inputMode="decimal"
@@ -562,7 +534,7 @@ function ReceiptForm({
                   />
                 </TableCell>
                 <TableCell>
-                  <Input
+                  <TextBox
                     aria-label={t('purchasing.line.unitCostOf', { row: i + 1 })}
                     className="h-9 w-28"
                     inputMode="decimal"
@@ -572,7 +544,7 @@ function ReceiptForm({
                   />
                 </TableCell>
                 <TableCell>
-                  <Input
+                  <TextBox
                     aria-label={t('purchasing.line.discountOf', { row: i + 1 })}
                     className="h-9 w-24"
                     inputMode="decimal"
@@ -589,13 +561,12 @@ function ReceiptForm({
                 </TableCell>
                 <TableCell>
                   {can && lines.length > 1 && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                    <IconButton
+                      icon={Trash2}
+                      tone="danger"
+                      label={t('purchasing.line.removeOf', { row: i + 1 })}
                       onClick={() => setLines(lines.filter((_, k) => k !== i))}
-                    >
-                      {t('purchasing.line.remove')}
-                    </Button>
+                    />
                   )}
                 </TableCell>
               </TableRow>
@@ -604,7 +575,7 @@ function ReceiptForm({
         </Table>
         {can && (
           <div className="px-2 pt-2">
-            <Button size="sm" variant="outline" onClick={() => setLines([...lines, blankLine()])}>
+            <Button size="sm" variant="outline" icon={Plus} onClick={() => setLines([...lines, blankLine()])}>
               {t('purchasing.line.add')}
             </Button>
           </div>
@@ -613,13 +584,13 @@ function ReceiptForm({
 
       <Panel className="grid grid-cols-1 gap-3.5 p-3.5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <fieldset disabled={!can} className="m-0 grid gap-3.5 border-0 p-0">
-          <TextField
+          <TextInput
             label={t('purchasing.fields.billDiscount')}
             inputMode="decimal"
             value={h.billDiscount}
             onChange={(e) => set('billDiscount', e.target.value)}
           />
-          <TextField
+          <TextInput
             label={t('purchasing.fields.notes')}
             value={h.notes}
             onChange={(e) => set('notes', e.target.value)}
@@ -662,14 +633,18 @@ function ReceiptForm({
       )}
       {can && (
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => void saveDraft()} variant="outline">
+          <Button onClick={() => void saveDraft()} variant="outline" icon={Save}>
             {t('purchasing.saveDraft')}
           </Button>
-          <Button onClick={() => void postIt()} disabled={check.problems.length > 0 || locked !== null}>
+          <Button
+            onClick={() => void postIt()}
+            icon={Send}
+            disabled={check.problems.length > 0 || locked !== null}
+          >
             {t('purchasing.post')}
           </Button>
           {r && (
-            <Button variant="ghost" onClick={() => void remove()}>
+            <Button variant="ghost" icon={Trash2} className="text-bad" onClick={() => void remove()}>
               {t('purchasing.deleteDraft')}
             </Button>
           )}
