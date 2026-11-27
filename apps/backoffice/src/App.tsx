@@ -75,6 +75,7 @@ import { CashVarianceScreen, DayReconciliationScreen } from './screens/ReportsSc
 import { PersonScreen } from './staff/PersonScreen';
 import { StaffScreen } from './staff/StaffScreen';
 import { applyTheme, type Theme } from './theme';
+import { notify } from './ui';
 
 // The back office: sign in, the forced password change (W1-02), then the layout with its menu and the screen named by
 // the address (W1-04 plan).
@@ -151,6 +152,7 @@ export function App({ api }: { api: Api }) {
 
   const signOut = async () => {
     await api('POST', '/api/auth/logout');
+    notify.clear();
     setMe(null);
   };
   // A choice shows at once and is then saved for the person's other computers; a failed save keeps it here (W2-07).

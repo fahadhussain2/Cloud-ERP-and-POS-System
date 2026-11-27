@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { mayOpen, REPORTS } from '../reports/catalog';
 import type { Route } from '../router';
 import type { Theme } from '../theme';
+import { Toaster } from '../ui';
 import { menuFor } from './menu';
 import { ScreenSearch } from './ScreenSearch';
 import { Sidebar, type Badges } from './Sidebar';
@@ -69,6 +70,7 @@ export function Shell({
         open={searching}
         onOpenChange={setSearching}
       />
+      <Toaster />
     </TooltipProvider>
   );
 }

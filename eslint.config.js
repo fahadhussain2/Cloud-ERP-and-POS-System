@@ -101,5 +101,66 @@ export default defineConfig(
     },
   },
 
+  // The back office's own controls (W2-12, D-127): its screens use apps/backoffice/src/ui, not packages/ui's, which
+  // stay as the POS has them. The screens not yet moved are listed; each screen pass (W2-14, W2-15) takes its own off,
+  // and W2-15 removes the list.
+  {
+    files: ['apps/backoffice/src/**/*.{ts,tsx}'],
+    ignores: [
+      'apps/backoffice/src/ui/**',
+      '**/*.test.{ts,tsx}',
+      ...[
+        'accounting/AccountsScreens.tsx',
+        'accounting/MoneyScreen.tsx',
+        'accounting/PeriodsScreen.tsx',
+        'accounting/VoucherScreen.tsx',
+        'accounting/data.tsx',
+        'catalog/CategoriesScreen.tsx',
+        'catalog/ItemScreen.tsx',
+        'catalog/ItemsScreen.tsx',
+        'catalog/LabelsScreen.tsx',
+        'catalog/NewItemScreen.tsx',
+        'inventory/AdjustmentScreen.tsx',
+        'inventory/StockScreens.tsx',
+        'inventory/TransferScreen.tsx',
+        'layout/ScreenSearch.tsx',
+        'purchasing/ItemPicker.tsx',
+        'purchasing/ReceiptScreen.tsx',
+        'purchasing/ReturnScreen.tsx',
+        'purchasing/SuppliersScreen.tsx',
+        'reports/BillScreen.tsx',
+        'reports/FinancialScreens.tsx',
+        'reports/PartnerReportScreens.tsx',
+        'reports/ReportViews.tsx',
+        'reports/SalesReportScreens.tsx',
+        'reports/StockReportScreens.tsx',
+        'reports/frame/ReportFrame.tsx',
+        'screens/CountersScreen.tsx',
+        'screens/LoginScreen.tsx',
+        'screens/PasswordScreen.tsx',
+        'screens/ReportsScreens.tsx',
+        'screens/ShopSettingsScreen.tsx',
+        'staff/PersonScreen.tsx',
+        'staff/StaffScreen.tsx',
+        'staff/dialogs.tsx',
+      ].map((f) => `apps/backoffice/src/${f}`),
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@erp/ui',
+              importNames: ['Button', 'Input', 'TextField', 'LABEL_CLASS', 'DialogActions', 'Checkbox'],
+              message:
+                "Use the back office's own control from src/ui (W2-12, D-127); packages/ui's stay as the POS has them.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   prettier,
 );
