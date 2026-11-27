@@ -28,6 +28,9 @@ test.skip(
 );
 
 const look = async (page: Page, name: string) => {
+  // The mouse rests on the top corner, over nothing that reacts to it: a button under a resting pointer may or may not
+  // show its hover by the time the picture is taken (CI, 2026-11-27: Rs 7,000 in the Cash popup).
+  await page.mouse.move(1, 1);
   await expect(page).toHaveScreenshot(`${name}.png`, {
     maxDiffPixels: 0,
     animations: 'disabled',
@@ -80,6 +83,7 @@ async function screens(page: Page, browser: Browser) {
   await page.getByLabel(pos.setup.code).fill(code);
   await page.getByRole('button', { name: pos.setup.submit }).click();
   await expect(page.getByRole('button', { name: new RegExp(SALESMAN.fullName) })).toBeVisible();
+  await expect(page.locator('.status-bar .online')).toBeVisible();
   await look(page, 'unlock');
 
   await page.getByRole('button', { name: new RegExp(SALESMAN.fullName) }).click();

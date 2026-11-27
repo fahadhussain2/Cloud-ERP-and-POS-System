@@ -1,6 +1,11 @@
 /* pos-look.spec.ts: what changes from run to run, hidden while a picture is taken (the clock's times in the status
-   bar). Hidden, not removed, so the layout around them is the same. */
+   bar). Hidden, not removed, and at a fixed width, so the layout around them is the same whatever the time ("Last
+   sync 9:05 AM" is narrower than "Last sync 12:45 PM"; CI, 2026-11-27: the pills beside it moved by a few pixels). */
 .status-bar .sync-area > span:last-child,
 .status-bar .offline {
   visibility: hidden !important;
+  display: inline-block !important;
+  inline-size: 10rem !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
 }
