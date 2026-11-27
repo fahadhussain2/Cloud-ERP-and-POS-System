@@ -1,11 +1,12 @@
 import type { AccountingLookups, AccountRow, PartyHit } from '@erp/contracts';
 import { lineEffect } from '@erp/domain';
-import { formatMoney, Input } from '@erp/ui';
+import { formatMoney } from '@erp/ui';
 import type { TFunction } from 'i18next';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { SearchBox } from '../ui';
 
 // What the accounting screens share (W1-19, D-108): the lookups (banks, categories, the chart, the shop's day and lock
 // date, what this person may do), the words for a problem or a refusal, and the pickers for a party and an account.
@@ -76,7 +77,10 @@ export function ErrorText({ text }: { text: string | null }) {
   ) : null;
 }
 
-/** A customer or supplier, found by code, name or phone. */
+/**
+ * A customer or supplier, found by code, name or phone. ↑ ↓ move through the hits and Enter takes the highlighted one
+ * (W2-13); Esc closes the list until the text changes.
+ */
 export function PartyPicker({
   api,
   label,
@@ -94,7 +98,8 @@ export function PartyPicker({
   // What was typed since the last pick; null shows the picked party's name.
   const [typed, setTyped] = useState<string | null>(null);
   const [found, setFound] = useState<{ q: string; hits: PartyHit[] }>({ q: '', hits: [] });
-  const listId = useId();
+  // The text whose list Esc closed.
+  const [closedFor, setClosedFor] = useState<string | null>(null);
   const text = typed ?? picked?.name ?? '';
   const q = typed?.trim() ?? '';
   useEffect(() => {
@@ -110,49 +115,34 @@ export function PartyPicker({
       clearTimeout(timer);
     };
   }, [api, q, role]);
-  const hits = q.length >= 2 && found.q === q ? found.hits : [];
+  const hits = q.length >= 2 && found.q === q && closedFor !== q ? found.hits : NO_HITS;
   return (
-    <div className="relative">
-      <Input
-        aria-label={label}
-        role="combobox"
-        aria-expanded={hits.length > 0}
-        aria-controls={listId}
-        value={text}
-        placeholder={t('accounting.party.search')}
-        onChange={(e) => {
-          setTyped(e.target.value);
-          if (picked) onPick(null);
-        }}
-      />
-      {hits.length > 0 && (
-        <ul
-          id={listId}
-          role="listbox"
-          aria-label={label}
-          className="absolute inset-x-0 top-full z-50 m-0 max-h-64 list-none overflow-auto rounded-md border border-input bg-surface p-1 shadow-md"
-        >
-          {hits.map((p) => (
-            <li key={p.id} role="option" aria-selected={false}>
-              <button
-                type="button"
-                className="flex w-full justify-between gap-3 rounded px-2 py-1.5 text-start hover:bg-surface-2"
-                onClick={() => {
-                  setTyped(null);
-                  onPick(p);
-                }}
-              >
-                <span>
-                  <span className="font-mono text-xs text-muted-foreground">{p.code}</span> {p.name}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+    <SearchBox
+      label={label}
+      listLabel={label}
+      placeholder={t('accounting.party.search')}
+      text={text}
+      onText={(v) => {
+        setTyped(v);
+        if (picked) onPick(null);
+      }}
+      hits={hits}
+      hitKey={(p) => p.id}
+      onPick={(p) => {
+        setTyped(null);
+        onPick(p);
+      }}
+      onEscape={() => setClosedFor(q)}
+    >
+      {(p) => (
+        <>
+          <span className="font-mono text-xs text-muted-foreground">{p.code}</span> {p.name}
+        </>
       )}
-    </div>
+    </SearchBox>
   );
 }
+const NO_HITS: PartyHit[] = [];
 
 /** A select of accounts, shown as code and name. */
 export function AccountSelect({

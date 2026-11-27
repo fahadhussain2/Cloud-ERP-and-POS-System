@@ -169,7 +169,7 @@ describe('the money list', () => {
     fireEvent.change(within(dialog).getByRole('combobox', { name: a.fields.customer }), {
       target: { value: 'khan' },
     });
-    fireEvent.click(await within(dialog).findByRole('button', { name: /Khan Motors/ }));
+    fireEvent.click(await within(dialog).findByRole('option', { name: /Khan Motors/ }));
     fireEvent.change(within(dialog).getByLabelText(a.fields.amount), { target: { value: '25,000' } });
     fireEvent.click(within(dialog).getByRole('button', { name: a.new.save }));
     expect(await within(dialog).findByText(a.problems.possible_duplicate)).toBeTruthy();

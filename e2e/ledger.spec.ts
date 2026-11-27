@@ -62,7 +62,7 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   await page.getByRole('button', { name: a.money.newReceipt }).click();
   let dialog = page.getByRole('dialog');
   await dialog.getByRole('combobox', { name: a.fields.customer }).fill('Rehman');
-  await dialog.getByRole('button', { name: /Rehman Autos/ }).click();
+  await dialog.getByRole('option', { name: /Rehman Autos/ }).click();
   await dialog.getByLabel(a.fields.intoBank).selectOption({ label: 'Bank: HBL' });
   await dialog.getByLabel(a.fields.amount).fill('25,000');
   await dialog.getByRole('button', { name: a.new.save }).click();
@@ -127,7 +127,7 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   await page.getByRole('button', { name: a.money.newReceipt }).click();
   dialog = page.getByRole('dialog');
   await dialog.getByRole('combobox', { name: a.fields.customer }).fill('Rehman');
-  await dialog.getByRole('button', { name: /Rehman Autos/ }).click();
+  await dialog.getByRole('option', { name: /Rehman Autos/ }).click();
   await dialog.getByLabel(a.fields.amount).fill('100');
   await dialog.getByLabel(a.fields.date).fill(lockDate);
   await dialog.getByRole('button', { name: a.new.save }).click();

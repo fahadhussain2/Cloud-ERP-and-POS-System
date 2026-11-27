@@ -8,4 +8,5 @@ export { ConfirmDialog, FormDialog, type DialogSize } from './FormDialog';
 export { IconButton } from './IconButton';
 export { ListToolbar } from './ListToolbar';
 export { notify, Toaster } from './notify';
+export { SearchBox } from './SearchBox';
 export { Select, type SelectOption } from './Select';

@@ -318,8 +318,8 @@ describe('a receipt line (owner review)', () => {
     show(<ReceiptScreen api={f.api} id="r1" />);
     fireEvent.click(await screen.findByRole('button', { name: en.purchasing.line.add }));
     fireEvent.click(screen.getByRole('button', { name: 'Item of line 3' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Item of line 3' }), { target: { value: 'oil' } });
-    fireEvent.click(await screen.findByRole('button', { name: /OIL050/ }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Item of line 3' }), { target: { value: 'oil' } });
+    fireEvent.click(await screen.findByRole('option', { name: /OIL050/ }));
     const cost = screen.getByLabelText<HTMLInputElement>('Unit cost of line 3');
     expect(cost.value).toBe('2450');
     fireEvent.change(cost, { target: { value: '2500' } });
