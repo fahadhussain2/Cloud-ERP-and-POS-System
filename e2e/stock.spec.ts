@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { menu } from './backoffice';
+import { choose, menu } from './backoffice';
 import { expect, test } from './counter-test';
 import { BACKOFFICE_PORT, MANAGER, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
 
@@ -58,8 +58,8 @@ test('the manager moves and corrects stock; a large loss waits for the owner', a
   await menu(page, bo.nav.transfers);
   await expect(page.getByText(/legacy app/i)).toHaveCount(0); // no go-live notice (D-113)
   await page.getByRole('link', { name: bo.inventory.transfers.add }).click();
-  await page.getByLabel(bo.inventory.fields.from).selectOption({ label: 'Shop' });
-  await page.getByLabel(bo.inventory.fields.to).selectOption({ label: 'Godown' });
+  await choose(page, bo.inventory.fields.from, 'Shop');
+  await choose(page, bo.inventory.fields.to, 'Godown');
   await pickItem(page, 1, 'enol001');
   await page.getByLabel('Quantity of line 1').fill('5');
   await page.getByRole('button', { name: bo.inventory.post }).click();
@@ -69,7 +69,7 @@ test('the manager moves and corrects stock; a large loss waits for the owner', a
   // One broken: Rs 4,900, under the limit, posts at once against Inventory adjustments.
   await menu(page, bo.nav.adjustments);
   await page.getByRole('link', { name: bo.inventory.adjustments.add }).click();
-  await page.getByLabel(bo.inventory.fields.reason).selectOption({ label: bo.inventory.reasons.damaged });
+  await choose(page, bo.inventory.fields.reason, bo.inventory.reasons.damaged);
   await pickItem(page, 1, 'enol001');
   await page.getByLabel('Change of line 1').fill('-1');
   await page.getByRole('button', { name: bo.inventory.post }).click();
@@ -87,7 +87,7 @@ test('the manager moves and corrects stock; a large loss waits for the owner', a
   // Three lost: Rs 14,700, above Rs 10,000, so it waits for the owner and the stock doesn't move yet.
   await menu(page, bo.nav.adjustments);
   await page.getByRole('link', { name: bo.inventory.adjustments.add }).click();
-  await page.getByLabel(bo.inventory.fields.reason).selectOption({ label: bo.inventory.reasons.lost });
+  await choose(page, bo.inventory.fields.reason, bo.inventory.reasons.lost);
   await pickItem(page, 1, 'enol001');
   await page.getByLabel('Change of line 1').fill('-3');
   await expect(page.getByRole('status')).toContainText(/Loss Rs\s?14,700/);

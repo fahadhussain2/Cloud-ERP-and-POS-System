@@ -11,9 +11,9 @@ export type ButtonVariant = 'default' | 'outline' | 'ghost' | 'destructive' | 'l
 const VARIANT: Record<ButtonVariant, string> = {
   default: 'bg-primary text-primary-foreground hover:bg-primary/90',
   outline: 'border border-field-line bg-surface text-ink shadow-none hover:bg-surface-2',
-  ghost: 'text-ink hover:bg-surface-2',
+  ghost: 'bg-transparent text-ink hover:bg-surface-2',
   destructive: 'bg-bad text-bad-ink hover:bg-bad/90',
-  link: 'h-auto px-0 text-primary underline-offset-4 hover:underline',
+  link: 'h-auto bg-transparent px-0 text-primary underline-offset-4 hover:underline',
 };
 
 /** The classes of a kit button, for a link or a label that looks like one. */
@@ -41,6 +41,8 @@ export function Button({
 }) {
   return (
     <SharedButton
+      // The shared button's own variant too, so none of its default fill is left under a quiet one.
+      variant={variant}
       size={size === 'sm' ? 'sm' : 'default'}
       className={cn(buttonClass(variant, size), className)}
       {...(asChild ? { asChild } : {})}

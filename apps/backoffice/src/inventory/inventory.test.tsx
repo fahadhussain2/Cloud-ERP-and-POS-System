@@ -11,6 +11,7 @@ import { href, parseHash } from '../router';
 import { AdjustmentScreen } from './AdjustmentScreen';
 import { StockCardScreen, TransferNeededScreen } from './StockScreens';
 import { TransferScreen } from './TransferScreen';
+import { notify, Toaster } from '../ui';
 
 // The stock screens (W1-18) over a fake API: a transfer the purchaser types but can't post, a route that sends and
 // receives, an adjustment that waits for the owner above the limit, the owner's approval, the stock card's running
@@ -159,8 +160,18 @@ function fakeApi(l: InventoryLookups, answers: Record<string, { status: number; 
   return { api, calls };
 }
 
-const show = (ui: ReactElement) => render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
-afterEach(cleanup);
+// With the frame's toasts (W2-12, owner answer 6), which start empty for each test.
+const show = (ui: ReactElement) =>
+  render(
+    <I18nextProvider i18n={i18n}>
+      {ui}
+      <Toaster />
+    </I18nextProvider>,
+  );
+afterEach(() => {
+  cleanup();
+  notify.clear();
+});
 
 describe('the stock addresses', () => {
   it('open the stock screens', () => {
@@ -213,6 +224,7 @@ describe('a transfer', () => {
       expect(await screen.findByText(en.inventory.errors.empty_draft)).toBeDefined();
       expect(f.calls.some((c) => c.method === 'POST')).toBe(false);
       cleanup();
+      notify.clear();
     }
   });
 

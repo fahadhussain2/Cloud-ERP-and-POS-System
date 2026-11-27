@@ -1921,7 +1921,8 @@
       "note_required": "Add a note for \"Other\".",
       "write_off_not_damaged": "A write-off is out of Damaged: transfer the goods there first.",
       "write_off_gain": "A write-off takes stock out: type it below 0.",
-      "qty_zero": "Type a change other than 0."
+      "qty_zero": "Type a change other than 0.",
+      "amount": "Type an amount of 0 or more."
     },
     "warnings": {
       "below_zero": "More than it has now: it goes below 0. It still posts."
@@ -2026,7 +2027,8 @@
       "routesHelp": "Tick a route when goods spend time on the way (sent, then received). Unticked routes move at once.",
       "to": "To {{name}}",
       "needsReceiving": "{{from}} to {{to}} needs receiving",
-      "save": "Save settings"
+      "save": "Save settings",
+      "saved": "Stock settings saved."
     },
     "unnumbered": "Not posted yet"
   },
