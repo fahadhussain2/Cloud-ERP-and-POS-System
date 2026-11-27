@@ -28,6 +28,9 @@ test.skip(
 );
 
 const look = async (page: Page, name: string) => {
+  // The mouse rests on the top corner, over nothing that reacts to it: a button under a resting pointer may or may not
+  // show its hover by the time the picture is taken (CI, 2026-11-27: Rs 7,000 in the Cash popup).
+  await page.mouse.move(1, 1);
   await expect(page).toHaveScreenshot(`${name}.png`, {
     maxDiffPixels: 0,
     animations: 'disabled',
