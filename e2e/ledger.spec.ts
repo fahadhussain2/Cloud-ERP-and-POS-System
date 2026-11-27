@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { menu } from './backoffice';
+import { menu, pick } from './backoffice';
 import { expect, test } from './counter-test';
 import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
 
@@ -145,9 +145,7 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   await expect(page.getByRole('heading', { name: 'Late Bill Traders' })).toBeVisible();
   await menu(page, bo.nav.receipts);
   await page.getByRole('link', { name: bo.purchasing.receipts.add }).click();
-  await page
-    .getByLabel(bo.purchasing.fields.supplier, { exact: true })
-    .selectOption({ label: 'Late Bill Traders (S900)' });
+  await pick(page, bo.purchasing.fields.supplier, 'Late Bill Traders');
   await page.getByLabel(bo.purchasing.fields.billNo).fill('LATE-1');
   // The shop's business date, the form's default (W2-05): not this machine's calendar, which is a day ahead after
   // midnight in Karachi and could be refused as a future date.

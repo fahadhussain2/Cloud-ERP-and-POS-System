@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import pos from '../apps/pos/src/locales/en.json' with { type: 'json' };
-import { choose, menu } from './backoffice';
+import { choose, menu, pick } from './backoffice';
 import { expect, test } from './counter-test';
 import {
   BACKOFFICE_PORT,
@@ -839,8 +839,8 @@ test('the owner changes a price and adds an item in the back office; the counter
   await bop.getByRole('link', { name: bo.catalog.items.add }).click();
   await bop.getByLabel(bo.catalog.fields.code).fill('abea050');
   await bop.getByLabel(bo.catalog.fields.name).fill('ADJUSTER BEARING VITZ');
-  await bop.getByLabel(bo.catalog.fields.category).selectOption({ label: 'BRPD · BRPD' });
-  await bop.getByLabel(bo.catalog.fields.unit).selectOption({ label: 'PCS' });
+  await pick(bop, bo.catalog.fields.category, 'BRPD');
+  await choose(bop, bo.catalog.fields.unit, 'PCS');
   await bop.getByLabel('Retail').fill('3950');
   await expect(bop.getByLabel('Mechanic')).toHaveValue('3753');
   await bop.getByRole('button', { name: bo.catalog.newItem.create }).click();

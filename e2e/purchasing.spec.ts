@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { menu } from './backoffice';
+import { choose, menu, pick } from './backoffice';
 import { expect, test } from './counter-test';
 import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
 
@@ -61,9 +61,7 @@ test('the owner records a supplier bill with a bill discount, returns part of it
   // The bill: 10 × Rs 5,000 less Rs 1,000 on the whole bill = Rs 49,000.
   await menu(page, bo.nav.receipts);
   await page.getByRole('link', { name: bo.purchasing.receipts.add }).click();
-  await page
-    .getByLabel(bo.purchasing.fields.supplier, { exact: true })
-    .selectOption({ label: 'Naveed Glass (S100)' });
+  await pick(page, bo.purchasing.fields.supplier, 'Naveed Glass');
   await page.getByLabel(bo.purchasing.fields.billNo).fill('INV-4471');
   // W2-13 (owner, 2026-11-26): ↓ moves through the results and Enter takes the highlighted one, not the first.
   await page.getByRole('button', { name: 'Item of line 1' }).click();
@@ -116,7 +114,7 @@ test('the owner records a supplier bill with a bill discount, returns part of it
   // Two back to the supplier, from this receipt.
   await page.getByRole('link', { name: bo.purchasing.returns.fromReceipt }).click();
   await page.getByLabel('Quantity of line 1').fill('2');
-  await page.getByLabel(bo.purchasing.fields.reason).selectOption({ label: bo.purchasing.reasons.damaged });
+  await choose(page, bo.purchasing.fields.reason, bo.purchasing.reasons.damaged);
   await expect(page.getByText(/Supplier owes back: Rs\s?9,800/)).toBeVisible();
   await page.getByRole('button', { name: bo.purchasing.post }).click();
   await expect(page.getByRole('heading', { name: 'PR000001' })).toBeVisible();

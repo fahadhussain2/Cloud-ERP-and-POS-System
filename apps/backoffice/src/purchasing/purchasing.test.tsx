@@ -8,6 +8,7 @@ import type { Api } from '../api';
 import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import { href, navigate } from '../router';
+import { notify, Toaster } from '../ui';
 import { ReceiptScreen } from './ReceiptScreen';
 import { ReturnScreen } from './ReturnScreen';
 import { SupplierScreen, SuppliersScreen } from './SuppliersScreen';
@@ -141,8 +142,18 @@ function fakeApi(l: PurchasingLookups, answers: Record<string, { status: number;
   return { api, calls };
 }
 
-const show = (ui: ReactElement) => render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
-afterEach(cleanup);
+// With the frame's toasts (W2-12, owner answer 6), which start empty for each test.
+const show = (ui: ReactElement) =>
+  render(
+    <I18nextProvider i18n={i18n}>
+      {ui}
+      <Toaster />
+    </I18nextProvider>,
+  );
+afterEach(() => {
+  cleanup();
+  notify.clear();
+});
 
 describe('a goods receipt', () => {
   it('shows the difference from the printed total and keeps Post waiting until it matches', async () => {
@@ -390,9 +401,9 @@ describe('the suppliers table (owner review)', () => {
     );
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: en.purchasing.suppliers.deactivate }));
-    expect((await within(dialog).findByRole('alert')).textContent).toMatch(
-      /still owes this supplier Rs\s?10,901/,
-    );
+    // A toast, and the question stays open (owner answer 6).
+    expect((await screen.findByRole('alert')).textContent).toMatch(/still owes this supplier Rs\s?10,901/);
+    expect(dialog.isConnected).toBe(true);
     expect(f.calls.find((c) => c.method === 'PATCH')!.body).toEqual({ rowVersion: '5', status: 'inactive' });
   });
 

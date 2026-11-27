@@ -11,6 +11,8 @@ import { qtyText, qtyValue } from './data';
 import { ItemScreen } from './ItemScreen';
 import { ItemsScreen } from './ItemsScreen';
 import { NewItemScreen } from './NewItemScreen';
+import { notify, Toaster } from '../ui';
+import { chooseOption } from '../ui/testing/choose';
 
 // The catalog screens (W1-15) over a fake API: the list and its search, an item's parts, the price form only for the
 // owner (owner answer 3) with a reason when a price goes down (owner answer 2), a stale save, the notice until the
@@ -163,8 +165,18 @@ function fakeApi(l: CatalogLookups, answers: Record<string, { status: number; bo
   return { api, calls };
 }
 
-const show = (ui: React.ReactElement) => render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
-afterEach(cleanup);
+// With the frame's toasts (W2-12, owner answer 6), which start empty for each test.
+const show = (ui: React.ReactElement) =>
+  render(
+    <I18nextProvider i18n={i18n}>
+      {ui}
+      <Toaster />
+    </I18nextProvider>,
+  );
+afterEach(() => {
+  cleanup();
+  notify.clear();
+});
 
 describe('the item list', () => {
   it('lists items with their Retail price and searches as you type, with no go-live notice (D-113)', async () => {
@@ -228,7 +240,8 @@ describe('the item list with its stock (W1-26)', () => {
       .getAllByRole('cell')
       .map((c) => c.textContent);
     expect(cells).toEqual([
-      '',
+      // The pick-for-labels box, named for screen readers only.
+      'Label ABEA001',
       'ABEA001',
       'ADJUSTER BEARING SALOON',
       'CHINA',
@@ -293,7 +306,7 @@ describe('the item list with its stock (W1-26)', () => {
     const f = fakeApi(lookups());
     show(<ItemsScreen api={f.api} />);
     await screen.findByRole('link', { name: 'ABEA001' });
-    fireEvent.change(screen.getByLabelText(en.catalog.items.level), { target: { value: 'low' } });
+    await chooseOption(en.catalog.items.level, en.catalog.items.levelFilters.low);
     await waitFor(() => expect(f.calls.some((c) => c.path.includes('level=low'))).toBe(true));
     fireEvent.click(screen.getByRole('button', { name: en.catalog.items.value }));
     await waitFor(() => expect(f.calls.some((c) => c.path.includes('sort=value&dir=desc'))).toBe(true));
@@ -322,7 +335,7 @@ describe('an item', () => {
     const mechanic = await screen.findByLabelText('Mechanic');
     expect(screen.queryByLabelText(en.catalog.item.reason)).toBeNull();
     fireEvent.change(mechanic, { target: { value: '3700' } });
-    fireEvent.change(screen.getByLabelText(en.catalog.item.reason), { target: { value: 'market_price' } });
+    await chooseOption(en.catalog.item.reason, en.catalog.reasons.market_price);
     fireEvent.click(screen.getByRole('button', { name: en.catalog.item.savePrices }));
     await waitFor(() => expect(f.calls.some((c) => c.method === 'PUT')).toBe(true));
     expect(f.calls.find((c) => c.method === 'PUT')).toMatchObject({
@@ -378,8 +391,11 @@ describe('a new item', () => {
     fireEvent.change(screen.getByLabelText(en.catalog.fields.name), {
       target: { value: 'ADJUSTER BEARING VITZ' },
     });
-    fireEvent.change(screen.getByLabelText(en.catalog.fields.category), { target: { value: 'c1' } });
-    fireEvent.change(screen.getByLabelText(en.catalog.fields.unit), { target: { value: 'u1' } });
+    // The category is searched (owner answer 3), and taken with Enter.
+    const category = screen.getByRole('combobox', { name: en.catalog.fields.category });
+    fireEvent.change(category, { target: { value: 'abea' } });
+    fireEvent.keyDown(category, { key: 'Enter' });
+    await chooseOption(en.catalog.fields.unit, 'PCS');
     fireEvent.click(screen.getByRole('button', { name: en.catalog.newItem.create }));
     await waitFor(() => expect(window.location.hash).toBe('#/catalog/items/i9'));
     expect(f.calls.find((c) => c.method === 'POST')!.body).toEqual({
@@ -389,6 +405,23 @@ describe('a new item', () => {
       unitId: 'u1',
       prices: { RETAIL: 395000, MECHANIC: 375300, WHOLESALE: 355500 },
     });
+  });
+
+  it('marks every wrong field at once and puts focus on the first; sends nothing (owner answer 6)', async () => {
+    const f = fakeApi(lookups());
+    show(<NewItemScreen api={f.api} />);
+    fireEvent.change(await screen.findByLabelText('Retail'), { target: { value: 'abc' } });
+    fireEvent.click(screen.getByRole('button', { name: en.catalog.newItem.create }));
+    const code = screen.getByLabelText(en.catalog.fields.code);
+    await waitFor(() => expect(document.activeElement).toBe(code));
+    for (const label of [
+      en.catalog.fields.code,
+      en.catalog.fields.name,
+      en.catalog.fields.category,
+      'Retail',
+    ])
+      expect(screen.getByLabelText(label).getAttribute('aria-invalid')).toBe('true');
+    expect(f.calls.some((c) => c.method === 'POST')).toBe(false);
   });
 
   it('a manager adds one without prices', async () => {

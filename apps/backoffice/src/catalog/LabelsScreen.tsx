@@ -1,32 +1,29 @@
 import type { LabelLineView, LabelsView, LabelTemplateRequest } from '@erp/contracts';
 import { labelPages, type LabelPage } from '@erp/domain';
 import { code39Svg, code39Width } from '@erp/print';
-import {
-  Button,
-  Checkbox,
-  Input,
-  Label,
-  PageHeader,
-  Panel,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TextField,
-} from '@erp/ui';
-import { useEffect, useId, useState, type CSSProperties, type FormEvent } from 'react';
+import { PageHeader, Panel, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@erp/ui';
+import { Pencil, Printer, Save, Search } from 'lucide-react';
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
-import { FormDialog } from '../staff/dialogs';
+import { Button, Checkbox, FormDialog, notify, TextBox, TextInput } from '../ui';
 
 // Printing item labels (W1-17, CAT-08, D-019, D-055): a posted goods receipt's labels (typed by number, or opened
 // from the receipt) or a relabel of items picked on the items screen. The counts and supplier abbreviations can be
 // changed before printing. Each label is one page on the Zebra roll (owner answer 1), laid out as the legacy label
 // (owner answer 3); the template is the owner's (owner answer 5). Labels are always black on white (PLT-13).
+// W2-14 (D-127): the back office's own controls, problems at their field (owner answer 6).
+
+type TemplateField = 'widthMm' | 'heightMm' | 'marginMm' | 'shopAbbr';
+/** The field each of the template's problems is about. */
+const FIELD_OF_PROBLEM: Record<string, TemplateField> = {
+  width_out_of_range: 'widthMm',
+  height_out_of_range: 'heightMm',
+  margin_out_of_range: 'marginMm',
+  shop_abbr_too_long: 'shopAbbr',
+};
 
 export type LabelsSource = { receipt: string } | { items: string[] } | null;
 
@@ -102,7 +99,12 @@ export function LabelsScreen({
         help={t('labels.help')}
         actions={
           canEditTemplate && (
-            <Button variant="outline" onClick={() => setEditing(true)} disabled={template === null}>
+            <Button
+              variant="outline"
+              icon={Pencil}
+              onClick={() => setEditing(true)}
+              disabled={template === null}
+            >
               {t('labels.template.edit')}
             </Button>
           )
@@ -116,19 +118,21 @@ export function LabelsScreen({
             if (number.trim() !== '') void loadReceipt(number);
           }}
         >
-          <TextField
+          {/* A receipt that can't be found or isn't posted is the number's problem (owner answer 6). */}
+          <TextInput
             label={t('labels.receiptNumber')}
+            error={error}
             value={number}
-            onChange={(e) => setNumber(e.target.value)}
+            onChange={(e) => {
+              setNumber(e.target.value);
+              setError(null);
+            }}
             wrapperClassName="w-56"
           />
-          <Button type="submit">{t('labels.load')}</Button>
+          <Button type="submit" icon={Search} className={error ? 'mb-[22px]' : undefined}>
+            {t('labels.load')}
+          </Button>
         </form>
-        {error && (
-          <p role="alert" className="m-0 mt-3 text-sm text-destructive">
-            {error}
-          </p>
-        )}
       </Panel>
 
       {view ? (
@@ -138,63 +142,69 @@ export function LabelsScreen({
               ? t('labels.from', { number: view.source.number, supplier: view.source.supplier })
               : t('labels.relabel')}
           </p>
-          <Table aria-label={t('labels.lines')}>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('labels.columns.code')}</TableHead>
-                <TableHead>{t('labels.columns.item')}</TableHead>
-                <TableHead>{t('labels.columns.supplierAbbr')}</TableHead>
-                <TableHead className="text-end">{t('labels.columns.labels')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lines.map((l, i) => (
-                <TableRow key={`${l.itemId}-${i}`} className="align-top">
-                  <TableCell className="leading-9 font-mono">{l.code}</TableCell>
-                  <TableCell>
-                    <div className="leading-9">{l.name}</div>
-                    {l.problems.map((p) => (
-                      <p key={p} className="m-0 text-sm text-destructive">
-                        {t(`labels.problems.${p}`)}
-                      </p>
-                    ))}
-                    {!l.supplierAbbr && (
-                      <p className="m-0 text-sm text-muted-foreground">
-                        {t('labels.warnings.supplier_abbr_missing')}
-                      </p>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      aria-label={t('labels.abbrFor', { code: l.code })}
-                      className="w-24 uppercase"
-                      maxLength={10}
-                      value={l.supplierAbbr ?? ''}
-                      onChange={(e) => {
-                        const v = e.target.value.trim().toUpperCase();
-                        put(i, { supplierAbbr: v === '' ? null : v });
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell className="text-end">
-                    <Input
-                      aria-label={t('labels.countFor', { code: l.code })}
-                      className="ms-auto w-20 text-end"
-                      inputMode="numeric"
-                      value={String(l.count)}
-                      onChange={(e) => {
-                        const n = Number(e.target.value);
-                        put(i, { count: Number.isInteger(n) && n >= 0 ? Math.min(n, 9999) : 0 });
-                      }}
-                    />
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table aria-label={t('labels.lines')}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('labels.columns.code')}</TableHead>
+                  <TableHead>{t('labels.columns.item')}</TableHead>
+                  <TableHead>{t('labels.columns.supplierAbbr')}</TableHead>
+                  <TableHead className="text-end">{t('labels.columns.labels')}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {lines.map((l, i) => (
+                  <TableRow key={`${l.itemId}-${i}`} className="align-top">
+                    <TableCell className="leading-9 font-mono">{l.code}</TableCell>
+                    <TableCell>
+                      <div className="leading-9">{l.name}</div>
+                      {l.problems.map((p) => (
+                        <p key={p} className="m-0 text-sm text-destructive">
+                          {t(`labels.problems.${p}`)}
+                        </p>
+                      ))}
+                      {!l.supplierAbbr && (
+                        <p className="m-0 text-sm text-muted-foreground">
+                          {t('labels.warnings.supplier_abbr_missing')}
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <TextBox
+                        aria-label={t('labels.abbrFor', { code: l.code })}
+                        className="w-24 uppercase"
+                        maxLength={10}
+                        value={l.supplierAbbr ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value.trim().toUpperCase();
+                          put(i, { supplierAbbr: v === '' ? null : v });
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell className="text-end">
+                      <TextBox
+                        aria-label={t('labels.countFor', { code: l.code })}
+                        className="ms-auto w-20 text-end"
+                        inputMode="numeric"
+                        value={String(l.count)}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          put(i, { count: Number.isInteger(n) && n >= 0 ? Math.min(n, 9999) : 0 });
+                        }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <span className="font-medium">{t('labels.count', { count: pages.length })}</span>
-            <Button onClick={() => window.print()} disabled={pages.length === 0 || template === null}>
+            <Button
+              icon={Printer}
+              onClick={() => window.print()}
+              disabled={pages.length === 0 || template === null}
+            >
               {t('labels.print')}
             </Button>
             <span className="text-sm text-muted-foreground">{t('labels.printHint')}</span>
@@ -310,7 +320,6 @@ function TemplateDialog({
   onSaved: (template: LabelTemplateRequest) => void;
 }) {
   const { t } = useTranslation();
-  const id = useId();
   const [f, setF] = useState(() => ({
     widthMm: String(template.widthMm),
     heightMm: String(template.heightMm),
@@ -319,12 +328,22 @@ function TemplateDialog({
     showName: template.showName,
     labelMakerBarcoded: template.labelMakerBarcoded,
   }));
-  const [error, setError] = useState<string | null>(null);
+  const [problems, setProblems] = useState<Partial<Record<TemplateField, string>>>({});
   const [busy, setBusy] = useState(false);
+  const set = (k: TemplateField, v: string) => {
+    setF((x) => ({ ...x, [k]: v }));
+    setProblems((p) => (p[k] ? { ...p, [k]: undefined } : p));
+  };
 
   const submit = async () => {
-    const nums = [f.widthMm, f.heightMm, f.marginMm].map((v) => (v.trim() === '' ? Number.NaN : Number(v)));
-    if (nums.some((n) => !Number.isFinite(n))) return setError(t('labels.template.invalidNumber'));
+    const sizes = ['widthMm', 'heightMm', 'marginMm'] as const;
+    const nums = sizes.map((k) => (f[k].trim() === '' ? Number.NaN : Number(f[k])));
+    const wrong: typeof problems = {};
+    sizes.forEach((k, n) => {
+      if (!Number.isFinite(nums[n])) wrong[k] = t('labels.template.invalidNumber');
+    });
+    setProblems(wrong);
+    if (Object.keys(wrong).length > 0) return;
     const [widthMm, heightMm, marginMm] = nums as [number, number, number];
     setBusy(true);
     const r = await api('PUT', '/api/catalog/labels/template', {
@@ -337,78 +356,74 @@ function TemplateDialog({
     });
     setBusy(false);
     if (r.status === 200) {
-      setError(null);
+      setProblems({});
       return onSaved(r.body as LabelTemplateRequest);
     }
+    // The API's problems name their field (owner answer 6); anything else is a toast.
     const b = r.body as { error?: string; problems?: string[] } | null;
-    setError(
-      b?.error === 'invalid' && b.problems?.length
-        ? b.problems.map((p) => t(`labels.template.problems.${p}`)).join(' ')
-        : t('app.error'),
-    );
+    if (b?.error === 'invalid' && b.problems?.length) {
+      const at: typeof problems = {};
+      for (const p of b.problems) at[FIELD_OF_PROBLEM[p] ?? 'widthMm'] = t(`labels.template.problems.${p}`);
+      setProblems(at);
+    } else notify.problem(t('app.error'));
   };
 
   return (
     <FormDialog
       open={open}
       onOpenChange={(o) => {
-        if (!o) setError(null);
+        if (!o) setProblems({});
         onOpenChange(o);
       }}
       title={t('labels.template.title')}
       description={t('labels.template.description')}
       actionLabel={t('labels.template.save')}
+      actionIcon={Save}
       cancelLabel={t('labels.template.cancel')}
       busy={busy}
       onSubmit={() => void submit()}
+      errors={problems}
     >
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-        <TextField
+        <TextInput
           label={t('labels.template.width')}
+          error={problems.widthMm}
           inputMode="decimal"
           value={f.widthMm}
-          onChange={(e) => setF((x) => ({ ...x, widthMm: e.target.value }))}
+          onChange={(e) => set('widthMm', e.target.value)}
         />
-        <TextField
+        <TextInput
           label={t('labels.template.height')}
+          error={problems.heightMm}
           inputMode="decimal"
           value={f.heightMm}
-          onChange={(e) => setF((x) => ({ ...x, heightMm: e.target.value }))}
+          onChange={(e) => set('heightMm', e.target.value)}
         />
-        <TextField
+        <TextInput
           label={t('labels.template.margin')}
+          error={problems.marginMm}
           inputMode="decimal"
           value={f.marginMm}
-          onChange={(e) => setF((x) => ({ ...x, marginMm: e.target.value }))}
+          onChange={(e) => set('marginMm', e.target.value)}
         />
       </div>
-      <TextField
+      <TextInput
         label={t('labels.template.shopAbbr')}
         hint={t('labels.template.shopAbbrHint')}
+        error={problems.shopAbbr}
         value={f.shopAbbr}
-        onChange={(e) => setF((x) => ({ ...x, shopAbbr: e.target.value }))}
+        onChange={(e) => set('shopAbbr', e.target.value)}
       />
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id={`${id}-name`}
-          checked={f.showName}
-          onCheckedChange={(v) => setF((x) => ({ ...x, showName: v === true }))}
-        />
-        <Label htmlFor={`${id}-name`}>{t('labels.template.showName')}</Label>
-      </div>
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id={`${id}-maker`}
-          checked={f.labelMakerBarcoded}
-          onCheckedChange={(v) => setF((x) => ({ ...x, labelMakerBarcoded: v === true }))}
-        />
-        <Label htmlFor={`${id}-maker`}>{t('labels.template.labelMakerBarcoded')}</Label>
-      </div>
-      {error && (
-        <p role="alert" className="m-0 text-sm text-destructive">
-          {error}
-        </p>
-      )}
+      <Checkbox
+        label={t('labels.template.showName')}
+        checked={f.showName}
+        onCheckedChange={(v) => setF((x) => ({ ...x, showName: v }))}
+      />
+      <Checkbox
+        label={t('labels.template.labelMakerBarcoded')}
+        checked={f.labelMakerBarcoded}
+        onCheckedChange={(v) => setF((x) => ({ ...x, labelMakerBarcoded: v }))}
+      />
     </FormDialog>
   );
 }

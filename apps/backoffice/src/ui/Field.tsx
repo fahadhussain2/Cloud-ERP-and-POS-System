@@ -29,6 +29,11 @@ export function FieldNote({ id, hint, error }: { id: string; hint?: ReactNode; e
   return null;
 }
 
+/** A bare box in the kit's look, for a table cell whose column names it (give it an `aria-label`). */
+export function TextBox({ className, ...props }: ComponentProps<'input'>) {
+  return <Input className={cn(FIELD_BOX, className)} {...props} />;
+}
+
 export function TextInput({
   label,
   hint,
