@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { chromium, type BrowserContext, type Page } from '@playwright/test';
+import { chromium, type Browser, type Page } from '@playwright/test';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import pos from '../apps/pos/src/locales/en.json' with { type: 'json' };
@@ -22,7 +22,6 @@ import { OWN_PIN, POS_PORT, SALESMAN, SHOP } from './fixtures';
 const POS = `http://localhost:${POS_PORT}`;
 const SCREEN = { width: 1366, height: 768 };
 
-test.describe.configure({ mode: 'serial' });
 test.skip(
   process.platform !== 'linux',
   "The baseline is CI's Linux Chromium; fonts differ on other platforms.",
@@ -37,32 +36,33 @@ const look = async (page: Page, name: string) => {
   });
 };
 
-let counter: BrowserContext;
-let dir = '';
-let page: Page;
-
-test.beforeAll(async ({ channel }) => {
-  dir = await mkdtemp(join(tmpdir(), 'erp-look-'));
-  counter = await chromium.launchPersistentContext(dir, {
+// One test, so a first run without a baseline writes all six pictures (a failed test restarts the worker).
+test("the counter's screens look as before: setup, unlock, the counter, a bill, the Cash and customer popups", async ({
+  browser,
+  channel,
+}) => {
+  test.setTimeout(90_000);
+  const dir = await mkdtemp(join(tmpdir(), 'erp-look-'));
+  const counter = await chromium.launchPersistentContext(dir, {
     ...(channel ? { channel } : {}),
     viewport: SCREEN,
     colorScheme: 'light',
     locale: 'en-US',
   });
-  await counter.addInitScript(() => {
-    navigator.storage.persisted = () => Promise.resolve(true);
-    navigator.storage.persist = () => Promise.resolve(true);
-    window.print = () => undefined;
-  });
-  page = await counter.newPage();
+  try {
+    await counter.addInitScript(() => {
+      navigator.storage.persisted = () => Promise.resolve(true);
+      navigator.storage.persist = () => Promise.resolve(true);
+      window.print = () => undefined;
+    });
+    await screens(await counter.newPage(), browser);
+  } finally {
+    await counter.close();
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
-test.afterAll(async () => {
-  await counter.close();
-  await rm(dir, { recursive: true, force: true });
-});
-
-test('the setup screen and the unlock screen look as before', async ({ browser }) => {
+async function screens(page: Page, browser: Browser) {
   await page.goto(POS);
   await expect(page.getByRole('heading', { name: pos.setup.title })).toBeVisible();
   await look(page, 'setup');
@@ -81,9 +81,7 @@ test('the setup screen and the unlock screen look as before', async ({ browser }
   await page.getByRole('button', { name: pos.setup.submit }).click();
   await expect(page.getByRole('button', { name: new RegExp(SALESMAN.fullName) })).toBeVisible();
   await look(page, 'unlock');
-});
 
-test('the counter, a bill of three lines, the Cash popup and the customer popup look as before', async () => {
   await page.getByRole('button', { name: new RegExp(SALESMAN.fullName) }).click();
   await page.getByLabel(pos.unlock.pin).fill(OWN_PIN);
   await page.getByRole('button', { name: pos.unlock.submit }).click();
@@ -124,4 +122,4 @@ test('the counter, a bill of three lines, the Cash popup and the customer popup 
     .getByRole('button', { name: new RegExp(`^${pos.clear.action}`) })
     .click();
   await expect(page.getByText(pos.bill.empty)).toBeVisible();
-});
+}
