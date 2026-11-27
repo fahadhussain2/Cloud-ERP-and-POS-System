@@ -11,12 +11,13 @@ import {
   type TrialBalanceView,
 } from '@erp/contracts';
 import { changeOf } from '@erp/domain';
-import { Checkbox, Input, Label, Panel, StatusChip, TableCell, TableRow } from '@erp/ui';
+import { Panel, StatusChip, TableCell, TableRow } from '@erp/ui';
 import type { TFunction } from 'i18next';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { Checkbox, TextBox } from '../ui';
 import type { Badges } from '../layout/Sidebar';
 import { REPORT_SECTIONS, REPORTS, mayOpen } from './catalog';
 import { apiQuery, useFilters } from './frame/filters';
@@ -65,7 +66,7 @@ export function ReportsHomeScreen({
           <h1 className="m-0 font-display text-[28px] leading-tight font-bold">{t('reports.home.title')}</h1>
           <p className="m-0 max-w-[75ch] text-muted-foreground">{t('reports.home.help')}</p>
         </div>
-        <Input
+        <TextBox
           type="search"
           aria-label={t('reports.home.search')}
           placeholder={t('reports.home.search')}
@@ -193,14 +194,13 @@ export function TrialBalanceScreen({ api }: { api: Api }) {
             ]}
             onChange={(v) => set({ level: v })}
           />
-          <div className="flex h-9 items-center gap-2">
-            <Checkbox
-              id="tb-empty"
-              checked={empty}
-              onCheckedChange={(c) => set({ empty: c === true ? 'show' : '' })}
-            />
-            <Label htmlFor="tb-empty">{t('reports.tb.empty')}</Label>
-          </div>
+          <Checkbox
+            className="h-9 items-center"
+            id="tb-empty"
+            label={t('reports.tb.empty')}
+            checked={empty}
+            onCheckedChange={(c) => set({ empty: c ? 'show' : '' })}
+          />
         </>
       }
       printFilters={periodWords(report)}

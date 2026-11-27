@@ -25,10 +25,7 @@ import {
 } from '@erp/contracts';
 import {
   Badge,
-  Checkbox,
   cn,
-  Label,
-  LABEL_CLASS,
   Panel,
   Table,
   TableBody,
@@ -43,6 +40,7 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { Checkbox, FIELD_LABEL } from '../ui';
 import { qtyText } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
 import { href, queryOf, withQuery } from '../router';
@@ -130,7 +128,7 @@ function StatementHeading({
         ))}
       </div>
       <div className="flex flex-col sm:text-end">
-        <span className={LABEL_CLASS}>{p(t, 'statement.for', { from, to })}</span>
+        <span className={FIELD_LABEL}>{p(t, 'statement.for', { from, to })}</span>
         <span className="font-semibold">
           {party.name} ({party.code})
         </span>
@@ -270,7 +268,7 @@ export function PartnerLedgerScreen({ api }: { api: Api }) {
             onChange={(v) => set({ role: v, partyId: '' })}
           />
           <div className="flex w-80 max-w-full flex-col gap-1">
-            <span className={LABEL_CLASS}>{p(t, `roles.${role}`)}</span>
+            <span className={FIELD_LABEL}>{p(t, `roles.${role}`)}</span>
             <ItemPicker
               api={api}
               url={role === 'customer' ? '/api/reports/customers' : '/api/reports/suppliers'}
@@ -281,14 +279,14 @@ export function PartnerLedgerScreen({ api }: { api: Api }) {
           </div>
           <PeriodFilter value={period} shown={report} onChange={setPeriod} />
           {(['statement', 'items'] as const).map((k) => (
-            <div key={k} className="flex h-9 items-center gap-2">
-              <Checkbox
-                id={`ledger-${k}`}
-                checked={k === 'statement' ? statement : withItems}
-                onCheckedChange={(c) => set({ [k]: c === true ? '1' : '' })}
-              />
-              <Label htmlFor={`ledger-${k}`}>{p(t, `ledger.${k}`)}</Label>
-            </div>
+            <Checkbox
+              key={k}
+              className="h-9 items-center"
+              id={`ledger-${k}`}
+              label={p(t, `ledger.${k}`)}
+              checked={k === 'statement' ? statement : withItems}
+              onCheckedChange={(c) => set({ [k]: c ? '1' : '' })}
+            />
           ))}
         </>
       }
@@ -462,14 +460,13 @@ export function StatementsScreen({ api }: { api: Api }) {
       filters={
         <>
           <PeriodFilter value={period} shown={report} onChange={setPeriod} />
-          <div className="flex h-9 items-center gap-2">
-            <Checkbox
-              id="statements-items"
-              checked={withItems}
-              onCheckedChange={(c) => set({ items: c === true ? '1' : '' })}
-            />
-            <Label htmlFor="statements-items">{p(t, 'ledger.items')}</Label>
-          </div>
+          <Checkbox
+            className="h-9 items-center"
+            id="statements-items"
+            label={p(t, 'ledger.items')}
+            checked={withItems}
+            onCheckedChange={(c) => set({ items: c ? '1' : '' })}
+          />
         </>
       }
       printFilters={periodWords(report)}

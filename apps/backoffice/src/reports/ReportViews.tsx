@@ -17,11 +17,7 @@ import type {
 import {
   Alert,
   AlertDescription,
-  Button,
-  Checkbox,
   formatMoney,
-  Label,
-  LABEL_CLASS,
   PageHeader,
   Panel,
   StatusChip,
@@ -31,7 +27,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
 } from '@erp/ui';
 import type { TFunction } from 'i18next';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -41,7 +36,7 @@ import type { Api } from '../api';
 import { qtyText } from '../catalog/data';
 import { href, navigate } from '../router';
 import { useShopToday } from '../shopDay';
-import { FormDialog } from '../ui';
+import { Button, Checkbox, FIELD_LABEL, FormDialog, TextInput } from '../ui';
 import { apiQuery, current, only, useFilters, type Filters } from './frame/filters';
 import {
   ChoiceFilter,
@@ -673,7 +668,7 @@ export function SearchFilter({
     return () => clearTimeout(id);
   }, [text, value]);
   return (
-    <TextField
+    <TextInput
       type="search"
       label={label}
       value={text}
@@ -760,14 +755,13 @@ export function StockReportScreen({ api }: { api: Api }) {
       filters={
         <>
           <SearchFilter label={t('reports.stock.search')} value={text} onChange={(v) => set({ q: v })} />
-          <div className="flex h-9 items-center gap-2">
-            <Checkbox
-              id="stock-below"
-              checked={below}
-              onCheckedChange={(c) => set({ below: c === true ? '1' : '' })}
-            />
-            <Label htmlFor="stock-below">{t('reports.stock.below')}</Label>
-          </div>
+          <Checkbox
+            className="h-9 items-center"
+            id="stock-below"
+            label={t('reports.stock.below')}
+            checked={below}
+            onCheckedChange={(c) => set({ below: c ? '1' : '' })}
+          />
         </>
       }
       printFilters={[text, below ? t('reports.stock.below') : ''].filter(Boolean).join(' · ')}
@@ -1025,14 +1019,13 @@ export function ExceptionsScreen({ api, permissions }: { api: Api; permissions: 
       filters={
         <>
           <DaysFilter days={days} />
-          <div className="flex h-9 items-center gap-2">
-            <Checkbox
-              id="exceptions-all"
-              checked={all}
-              onCheckedChange={(c) => days.set({ status: c === true ? 'all' : '' })}
-            />
-            <Label htmlFor="exceptions-all">{t('reports.exc.showReviewed')}</Label>
-          </div>
+          <Checkbox
+            className="h-9 items-center"
+            id="exceptions-all"
+            label={t('reports.exc.showReviewed')}
+            checked={all}
+            onCheckedChange={(c) => days.set({ status: c ? 'all' : '' })}
+          />
         </>
       }
       printFilters={[periodWords(days.dates), all ? t('reports.exc.showReviewed') : '']
@@ -1118,7 +1111,7 @@ function ReviewDialog({
       onSubmit={() => void submit()}
     >
       <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
-        <legend className={LABEL_CLASS}>{t('reports.exc.status')}</legend>
+        <legend className={FIELD_LABEL}>{t('reports.exc.status')}</legend>
         {(['reviewed', 'dismissed', 'open'] as const).map((s) => (
           <label key={s} className="flex items-center gap-2">
             <input
@@ -1132,7 +1125,7 @@ function ReviewDialog({
         ))}
       </fieldset>
       {status !== 'open' && (
-        <TextField
+        <TextInput
           label={t('reports.exc.note')}
           value={note}
           maxLength={500}
@@ -1190,7 +1183,7 @@ export function TraceScreen({ api, number }: { api: Api; number: string | null }
             if (typed.trim()) navigate(href.trace(typed.trim()));
           }}
         >
-          <TextField
+          <TextInput
             label={t('support.trace.number')}
             value={typed}
             onChange={(e) => setTyped(e.target.value)}

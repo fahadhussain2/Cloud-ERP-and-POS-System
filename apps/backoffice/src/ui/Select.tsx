@@ -85,6 +85,8 @@ export function Select({
               <SelectItem
                 key={o.value}
                 value={o.value}
+                // Tests pick an option by its value (`chooseValue`).
+                data-value={o.value}
                 {...(o.disabled ? { disabled: true } : {})}
                 className="h-[34px] cursor-pointer rounded-md ps-2.5 text-sm focus:bg-surface-2 focus:text-ink data-[state=checked]:font-semibold [&_svg]:text-primary"
               >

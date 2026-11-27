@@ -19,7 +19,9 @@ import {
   type StockChoicesView,
   type TopItemView,
 } from '@erp/contracts';
-import { Button, Checkbox, Label, LABEL_CLASS, TableCell, TableRow, type MoneyFormat } from '@erp/ui';
+import { TableCell, TableRow, type MoneyFormat } from '@erp/ui';
+
+import { Button, Checkbox, FIELD_LABEL } from '../ui';
 import type { TFunction } from 'i18next';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -544,14 +546,13 @@ export function PurchaseRegisterScreen({ api }: { api: Api }) {
             keys={['supplierId']}
             onChange={(k, v) => set({ [k]: v })}
           />
-          <div className="flex h-9 items-center gap-2">
-            <Checkbox
-              id="register-lines"
-              checked={withLines}
-              onCheckedChange={(c) => set({ lines: c === true ? '1' : '' })}
-            />
-            <Label htmlFor="register-lines">{s(t, 'register.withLines')}</Label>
-          </div>
+          <Checkbox
+            className="h-9 items-center"
+            id="register-lines"
+            label={s(t, 'register.withLines')}
+            checked={withLines}
+            onCheckedChange={(c) => set({ lines: c ? '1' : '' })}
+          />
         </>
       }
       printFilters={[periodWords(report), ...filterWords(t, choices, filters, ['supplierId'])].join(' · ')}
@@ -767,7 +768,7 @@ export function RatesScreen({ api }: { api: Api }) {
             const chosen = k === 'item' ? report?.item : report?.party;
             return (
               <div key={k} className="flex w-80 max-w-full flex-col gap-1">
-                <span className={LABEL_CLASS}>{s(t, `rates.${k}`)}</span>
+                <span className={FIELD_LABEL}>{s(t, `rates.${k}`)}</span>
                 <div className="flex gap-1">
                   <div className="flex-1">
                     <ItemPicker

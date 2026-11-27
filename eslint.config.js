@@ -111,16 +111,8 @@ export default defineConfig(
       '**/*.test.{ts,tsx}',
       ...[
         'layout/ScreenSearch.tsx',
-        'reports/BillScreen.tsx',
-        'reports/FinancialScreens.tsx',
-        'reports/PartnerReportScreens.tsx',
-        'reports/ReportViews.tsx',
-        'reports/SalesReportScreens.tsx',
-        'reports/StockReportScreens.tsx',
-        'reports/frame/ReportFrame.tsx',
         'screens/LoginScreen.tsx',
         'screens/PasswordScreen.tsx',
-        'screens/ReportsScreens.tsx',
       ].map((f) => `apps/backoffice/src/${f}`),
     ],
     rules: {
