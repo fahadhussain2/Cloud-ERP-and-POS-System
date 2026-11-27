@@ -28,6 +28,7 @@ import {
   IconButton,
   ListToolbar,
   notify,
+  SearchBox,
   Select,
   TextInput,
 } from '../ui';
@@ -350,7 +351,7 @@ export function CustomerDialog({
   const defaultTier = lookups.tiers.find((x) => x.isDefault)?.id ?? lookups.tiers[0]?.id ?? '';
   const blank = (): Form => ({
     source: 'new',
-    supplierId: lookups.suppliers[0]?.id ?? '',
+    supplierId: '',
     code: '',
     name: customer?.name ?? '',
     phones: customer?.phones.join(', ') ?? '',
@@ -440,8 +441,10 @@ export function CustomerDialog({
   const submit = async () => {
     const wrong: Problems = {};
     let body: Record<string, unknown>;
-    if (fromSupplier) body = { partyId: f.supplierId };
-    else {
+    if (fromSupplier) {
+      if (f.supplierId === '') wrong.supplierId = t('customers.problems.supplier');
+      body = { partyId: f.supplierId };
+    } else {
       if (f.name.trim() === '') wrong.name = t('customers.problems.name');
       body = {
         name: f.name,
@@ -509,12 +512,11 @@ export function CustomerDialog({
         />
       )}
       {fromSupplier ? (
-        <Select
-          label={t('customers.source.pick')}
+        <SupplierPick
+          suppliers={lookups.suppliers}
           value={f.supplierId}
-          onValueChange={(v) => set('supplierId', v)}
+          onChange={(id) => set('supplierId', id)}
           error={problems.supplierId}
-          options={lookups.suppliers.map((s) => ({ value: s.id, label: `${s.code} · ${s.name}` }))}
         />
       ) : (
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -631,6 +633,66 @@ export function CustomerDialog({
         )}
       </fieldset>
     </FormDialog>
+  );
+}
+
+/**
+ * The supplier to make a customer, searched by code or name (owner answer 3: a list that keeps growing gets a search,
+ * not a dropdown; W2-13). The suppliers are already in the lookups, so the search runs here.
+ */
+function SupplierPick({
+  suppliers,
+  value,
+  onChange,
+  error,
+}: {
+  suppliers: CustomerLookups['suppliers'];
+  value: string;
+  onChange: (id: string) => void;
+  error: string | undefined;
+}) {
+  const { t } = useTranslation();
+  const label = t('customers.source.pick');
+  const picked = suppliers.find((s) => s.id === value);
+  // What was typed since the last pick; null shows the picked supplier.
+  const [typed, setTyped] = useState<string | null>(null);
+  const [closed, setClosed] = useState(false);
+  const q = typed?.trim().toLowerCase() ?? '';
+  const hits =
+    q === '' || closed
+      ? []
+      : suppliers
+          .filter((s) => s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))
+          .slice(0, 20);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className={FIELD_LABEL}>{label}</span>
+      <SearchBox
+        label={label}
+        listLabel={label}
+        placeholder={t('customers.source.search')}
+        text={typed ?? (picked ? `${picked.code} · ${picked.name}` : '')}
+        onText={(v) => {
+          setTyped(v);
+          setClosed(false);
+          if (value) onChange('');
+        }}
+        hits={hits}
+        hitKey={(s) => s.id}
+        onPick={(s) => {
+          setTyped(null);
+          onChange(s.id);
+        }}
+        onEscape={() => setClosed(true)}
+        error={error}
+      >
+        {(s) => (
+          <>
+            <span className="font-mono text-xs text-muted-foreground">{s.code}</span> {s.name}
+          </>
+        )}
+      </SearchBox>
+    </div>
   );
 }
 

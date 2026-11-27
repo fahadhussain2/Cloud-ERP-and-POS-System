@@ -296,9 +296,16 @@ describe('adding a customer', () => {
       lookups({ suppliers: [{ id: 's1', code: 'S0001', name: 'Naveed' }] }),
     );
     await chooseOption(en.customers.source.label, en.customers.source.supplier, dialog);
-    expect(within(dialog).getByRole('combobox', { name: en.customers.source.pick }).textContent).toContain(
-      'S0001 · Naveed',
-    );
+    // None picked yet: the field says so, and nothing is sent.
+    fireEvent.click(within(dialog).getByRole('button', { name: en.customers.create }));
+    const pick = within(dialog).getByRole('combobox', { name: en.customers.source.pick });
+    await waitFor(() => expect(pick.getAttribute('aria-invalid')).toBe('true'));
+    expect(within(dialog).getByText(en.customers.problems.supplier)).toBeDefined();
+    expect(f.calls.some((c) => c.method === 'POST')).toBe(false);
+    // Searched by name (owner answer 3), picked with Enter (W2-13).
+    fireEvent.change(pick, { target: { value: 'nav' } });
+    fireEvent.keyDown(pick, { key: 'Enter' });
+    expect((pick as HTMLInputElement).value).toBe('S0001 · Naveed');
     fireEvent.click(within(dialog).getByRole('button', { name: en.customers.create }));
     await waitFor(() => expect(f.calls.some((c) => c.method === 'POST')).toBe(true));
     expect(f.calls.find((c) => c.method === 'POST')!.body).toMatchObject({ partyId: 's1' });

@@ -1,15 +1,15 @@
-import { Input } from '@erp/ui';
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { createPortal } from 'react-dom';
+import { cn } from '@erp/ui';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { FIELD_BOX, SearchBox } from '../ui';
 import type { PickedItem } from './data';
 
 // The item of a receipt, return, transfer or adjustment line: type a code, name words, a barcode or an OEM number and
 // pick from the list (W1-16, W1-18). Searches a moment after the last key, at `url` (purchasing's search by default).
 // The results are drawn over the page, under the field: a line sits in a table whose scrolling container would cut a
-// list inside it off (owner, staging 2026-11-08).
+// list inside it off (owner, staging 2026-11-08). ↑ ↓ move through them and Enter takes the highlighted one (W2-13).
 
 interface Found {
   id: string;
@@ -38,25 +38,6 @@ export function ItemPicker<T extends Found = PickedItem>({
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [found, setFound] = useState<T[]>([]);
-  const listId = useId();
-  const field = useRef<HTMLDivElement>(null);
-  const [place, setPlace] = useState<CSSProperties | null>(null);
-
-  // Under the field, kept there while the page scrolls or resizes.
-  useLayoutEffect(() => {
-    if (!open || found.length === 0) return;
-    const follow = () => {
-      const r = field.current?.getBoundingClientRect();
-      if (r) setPlace({ position: 'fixed', top: r.bottom, left: r.left, width: r.width });
-    };
-    follow();
-    window.addEventListener('scroll', follow, true);
-    window.addEventListener('resize', follow);
-    return () => {
-      window.removeEventListener('scroll', follow, true);
-      window.removeEventListener('resize', follow);
-    };
-  }, [open, found.length]);
 
   useEffect(() => {
     if (!open || text.trim() === '') return;
@@ -76,7 +57,7 @@ export function ItemPicker<T extends Found = PickedItem>({
     return (
       <button
         type="button"
-        className="w-full rounded-md border border-input bg-surface-2 px-2 py-1.5 text-start disabled:opacity-60"
+        className={cn(FIELD_BOX, 'flex w-full items-center gap-1.5 truncate text-start disabled:opacity-60')}
         aria-label={label}
         disabled={disabled}
         onClick={() => {
@@ -87,8 +68,8 @@ export function ItemPicker<T extends Found = PickedItem>({
       >
         {picked?.code ? (
           <>
-            <span className="font-mono font-semibold">{picked.code}</span>{' '}
-            <span className="text-muted-foreground">{picked.name}</span>
+            <span className="font-mono font-semibold">{picked.code}</span>
+            <span className="truncate text-muted-foreground">{picked.name}</span>
           </>
         ) : (
           <span className="text-muted-foreground">{t('purchasing.line.pick')}</span>
@@ -96,52 +77,28 @@ export function ItemPicker<T extends Found = PickedItem>({
       </button>
     );
   return (
-    <div className="relative" ref={field}>
-      <Input
-        autoFocus
-        aria-label={label}
-        aria-controls={listId}
-        className="h-9"
-        value={text}
-        placeholder={t('purchasing.line.searchHint')}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') setOpen(false);
-          if (e.key === 'Enter' && found[0]) {
-            e.preventDefault();
-            onPick(found[0]);
-            setOpen(false);
-          }
-        }}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-      />
-      {found.length > 0 &&
-        createPortal(
-          <ul
-            id={listId}
-            role="listbox"
-            aria-label={t('purchasing.line.results')}
-            style={place ?? { position: 'fixed', visibility: 'hidden' }}
-            className="z-50 m-0 max-h-64 list-none overflow-auto rounded-md border border-input bg-surface p-1 shadow-md"
-          >
-            {found.map((i) => (
-              <li key={i.id} role="option" aria-selected={false}>
-                <button
-                  type="button"
-                  className="w-full rounded px-2 py-1 text-start hover:bg-surface-2"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    onPick(i);
-                    setOpen(false);
-                  }}
-                >
-                  <span className="font-mono font-semibold">{i.code}</span> {i.name}
-                </button>
-              </li>
-            ))}
-          </ul>,
-          document.body,
-        )}
-    </div>
+    <SearchBox
+      autoFocus
+      floating="page"
+      label={label}
+      listLabel={t('purchasing.line.results')}
+      placeholder={t('purchasing.line.searchHint')}
+      text={text}
+      onText={setText}
+      hits={text.trim() === '' ? [] : found}
+      hitKey={(i) => i.id}
+      onPick={(i) => {
+        onPick(i);
+        setOpen(false);
+      }}
+      onEscape={() => setOpen(false)}
+      onBlur={() => setTimeout(() => setOpen(false), 150)}
+    >
+      {(i) => (
+        <>
+          <span className="font-mono font-semibold">{i.code}</span> {i.name}
+        </>
+      )}
+    </SearchBox>
   );
 }

@@ -57,9 +57,9 @@ test('stock at today is the stock on hand; a sold part opens its stock ledger an
   await report(page, bo.nav.stockLedger);
   await expect(page.getByText(r.ledger.pick)).toBeVisible();
   await page.getByRole('button', { name: r.item, exact: true }).click();
-  await page.getByRole('textbox', { name: r.item, exact: true }).fill('BRPD001');
+  await page.getByRole('combobox', { name: r.item, exact: true }).fill('BRPD001');
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('BRPD001');
-  await page.getByRole('textbox', { name: r.item, exact: true }).press('Enter');
+  await page.getByRole('combobox', { name: r.item, exact: true }).press('Enter');
   // This month, the default: the ledger takes up to 92 days.
   await expect(page.getByRole('heading', { level: 1 })).toContainText('BRPD001');
   const lines = page.getByRole('table', { name: r.ledger.lines });

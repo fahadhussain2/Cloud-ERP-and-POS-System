@@ -20,9 +20,9 @@ test("Khan Motors' ledger for this month: the bills and the desk's payment, a bi
   await report(page, bo.nav.partnerLedger);
   await expect(page.getByText(r.ledger.pick.customer)).toBeVisible();
   await page.getByRole('button', { name: r.roles.customer, exact: true }).click();
-  await page.getByRole('textbox', { name: r.roles.customer, exact: true }).fill('khan');
+  await page.getByRole('combobox', { name: r.roles.customer, exact: true }).fill('khan');
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('C0042');
-  await page.getByRole('textbox', { name: r.roles.customer, exact: true }).press('Enter');
+  await page.getByRole('combobox', { name: r.roles.customer, exact: true }).press('Enter');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Khan Motors (C0042)');
 
   const table = page.getByRole('table', { name: bo.nav.partnerLedger });

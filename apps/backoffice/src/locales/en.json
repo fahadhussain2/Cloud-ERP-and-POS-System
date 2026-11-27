@@ -1511,7 +1511,8 @@
       "label": "Add from",
       "new": "A new customer",
       "supplier": "From an existing supplier",
-      "pick": "Supplier"
+      "pick": "Supplier",
+      "search": "Type a code or name"
     },
     "fields": {
       "code": "Code",
@@ -1567,7 +1568,8 @@
       "limit": "Type the credit limit, or tick No limit.",
       "amount": "Type an amount in rupees.",
       "terms": "Payment terms are whole days, 0 to 365.",
-      "name": "Type the customer's name."
+      "name": "Type the customer's name.",
+      "supplier": "Pick the supplier."
     },
     "errors": {
       "code_taken": "That code is already used by another customer or supplier.",

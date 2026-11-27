@@ -80,18 +80,18 @@ test("the rates show BRPD001's sale and what Naveed Glass was paid", async ({ pa
   await report(page, bo.nav.rates);
   await expect(page.getByText(r.rates.pick)).toBeVisible();
   await page.getByRole('button', { name: r.rates.item, exact: true }).click();
-  await page.getByRole('textbox', { name: r.rates.item, exact: true }).fill('BRPD001');
+  await page.getByRole('combobox', { name: r.rates.item, exact: true }).fill('BRPD001');
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('BRPD001');
-  await page.getByRole('textbox', { name: r.rates.item, exact: true }).press('Enter');
+  await page.getByRole('combobox', { name: r.rates.item, exact: true }).press('Enter');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('BRPD001');
   await expect(page.getByRole('table', { name: r.rates.sales }).getByRole('row')).not.toHaveCount(1);
 
   // Any item, and the supplier instead: ENOL001 at its rate on the bill and net of the bill discount.
   await page.getByRole('button', { name: r.rates.clear.item }).click();
   await page.getByRole('button', { name: r.rates.party, exact: true }).click();
-  await page.getByRole('textbox', { name: r.rates.party, exact: true }).fill('naveed');
+  await page.getByRole('combobox', { name: r.rates.party, exact: true }).fill('naveed');
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('S100');
-  await page.getByRole('textbox', { name: r.rates.party, exact: true }).press('Enter');
+  await page.getByRole('combobox', { name: r.rates.party, exact: true }).press('Enter');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Naveed Glass');
   await expect(page.getByRole('table', { name: r.rates.purchases })).toContainText('ENOL001');
 });
