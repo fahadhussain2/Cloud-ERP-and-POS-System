@@ -65,10 +65,20 @@ test('the owner records a supplier bill with a bill discount, returns part of it
     .getByLabel(bo.purchasing.fields.supplier, { exact: true })
     .selectOption({ label: 'Naveed Glass (S100)' });
   await page.getByLabel(bo.purchasing.fields.billNo).fill('INV-4471');
+  // W2-13 (owner, 2026-11-26): ↓ moves through the results and Enter takes the highlighted one, not the first.
   await page.getByRole('button', { name: 'Item of line 1' }).click();
-  await page.getByRole('textbox', { name: 'Item of line 1' }).fill('enol001');
+  await page.getByRole('combobox', { name: 'Item of line 1' }).fill('fnbl');
+  await expect(
+    page.getByRole('listbox', { name: bo.purchasing.line.results }).getByRole('option'),
+  ).toHaveCount(2);
+  await page.getByRole('combobox', { name: 'Item of line 1' }).press('ArrowDown');
+  await page.getByRole('combobox', { name: 'Item of line 1' }).press('Enter');
+  await expect(page.getByRole('button', { name: 'Item of line 1' })).toContainText('FNBL002');
+  // The line's item for this flow.
+  await page.getByRole('button', { name: 'Item of line 1' }).click();
+  await page.getByRole('combobox', { name: 'Item of line 1' }).fill('enol001');
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('ENOL001');
-  await page.getByRole('textbox', { name: 'Item of line 1' }).press('Enter');
+  await page.getByRole('combobox', { name: 'Item of line 1' }).press('Enter');
   await page.getByLabel('Quantity of line 1').fill('10');
   await page.getByLabel('Unit cost of line 1').fill('5000');
   await page.getByLabel(bo.purchasing.fields.billDiscount).fill('1000');

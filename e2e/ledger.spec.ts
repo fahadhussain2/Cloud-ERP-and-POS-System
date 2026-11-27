@@ -154,9 +154,9 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   const today = await page.getByLabel(bo.purchasing.fields.receivedOn).inputValue();
   await page.getByLabel(bo.purchasing.fields.receivedOn).fill(lockDate);
   await page.getByRole('button', { name: 'Item of line 1' }).click();
-  await page.getByRole('textbox', { name: 'Item of line 1' }).fill('enol001');
+  await page.getByRole('combobox', { name: 'Item of line 1' }).fill('enol001');
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('ENOL001');
-  await page.getByRole('textbox', { name: 'Item of line 1' }).press('Enter');
+  await page.getByRole('combobox', { name: 'Item of line 1' }).press('Enter');
   await page.getByLabel('Quantity of line 1').fill('1');
   await page.getByLabel('Unit cost of line 1').fill('100');
   await page.getByLabel(bo.purchasing.fields.billTotal).fill('100');

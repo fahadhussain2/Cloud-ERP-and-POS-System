@@ -37,9 +37,9 @@ const signIn = async (page: Page, username: string, password: string) => {
 };
 const pickItem = async (page: Page, row: number, text: string) => {
   await page.getByRole('button', { name: `Item of line ${row}` }).click();
-  await page.getByRole('textbox', { name: `Item of line ${row}` }).fill(text);
+  await page.getByRole('combobox', { name: `Item of line ${row}` }).fill(text);
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('ENOL001');
-  await page.getByRole('textbox', { name: `Item of line ${row}` }).press('Enter');
+  await page.getByRole('combobox', { name: `Item of line ${row}` }).press('Enter');
 };
 const shopStock = async () =>
   (
