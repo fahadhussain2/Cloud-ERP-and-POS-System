@@ -126,7 +126,8 @@ test('the owner records a supplier bill with a bill discount, returns part of it
   const pay = page.getByRole('dialog');
   await pay.getByLabel(bo.purchasing.pay.amount).fill('10000');
   await pay.getByRole('button', { name: new RegExp(`^${bo.purchasing.pay.confirm}`) }).click();
-  await expect(page.getByRole('status')).toContainText('SP000001');
+  // A toast; the one for the supplier added a moment ago may still be showing (CI, 2026-11-27).
+  await expect(page.getByRole('status').filter({ hasText: 'SP000001' })).toBeVisible();
   const ledger = page.getByRole('table', { name: bo.purchasing.ledger.title });
   await expect(ledger).toContainText('GR000001');
   await expect(ledger).toContainText('PR000001');

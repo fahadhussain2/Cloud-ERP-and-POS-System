@@ -930,7 +930,10 @@ test('a customer added in the back office buys on account at a counter; credit o
   form = bop.getByRole('dialog');
   await form.getByLabel(c.fields.creditAllowed).uncheck();
   await form.getByRole('button', { name: c.save }).click();
-  await expect(bop.getByRole('status')).toHaveText(c.saved.replace('{{name}}', 'Test Motors'));
+  // A toast, found by its words: another (the customer added) may still be showing.
+  await expect(
+    bop.getByRole('status').filter({ hasText: c.saved.replace('{{name}}', 'Test Motors') }),
+  ).toBeVisible();
   await office.close();
 
   await addToBill(page, 'brpd001');
