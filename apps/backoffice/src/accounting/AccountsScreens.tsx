@@ -174,7 +174,6 @@ function NewAccountDialog({
   const { t } = useTranslation();
   const [code, setCode] = useState(nextCode(parent, rows));
   const [name, setName] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     setBusy(true);
