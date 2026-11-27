@@ -165,3 +165,12 @@ Each is its own branch off `staging` and its own PR.
 - New colours or a new brand colour (the reference's mustard/black buttons): the existing tokens stay.
 - Table sorting, column choices, paging or other new list features.
 - Printed layouts (reports on paper, labels, bills).
+
+## W2-12 as built (2026-11-27)
+
+- **POS guard first:** `e2e/pos-look.spec.ts` sets up a counter of its own (after `counter.spec`) and compares six screens: setup, unlock, the empty counter, a 3-line bill, the Cash popup and the customer popup. The cash desk isn't in it: setting one up needs a cashier, which `till.spec` creates later. It is one test, so a first run writes all six pictures. The baseline came from CI run 45957917404, on code identical to staging, and was committed before any back-office change; the next run passed on it.
+- **The lint rule** is an **error** from the start, with the screens not yet moved listed in it, instead of a warning: `pnpm lint` fails on any warning (`--max-warnings 0`). Each pass takes its screens off the list; W2-15 removes it.
+- **Toasts:** our own small toaster (`src/ui/notify.tsx`), as the plan allowed, because Sonner gives its toasts no `status`/`alert` role and announces problems as politely as results.
+- **The dialog's close ✕** sits after the form and has no tooltip, so a dialog opens with focus on its first field and Esc closes the dialog, not a tooltip.
+- **Add customer's "From an existing supplier"** uses the new dropdown for now; it becomes the searchable picker (answer 3) with W2-13, which rebuilds the pickers.
+- **Customers** now also says *added* in a toast after Add (the key existed, unused), and checks a missing name before sending (`customers.problems.name`).

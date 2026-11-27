@@ -3,7 +3,11 @@
     "title": "Back office",
     "loading": "Loading…",
     "error": "Something went wrong. Reload the page; if it stays, tell the support team.",
-    "brand": "Tijara"
+    "brand": "Tijara",
+    "cancel": "Cancel",
+    "close": "Close",
+    "notifications": "Notifications",
+    "noOptions": "Nothing to choose"
   },
   "login": {
     "title": "Sign in",
@@ -1482,6 +1486,8 @@
     "save": "Save",
     "cancel": "Cancel",
     "edit": "Edit",
+    "count_one": "{{count}} customer",
+    "count_other": "{{count}} customers",
     "search": "Search by code, name, phone or city",
     "show": "Show",
     "all": "All",
@@ -1560,7 +1566,8 @@
     "problems": {
       "limit": "Type the credit limit, or tick No limit.",
       "amount": "Type an amount in rupees.",
-      "terms": "Payment terms are whole days, 0 to 365."
+      "terms": "Payment terms are whole days, 0 to 365.",
+      "name": "Type the customer's name."
     },
     "errors": {
       "code_taken": "That code is already used by another customer or supplier.",
