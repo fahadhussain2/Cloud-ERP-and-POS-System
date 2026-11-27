@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
-import { SearchBox } from '../ui';
+import { ListPicker, SearchBox } from '../ui';
 
 // What the accounting screens share (W1-19, D-108): the lookups (banks, categories, the chart, the shop's day and lock
 // date, what this person may do), the words for a problem or a refusal, and the pickers for a party and an account.
@@ -87,12 +87,15 @@ export function PartyPicker({
   role,
   picked,
   onPick,
+  error,
 }: {
   api: Api;
   label: string;
   role: 'customer' | 'supplier' | 'any';
   picked: { id: string; name: string } | null;
   onPick: (party: PartyHit | null) => void;
+  /** The field's problem, shown under it (owner answer 6). */
+  error?: string | undefined;
 }) {
   const { t } = useTranslation();
   // What was typed since the last pick; null shows the picked party's name.
@@ -133,6 +136,7 @@ export function PartyPicker({
         onPick(p);
       }}
       onEscape={() => setClosedFor(q)}
+      error={error}
     >
       {(p) => (
         <>
@@ -144,36 +148,36 @@ export function PartyPicker({
 }
 const NO_HITS: PartyHit[] = [];
 
-/** A select of accounts, shown as code and name. */
+/**
+ * An account, searched by code or name (owner answer 3: the chart of accounts is a list that keeps growing; W2-15).
+ * `hideLabel` in a table cell, whose column names it.
+ */
 export function AccountSelect({
-  id,
   label,
   accounts,
   value,
   onChange,
+  hideLabel = false,
+  error,
 }: {
-  id?: string;
   label: string;
   accounts: readonly AccountRow[];
   value: string | null;
   onChange: (id: string | null) => void;
+  hideLabel?: boolean;
+  error?: string | undefined;
 }) {
   const { t } = useTranslation();
   return (
-    <select
-      id={id}
-      aria-label={label}
-      className="h-11 w-full rounded-md border border-input bg-surface-2 px-2"
+    <ListPicker
+      label={label}
+      hideLabel={hideLabel}
+      placeholder={t('accounting.voucher.pickAccount')}
+      options={accounts}
       value={value ?? ''}
-      onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
-    >
-      <option value="">{t('accounting.voucher.pickAccount')}</option>
-      {accounts.map((a) => (
-        <option key={a.id} value={a.id}>
-          {a.code} {a.name}
-        </option>
-      ))}
-    </select>
+      error={error}
+      onChange={(id) => onChange(id === '' ? null : id)}
+    />
   );
 }
 

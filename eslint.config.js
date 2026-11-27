@@ -110,10 +110,6 @@ export default defineConfig(
       'apps/backoffice/src/ui/**',
       '**/*.test.{ts,tsx}',
       ...[
-        'accounting/AccountsScreens.tsx',
-        'accounting/MoneyScreen.tsx',
-        'accounting/PeriodsScreen.tsx',
-        'accounting/VoucherScreen.tsx',
         'layout/ScreenSearch.tsx',
         'reports/BillScreen.tsx',
         'reports/FinancialScreens.tsx',
