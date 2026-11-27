@@ -1,8 +1,9 @@
-import { Dialog, DialogContent, DialogTitle, Input, moveSelection, OptionList } from '@erp/ui';
+import { Dialog, DialogContent, DialogTitle, moveSelection, OptionList } from '@erp/ui';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { navigate } from '../router';
+import { TextBox } from '../ui';
 import type { ReportEntry } from '../reports/catalog';
 import type { MenuGroup } from './menu';
 
@@ -71,7 +72,7 @@ export function ScreenSearch({
       >
         <DialogTitle className="sr-only">{t('nav.searchTitle')}</DialogTitle>
         <div className="border-b border-line p-2">
-          <Input
+          <TextBox
             autoFocus
             role="combobox"
             aria-label={t('nav.searchLabel')}
@@ -79,7 +80,7 @@ export function ScreenSearch({
             aria-controls={listId}
             aria-activedescendant={screens.length > 0 ? `${listId}-${at}` : undefined}
             placeholder={t('nav.searchTitle')}
-            className="h-10 border-0 shadow-none focus-visible:ring-0"
+            className="h-10 border-0 bg-transparent shadow-none focus-visible:ring-0"
             value={text}
             onChange={(e) => {
               setText(e.target.value);

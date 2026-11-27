@@ -76,7 +76,8 @@ const addPerson = async (
   if (p.temporaryPassword) await dialog.getByLabel(bo.staff.password.optional).fill(p.temporaryPassword);
   await dialog.getByRole('checkbox', { name: role }).click();
   await dialog.getByRole('button', { name: bo.staff.create }).click();
-  await expect(page.getByRole('status')).toContainText(p.fullName);
+  // A toast, found by its words: another may still be showing (W2-15).
+  await expect(page.getByRole('status').filter({ hasText: p.fullName })).toBeVisible();
 };
 
 test('the owner signs in, adds a manager and a salesman, gives temporary PINs and a one-time counter code', async ({
@@ -274,7 +275,8 @@ test('the owner deactivates the new salesman in the back office', async ({ brows
   await expect(page.getByRole('heading', { name: NEWCOMER.fullName })).toBeVisible();
   await page.getByRole('button', { name: bo.staff.deactivate }).click();
   await page.getByRole('dialog').getByRole('button', { name: bo.staff.deactivate }).click();
-  await expect(page.getByRole('status')).toContainText(NEWCOMER.fullName);
+  // A toast, found by its words: another may still be showing (W2-15).
+  await expect(page.getByRole('status').filter({ hasText: NEWCOMER.fullName })).toBeVisible();
   await office.close();
 });
 

@@ -1,7 +1,7 @@
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { report, signInAsOwner as signIn } from './backoffice';
+import { chooseValue, report, signInAsOwner as signIn } from './backoffice';
 import { expect, test } from './counter-test';
 import { SHOP } from './fixtures';
 
@@ -46,7 +46,7 @@ test('sales and gross profit for today, by category, opens the items, their bill
   )) as [{ category: string }];
   await signIn(page);
   await report(page, bo.nav.salesProfit);
-  await page.getByLabel(bo.reports.frame.period).selectOption('today');
+  await chooseValue(page, bo.reports.frame.period, 'today');
   const table = page.getByRole('table', { name: bo.nav.salesProfit });
   await expect(table).toBeVisible();
   await expect(page.getByLabel(bo.reports.frame.figures)).toContainText(`${r.bills}${bills}`);

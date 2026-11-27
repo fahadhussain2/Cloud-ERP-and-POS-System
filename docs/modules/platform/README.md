@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress: W0-07, W0-09, W0-10, W0-11 done; counter side of PLT-03/PLT-04 built with W1-02; staff and user admin (PLT-04, PLT-05 assign) built with W1-04 (in review); the back-office frame redesigned with W1-28 (D-114); back-office documents on the shop's business date with W2-05 (D-117); the back office's light and dark themes with W2-07 (D-120, PLT-13); the back office's own controls with W2-12 (D-127), Customers moved, the other screens in W2-14 and W2-15 |
+| **Status** | In progress: W0-07, W0-09, W0-10, W0-11 done; counter side of PLT-03/PLT-04 built with W1-02; staff and user admin (PLT-04, PLT-05 assign) built with W1-04 (in review); the back-office frame redesigned with W1-28 (D-114); back-office documents on the shop's business date with W2-05 (D-117); the back office's light and dark themes with W2-07 (D-120, PLT-13); the back office's own controls with W2-12 to W2-15 (D-127), every screen moved |
 | **Requirements** | 13 (PLT-01…PLT-13) |
 | **Feature spec needed** | Yes: device enrollment + PIN security |
 
@@ -108,7 +108,8 @@ Full wording is in [the PRD](../../01-PRD.md). Wave 1 = critical path for go-liv
 - **Looks** come from `apps/backoffice/src/styles.css`: the orange focus (`--focus` set to the accent), `--glow`, `--field-line`, and the pointer cursor on everything you can press. `theme.css` is the POS's as much as the back office's and is not changed for this.
 - **Problems** show at their field: a form keeps its problems by field and passes them to `FormDialog` (`errors`), which puts focus on the first wrong field after a save is tried. A result, or a problem that isn't one field's, is a toast: `notify.done(text)` (green, fades) or `notify.problem(text)` (red, stays). No page banners for results.
 - **Tests** pick a kit dropdown with `chooseOption` (`src/ui/testing/choose.ts`) and, end to end, `choose` (`e2e/backoffice.ts`).
-- **The lint rule** (`eslint.config.js`) refuses packages/ui's Button, Input, TextField, Checkbox, LABEL_CLASS and DialogActions in the back office, except in the screens still listed there; a screen comes off the list when it moves (W2-14, W2-15).
+- **The lint rule** (`eslint.config.js`) refuses packages/ui's Button, Input, TextField, Checkbox, LABEL_CLASS and DialogActions anywhere in the back office but the kit itself (every screen moved by W2-15).
+- **Searched choices:** `SearchBox` (a combobox worked from the keyboard), `ListPicker` (a list already on the screen) and `AccountSelect`; the report frame searches any choice past 15 options. Tests pick a dropdown option with `chooseOption` (by its name) or `chooseValue` (by `data-value`).
 - **The POS look** (`e2e/pos-look.spec.ts`, Linux Chromium in CI only) compares six counter screens with `e2e/pos-look.spec.ts-snapshots/`, pixel for pixel. Those pictures are only ever re-taken from `staging`, in a PR of their own.
 
 ## Related

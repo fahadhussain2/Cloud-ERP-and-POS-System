@@ -1,5 +1,5 @@
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { report, signInAsOwner as signIn } from './backoffice';
+import { chooseValue, report, signInAsOwner as signIn } from './backoffice';
 import { expect, test } from './counter-test';
 
 // W2-04 plan (RPT-16, RPT-17, ACC-07; D-116): the owner reads customers, suppliers, control and the cash flow on the
@@ -48,7 +48,7 @@ test("Khan Motors' ledger for this month: the bills and the desk's payment, a bi
 test("this month's statements include Khan Motors, one to a page", async ({ page }) => {
   await signIn(page);
   await report(page, bo.nav.statements);
-  await page.getByLabel(bo.reports.frame.period).selectOption('thisMonth');
+  await chooseValue(page, bo.reports.frame.period, 'thisMonth');
   const khan = page.getByRole('region', { name: 'Khan Motors' });
   await expect(khan).toBeVisible();
   await expect(khan.getByRole('table', { name: r.statement.ageing })).toBeVisible();
@@ -73,7 +73,7 @@ test('overdue takes its days from the address, and every bill of today is not ye
 }) => {
   await signIn(page);
   await report(page, bo.nav.overdue);
-  await page.getByLabel(r.overdue.by).selectOption('0');
+  await chooseValue(page, r.overdue.by, '0');
   await expect(page).toHaveURL(/days=0/);
   await expect(page.getByRole('table', { name: bo.nav.overdue })).toContainText(bo.reports.none);
 });
@@ -88,7 +88,7 @@ test("money received today lists the desk's payment from Khan Motors, by how and
   await expect(row).toContainText('Khan Motors');
   await expect(row).toContainText('D01');
   await expect(page.getByRole('table', { name: r.register.byMethod })).toBeVisible();
-  await page.getByLabel(r.register.side).selectOption('paid');
+  await chooseValue(page, r.register.side, 'paid');
   await expect(page.getByRole('table', { name: r.register.title.paid })).toBeVisible();
 });
 
@@ -98,7 +98,7 @@ test("user activity shows today's void and sign-ins, and filters by kind", async
   const table = page.getByRole('table', { name: bo.nav.userActivity });
   await expect(table).toContainText(r.activity.actions.sale.voided);
   await expect(table).toContainText(r.activity.records.sales_documents);
-  await page.getByLabel(r.kind).selectOption('sign_in');
+  await chooseValue(page, r.kind, 'sign_in');
   await expect(page).toHaveURL(/kind=sign_in/);
   await expect(table).toContainText(r.activity.actions.login.success);
   await expect(table).not.toContainText(r.activity.actions.sale.voided);

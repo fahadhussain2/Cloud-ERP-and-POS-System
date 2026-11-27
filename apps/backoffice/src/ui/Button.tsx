@@ -19,6 +19,8 @@ const VARIANT: Record<ButtonVariant, string> = {
 /** The classes of a kit button, for a link or a label that looks like one. */
 export function buttonClass(variant: ButtonVariant = 'default', size: 'default' | 'sm' = 'default') {
   return cn(
+    // The shared button's own layout too, for a link that looks like a button: the icon beside the word, not above it.
+    'inline-flex shrink-0 items-center justify-center whitespace-nowrap outline-none',
     'gap-2 rounded-lg text-sm font-semibold focus-visible:border-focus focus-visible:ring-[3px] focus-visible:ring-glow',
     size === 'sm' ? 'h-8 px-3 text-[13px] has-[>svg]:px-2.5' : 'h-9 px-3.5 has-[>svg]:px-3',
     VARIANT[variant],

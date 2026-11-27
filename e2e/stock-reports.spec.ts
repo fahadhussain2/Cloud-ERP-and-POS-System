@@ -1,7 +1,7 @@
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { report, signInAsOwner as signIn } from './backoffice';
+import { chooseValue, report, signInAsOwner as signIn } from './backoffice';
 import { expect, test } from './counter-test';
 import { SHOP } from './fixtures';
 
@@ -105,7 +105,7 @@ test.describe('the reorder list', () => {
 test('the stock movement downloads as CSV', async ({ page }) => {
   await signIn(page);
   await report(page, bo.nav.stockMovement);
-  await page.getByLabel(bo.reports.frame.period).selectOption('thisYear');
+  await chooseValue(page, bo.reports.frame.period, 'thisYear');
   await expect(page.getByRole('table', { name: bo.nav.stockMovement })).toBeVisible();
   const [download] = await Promise.all([
     page.waitForEvent('download'),

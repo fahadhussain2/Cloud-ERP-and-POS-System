@@ -102,19 +102,10 @@ export default defineConfig(
   },
 
   // The back office's own controls (W2-12, D-127): its screens use apps/backoffice/src/ui, not packages/ui's, which
-  // stay as the POS has them. The screens not yet moved are listed; each screen pass (W2-14, W2-15) takes its own off,
-  // and W2-15 removes the list.
+  // stay as the POS has them. Every screen moved by W2-15; only the kit itself composes the shared ones.
   {
     files: ['apps/backoffice/src/**/*.{ts,tsx}'],
-    ignores: [
-      'apps/backoffice/src/ui/**',
-      '**/*.test.{ts,tsx}',
-      ...[
-        'layout/ScreenSearch.tsx',
-        'screens/LoginScreen.tsx',
-        'screens/PasswordScreen.tsx',
-      ].map((f) => `apps/backoffice/src/${f}`),
-    ],
+    ignores: ['apps/backoffice/src/ui/**', '**/*.test.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',

@@ -183,3 +183,12 @@ Each is its own branch off `staging` and its own PR.
 - **Kit additions:** `TextBox` (a bare box for a table cell), `ListPicker`, and a hidden label on `Checkbox` and `ListPicker` (a box in a row, a filter in a toolbar).
 - **Fixed on the way:** a quiet kit button (ghost, link) kept the shared button's orange fill; the kit now passes its variant through, with a test. Stock settings' limit field no longer overflows a phone.
 - **Standing banners stay** (a transfer's shortfall adjustment, an adjustment awaiting approval or rejected); results and refusals are toasts.
+
+## W2-15 as built (2026-11-27)
+
+- **Screens:** staff, a person, counters, the shop; money, vouchers, accounts, expense categories, periods; bills, returns, bill details, the day reconciliation, cash variance and every report through the report frame; sign-in, the password change and the screen search. The lint rule's list is gone: no back-office screen may import packages/ui's Button, Input, TextField, Checkbox, LABEL_CLASS or DialogActions; only the kit composes them.
+- **Searched lists (answer 3):** the account (vouchers, expense categories; `AccountSelect` is now a `ListPicker`), and in the report frame any choice of more than 15 options. Shorter report filters use the dropdown.
+- **Problems at their field (answer 6):** a duplicate username, short code or email, a weak PIN or password; a receipt's amount, charges, customer and date (the API's `date_locked` included); an expense category's account. A possible duplicate payment, and refusals that aren't one field's, are toasts. The sign-in failure stays under the password.
+- **Tests:** the kit dropdown names each option's value (`data-value`); `chooseValue` picks by it in component tests and end to end.
+- **Fixed on the way:** a tooltip left showing over the row above blocked that row's icon (it, and the wrapper Radix positions it in, now ignore the pointer; e2e found it); a link styled as a button (Download CSV, + New goods receipt) put its icon above the word (`buttonClass` now carries the button's layout). Both with a test.
+

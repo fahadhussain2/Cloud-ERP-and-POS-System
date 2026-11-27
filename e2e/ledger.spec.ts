@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { menu, pick } from './backoffice';
+import { choose, menu, pick } from './backoffice';
 import { expect, test } from './counter-test';
 import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
 
@@ -45,8 +45,6 @@ const owes = async () =>
       )
     )[0]!.b,
   );
-const accountId = async (code: string) =>
-  (await sql<{ id: string }>('SELECT id FROM erp.accounts WHERE code = $1', [code]))[0]!.id;
 
 test('the owner records money in and out, a voucher and a reversal, and locks last month', async ({
   browser,
@@ -63,20 +61,22 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   let dialog = page.getByRole('dialog');
   await dialog.getByRole('combobox', { name: a.fields.customer }).fill('Rehman');
   await dialog.getByRole('option', { name: /Rehman Autos/ }).click();
-  await dialog.getByLabel(a.fields.intoBank).selectOption({ label: 'Bank: HBL' });
+  await choose(dialog, a.fields.intoBank, 'Bank: HBL');
   await dialog.getByLabel(a.fields.amount).fill('25,000');
   await dialog.getByRole('button', { name: a.new.save }).click();
-  await expect(page.getByRole('status')).toHaveText('CR000001 is posted.');
+  // A toast, found by its words: another may still be showing (W2-15).
+  await expect(page.getByRole('status').filter({ hasText: 'CR000001 is posted.' })).toBeVisible();
   expect(await owes()).toBe(before - 2_500_000);
 
   // The electricity bill, Rs 18,500 from Soneri.
   await page.getByRole('button', { name: a.money.newExpense }).click();
   dialog = page.getByRole('dialog');
-  await dialog.getByLabel(a.fields.category).selectOption({ label: 'Utilities' });
-  await dialog.getByLabel(a.fields.paidFrom).selectOption({ label: 'Bank: Soneri' });
+  await choose(dialog, a.fields.category, 'Utilities');
+  await choose(dialog, a.fields.paidFrom, 'Bank: Soneri');
   await dialog.getByLabel(a.fields.amount).fill('18,500');
   await dialog.getByRole('button', { name: a.new.save }).click();
-  await expect(page.getByRole('status')).toHaveText('EX000001 is posted.');
+  // A toast, found by its words: another may still be showing (W2-15).
+  await expect(page.getByRole('status').filter({ hasText: 'EX000001 is posted.' })).toBeVisible();
 
   // Partners' drawings by journal voucher: Dr 3110 / Cr HBL Rs 5,000.
   await page.getByRole('button', { name: a.money.newVoucher }).click();
@@ -85,9 +85,10 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   await page.getByRole('button', { name: a.voucher.save }).click();
   await expect(page.getByText(a.errors.empty_draft)).toBeVisible();
   await page.getByLabel(a.voucher.narration).fill("Partner's drawings, November");
-  await page.getByRole('combobox', { name: 'Account, line 1' }).selectOption(await accountId('3110'));
+  // The account is searched by its code (owner answer 3, W2-15).
+  await pick(page, 'Account, line 1', '3110');
   await page.getByLabel('Debit, line 1').fill('5,000');
-  await page.getByRole('combobox', { name: 'Account, line 2' }).selectOption(await accountId('1160'));
+  await pick(page, 'Account, line 2', '1160');
   await page.getByLabel('Credit, line 2').fill('5,000');
   // Each line says what it does: drawings lower equity, and the bank goes down (owner's review of W1-19).
   await expect(page.getByText(/^↓ Partners' drawings goes down Rs\s5,000$/)).toBeVisible();

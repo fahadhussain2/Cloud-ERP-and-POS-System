@@ -1,9 +1,10 @@
-import { Button, TextField } from '@erp/ui';
+import { LogIn } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import type { Me } from '../App';
+import { Button, TextInput } from '../ui';
 import { CardScreen } from './CardScreen';
 
 const SHOP_KEY = 'erp.shopCode';
@@ -46,21 +47,21 @@ export function LoginScreen({ api, onSignedIn }: { api: Api; onSignedIn: (me: Me
   return (
     <CardScreen title={t('login.title')}>
       <form className="flex flex-col gap-3" onSubmit={(e) => void submit(e)}>
-        <TextField
+        <TextInput
           label={t('login.shopCode')}
           value={tenantCode}
           onChange={(e) => setTenantCode(e.target.value)}
           autoComplete="organization"
           required
         />
-        <TextField
+        <TextInput
           label={t('login.username')}
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           autoComplete="username"
           required
         />
-        <TextField
+        <TextInput
           label={t('login.password')}
           type="password"
           value={password}
@@ -69,7 +70,7 @@ export function LoginScreen({ api, onSignedIn }: { api: Api; onSignedIn: (me: Me
           required
           error={error ?? undefined}
         />
-        <Button type="submit" size="lg" disabled={busy}>
+        <Button type="submit" icon={LogIn} className="w-full" disabled={busy}>
           {busy ? t('login.busy') : t('login.submit')}
         </Button>
       </form>
