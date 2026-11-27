@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
@@ -28,6 +28,17 @@ export async function report(page: Page, name: string): Promise<void> {
     .getByRole('main')
     .getByRole('link', { name: new RegExp(`^${name}`) })
     .click();
+}
+
+/**
+ * Picks an option in one of the back office's own dropdowns (W2-12): a button and a list, not a native <select>, so
+ * `selectOption` doesn't work on it. `scope` is where the box is, e.g. a dialog.
+ */
+export async function choose(scope: Page | Locator, label: string, option: string): Promise<void> {
+  await scope.getByRole('combobox', { name: label }).click();
+  const page = 'page' in scope ? scope.page() : scope;
+  await page.getByRole('listbox').getByRole('option', { name: option, exact: true }).click();
+  await expect(page.getByRole('listbox')).toHaveCount(0);
 }
 
 /** The account's button at the foot of the side menu, whoever is signed in. */

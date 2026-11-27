@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import pos from '../apps/pos/src/locales/en.json' with { type: 'json' };
-import { menu } from './backoffice';
+import { choose, menu } from './backoffice';
 import { expect, test } from './counter-test';
 import {
   BACKOFFICE_PORT,
@@ -876,7 +876,7 @@ test('a customer added in the back office buys on account at a counter; credit o
   await expect(form.getByLabel(c.fields.code)).toHaveValue(/^C\d{4}$/);
   await form.getByLabel(c.fields.name).fill('Test Motors');
   await form.getByLabel(c.fields.phones).fill('0333-5550101');
-  await form.getByLabel(c.fields.tier).selectOption({ label: 'Mechanic' });
+  await choose(form, c.fields.tier, 'Mechanic');
   await form.getByLabel(c.fields.creditAllowed).check();
   await form.getByLabel(c.fields.limit).fill('10,000');
   await form.getByRole('button', { name: new RegExp(`^${c.create}`) }).click();
@@ -921,7 +921,8 @@ test('a customer added in the back office buys on account at a counter; credit o
   await bop.getByRole('button', { name: `${c.deactivate} Test Motors` }).click();
   form = bop.getByRole('dialog');
   await form.getByRole('button', { name: c.deactivate }).click();
-  await expect(form.getByRole('alert')).toHaveText(/balance is Rs\s?4,275/);
+  // The refusal is a toast, and the question stays open (W2-12, owner answer 6).
+  await expect(bop.getByRole('alert')).toHaveText(/balance is Rs\s?4,275/);
   await form.getByRole('button', { name: c.cancel }).click();
 
   // Credit off: the counter stops offering On account after its next pull.

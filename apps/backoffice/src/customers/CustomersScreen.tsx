@@ -1,11 +1,6 @@
 import type { CustomerDetail, CustomerLookups, CustomerRow } from '@erp/contracts';
 import {
-  Alert,
-  AlertDescription,
-  Button,
   formatMoney,
-  Input,
-  LABEL_CLASS,
   PageHeader,
   Panel,
   plainAmount,
@@ -16,21 +11,34 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
 } from '@erp/ui';
-import { useEffect, useId, useState } from 'react';
+import { Pencil, Plus, Save, Trash2, UserCheck, UserX } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { moneyValue } from '../catalog/data';
 import { href, navigate, withQuery } from '../router';
-import { FormDialog } from '../staff/dialogs';
+import {
+  Button,
+  Checkbox,
+  ConfirmDialog,
+  FIELD_LABEL,
+  FormDialog,
+  IconButton,
+  ListToolbar,
+  notify,
+  Select,
+  TextInput,
+} from '../ui';
 import { customerRefusal, phoneToCheck, useCustomerLookups } from './data';
 
 // Customers (W1-22, D-109; POS-05, POS-07, CAT-04, PUR-01, ACC-03): the list with what each customer owes, Add and
 // Edit as dialogs (as the suppliers screen, D-105), Deactivate only at a zero balance and Delete only one never used
 // (owner answer 5), and a customer's page with the ledger (owner answer 7). The tier and credit terms are the owner's
 // (cust.terms.edit, owner answer 2); everyone else sees them read only. Phones are shown in full here (staff only).
+// W2-12 (D-127): the back office's own controls, the pilot of the new look: icon row actions, the search and filter
+// in the table's toolbar, problems at their field and results in a toast.
 
 type Status = '' | 'active' | 'inactive';
 
@@ -41,10 +49,7 @@ export function CustomersScreen({ api }: { api: Api }) {
   const [status, setStatus] = useState<Status>('active');
   const [list, setList] = useState<CustomerRow[] | null>(null);
   const [adding, setAdding] = useState(false);
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [version, setVersion] = useState(0);
-  const searchId = useId();
-  const statusId = useId();
 
   useEffect(() => {
     let live = true;
@@ -70,120 +75,98 @@ export function CustomersScreen({ api }: { api: Api }) {
         help={t('customers.help')}
         actions={
           canEdit && (
-            <Button size="lg" onClick={() => setAdding(true)}>
+            <Button icon={Plus} onClick={() => setAdding(true)}>
               {t('customers.add')}
             </Button>
           )
         }
       />
-      {message && (
-        <Alert variant={message.error ? 'destructive' : 'default'}>
-          <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>
-        </Alert>
-      )}
       <CustomerDialog
         api={api}
         lookups={lookups}
         open={adding}
         onOpenChange={setAdding}
-        onDone={(id) => {
+        onDone={(id, name) => {
           setAdding(false);
+          notify.done(t('customers.added', { name }));
           if (id) navigate(href.customer(id));
         }}
       />
-      <Panel className="flex flex-wrap items-end gap-3 p-3.5">
-        <div className="flex min-w-64 flex-1 flex-col gap-1">
-          <label htmlFor={searchId} className={LABEL_CLASS}>
-            {t('customers.search')}
-          </label>
-          <Input
-            id={searchId}
-            type="search"
-            className="h-10 max-w-md"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
+      <Panel className="overflow-hidden p-0">
+        <ListToolbar
+          search={{ label: t('customers.search'), value: text, onChange: setText }}
+          {...(list === null ? {} : { count: t('customers.count', { count: list.length }) })}
+        >
+          <Select
+            aria-label={t('customers.show')}
+            wrapperClassName="w-36"
+            value={status || 'all'}
+            onValueChange={(v) => setStatus(v === 'all' ? '' : (v as Status))}
+            options={[
+              { value: 'active', label: t('customers.active') },
+              { value: 'inactive', label: t('customers.inactive') },
+              { value: 'all', label: t('customers.all') },
+            ]}
           />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor={statusId} className={LABEL_CLASS}>
-            {t('customers.show')}
-          </label>
-          <select
-            id={statusId}
-            className="h-10 rounded-md border border-input bg-surface-2 px-2"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as Status)}
-          >
-            <option value="active">{t('customers.active')}</option>
-            <option value="inactive">{t('customers.inactive')}</option>
-            <option value="">{t('customers.all')}</option>
-          </select>
-        </div>
-      </Panel>
-      <Panel className="px-1.5 pb-2.5">
+        </ListToolbar>
         {list === null ? (
-          <p className="p-2 text-muted-foreground">{t('app.loading')}</p>
+          <p className="m-0 p-4 text-muted-foreground">{t('app.loading')}</p>
         ) : list.length === 0 ? (
-          <p className="p-2 text-muted-foreground">{t('customers.empty')}</p>
+          <p className="m-0 p-4 text-muted-foreground">{t('customers.empty')}</p>
         ) : (
-          <Table aria-label={t('customers.title')}>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('customers.fields.code')}</TableHead>
-                <TableHead>{t('customers.fields.name')}</TableHead>
-                <TableHead>{t('customers.fields.city')}</TableHead>
-                <TableHead>{t('customers.fields.phone')}</TableHead>
-                <TableHead>{t('customers.fields.tier')}</TableHead>
-                <TableHead>{t('customers.fields.credit')}</TableHead>
-                <TableHead className="text-end">{t('customers.owed')}</TableHead>
-                {canEdit && (
-                  <TableHead>
-                    <span className="sr-only">{t('customers.actions')}</span>
-                  </TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-mono">{c.code}</TableCell>
-                  <TableCell>
-                    <a
-                      href={href.customer(c.id)}
-                      className="font-semibold text-ink underline-offset-4 hover:underline"
-                    >
-                      {c.name}
-                    </a>
-                    {c.status === 'inactive' && (
-                      <span className="ms-2 inline-block">
-                        <StatusChip tone="neutral">{t('customers.inactive')}</StatusChip>
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>{c.city ?? '—'}</TableCell>
-                  <TableCell className="tabular-nums">{c.phones[0] ?? '—'}</TableCell>
-                  <TableCell>{c.tierName}</TableCell>
-                  <TableCell>
-                    <CreditText row={c} money={m} />
-                  </TableCell>
-                  <TableCell className="text-end tabular-nums">{formatMoney(c.balance, m)}</TableCell>
+          // Wide tables scroll sideways inside their panel, never the whole page.
+          <div className="overflow-x-auto px-1.5 pb-1.5">
+            <Table aria-label={t('customers.title')}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('customers.fields.code')}</TableHead>
+                  <TableHead>{t('customers.fields.name')}</TableHead>
+                  <TableHead>{t('customers.fields.city')}</TableHead>
+                  <TableHead>{t('customers.fields.phone')}</TableHead>
+                  <TableHead>{t('customers.fields.tier')}</TableHead>
+                  <TableHead>{t('customers.fields.credit')}</TableHead>
+                  <TableHead className="text-end">{t('customers.owed')}</TableHead>
                   {canEdit && (
-                    <TableCell className="text-end">
-                      <CustomerActions
-                        api={api}
-                        lookups={lookups}
-                        row={c}
-                        onDone={(done) => {
-                          setMessage(done);
-                          reload();
-                        }}
-                      />
-                    </TableCell>
+                    <TableHead>
+                      <span className="sr-only">{t('customers.actions')}</span>
+                    </TableHead>
                   )}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {list.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell className="font-mono">{c.code}</TableCell>
+                    <TableCell className="min-w-44">
+                      <a
+                        href={href.customer(c.id)}
+                        className="font-semibold text-ink underline-offset-4 hover:underline"
+                      >
+                        {c.name}
+                      </a>
+                      {c.status === 'inactive' && (
+                        <span className="ms-2 inline-block">
+                          <StatusChip tone="neutral">{t('customers.inactive')}</StatusChip>
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>{c.city ?? '—'}</TableCell>
+                    <TableCell className="tabular-nums">{c.phones[0] ?? '—'}</TableCell>
+                    <TableCell>{c.tierName}</TableCell>
+                    <TableCell>
+                      <CreditText row={c} money={m} />
+                    </TableCell>
+                    <TableCell className="text-end tabular-nums">{formatMoney(c.balance, m)}</TableCell>
+                    {canEdit && (
+                      <TableCell className="w-0 text-end">
+                        <CustomerActions api={api} lookups={lookups} row={c} onDone={reload} />
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </Panel>
     </>
@@ -199,7 +182,7 @@ function CreditText({ row, money }: { row: CustomerRow; money: CustomerLookups['
 
 type Action = 'edit' | 'status' | 'delete';
 
-/** A row's Edit, Deactivate or Reactivate, and Delete (never used only); each reads the customer first. */
+/** A row's Edit, Deactivate or Reactivate, and Delete (never used only), as icons; each reads the customer first. */
 function CustomerActions({
   api,
   lookups,
@@ -209,19 +192,17 @@ function CustomerActions({
   api: Api;
   lookups: CustomerLookups;
   row: CustomerRow;
-  onDone: (message: { text: string; error: boolean }) => void;
+  onDone: () => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState<Action | null>(null);
   const [customer, setCustomer] = useState<CustomerDetail['customer'] | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const start = async (action: Action) => {
-    setError(null);
     if (action !== 'delete') {
       const r = await api('GET', `/api/customers/${encodeURIComponent(row.id)}`);
-      if (r.status !== 200) return onDone({ text: customerRefusal(t, r.body), error: true });
+      if (r.status !== 200) return notify.problem(customerRefusal(t, r.body));
       setCustomer((r.body as CustomerDetail).customer);
     }
     setOpen(action);
@@ -230,6 +211,7 @@ function CustomerActions({
   const deactivating = row.status === 'active';
   const statusLabel = t(deactivating ? 'customers.deactivate' : 'customers.reactivate');
 
+  // A refusal isn't one field's: it goes to a toast and the question stays open (owner answer 6).
   const changeStatus = async () => {
     if (!customer) return;
     setBusy(true);
@@ -238,50 +220,40 @@ function CustomerActions({
       status: deactivating ? 'inactive' : 'active',
     });
     setBusy(false);
-    if (r.status !== 200) return setError(customerRefusal(t, r.body, lookups.money));
+    if (r.status !== 200) return notify.problem(customerRefusal(t, r.body, lookups.money));
     close();
-    onDone({
-      text: t(deactivating ? 'customers.deactivated' : 'customers.reactivated', { name: row.name }),
-      error: false,
-    });
+    notify.done(t(deactivating ? 'customers.deactivated' : 'customers.reactivated', { name: row.name }));
+    onDone();
   };
   const remove = async () => {
     setBusy(true);
     const r = await api('DELETE', `/api/customers/${encodeURIComponent(row.id)}`);
     setBusy(false);
-    if (r.status !== 200) return setError(customerRefusal(t, r.body, lookups.money));
+    if (r.status !== 200) return notify.problem(customerRefusal(t, r.body, lookups.money));
     close();
-    onDone({ text: t('customers.deleted', { name: row.name }), error: false });
+    notify.done(t('customers.deleted', { name: row.name }));
+    onDone();
   };
 
   return (
-    <span className="inline-flex flex-wrap justify-end gap-1">
-      <Button
-        size="sm"
-        variant="outline"
-        aria-label={`${t('customers.edit')} ${row.name}`}
+    <span className="inline-flex justify-end gap-0.5">
+      <IconButton
+        icon={Pencil}
+        label={`${t('customers.edit')} ${row.name}`}
         onClick={() => void start('edit')}
-      >
-        {t('customers.edit')}
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        aria-label={`${statusLabel} ${row.name}`}
+      />
+      <IconButton
+        icon={deactivating ? UserX : UserCheck}
+        label={`${statusLabel} ${row.name}`}
         onClick={() => void start('status')}
-      >
-        {statusLabel}
-      </Button>
+      />
       {row.deletable && (
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-destructive"
-          aria-label={`${t('customers.delete')} ${row.name}`}
+        <IconButton
+          icon={Trash2}
+          tone="danger"
+          label={`${t('customers.delete')} ${row.name}`}
           onClick={() => void start('delete')}
-        >
-          {t('customers.delete')}
-        </Button>
+        />
       )}
       {customer && (
         <CustomerDialog
@@ -291,51 +263,70 @@ function CustomerActions({
           customer={customer}
           open={open === 'edit'}
           onOpenChange={(o) => !o && close()}
-          onDone={() => {
+          onDone={(_, name) => {
             close();
-            onDone({ text: t('customers.saved', { name: row.name }), error: false });
+            notify.done(t('customers.saved', { name }));
+            onDone();
           }}
         />
       )}
-      <FormDialog
+      <ConfirmDialog
         open={open === 'status'}
         onOpenChange={(o) => !o && close()}
         title={t(deactivating ? 'customers.deactivateTitle' : 'customers.reactivateTitle', {
           name: row.name,
         })}
-        description={t(deactivating ? 'customers.deactivateText' : 'customers.reactivateText')}
         actionLabel={statusLabel}
+        actionIcon={deactivating ? UserX : UserCheck}
         cancelLabel={t('customers.cancel')}
         busy={busy}
-        onSubmit={() => void changeStatus()}
+        onConfirm={() => void changeStatus()}
       >
-        <ErrorText text={error} />
-      </FormDialog>
-      <FormDialog
+        {t(deactivating ? 'customers.deactivateText' : 'customers.reactivateText')}
+      </ConfirmDialog>
+      <ConfirmDialog
         open={open === 'delete'}
         onOpenChange={(o) => !o && close()}
         title={t('customers.deleteTitle', { name: row.name })}
-        description={t('customers.deleteText')}
         actionLabel={t('customers.delete')}
+        actionIcon={Trash2}
+        tone="danger"
         cancelLabel={t('customers.cancel')}
         busy={busy}
-        onSubmit={() => void remove()}
+        onConfirm={() => void remove()}
       >
-        <ErrorText text={error} />
-      </FormDialog>
+        {t('customers.deleteText')}
+      </ConfirmDialog>
     </span>
   );
 }
 
-function ErrorText({ text }: { text: string | null }) {
-  return text ? (
-    <p role="alert" className="m-0 text-sm text-destructive">
-      {text}
-    </p>
-  ) : null;
-}
+type Form = {
+  source: 'new' | 'supplier';
+  supplierId: string;
+  code: string;
+  name: string;
+  phones: string;
+  city: string;
+  contactPerson: string;
+  address: string;
+  notes: string;
+  tierId: string;
+  creditAllowed: boolean;
+  noLimit: boolean;
+  limit: string;
+  cap: string;
+  termsDays: string;
+};
+type Problems = Partial<Record<keyof Form, string>>;
 
-const SELECT_CLASS = 'h-11 rounded-md border border-input bg-surface-2 px-2';
+/** The refusals that name a field show at it (owner answer 6); the rest go to a toast. */
+const REFUSAL_FIELD: Record<string, keyof Form> = {
+  code_taken: 'code',
+  phone_invalid: 'phones',
+  limit_required: 'limit',
+  already_customer: 'supplierId',
+};
 
 /** A new customer (or an existing supplier made one), or a customer's details and terms, in a dialog. */
 export function CustomerDialog({
@@ -351,13 +342,14 @@ export function CustomerDialog({
   customer?: CustomerDetail['customer'];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onDone: (id: string | null) => void;
+  /** The customer's id (null when it can't be told) and name, once saved. */
+  onDone: (id: string | null, name: string) => void;
 }) {
   const { t } = useTranslation();
   const minor = lookups.money.minorUnits;
   const defaultTier = lookups.tiers.find((x) => x.isDefault)?.id ?? lookups.tiers[0]?.id ?? '';
-  const blank = () => ({
-    source: 'new' as 'new' | 'supplier',
+  const blank = (): Form => ({
+    source: 'new',
     supplierId: lookups.suppliers[0]?.id ?? '',
     code: '',
     name: customer?.name ?? '',
@@ -374,14 +366,14 @@ export function CustomerDialog({
     termsDays: customer?.termsDays == null ? '' : String(customer.termsDays),
   });
   const [f, setF] = useState(blank);
-  const [error, setError] = useState<string | null>(null);
+  const [problems, setProblems] = useState<Problems>({});
   const [busy, setBusy] = useState(false);
   const [found, setFound] = useState<{ check: string; row: CustomerRow | null } | null>(null);
-  const tierId = useId();
-  const sourceId = useId();
-  const supplierPick = useId();
-  const set = <K extends keyof ReturnType<typeof blank>>(k: K, v: ReturnType<typeof blank>[K]) =>
+  // Changing a field clears its problem; the others stay until the next save.
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setF((x) => ({ ...x, [k]: v }));
+    setProblems((p) => (p[k] ? { ...p, [k]: undefined } : p));
+  };
   const canTerms = lookups.can.terms;
   const fromSupplier = !customer && f.source === 'supplier';
 
@@ -417,18 +409,19 @@ export function CustomerDialog({
   }, [api, open, check, customer?.id]);
   const twin = open && found !== null && found.check === check ? found.row : null;
 
-  const terms = () => {
+  /** The terms to send, and every problem with them at once (owner answer 6). */
+  const terms = (wrong: Problems) => {
     const days = f.termsDays.trim() === '' ? null : Number(f.termsDays);
     if (days !== null && (!Number.isInteger(days) || days < 0 || days > 365))
-      return t('customers.problems.terms');
+      wrong.termsDays = t('customers.problems.terms');
     const cap = moneyValue(f.cap, minor);
-    if (typeof cap !== 'number' || cap < 0) return t('customers.problems.amount');
+    if (f.creditAllowed && (typeof cap !== 'number' || cap < 0)) wrong.cap = t('customers.problems.amount');
     let limit: number | null = null;
     if (f.creditAllowed && !f.noLimit) {
       const v = moneyValue(f.limit, minor);
-      if (v === null) return t('customers.problems.limit');
-      if (v === undefined || v < 0) return t('customers.problems.amount');
-      limit = v;
+      if (v === null) wrong.limit = t('customers.problems.limit');
+      else if (v === undefined || v < 0) wrong.limit = t('customers.problems.amount');
+      else limit = v;
     } else if (!f.creditAllowed && !f.noLimit) {
       // Credit off keeps the limit (owner answer 5: stopping a debtor), so turning it back on finds it.
       const v = moneyValue(f.limit, minor);
@@ -439,15 +432,17 @@ export function CustomerDialog({
       creditAllowed: f.creditAllowed,
       creditLimit: limit,
       noLimit: f.creditAllowed && f.noLimit,
-      offlineDailyCap: cap,
+      offlineDailyCap: typeof cap === 'number' ? cap : lookups.defaultOfflineDailyCap,
       termsDays: days,
     };
   };
 
   const submit = async () => {
+    const wrong: Problems = {};
     let body: Record<string, unknown>;
     if (fromSupplier) body = { partyId: f.supplierId };
-    else
+    else {
+      if (f.name.trim() === '') wrong.name = t('customers.problems.name');
       body = {
         name: f.name,
         phones: f.phones
@@ -459,11 +454,10 @@ export function CustomerDialog({
         address: f.address,
         notes: f.notes,
       };
-    if (canTerms) {
-      const tm = terms();
-      if (typeof tm === 'string') return setError(tm);
-      body['terms'] = tm;
     }
+    if (canTerms) body['terms'] = terms(wrong);
+    setProblems(wrong);
+    if (Object.values(wrong).some(Boolean)) return;
     setBusy(true);
     const r = customer
       ? await api('PATCH', `/api/customers/${encodeURIComponent(customer.id)}`, {
@@ -474,166 +468,161 @@ export function CustomerDialog({
       : await api('POST', '/api/customers', fromSupplier ? body : { ...body, code: f.code });
     setBusy(false);
     if (r.status === 200 || r.status === 201) {
+      const name = fromSupplier
+        ? (lookups.suppliers.find((s) => s.id === f.supplierId)?.name ?? '')
+        : f.name.trim();
       setF(blank());
-      setError(null);
-      return onDone(r.status === 201 ? (r.body as { id: string }).id : (customer?.id ?? null));
+      setProblems({});
+      return onDone(r.status === 201 ? (r.body as { id: string }).id : (customer?.id ?? null), name);
     }
-    setError(customerRefusal(t, r.body, lookups.money));
+    const field = REFUSAL_FIELD[(r.body as { error?: string } | null)?.error ?? ''];
+    const text = customerRefusal(t, r.body, lookups.money);
+    if (field) setProblems({ [field]: text });
+    else notify.problem(text);
   };
 
   return (
     <FormDialog
       open={open}
       onOpenChange={(o) => {
-        if (!o) setError(null);
+        if (!o) setProblems({});
         onOpenChange(o);
       }}
       title={customer ? t('customers.details') : t('customers.add')}
       actionLabel={customer ? t('customers.save') : t('customers.create')}
+      actionIcon={customer ? Save : Plus}
       cancelLabel={t('customers.cancel')}
       busy={busy}
       onSubmit={() => void submit()}
+      size="lg"
+      errors={problems}
     >
       {!customer && lookups.suppliers.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={sourceId} className={LABEL_CLASS}>
-            {t('customers.source.label')}
-          </label>
-          <select
-            id={sourceId}
-            className={SELECT_CLASS}
-            value={f.source}
-            onChange={(e) => set('source', e.target.value as 'new' | 'supplier')}
-          >
-            <option value="new">{t('customers.source.new')}</option>
-            <option value="supplier">{t('customers.source.supplier')}</option>
-          </select>
-        </div>
+        <Select
+          label={t('customers.source.label')}
+          value={f.source}
+          onValueChange={(v) => set('source', v as Form['source'])}
+          options={[
+            { value: 'new', label: t('customers.source.new') },
+            { value: 'supplier', label: t('customers.source.supplier') },
+          ]}
+        />
       )}
       {fromSupplier ? (
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={supplierPick} className={LABEL_CLASS}>
-            {t('customers.source.pick')}
-          </label>
-          <select
-            id={supplierPick}
-            className={SELECT_CLASS}
-            value={f.supplierId}
-            onChange={(e) => set('supplierId', e.target.value)}
-          >
-            {lookups.suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} · {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          label={t('customers.source.pick')}
+          value={f.supplierId}
+          onValueChange={(v) => set('supplierId', v)}
+          error={problems.supplierId}
+          options={lookups.suppliers.map((s) => ({ value: s.id, label: `${s.code} · ${s.name}` }))}
+        />
       ) : (
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           {!customer && (
-            <TextField
+            <TextInput
               label={t('customers.fields.code')}
               hint={t('customers.fields.codeHint')}
+              error={problems.code}
               value={f.code}
               onChange={(e) => set('code', e.target.value)}
             />
           )}
-          <TextField
+          <TextInput
             label={t('customers.fields.name')}
+            error={problems.name}
             value={f.name}
             onChange={(e) => set('name', e.target.value)}
           />
-          <TextField
+          <TextInput
             label={t('customers.fields.phones')}
             hint={t('customers.fields.phonesHint')}
+            error={problems.phones}
             inputMode="tel"
             value={f.phones}
             onChange={(e) => set('phones', e.target.value)}
           />
-          <TextField
+          <TextInput
             label={t('customers.fields.city')}
             value={f.city}
             onChange={(e) => set('city', e.target.value)}
           />
-          <TextField
+          <TextInput
             label={t('customers.fields.contact')}
             value={f.contactPerson}
             onChange={(e) => set('contactPerson', e.target.value)}
           />
-          <TextField
+          <TextInput
             label={t('customers.fields.address')}
             value={f.address}
             onChange={(e) => set('address', e.target.value)}
           />
-          <div className="sm:col-span-2">
-            <TextField
-              label={t('customers.fields.notes')}
-              value={f.notes}
-              onChange={(e) => set('notes', e.target.value)}
-            />
-          </div>
+          <TextInput
+            wrapperClassName="sm:col-span-2"
+            label={t('customers.fields.notes')}
+            value={f.notes}
+            onChange={(e) => set('notes', e.target.value)}
+          />
         </div>
       )}
       {twin && (
-        <p role="status" className="m-0 text-sm text-warn">
+        <p role="status" className="m-0 text-[13px] font-medium text-warn">
           {t('customers.phoneUsed', { code: twin.code, name: twin.name })}
         </p>
       )}
-      <fieldset className="m-0 grid grid-cols-1 gap-3.5 border-0 p-0 sm:grid-cols-2" disabled={!canTerms}>
-        <legend className="mb-1 text-sm font-semibold">{t('customers.fields.credit')}</legend>
+      <fieldset
+        className="m-0 grid grid-cols-1 gap-3.5 border-0 border-t border-line p-0 pt-4 sm:grid-cols-2"
+        disabled={!canTerms}
+      >
+        <legend className="float-start mb-1 w-full text-sm font-semibold sm:col-span-2">
+          {t('customers.fields.credit')}
+        </legend>
         {!canTerms && (
           <p className="m-0 text-sm text-muted-foreground sm:col-span-2">
             {t(customer ? 'customers.termsLockedEdit' : 'customers.termsLocked')}
           </p>
         )}
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={tierId} className={LABEL_CLASS}>
-            {t('customers.fields.tier')}
-          </label>
-          <select
-            id={tierId}
-            className={SELECT_CLASS}
-            disabled={!canTerms}
-            value={f.tierId}
-            onChange={(e) => set('tierId', e.target.value)}
-          >
-            {lookups.tiers.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <TextField
+        <Select
+          label={t('customers.fields.tier')}
+          disabled={!canTerms}
+          value={f.tierId}
+          onValueChange={(v) => set('tierId', v)}
+          options={lookups.tiers.map((x) => ({ value: x.id, label: x.name }))}
+        />
+        <TextInput
           label={t('customers.fields.terms')}
+          error={problems.termsDays}
           inputMode="numeric"
           value={f.termsDays}
           onChange={(e) => set('termsDays', e.target.value)}
         />
-        <label className="flex items-center gap-2 text-sm sm:col-span-2">
-          <input
-            type="checkbox"
-            checked={f.creditAllowed}
-            onChange={(e) => set('creditAllowed', e.target.checked)}
-          />
-          {t('customers.fields.creditAllowed')}
-        </label>
+        <Checkbox
+          className="sm:col-span-2"
+          label={t('customers.fields.creditAllowed')}
+          disabled={!canTerms}
+          checked={f.creditAllowed}
+          onCheckedChange={(v) => set('creditAllowed', v)}
+        />
         {f.creditAllowed && (
           <>
-            <TextField
+            <TextInput
               label={t('customers.fields.limit')}
+              error={problems.limit}
               inputMode="decimal"
               disabled={f.noLimit || !canTerms}
               value={f.noLimit ? '' : f.limit}
               onChange={(e) => set('limit', e.target.value)}
             />
-            <label className="flex items-center gap-2 self-end pb-3 text-sm">
-              <input type="checkbox" checked={f.noLimit} onChange={(e) => set('noLimit', e.target.checked)} />
-              {t('customers.fields.noLimit')}
-            </label>
-            <TextField
+            <Checkbox
+              className="self-end pb-2"
+              label={t('customers.fields.noLimit')}
+              disabled={!canTerms}
+              checked={f.noLimit}
+              onCheckedChange={(v) => set('noLimit', v)}
+            />
+            <TextInput
               label={t('customers.fields.cap')}
               hint={t('customers.fields.capHint')}
+              error={problems.cap}
               inputMode="decimal"
               value={f.cap}
               onChange={(e) => set('cap', e.target.value)}
@@ -641,7 +630,6 @@ export function CustomerDialog({
           </>
         )}
       </fieldset>
-      <ErrorText text={error} />
     </FormDialog>
   );
 }
@@ -693,7 +681,7 @@ export function CustomerScreen({ api, id, reports = false }: { api: Api; id: str
         help={t('customers.owes', { amount: formatMoney(detail.balance, m) })}
         actions={
           lookups.can.edit && (
-            <Button variant="outline" onClick={() => setEditing(true)}>
+            <Button variant="outline" icon={Pencil} onClick={() => setEditing(true)}>
               {t('customers.edit')}
             </Button>
           )
@@ -706,8 +694,9 @@ export function CustomerScreen({ api, id, reports = false }: { api: Api; id: str
         customer={c}
         open={editing}
         onOpenChange={setEditing}
-        onDone={() => {
+        onDone={(_, name) => {
           setEditing(false);
+          notify.done(t('customers.saved', { name }));
           setVersion((v) => v + 1);
         }}
       />
@@ -745,50 +734,52 @@ export function CustomerScreen({ api, id, reports = false }: { api: Api; id: str
         {detail.ledger.length === 0 ? (
           <p className="p-2 text-muted-foreground">{t('customers.ledger.empty')}</p>
         ) : (
-          <Table aria-label={t('customers.ledger.title')}>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('customers.ledger.date')}</TableHead>
-                <TableHead>{t('customers.ledger.document')}</TableHead>
-                <TableHead>{t('customers.ledger.due')}</TableHead>
-                <TableHead className="text-end">{t('customers.ledger.amount')}</TableHead>
-                <TableHead className="text-end">{t('customers.ledger.balance')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {detail.ledger.map((e, n) => (
-                <TableRow key={n}>
-                  <TableCell>{e.entryDate}</TableCell>
-                  <TableCell>
-                    {t(`customers.ledger.${LEDGER_KINDS.has(e.kind) ? e.kind : 'other'}`)}{' '}
-                    {e.kind === 'customer_receipt' || e.kind === 'journal_voucher' ? (
-                      <a
-                        href={href.accountingDocument(e.kind, e.sourceId)}
-                        className="font-mono underline-offset-4 hover:underline"
-                      >
-                        {e.number}
-                      </a>
-                    ) : (
-                      <span className="font-mono">{e.number}</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{e.amount > 0 ? e.dueDate : '—'}</TableCell>
-                  <TableCell className="text-end tabular-nums">{formatMoney(e.amount, m)}</TableCell>
-                  <TableCell className="text-end tabular-nums">{formatMoney(e.balance, m)}</TableCell>
+          <div className="overflow-x-auto">
+            <Table aria-label={t('customers.ledger.title')}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('customers.ledger.date')}</TableHead>
+                  <TableHead>{t('customers.ledger.document')}</TableHead>
+                  <TableHead>{t('customers.ledger.due')}</TableHead>
+                  <TableHead className="text-end">{t('customers.ledger.amount')}</TableHead>
+                  <TableHead className="text-end">{t('customers.ledger.balance')}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {detail.ledger.map((e, n) => (
+                  <TableRow key={n}>
+                    <TableCell>{e.entryDate}</TableCell>
+                    <TableCell>
+                      {t(`customers.ledger.${LEDGER_KINDS.has(e.kind) ? e.kind : 'other'}`)}{' '}
+                      {e.kind === 'customer_receipt' || e.kind === 'journal_voucher' ? (
+                        <a
+                          href={href.accountingDocument(e.kind, e.sourceId)}
+                          className="font-mono underline-offset-4 hover:underline"
+                        >
+                          {e.number}
+                        </a>
+                      ) : (
+                        <span className="font-mono">{e.number}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{e.amount > 0 ? e.dueDate : '—'}</TableCell>
+                    <TableCell className="text-end tabular-nums">{formatMoney(e.amount, m)}</TableCell>
+                    <TableCell className="text-end tabular-nums">{formatMoney(e.balance, m)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </Panel>
     </>
   );
 }
 
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <span>
-      <span className={LABEL_CLASS}>{label}</span> {children}
+      <span className={FIELD_LABEL}>{label}</span> {children}
     </span>
   );
 }
