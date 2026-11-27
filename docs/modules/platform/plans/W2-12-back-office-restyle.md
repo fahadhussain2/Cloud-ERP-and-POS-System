@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Issue** | to be opened on acceptance (one issue per task below: W2-12, W2-13, W2-14, W2-15) |
+| **Issue** | #217 (W2-12), #218 (W2-13), #219 (W2-14), #220 (W2-15) |
 | **Module** | platform (the back-office frame and its building blocks), touching every back-office screen; **not** `apps/pos` or `packages/ui` |
 | **Status** | Accepted by the owner (2026-11-27), questions 1–3 as recommended, rules 5 and 6 added; no responsiveness list yet (answer 4) |
 | **Refs** | D-066 (shadcn/ui on Radix in `packages/ui`), D-053 (every popup ends with Cancel and a main button), D-114 (the back-office frame), D-120 (themes), D-109 (customers); PRD §1 principle 2 (keyboard first); CLAUDE.md rule 10; mockup [Back-office restyle — Customers](https://claude.ai/artifact/4TCNKN5Cu5JpYfDp6B5p5k) (private canvas, sample names and figures); the owner's reference images (2026-11-27: a button, a field, a dropdown, a dialog) |
