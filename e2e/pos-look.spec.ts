@@ -80,6 +80,7 @@ async function screens(page: Page, browser: Browser) {
   await page.getByLabel(pos.setup.code).fill(code);
   await page.getByRole('button', { name: pos.setup.submit }).click();
   await expect(page.getByRole('button', { name: new RegExp(SALESMAN.fullName) })).toBeVisible();
+  await expect(page.locator('.status-bar .online')).toBeVisible();
   await look(page, 'unlock');
 
   await page.getByRole('button', { name: new RegExp(SALESMAN.fullName) }).click();
