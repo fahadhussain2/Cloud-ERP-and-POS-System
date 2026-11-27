@@ -213,7 +213,11 @@
     "notFound": "Person not found",
     "branchForNew": "Branch for roles you tick",
     "pinHelp": "Give a temporary PIN to someone new or who forgot theirs. At their first unlock the counter makes them choose their own, and a new PIN also clears a lock on every counter at its next sync.",
-    "reactivateConfirm": "{{name}} can sign in again (if they have a password) and appears on the counters at their next sync."
+    "reactivateConfirm": "{{name}} can sign in again (if they have a password) and appears on the counters at their next sync.",
+    "problems": {
+      "fullName": "Type the person's full name.",
+      "username": "Type a username."
+    }
   },
   "counters": {
     "title": "Counters",

@@ -41,7 +41,7 @@ import type { Api } from '../api';
 import { qtyText } from '../catalog/data';
 import { href, navigate } from '../router';
 import { useShopToday } from '../shopDay';
-import { FormDialog } from '../staff/dialogs';
+import { FormDialog } from '../ui';
 import { apiQuery, current, only, useFilters, type Filters } from './frame/filters';
 import {
   ChoiceFilter,

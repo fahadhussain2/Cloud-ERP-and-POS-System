@@ -273,7 +273,8 @@ describe('Staff', () => {
     show(api);
     const row = (await screen.findByText('Asif Khan')).closest('tr')!;
     expect(screen.queryByRole('button', { name: en.staff.add })).toBeNull();
-    fireEvent.click(within(row).getByRole('button', { name: en.staff.give }));
+    // A row action is an icon named with the person (W2-15).
+    fireEvent.click(within(row).getByRole('button', { name: `${en.staff.give} Asif Khan` }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText(en.staff.temporaryPin), { target: { value: '4831' } });
     fireEvent.click(within(dialog).getByRole('button', { name: en.staff.save }));
@@ -285,7 +286,7 @@ describe('Staff', () => {
   it('a manager has no PIN action for someone they may not give a PIN to (an Owner)', async () => {
     show(fakeApi(signedIn(MANAGER)).api);
     const row = (await screen.findByText('Fahad Owner')).closest('tr')!;
-    expect(within(row).queryByRole('button', { name: en.staff.give })).toBeNull();
+    expect(within(row).queryByRole('button', { name: new RegExp(`^${en.staff.give}`) })).toBeNull();
     fireEvent.click(within(row).getByRole('link', { name: 'Fahad Owner' }));
     expect(await screen.findByRole('heading', { name: 'Fahad Owner' })).toBeDefined();
     expect(screen.queryByRole('button', { name: en.staff.give })).toBeNull();
@@ -299,11 +300,14 @@ describe('Staff', () => {
     );
     show(api);
     const row = (await screen.findByText('Asif Khan')).closest('tr')!;
-    fireEvent.click(within(row).getByRole('button', { name: en.staff.give }));
+    // A row action is an icon named with the person (W2-15).
+    fireEvent.click(within(row).getByRole('button', { name: `${en.staff.give} Asif Khan` }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText(en.staff.temporaryPin), { target: { value: '4831' } });
     fireEvent.click(within(dialog).getByRole('button', { name: en.staff.save }));
-    expect(await within(dialog).findByText(en.staff.errors.pin_not_allowed)).toBeDefined();
+    // Not about the PIN itself: a toast, and the dialog stays open (owner answer 6).
+    expect(await screen.findByText(en.staff.errors.pin_not_allowed)).toBeDefined();
+    expect(dialog.isConnected).toBe(true);
   });
 
   it('an owner adds a person with a role and no password', async () => {
@@ -449,7 +453,7 @@ describe('Counters', () => {
       kind: 'counter',
     });
     const row = screen.getByText('C01').closest('tr')!;
-    fireEvent.click(within(row).getByRole('button', { name: en.counters.revoke }));
+    fireEvent.click(within(row).getByRole('button', { name: `${en.counters.revoke} C01` }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: en.counters.confirmRevoke }));
     await screen.findByText(i18n.t('counters.revoked', { code: 'C01' }));
@@ -570,8 +574,8 @@ describe('Counters: health and Re-enable (W1-07)', () => {
     window.location.hash = '#/counters';
     show(api);
     const row = (await screen.findByText('C01')).closest('tr')!;
-    expect(within(row).queryByRole('button', { name: en.counters.revoke })).toBeNull();
-    fireEvent.click(within(row).getByRole('button', { name: en.counters.reenable }));
+    expect(within(row).queryByRole('button', { name: `${en.counters.revoke} C01` })).toBeNull();
+    fireEvent.click(within(row).getByRole('button', { name: `${en.counters.reenable} C01` }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: en.counters.confirmReenable }));
     await screen.findByText(i18n.t('counters.reenabled', { code: 'C01' }));

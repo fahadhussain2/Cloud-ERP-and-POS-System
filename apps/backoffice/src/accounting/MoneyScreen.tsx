@@ -26,7 +26,7 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../api';
 import { moneyValue } from '../catalog/data';
 import { href, navigate } from '../router';
-import { FormDialog } from '../staff/dialogs';
+import { FormDialog } from '../ui';
 import {
   accountingRefusal,
   ErrorText,

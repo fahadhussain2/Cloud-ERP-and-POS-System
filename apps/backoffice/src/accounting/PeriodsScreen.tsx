@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
-import { FormDialog } from '../staff/dialogs';
+import { FormDialog } from '../ui';
 import { accountingRefusal, ErrorText, useAccountingLookups } from './data';
 
 // Periods and the lock date (ACC-06, owner answer 5 to W1-19, D-108). The months are worked out from the shop's start

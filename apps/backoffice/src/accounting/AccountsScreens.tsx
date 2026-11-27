@@ -30,7 +30,7 @@ import {
   useReport,
 } from '../reports/frame/ReportFrame';
 import { href } from '../router';
-import { FormDialog } from '../staff/dialogs';
+import { FormDialog } from '../ui';
 import { accountingRefusal, AccountSelect, ErrorText, useAccountingLookups } from './data';
 
 // The chart with each account's balance at a date, an account's ledger with its running balance (part of ACC-07, owner

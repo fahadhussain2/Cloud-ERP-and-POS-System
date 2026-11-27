@@ -8,6 +8,7 @@ import type { Api } from '../api';
 import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import { ShopSettingsScreen } from './ShopSettingsScreen';
+import { notify, Toaster } from '../ui';
 
 // The shop's name and bill header (W1-25, PLT-01, POS-09) over a fake API: the fields as saved, a preview in the
 // bill's order, the limits checked before saving, one save, and a refusal shown.
@@ -34,8 +35,18 @@ function fakeApi(put: { status: number; body: unknown } = { status: 200, body: S
   return { api, calls };
 }
 
-const show = (ui: ReactElement) => render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
-afterEach(cleanup);
+// With the frame's toasts (W2-12, owner answer 6), which start empty for each test.
+const show = (ui: ReactElement) =>
+  render(
+    <I18nextProvider i18n={i18n}>
+      {ui}
+      <Toaster />
+    </I18nextProvider>,
+  );
+afterEach(() => {
+  cleanup();
+  notify.clear();
+});
 
 const field = (name: string) => screen.getByRole<HTMLInputElement>('textbox', { name });
 const value = (name: string) => field(name).value;
