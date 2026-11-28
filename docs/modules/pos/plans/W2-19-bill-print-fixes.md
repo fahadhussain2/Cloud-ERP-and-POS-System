@@ -113,3 +113,15 @@ One branch off `staging`, one PR.
 - The thermal templates and the signed QR (D-048: not until a tenant needs them).
 - Changing the bill code's content.
 - Any change to the counter's screens or `packages/ui`.
+
+## As built (2026-11-28)
+
+- **Bugs first:** the tests for the bars' size, the margin inside the page (bills and desk slips) and the white page were committed and locked, then the fix, then unlocked.
+- **No `code39Modules`:** `packages/print` already had `code39Width`, which gives the drawing's width in its own units. With the units in mm it is the barcode's width in mm. `code39Svg` gained `mm: true`, which writes that real size on the `<svg>`; without it the output is byte for byte as before (the labels).
+- **`apps/pos/src/print/page-style.ts`** holds the page rule (`pageStyle`) and the bill code's sizes (`BILL_BARS`), used by `BillPrint` and `DeskSlipPrint`. The rule is rendered with the print, so it exists only while printing. The fixed `62mm` on `.bill-bars svg` is gone.
+- **The two-page check:** a 45-line bill printed to PDF in Chromium (Edge) with background graphics on kept its 8 mm margin at the top and sides of pages 2 and 3, so `box-decoration-break: clone` works and the fallback wasn't needed. A short bill printed on a white page with an 8 mm margin all round, its barcode 94.8 mm wide (104.6 mm for a 6-digit cash due).
+- **A correction to the plan:** the dark theme already switches to the light colours when printing (`@media screen` in `theme.css`, W2-07), so a dark counter printed the same grey, not near-black. The white-page rule still fixes the grey.
+- **The e2e check of the printed page** was done as that PDF render instead of an e2e flow: the counter's e2e stubs `window.print`, and the print container is cleared right after it. The unit tests pin the rule; the PDFs show it working.
+- **The sample PDFs** use made-up names and numbers. They were sent to the owner, not committed.
+- **Still to do after merge:** the shop test on the HP LaserJet P1005 with the cash-desk scanner (W1-01, go-live checklist).
+

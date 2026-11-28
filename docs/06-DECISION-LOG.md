@@ -292,6 +292,7 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Consequence:** the legacy app already prints graphics-mode output (TrueType fonts and an image) on this printer, so browser printing should be about as fast as today. Barcode scannability on this printer is already proven. The Wave 1 print test stays, now as a confirmation.
 - **Still open (PRD Q7):** printer model, paper type, label printer and label size.
 - **Status:** Accepted
+- **W2-19 (owner, 2026-11-28): the bill prints right.** The owner's scanner couldn't read a printed bill's barcode, which was squeezed into 62 mm (narrowest bars 0.20–0.22 mm). The bill code's narrowest bar is now **1/75 inch (0.339 mm)**, the wide 2.5 times that, and the barcode is as wide as its code needs (about 95 mm). The **8 mm margin is inside each page**, so the print dialog's *Margins: None* can't drop it, and it repeats on every page of a long bill. The page prints **white** with black ink. Desk slips get the same page. The code's content is unchanged. [Plan](modules/pos/plans/W2-19-bill-print-fixes.md).
 
 ### D-056 Business day: 04:00 date cutoff, 20:00 closing time (2026-10-21)
 - **Decision:** the business-date cutoff stays at **04:00**, and a separate **closing time of 20:00** is added for the day-close reminder and auto-locking idle counters. Supersedes the "Proposed" status of D-046.

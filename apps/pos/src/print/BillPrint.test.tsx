@@ -178,7 +178,7 @@ describe('the printed bill', () => {
   });
 
   it('keeps its 8 mm margin inside each page, whatever the print dialog says, and prints on a white page', () => {
-    const style = show(job()).container.querySelector('style')!.textContent!;
+    const style = show(job()).container.querySelector('style')!.textContent;
     expect(style).toMatch(/@page \{[^}]*margin: 0;/);
     expect(style).toMatch(/\.bill-page \{[^}]*padding: 8mm;[^}]*box-decoration-break: clone;/);
     expect(style).toMatch(

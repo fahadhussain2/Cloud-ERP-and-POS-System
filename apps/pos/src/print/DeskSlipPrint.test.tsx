@@ -56,7 +56,7 @@ describe('the desk slips', () => {
     );
     // This file's other tests find their slip by its words: leave none behind, even when this one fails.
     try {
-      const style = container.querySelector('style')!.textContent!;
+      const style = container.querySelector('style')!.textContent;
       expect(style).toMatch(/@page \{[^}]*margin: 0;/);
       expect(style).toMatch(/\.bill-page \{[^}]*padding: 8mm;/);
       expect(style).toContain('@media print { html, body { background: #fff !important;');
