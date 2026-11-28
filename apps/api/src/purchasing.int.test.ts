@@ -371,9 +371,11 @@ describe('a goods receipt (PUR-02)', () => {
 describe('a purchase return (PUR-03)', () => {
   it("can't return more than the receipt still has, and takes stock out and the debt down when posted", async () => {
     const lines = (await send('GET', `/api/purchasing/receipts/${receiptId}`, 'maria')).json<{
-      lines: { id: string; itemId: string; qty: number; netUnitCost: number }[];
+      lines: { id: string; itemId: string; qty: number; netUnitCost: number; returnable: number | null }[];
     }>().lines;
     const line = lines.find((l) => l.itemId === items['ABEA001'])!;
+    // A posted receipt's line says what is left to send back (W2-16): all 10 before any return.
+    expect(line.returnable).toBe(10000);
     const create = (qty: number) =>
       send('POST', '/api/purchasing/returns', 'maria', {
         supplierId: naveed,
@@ -407,6 +409,12 @@ describe('a purchase return (PUR-03)', () => {
     ).toEqual([{ qty: '8.000' }]);
     const l = await ledgerOf(naveed);
     expect(l.ledger.at(-1)).toMatchObject({ kind: 'purchase_return', number: 'PR000001', amount: -250000 });
+    // 2 of the 10 went back; a draft return (the refused 11) counts for nothing.
+    const left = (await send('GET', `/api/purchasing/receipts/${receiptId}`, 'maria')).json<{
+      lines: { itemId: string; returnable: number | null }[];
+    }>().lines;
+    expect(left.find((x) => x.itemId === items['ABEA001'])!.returnable).toBe(8000);
+    expect(left.find((x) => x.itemId === items['ABEA002'])!.returnable).toBe(2000);
   });
 });
 

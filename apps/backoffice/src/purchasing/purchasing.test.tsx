@@ -69,6 +69,7 @@ const DRAFT: ReceiptView = {
       allowsFraction: false,
       lastCost: 100000,
       retail: 160000,
+      returnable: null,
     },
     {
       id: 'l2',
@@ -84,6 +85,7 @@ const DRAFT: ReceiptView = {
       allowsFraction: false,
       lastCost: null,
       retail: null,
+      returnable: null,
     },
   ],
   check: { problems: [], warnings: [], total: null, difference: null },
