@@ -24,6 +24,11 @@ export interface Code39Options {
   height: number;
   /** Blank margin on each side, in narrow elements (at least 10). */
   quiet: number;
+  /**
+   * The units are millimetres: the drawing carries its real size (`width` and `height` in mm), so a printed barcode
+   * keeps its bars' widths (W2-19). Without it the drawing has no size of its own and fills its box (the labels).
+   */
+  mm?: boolean;
 }
 
 /** The patterns of `CODE39_CHARACTERS`, in the same order. */
@@ -87,8 +92,9 @@ export function code39Svg(text: string, options: Code39Options): string {
     });
   });
   const total = x + quiet * narrow;
+  const size = options.mm ? `width="${unit(total)}mm" height="${unit(height)}mm" ` : '';
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${unit(total)} ${unit(height)}" ` +
+    `<svg xmlns="http://www.w3.org/2000/svg" ${size}viewBox="0 0 ${unit(total)} ${unit(height)}" ` +
     `preserveAspectRatio="none" shape-rendering="crispEdges" fill="#000">${bars.join('')}</svg>`
   );
 }

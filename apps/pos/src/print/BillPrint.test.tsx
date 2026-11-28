@@ -157,6 +157,35 @@ describe('the printed bill', () => {
     expect(container.querySelectorAll('.bill-bars svg rect').length).toBeGreaterThan(50);
   });
 
+  // W2-19 (owner's scan test, 2026-11-28): the bars were squeezed into 62 mm, 0.2 mm wide, too thin to scan.
+  it('draws the bill code with bars of 1/75 inch, the barcode as wide as its code needs', () => {
+    const { container } = show(job());
+    const svg = container.querySelector('.bill-bars svg')!;
+    // 'C03-S000412 3000': 18 characters with start and stop, 280 narrow widths of 0.339 mm.
+    expect(svg.getAttribute('width')).toBe('94.827mm');
+    expect(svg.getAttribute('height')).toBe('11mm');
+    const widths = [...svg.querySelectorAll('rect')].map((r) => Number(r.getAttribute('width')));
+    expect(Math.min(...widths)).toBe(0.339);
+    expect(Math.max(...widths)).toBe(0.847);
+    cleanup();
+    // A bigger cash due is a longer code: a wider barcode, never thinner bars.
+    const big = show(job({ document: { ...document, cashDue: 12_500_000 as Money } }));
+    const wide = big.container.querySelector('.bill-bars svg')!;
+    expect(Number(wide.getAttribute('width')!.replace('mm', ''))).toBeGreaterThan(94.827);
+    expect(Math.min(...[...wide.querySelectorAll('rect')].map((r) => Number(r.getAttribute('width'))))).toBe(
+      0.339,
+    );
+  });
+
+  it('keeps its 8 mm margin inside each page, whatever the print dialog says, and prints on a white page', () => {
+    const style = show(job()).container.querySelector('style')!.textContent;
+    expect(style).toMatch(/@page \{[^}]*margin: 0;/);
+    expect(style).toMatch(/\.bill-page \{[^}]*padding: 8mm;[^}]*box-decoration-break: clone;/);
+    expect(style).toMatch(
+      /@media print \{ html, body \{ background: #fff !important; color: #000 !important; \} \}/,
+    );
+  });
+
   it('has no discount line without a bill discount, and only i18n text', () => {
     const { container } = show(job());
     const text = container.textContent ?? '';
