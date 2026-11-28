@@ -36,6 +36,7 @@ export function Select({
   className,
   wrapperClassName,
   'aria-label': ariaLabel,
+  note,
 }: {
   /** Shown above; leave it out in a toolbar and give `aria-label` instead. */
   label?: ReactNode;
@@ -50,6 +51,8 @@ export function Select({
   className?: string;
   wrapperClassName?: string;
   'aria-label'?: string;
+  /** A line of help under the options, not an option (the cash note under Paid, W2-16). */
+  note?: ReactNode;
 }) {
   const { t } = useTranslation();
   const own = useId();
@@ -93,6 +96,11 @@ export function Select({
                 {o.label}
               </SelectItem>
             ))
+          )}
+          {note && (
+            <p className="m-0 mt-1 max-w-80 border-t border-line px-2.5 pt-2 pb-1.5 text-xs text-muted-foreground">
+              {note}
+            </p>
           )}
         </SelectContent>
       </SharedSelect>

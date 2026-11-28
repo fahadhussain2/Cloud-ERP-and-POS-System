@@ -7,10 +7,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import {
+  ActionBar,
   Button,
   buttonClass,
   Checkbox,
   ConfirmDialog,
+  FIELD_BOX,
   FormDialog,
   IconButton,
   ListToolbar,
@@ -375,5 +377,60 @@ describe('notify', () => {
     const alert = screen.getByRole('alert');
     fireEvent.click(within(alert).getByRole('button', { name: en.app.close }));
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+// W2-16 (the goods receipt layout, owner 2026-11-28): a bar kept at the bottom of the window, a red bin on a line, a
+// note under a dropdown's options, and the faint fill dark-mode fields keep.
+describe('ActionBar', () => {
+  it('is a named region kept at the bottom of the window', () => {
+    show(
+      <ActionBar label="Save or post">
+        <Button>Post</Button>
+      </ActionBar>,
+    );
+    const bar = screen.getByRole('region', { name: 'Save or post' });
+    expect(bar.className).toContain('sticky');
+    expect(bar.className).toContain('bottom-0');
+    expect(within(bar).getByRole('button', { name: 'Post' })).toBeDefined();
+  });
+});
+
+describe('IconButton, red', () => {
+  it('is red at rest with tone="bad", grey with tone="danger"', () => {
+    show(
+      <>
+        <IconButton icon={Save} tone="bad" label="Remove line 1" />
+        <IconButton icon={Save} tone="danger" label="Delete Khan Motors" />
+      </>,
+    );
+    expect(screen.getByRole('button', { name: 'Remove line 1' }).className).toContain('text-bad');
+    expect(screen.getByRole('button', { name: 'Delete Khan Motors' }).className).not.toMatch(
+      /(^|\s)text-bad(\s|$)/,
+    );
+  });
+});
+
+describe('Select with a note', () => {
+  it('shows the note under the options, not as an option', async () => {
+    show(
+      <Select
+        label="Paid"
+        value="account"
+        onValueChange={() => undefined}
+        options={[{ value: 'account', label: "On the supplier's account" }]}
+        note="Paid in cash? Pay it at the desk."
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Paid' }), { key: 'ArrowDown' });
+    const list = await screen.findByRole('listbox');
+    expect(within(list).getByText('Paid in cash? Pay it at the desk.')).toBeDefined();
+    expect(within(list).getAllByRole('option')).toHaveLength(1);
+  });
+});
+
+describe('fields in dark mode', () => {
+  it('keep a faint fill of their own, on boxes and on the controls drawn as a field', () => {
+    expect(FIELD_BOX).toContain('dark:bg-input/30');
   });
 });
