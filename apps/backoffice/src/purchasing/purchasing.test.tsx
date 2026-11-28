@@ -1,4 +1,4 @@
-import type { PurchasingLookups, ReceiptView, SupplierDetail, SupplierRow } from '@erp/contracts';
+import type { PurchasingLookups, ReceiptView, ReturnView, SupplierDetail, SupplierRow } from '@erp/contracts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
@@ -416,6 +416,88 @@ describe('the suppliers table (owner review)', () => {
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: en.purchasing.suppliers.delete }));
     expect(await screen.findByText('Typo Traders is deleted.')).toBeDefined();
+  });
+});
+
+// Bugs (owner's review of New goods receipt, 2026-11-28; W2-16 points 7 and 8): a purchase return draft couldn't be
+// deleted (the API could, the screen had no button); a receipt draft was deleted at once, without asking, by a button
+// beside Post; Make labels opened the labels page with the receipt's id in its "Goods receipt number" field.
+const RETURN_DRAFT: ReturnView = {
+  purchaseReturn: {
+    id: 'p1',
+    number: null,
+    status: 'draft',
+    supplierId: 's1',
+    supplierName: 'Naveed Glass',
+    goodsReceiptId: null,
+    goodsReceiptNumber: null,
+    locationId: 'shop',
+    returnedOn: '2026-11-07',
+    reason: 'damaged',
+    note: null,
+    total: null,
+    rowVersion: '2',
+  },
+  lines: [
+    {
+      id: 'pl1',
+      lineNo: 1,
+      itemId: 'i1',
+      code: 'ABEA001',
+      name: 'ADJUSTER BEARING SALOON',
+      receiptLineId: null,
+      qty: 1000,
+      unitCost: 125000,
+      allowsFraction: false,
+      returnable: null,
+    },
+  ],
+  check: { problems: [], total: 125000 },
+};
+
+describe('deleting a draft, and the labels of a receipt (W2-16)', () => {
+  it('asks before deleting a goods receipt draft', async () => {
+    const f = fakeApi(lookups(), {
+      'DELETE /api/purchasing/receipts/r1': { status: 200, body: { deleted: true } },
+    });
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    fireEvent.click(await screen.findByRole('button', { name: en.purchasing.deleteDraft }));
+    const dialog = await screen.findByRole('dialog');
+    expect(f.calls.some((c) => c.method === 'DELETE')).toBe(false);
+    fireEvent.click(within(dialog).getByRole('button', { name: en.purchasing.deleteDraft }));
+    await waitFor(() =>
+      expect(f.calls.some((c) => c.method === 'DELETE' && c.path === '/api/purchasing/receipts/r1')).toBe(
+        true,
+      ),
+    );
+  });
+
+  it('deletes a purchase return draft, after asking', async () => {
+    const f = fakeApi(lookups(), {
+      'GET /api/purchasing/returns/p1': { status: 200, body: RETURN_DRAFT },
+      'DELETE /api/purchasing/returns/p1': { status: 200, body: { deleted: true } },
+    });
+    show(<ReturnScreen api={f.api} id="p1" />);
+    fireEvent.click(await screen.findByRole('button', { name: en.purchasing.deleteDraft }));
+    const dialog = await screen.findByRole('dialog');
+    expect(f.calls.some((c) => c.method === 'DELETE')).toBe(false);
+    fireEvent.click(within(dialog).getByRole('button', { name: en.purchasing.deleteDraft }));
+    await waitFor(() =>
+      expect(f.calls.some((c) => c.method === 'DELETE' && c.path === '/api/purchasing/returns/p1')).toBe(
+        true,
+      ),
+    );
+  });
+
+  it("opens a posted receipt's labels by its number", async () => {
+    const posted: ReceiptView = {
+      ...DRAFT,
+      receipt: { ...DRAFT.receipt, status: 'posted', number: 'GR000001', dueDate: '2026-12-05' },
+    };
+    const f = fakeApi(lookups(), { 'GET /api/purchasing/receipts/r1': { status: 200, body: posted } });
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    const link = await screen.findByRole('link', { name: en.labels.makeLabels });
+    expect(link.getAttribute('href')).toBe(href.receiptLabels('GR000001'));
   });
 });
 

@@ -15,6 +15,7 @@ import {
   IconButton,
   ListToolbar,
   notify,
+  SearchBox,
   Select,
   TextInput,
   Toaster,
@@ -166,6 +167,64 @@ describe('Select', () => {
     fireEvent.keyDown(list, { key: 'Escape' });
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+// Bug (owner's review of New goods receipt, 2026-11-28; W2-16 point 3): the item list always opened under its field and
+// ran past the bottom of the window when the field was near it.
+describe('SearchBox near the bottom of the window', () => {
+  const HITS = ['AFLT001', 'AFLT002', 'AFLT003'];
+  /** The box with its field's edges at `top`–`top + 36` in a 768px window; the list it draws over the page. */
+  const listAt = (top: number) => {
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(768);
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      top,
+      bottom: top + 36,
+      left: 20,
+      right: 320,
+      width: 300,
+      height: 36,
+      x: 20,
+      y: top,
+      toJSON: () => ({}),
+    });
+    show(
+      <SearchBox
+        floating="page"
+        label="Item of line 4"
+        listLabel="Items found"
+        text="a"
+        onText={() => undefined}
+        hits={HITS}
+        hitKey={(h) => h}
+        onPick={() => undefined}
+        onEscape={() => undefined}
+      >
+        {(h) => h}
+      </SearchBox>,
+    );
+    return screen.getByRole('listbox');
+  };
+  afterEach(() => vi.restoreAllMocks());
+
+  it('opens above its field when there is no room under it', () => {
+    // The field ends 100px above the window's bottom.
+    const list = listAt(632);
+    expect(list.style.top).toBe('');
+    expect(list.style.bottom).toBe(`${768 - 632 + 4}px`);
+  });
+
+  it('stays under its field when there is some room, no taller than that room', () => {
+    // The field ends 180px above the window's bottom.
+    const list = listAt(552);
+    expect(list.style.top).toBe(`${552 + 36 + 4}px`);
+    expect(parseFloat(list.style.maxHeight)).toBeLessThanOrEqual(180 - 4);
+  });
+
+  it('opens under its field, at its full height, when there is room', () => {
+    const list = listAt(200);
+    expect(list.style.top).toBe(`${200 + 36 + 4}px`);
+    expect(list.style.maxHeight).toBe('256px');
   });
 });
 
