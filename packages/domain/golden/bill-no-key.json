@@ -1,0 +1,35 @@
+{
+  "description": "A supplier's bill number as compared (W2-18, owner 2026-11-28): one bill can be posted once per supplier, and two numbers are the same bill when they match after ignoring case and every space. Dashes, slashes and other characters still count.",
+  "cases": [
+    {
+      "name": "upper and lower case are one bill",
+      "input": "INV-4471",
+      "expected": "inv-4471"
+    },
+    {
+      "name": "spaces around and inside are ignored",
+      "input": "  inv 44 71 ",
+      "expected": "inv4471"
+    },
+    {
+      "name": "a tab or a line break is a space too",
+      "input": "INV\t12\n",
+      "expected": "inv12"
+    },
+    {
+      "name": "a dash still counts: INV-12 is not INV12",
+      "input": "INV-12",
+      "expected": "inv-12"
+    },
+    {
+      "name": "a slash still counts",
+      "input": "2027/1",
+      "expected": "2027/1"
+    },
+    {
+      "name": "nothing typed is empty",
+      "input": "   ",
+      "expected": ""
+    }
+  ]
+}
