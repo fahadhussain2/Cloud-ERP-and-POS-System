@@ -33,6 +33,38 @@ const show = (slip: DeskSlip) =>
 const common = { createdAt: '2026-11-02T10:30:00.000Z', note: null, reference: null };
 
 describe('the desk slips', () => {
+  // W2-19: the same page as a bill: the margin inside the page, and a white page.
+  it('keep their 8 mm margin inside the page and print on a white page, like a bill', () => {
+    const { container, unmount } = render(
+      <I18nextProvider i18n={i18n}>
+        <DeskSlipPrint
+          job={job({
+            kind: 'collection',
+            doc: {
+              ...common,
+              number: 'D01-R000002',
+              customerName: 'Ali Autos',
+              customerCode: 'C0042',
+              amount: money(100000),
+              balanceBefore: money(100000),
+            } as CustomerCollectionDocument,
+            methodName: 'Cash',
+            balanceAfter: 0,
+          })}
+        />
+      </I18nextProvider>,
+    );
+    // This file's other tests find their slip by its words: leave none behind, even when this one fails.
+    try {
+      const style = container.querySelector('style')!.textContent!;
+      expect(style).toMatch(/@page \{[^}]*margin: 0;/);
+      expect(style).toMatch(/\.bill-page \{[^}]*padding: 8mm;/);
+      expect(style).toContain('@media print { html, body { background: #fff !important;');
+    } finally {
+      unmount();
+    }
+  });
+
   it('a receipt shows the customer, the amount, the method and the balance before and after', () => {
     show({
       kind: 'collection',

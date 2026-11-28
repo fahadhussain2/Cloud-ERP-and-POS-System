@@ -57,3 +57,17 @@ describe('code39Width', () => {
     expect(() => code39Width('a', { narrow: 1, wide: 3, height: 50, quiet: 10 })).toThrow(Code39Error);
   });
 });
+
+// W2-19 (owner's scan test, 2026-11-28): a barcode drawn at its real size, so its bars keep their width on paper.
+describe('code39Svg in millimetres', () => {
+  it('writes its real size on the svg when its units are millimetres', () => {
+    const svg = code39Svg('A', { narrow: 1, wide: 3, height: 50, quiet: 10, mm: true });
+    expect(svg).toMatch(/^<svg [^>]*width="67mm" height="50mm"/);
+  });
+
+  it('draws exactly as before without it, so the item labels are unchanged', () => {
+    expect(code39Svg('A', { narrow: 1, wide: 3, height: 50, quiet: 10 })).toMatch(
+      /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 67 50" preserveAspectRatio="none"/,
+    );
+  });
+});
