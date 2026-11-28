@@ -906,3 +906,71 @@ describe("a supplier's bill, posted once (W2-18)", () => {
     expect(await screen.findByText('This bill is already on GR000015.')).toBeDefined();
   });
 });
+
+// Owner's staging test (2026-11-28): the unit cost an item filled in went with it. Changing the line's item replaced
+// nothing, so the old item's last cost stayed against the new item. A cost the purchaser typed stays.
+describe("changing a line's item", () => {
+  const ITEMS = {
+    status: 200,
+    body: {
+      items: [
+        {
+          id: 'i3',
+          code: 'OIL050',
+          name: 'ENGINE OIL',
+          allowsFraction: true,
+          lastCost: 245000,
+          retail: 300000,
+        },
+        {
+          id: 'i4',
+          code: 'FNBL005',
+          name: 'FAN BELT SWIFT',
+          allowsFraction: false,
+          lastCost: null,
+          retail: null,
+        },
+        {
+          id: 'i5',
+          code: 'FNBL002',
+          name: 'FAN BELT CIVIC',
+          allowsFraction: false,
+          lastCost: 68600,
+          retail: null,
+        },
+      ],
+    },
+  };
+  const choose = async (code: RegExp) => {
+    fireEvent.click(screen.getByRole('button', { name: 'Item of line 3' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Item of line 3' }), { target: { value: 'a' } });
+    fireEvent.click(await screen.findByRole('option', { name: code }));
+  };
+  const start = async () => {
+    show(<ReceiptScreen api={fakeApi(lookups(), { 'GET /api/purchasing/items': ITEMS }).api} id="r1" />);
+    fireEvent.click(await screen.findByRole('button', { name: en.purchasing.line.add }));
+    await choose(/OIL050/);
+    const cost = screen.getByLabelText<HTMLInputElement>('Unit cost of line 3');
+    expect(cost.value).toBe('2450');
+    return cost;
+  };
+
+  it('empties the cost the old item filled in when the new item has no last cost', async () => {
+    const cost = await start();
+    await choose(/FNBL005/);
+    expect(cost.value).toBe('');
+  });
+
+  it("puts the new item's last cost in place of the one the old item filled in", async () => {
+    const cost = await start();
+    await choose(/FNBL002/);
+    expect(cost.value).toBe('686');
+  });
+
+  it('keeps a cost the purchaser typed', async () => {
+    const cost = await start();
+    fireEvent.change(cost, { target: { value: '2500' } });
+    await choose(/FNBL002/);
+    expect(cost.value).toBe('2500');
+  });
+});
