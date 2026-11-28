@@ -64,6 +64,13 @@ export const amountLimit = (minorUnits: number): number => AMOUNT_LIMIT * 10 ** 
 /** The largest quantity the books hold, in thousandths: `numeric(14, 3)` (99,999,999,999.999). */
 export const QTY_LIMIT = 99_999_999_999_999;
 
+/**
+ * A supplier's bill number as compared (W2-18, owner 2026-11-28): one bill is posted once per supplier, and two numbers
+ * are the same bill when they match after ignoring case and every space ("inv 4471" = "INV4471"). Dashes, slashes and
+ * other characters still count. The API's lookup and its check at Post compare by this.
+ */
+export const billNoKey = (text: string): string => text.toLowerCase().replace(/\s+/g, '');
+
 export interface ReceiptCheckInput {
   supplierId: string | null;
   billNo: string | null;
@@ -84,11 +91,14 @@ export interface ReceiptCheckInput {
   }[];
   /** The most any amount may be, in minor units (`amountLimit`); none given = the safe-integer range (W2-17). */
   maxAmount?: number;
+  /** The number of a posted receipt that already has this supplier's bill (`billNoKey`); none = null (W2-18). */
+  billNoPostedAs?: string | null;
 }
 
 export type ReceiptProblem =
   | 'supplier_required'
   | 'bill_no_required'
+  | 'bill_no_taken'
   | 'bill_date_required'
   | 'location_required'
   | 'lines_required'
@@ -167,6 +177,8 @@ export function checkReceipt(input: ReceiptCheckInput): {
   const header = (p: ReceiptProblem) => problems.push({ problem: p, row: null });
   if (!input.supplierId) header('supplier_required');
   if ((input.billNo ?? '').trim() === '') header('bill_no_required');
+  // The same supplier's bill is posted once (W2-18): another posted receipt already has it.
+  else if (input.billNoPostedAs) header('bill_no_taken');
   if (!input.billDate) header('bill_date_required');
   if (!input.locationId) header('location_required');
   if (input.lines.length === 0) header('lines_required');

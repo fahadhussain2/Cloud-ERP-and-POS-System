@@ -571,3 +571,73 @@ describe('the books', () => {
     }
   });
 });
+
+// W2-18 (owner, 2026-11-28): one supplier's bill is posted once. Two numbers are the same bill when they match after
+// ignoring case and spaces; another supplier may use the same number; drafts with it still save.
+describe("a supplier's bill, posted once (W2-18)", () => {
+  const bill = (supplierId: string, billNo: string) => ({
+    supplierId,
+    billNo,
+    billDate: '2026-11-05',
+    receivedOn: '2026-11-06',
+    locationId: shopLocation,
+    paidFrom: null,
+    billDiscount: 0,
+    billTotal: 1999,
+    notes: null,
+    lines: [{ itemId: items['OIL050'], qty: 1000, unitCost: 1999, lineDiscount: 0 }],
+  });
+  const create = async (body: ReturnType<typeof bill>) => {
+    const res = await send('POST', '/api/purchasing/receipts', 'maria', body);
+    expect(res.statusCode).toBe(201);
+    return res.json<{ id: string; rowVersion: string }>();
+  };
+  const post = (r: { id: string; rowVersion: string }) =>
+    send('POST', `/api/purchasing/receipts/${r.id}/post`, 'maria', { rowVersion: r.rowVersion });
+  const supplier = async (code: string) =>
+    (await send('POST', '/api/purchasing/suppliers', 'maria', { code, name: `Supplier ${code}` })).json<{
+      id: string;
+    }>().id;
+  const lookup = async (supplierId: string, billNo: string, except: string) =>
+    (
+      await send(
+        'GET',
+        `/api/purchasing/receipts/bill-no?supplier=${supplierId}&billNo=${encodeURIComponent(billNo)}&except=${except}`,
+        'maria',
+      )
+    ).json<{ posted: { id: string; number: string } | null; drafts: number }>();
+
+  it('a second receipt with a posted bill, in another case and spacing, saves as a draft but is refused at Post', async () => {
+    const again = await create(bill(naveed, 'inv -4471 '));
+    const view = (await send('GET', `/api/purchasing/receipts/${again.id}`, 'maria')).json<{
+      check: { problems: { problem: string; row: number | null }[] };
+    }>();
+    expect(view.check.problems).toContainEqual({ problem: 'bill_no_taken', row: null });
+    expect(await lookup(naveed, 'INV-4471', again.id)).toMatchObject({
+      posted: { number: 'GR000001' },
+      drafts: 0,
+    });
+    const refused = await post(again);
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json()).toMatchObject({ error: 'bill_no_taken', number: 'GR000001' });
+  });
+
+  it('the same number from another supplier posts', async () => {
+    const other = await supplier('0310');
+    expect((await post(await create(bill(other, 'INV-4471')))).statusCode).toBe(200);
+  });
+
+  it('two drafts with the same bill both save, and each is told of the other', async () => {
+    const s = await supplier('0311');
+    const a = await create(bill(s, 'D-1'));
+    await create(bill(s, 'd-1'));
+    expect(await lookup(s, 'D-1', a.id)).toEqual({ posted: null, drafts: 1 });
+  });
+
+  it('two Posts of the same bill at the same moment: one posts, the other is refused', async () => {
+    const s = await supplier('0312');
+    const [a, b] = [await create(bill(s, 'RACE-1')), await create(bill(s, 'race-1'))];
+    const codes = (await Promise.all([post(a), post(b)])).map((r) => r.statusCode).sort();
+    expect(codes).toEqual([200, 409]);
+  });
+});

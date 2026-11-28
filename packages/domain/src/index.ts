@@ -220,6 +220,7 @@ export { costFloor } from './floor';
 export {
   AMOUNT_LIMIT,
   amountLimit,
+  billNoKey,
   checkReceipt,
   checkReturn,
   QTY_LIMIT,

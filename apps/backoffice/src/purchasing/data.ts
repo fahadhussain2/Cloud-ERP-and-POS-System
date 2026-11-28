@@ -70,6 +70,7 @@ export function purchasingRefusal(
     today?: string;
     balance?: number;
     limit?: number;
+    number?: string;
   } | null;
   if (b?.error === 'invalid' && b.problems?.length)
     return b.problems.map((p) => problemText(t, exists, p.problem, p.row)).join(' ');
@@ -85,6 +86,8 @@ export function purchasingRefusal(
   if (b?.error === 'posting_failed') return t('purchasing.errors.posting_failed', { code: b.code ?? '' });
   if (b?.error === 'date_locked') return t('purchasing.errors.date_locked', { date: b.lockDate ?? '' });
   if (b?.error === 'date_in_future') return t('purchasing.errors.date_in_future', { today: b.today ?? '' });
+  // Someone posted this supplier's bill a moment earlier (W2-18).
+  if (b?.error === 'bill_no_taken') return t('purchasing.errors.bill_no_taken', { number: b.number ?? '' });
   if (b?.error && exists(`purchasing.errors.${b.error}`)) return t(`purchasing.errors.${b.error}`);
   return t('app.error');
 }

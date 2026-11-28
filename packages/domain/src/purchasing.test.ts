@@ -1,11 +1,13 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
+import billNoKeyCases from '../golden/bill-no-key.json';
 import receiptCheckCases from '../golden/receipt-check.json';
 import receiptTotalCases from '../golden/receipt-totals.json';
 import returnCheckCases from '../golden/return-check.json';
 import { money } from './money';
 import {
+  billNoKey,
   checkReceipt,
   checkReturn,
   receiptTotals,
@@ -21,6 +23,7 @@ import { runGolden, type GoldenFile } from './testing/golden';
 
 runGolden(receiptTotalCases as unknown as GoldenFile<ReceiptTotalsInput>, receiptTotals);
 runGolden(receiptCheckCases as unknown as GoldenFile<ReceiptCheckInput>, checkReceipt);
+runGolden(billNoKeyCases as GoldenFile<string>, billNoKey);
 runGolden(returnCheckCases as unknown as GoldenFile<ReturnCheckInput>, checkReturn);
 
 describe('receipt total properties', () => {

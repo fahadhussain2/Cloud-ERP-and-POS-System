@@ -832,3 +832,77 @@ describe('the fixes from the staging test (W2-17)', () => {
     expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1);
   });
 });
+
+// W2-18 (owner, 2026-11-28): one supplier's bill is posted once. The screen asks who else has it when the bill number
+// is left (and when a draft opens), and says it under Supplier's bill no.
+describe("a supplier's bill, posted once (W2-18)", () => {
+  const POSTED = { status: 200, body: { posted: { id: 'r14', number: 'GR000014' }, drafts: 0 } };
+  const NEW = (answer: { status: number; body: unknown }) =>
+    fakeApi(lookups(), { 'GET /api/purchasing/receipts/bill-no': answer });
+  const pickSupplier = async () => {
+    fireEvent.change(await screen.findByRole('combobox', { name: en.purchasing.fields.supplier }), {
+      target: { value: 'naveed' },
+    });
+    fireEvent.click(await screen.findByRole('option', { name: /Naveed Glass/ }));
+  };
+
+  it('says under the bill number which posted receipt has it, as a link to that receipt', async () => {
+    const answers: Record<string, { status: number; body: unknown }> = {
+      'GET /api/purchasing/receipts/bill-no': { status: 200, body: { posted: null, drafts: 0 } },
+    };
+    const f = fakeApi(lookups(), answers);
+    show(<ReceiptScreen api={f.api} id="new" />);
+    await pickSupplier();
+    const billNo = screen.getByLabelText(en.purchasing.fields.billNo);
+    fireEvent.change(billNo, { target: { value: 'INV-4471' } });
+    expect(f.calls.some((c) => c.path.startsWith('/api/purchasing/receipts/bill-no'))).toBe(false);
+    answers['GET /api/purchasing/receipts/bill-no'] = POSTED;
+    fireEvent.blur(billNo);
+    const link = await screen.findByRole('link', { name: 'GR000014' });
+    expect(link.getAttribute('href')).toBe(href.receipt('r14'));
+    expect(billNo.getAttribute('aria-invalid')).toBe('true');
+    expect(noteOf(billNo)).toBe('Already on GR000014.');
+    const asked = f.calls.find((c) => c.path.startsWith('/api/purchasing/receipts/bill-no'))!;
+    expect(asked.path).toContain('supplier=s1');
+    expect(asked.path).toContain('billNo=INV-4471');
+  });
+
+  it('a draft opened with a posted bill says so at once, and Post sends nothing and goes to the bill number', async () => {
+    const f = NEW(POSTED);
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    const billNo = await screen.findByLabelText(en.purchasing.fields.billNo);
+    await waitFor(() => expect(noteOf(billNo)).toBe('Already on GR000014.'));
+    const asked = f.calls.find((c) => c.path.startsWith('/api/purchasing/receipts/bill-no'))!;
+    expect(asked.path).toContain('except=r1');
+    fireEvent.change(screen.getByLabelText(en.purchasing.fields.billTotal), { target: { value: '13401' } });
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.post }));
+    expect(document.activeElement).toBe(billNo);
+    expect(f.calls.some((c) => c.method !== 'GET')).toBe(false);
+  });
+
+  it('another draft with the bill is an amber note only, and Post goes ahead', async () => {
+    const f = NEW({ status: 200, body: { posted: null, drafts: 1 } });
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    const note = await screen.findByText(en.purchasing.warnings.bill_no_on_draft);
+    expect(note.className).toContain('text-warn');
+    fireEvent.change(screen.getByLabelText(en.purchasing.fields.billTotal), { target: { value: '13401' } });
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.post }));
+    await waitFor(() => expect(f.calls.some((c) => c.method === 'PUT')).toBe(true));
+  });
+
+  it('says which receipt has the bill when the server refuses Post a moment later', async () => {
+    const f = fakeApi(lookups(), {
+      'GET /api/purchasing/receipts/bill-no': { status: 200, body: { posted: null, drafts: 0 } },
+      'POST /api/purchasing/receipts/r1/post': {
+        status: 409,
+        body: { error: 'bill_no_taken', number: 'GR000015' },
+      },
+    });
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    fireEvent.change(await screen.findByLabelText(en.purchasing.fields.billTotal), {
+      target: { value: '13401' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.post }));
+    expect(await screen.findByText('This bill is already on GR000015.')).toBeDefined();
+  });
+});

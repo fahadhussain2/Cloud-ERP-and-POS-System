@@ -1,4 +1,5 @@
 import {
+  BillNoQuery,
   CreateSupplierRequest,
   PostRequest,
   ReceiptDraft,
@@ -7,6 +8,7 @@ import {
   SaveReturnRequest,
   SupplierPaymentRequest,
   UpdateSupplierRequest,
+  type BillNoLookup,
   type DocumentRow,
   type PurchasingLookups,
   type ReceiptView,
@@ -17,6 +19,7 @@ import {
 import { withTenant } from '@erp/db';
 import {
   amountLimit,
+  billNoKey,
   can,
   checkReceipt,
   checkReturn,
@@ -438,6 +441,31 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     return new Map(rows.map((r) => [r.id, Number(r.left)]));
   };
 
+  /**
+   * The posted receipt and the other drafts with this supplier's bill (W2-18), compared by `billNoKey` here rather than
+   * in SQL, so the screen, this lookup and the check at Post agree exactly. One supplier's receipts are few.
+   */
+  const sameBill = async (
+    c: Client,
+    supplierId: string | null,
+    billNo: string | null,
+    except: string,
+  ): Promise<BillNoLookup> => {
+    const key = billNoKey(billNo ?? '');
+    if (!supplierId || key === '') return { posted: null, drafts: 0 };
+    const { rows } = await c.query<{ id: string; number: string | null; status: string; bill: string }>(
+      `SELECT id, number, status, supplier_bill_no AS bill FROM erp.goods_receipts
+       WHERE supplier_party_id = $1 AND supplier_bill_no IS NOT NULL AND id <> $2 ORDER BY posted_at NULLS LAST`,
+      [supplierId, except],
+    );
+    const same = rows.filter((r) => billNoKey(r.bill) === key);
+    const posted = same.find((r) => r.status === 'posted');
+    return {
+      posted: posted ? { id: posted.id, number: posted.number ?? '' } : null,
+      drafts: same.filter((r) => r.status === 'draft').length,
+    };
+  };
+
   const receiptView = async (c: Client, id: string): Promise<ReceiptView | null> => {
     const h = (
       await c.query<Row>(
@@ -491,6 +519,17 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       // A posted receipt's warnings would compare it with itself (its cost is now the last cost).
       lines: lines.map((l) => ({ ...l, lastCost: posted ? null : l.lastCost })),
       maxAmount: await limitOf(c),
+      // A draft whose bill this supplier's posted receipt already has can't post (W2-18).
+      billNoPostedAs: posted
+        ? null
+        : ((
+            await sameBill(
+              c,
+              (h['supplier_party_id'] as string | null) ?? null,
+              (h['supplier_bill_no'] as string | null) ?? null,
+              id,
+            )
+          ).posted?.number ?? null),
     });
     if (check.total !== null) {
       const t = receiptTotals({ lines, billDiscount: Number(h['bill_discount']) });
@@ -596,6 +635,14 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     });
   });
 
+  // Who else has this supplier's bill (W2-18): the screen asks when the bill number is left or the supplier changes.
+  scope.get('/purchasing/receipts/bill-no', { preHandler: receive }, async (req, reply) => {
+    const parsed = BillNoQuery.safeParse(req.query);
+    if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+    const q = parsed.data;
+    return run(req, reply, (c) => sameBill(c, q.supplier, q.billNo, q.except ?? NO_RETURN));
+  });
+
   scope.get('/purchasing/receipts/:id', { preHandler: read }, async (req, reply) => {
     const { id } = req.params as { id: string };
     return run(req, reply, async (c) => {
@@ -670,6 +717,21 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
     return run(req, reply, async (c) => {
       await checkVersion(c, 'goods_receipts', id, parsed.data.rowVersion);
+      // One supplier's bill is posted once (W2-18): receipts of one supplier post one at a time, so two posting the
+      // same bill at the same moment can't both see it free.
+      const head = (
+        await c.query<{ supplier: string | null; bill: string | null }>(
+          'SELECT supplier_party_id AS supplier, supplier_bill_no AS bill FROM erp.goods_receipts WHERE id = $1',
+          [id],
+        )
+      ).rows[0]!;
+      if (head.supplier !== null) {
+        await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          `goods_receipt_bill:${req.auth!.tenantId}:${head.supplier}`,
+        ]);
+        const taken = (await sameBill(c, head.supplier, head.bill, id)).posted;
+        if (taken) throw new Refusal(409, { error: 'bill_no_taken', number: taken.number });
+      }
       const v = (await receiptView(c, id))!;
       if (v.check.problems.length > 0)
         throw new Refusal(400, {
