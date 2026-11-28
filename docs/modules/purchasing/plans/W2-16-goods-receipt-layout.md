@@ -149,3 +149,14 @@ One branch off `staging`, one PR.
 - A quantity column on the receipts list (point 9).
 - The same layout for transfers, adjustments or vouchers (only their field problems change here); the `ActionBar` is in the kit so they can take it later.
 - Any change to the POS or `packages/ui`.
+
+## As built (2026-11-28)
+
+- **Bugs first:** ten failing tests committed and locked (the item field reached with Tab, the focus after a pick or Esc, the list near the window's bottom, deleting a draft on both screens, the labels link), then the fixes, then unlocked.
+- **The item field:** a typed character opens the search with it and the caret after it; ↓ or Backspace opens it empty; Space and Enter still click; Ctrl, Alt and ⌘ shortcuts are left alone. After a pick or Esc the focus is back on the field; a click elsewhere closes the search without taking it back.
+- **The list's place:** under its box unless the window has less than 160px (about five rows) under it and more above; under the box it is no taller than the room. Both `floating` modes.
+- **`lineFields.tsx`** (purchasing): the problem-to-field maps, `useShownProblems` (a field's problem once it is left, every one on Save draft or Post, the cursor to the first marked field), `useFocusNewLine` (the cursor to a line added with Enter) and `LineBox` (a box filling its column with its problem and notes tied to it).
+- **Kit:** `ActionBar`; `IconButton tone="bad"` (red at rest); `Select`'s `note`; `FIELD_BOX` sets the dark fill (`dark:bg-input/30`).
+- **A server refusal on Post stays a toast,** even one about a field: the form reloads after a refused Post (as before), and its own check already marks every field problem before anything is sent.
+- **Transfers and adjustments:** each line problem under its own box (the quantity's under the quantity, with the below-zero warning; the rest under the item) and every cell at the top. Their problems still show as typed; the "once left" timing and the bar are only on receipts and returns.
+- **A purchase return's lines** have no bin, as before (the plan didn't add one).

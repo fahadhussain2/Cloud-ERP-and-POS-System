@@ -72,21 +72,47 @@ test('the owner records a supplier bill with a bill discount, returns part of it
   await page.getByRole('combobox', { name: 'Item of line 1' }).press('ArrowDown');
   await page.getByRole('combobox', { name: 'Item of line 1' }).press('Enter');
   await expect(page.getByRole('button', { name: 'Item of line 1' })).toContainText('FNBL002');
-  // The line's item for this flow.
-  await page.getByRole('button', { name: 'Item of line 1' }).click();
-  await page.getByRole('combobox', { name: 'Item of line 1' }).fill('enol001');
+  // W2-16 (owner, 2026-11-28): after a pick the cursor is back on the item, so Tab goes on to the quantity.
+  await page.keyboard.press('Tab');
+  await expect(page.getByLabel('Quantity of line 1')).toBeFocused();
+  // The line's item for this flow, typed straight into the field reached from the keyboard (W2-16).
+  await page.getByRole('button', { name: 'Item of line 1' }).focus();
+  await page.keyboard.type('enol001');
+  await expect(page.getByRole('combobox', { name: 'Item of line 1' })).toHaveValue('enol001');
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('ENOL001');
   await page.getByRole('combobox', { name: 'Item of line 1' }).press('Enter');
-  await page.getByLabel('Quantity of line 1').fill('10');
+  await expect(page.getByRole('button', { name: 'Item of line 1' })).toContainText('ENOL001');
+
+  // A problem under the quantity leaves the line's boxes in line, and typing moves no column (W2-16).
+  const boxes = ['Item of line 1', 'Quantity of line 1', 'Unit cost of line 1', 'Discount of line 1'];
+  const boxOf = (name: string) =>
+    name.startsWith('Item') ? page.getByRole('button', { name }) : page.getByLabel(name, { exact: true });
+  await page.getByLabel('Quantity of line 1').fill('0');
+  await page.getByLabel('Quantity of line 1').press('Tab');
+  await expect(page.getByLabel('Quantity of line 1')).toHaveAttribute('aria-invalid', 'true');
+  const tops = await Promise.all(boxes.map(async (b) => (await boxOf(b).boundingBox())!.y));
+  expect(new Set(tops.map((y) => Math.round(y))).size).toBe(1);
+  const lefts = async () =>
+    Promise.all(boxes.map(async (b) => Math.round((await boxOf(b).boundingBox())!.x)));
+  const before = await lefts();
   await page.getByLabel('Unit cost of line 1').fill('5000');
+  await page.getByLabel('Discount of line 1').fill('1250');
+  expect(await lefts()).toEqual(before);
+  await page.getByLabel('Discount of line 1').fill('');
+
+  await page.getByLabel('Quantity of line 1').fill('10');
   await page.getByLabel(bo.purchasing.fields.billDiscount).fill('1000');
   await page.getByLabel(bo.purchasing.fields.billTotal).fill('48000');
-  const totals = page.getByLabel(bo.purchasing.receipts.totals);
-  await expect(totals.getByRole('status')).toHaveText(/-Rs\s?1,000/);
-  await expect(page.getByRole('button', { name: bo.purchasing.post })).toBeDisabled();
+  // The totals stay in view in the bar at the bottom of the window; Post stays clickable and, while the lines don't
+  // add up to the bill, sends nothing and puts the cursor on the bill total (W2-16).
+  const bar = page.getByRole('region', { name: bo.purchasing.bar });
+  await expect(bar.getByRole('status')).toContainText(/-Rs\s?1,000/);
+  await bar.getByRole('button', { name: bo.purchasing.post }).click();
+  await expect(page.getByLabel(bo.purchasing.fields.billTotal)).toBeFocused();
+  await expect(page.getByLabel(bo.purchasing.fields.billTotal)).toHaveAttribute('aria-invalid', 'true');
   await page.getByLabel(bo.purchasing.fields.billTotal).fill('49000');
-  await expect(totals.getByRole('status')).toHaveText(bo.purchasing.totals.matches);
-  await page.getByRole('button', { name: bo.purchasing.post }).click();
+  await expect(bar.getByRole('status')).toContainText(bo.purchasing.totals.matches);
+  await bar.getByRole('button', { name: bo.purchasing.post }).click();
   await expect(page.getByRole('heading', { name: 'GR000001' })).toBeVisible();
   // Rs 4,900 a can after the bill discount: the item's average and last cost.
   await expect
@@ -101,6 +127,8 @@ test('the owner records a supplier bill with a bill discount, returns part of it
   // W1-17: the received cans' labels, one per piece, with the supplier's abbreviation and the Code 39 barcode.
   await page.getByRole('main').getByRole('link', { name: bo.labels.makeLabels }).click();
   await expect(page.getByText('GR000001 · Naveed Glass')).toBeVisible();
+  // Opened by its number, which the field shows (W2-16 point 8).
+  await expect(page.getByLabel(bo.labels.receiptNumber)).toHaveValue('GR000001');
   await expect(page.getByLabel('Labels for ENOL001')).toHaveValue('10');
   const preview = page.getByRole('region', { name: bo.labels.preview });
   await expect(preview.getByRole('img', { name: 'Label ENOL001' })).toHaveCount(10);
