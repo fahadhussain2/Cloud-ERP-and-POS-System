@@ -25,15 +25,33 @@ export function usePurchasingLookups(api: Api): PurchasingLookups | null {
   return lookups;
 }
 
-/** The words for a problem code, with its row when it has one. */
+/** The words for a problem code, with its row when it has one; `limit` names the most an amount may be (W2-17). */
 export function problemText(
   t: TFunction,
   exists: (key: string) => boolean,
   problem: string,
   row: number | null,
+  limit?: string,
 ) {
-  const text = exists(`purchasing.problems.${problem}`) ? t(`purchasing.problems.${problem}`) : problem;
+  const text = exists(`purchasing.problems.${problem}`)
+    ? t(`purchasing.problems.${problem}`, { limit })
+    : problem;
   return row === null ? text : t('purchasing.problems.row', { row: row + 1, text });
+}
+
+/**
+ * The short words under a line's box (W2-17): the column's heading already names the field, so "Above 0" says what
+ * "Type a quantity above 0." does. A problem with no short form keeps its sentence.
+ */
+export function shortProblemText(
+  t: TFunction,
+  exists: (key: string) => boolean,
+  problem: string,
+  limit: string,
+) {
+  return exists(`purchasing.short.${problem}`)
+    ? t(`purchasing.short.${problem}`, { limit })
+    : problemText(t, exists, problem, null, limit);
 }
 
 /** The words for a refusal from the purchasing API; `money` formats an amount in it (a supplier's open balance). */
@@ -51,9 +69,15 @@ export function purchasingRefusal(
     lockDate?: string;
     today?: string;
     balance?: number;
+    limit?: number;
   } | null;
   if (b?.error === 'invalid' && b.problems?.length)
     return b.problems.map((p) => problemText(t, exists, p.problem, p.row)).join(' ');
+  // An amount over Rs 1 crore (W2-17): the screen marks it first, so this is only for a page out of date.
+  if (b?.error === 'too_large' && b.problems?.length) {
+    const limit = b.limit !== undefined && money ? formatMoney(b.limit, money) : undefined;
+    return b.problems.map((p) => problemText(t, exists, p.problem, p.row, limit)).join(' ');
+  }
   if (b?.error === 'stale')
     return t('purchasing.errors.stale', { by: b.by ?? t('purchasing.errors.someone') });
   if (b?.error === 'balance_open' && b.balance !== undefined && money)

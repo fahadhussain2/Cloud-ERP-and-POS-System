@@ -28,7 +28,7 @@ import type { Api } from '../api';
 import { qtyText, qtyValue } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
 import { href, navigate, takeCarried } from '../router';
-import { Button, buttonClass, notify, Select, TextBox, TextInput } from '../ui';
+import { Button, buttonClass, notify, Select, TextBox, TextInput, useOneAtATime } from '../ui';
 import { LineBox } from '../purchasing/lineFields';
 import { dateProblem, inventoryRefusal, locationName, problemText, useInventoryLookups } from './data';
 
@@ -303,9 +303,12 @@ function TransferForm({
     if (!x) navigate(href.transfer(id));
     else onSaved();
   };
+  // One save at a time (W2-17): a second quick click could carry the version the first had just replaced. An action
+  // that succeeded keeps the buttons busy until the form is reloaded with the new version.
+  const act = useOneAtATime<'save' | 'post' | 'receive' | 'approve' | 'reject'>();
   const postIt = async () => {
     const s = await save();
-    if (!s) return;
+    if (!s) return false;
     const res = await api('POST', `/api/inventory/transfers/${encodeURIComponent(s.id)}/post`, {
       rowVersion: s.rowVersion,
     });
@@ -313,6 +316,7 @@ function TransferForm({
     // outlives the reload or the move to the new draft's own address.
     if (res.status !== 200) notify.problem(inventoryRefusal(t, exists, res.body));
     after(s.id);
+    return true;
   };
   const receiveIt = async () => {
     const res = await api('POST', `/api/inventory/transfers/${encodeURIComponent(x!.id)}/receive`, {
@@ -320,8 +324,13 @@ function TransferForm({
       receivedOn,
       lines: view!.lines.map((l, i) => ({ lineId: l.id, receivedQty: qtyValue(received[i] ?? '') ?? 0 })),
     });
-    if (res.status !== 200) notify.problem(inventoryRefusal(t, exists, res.body));
-    else onSaved();
+    if (res.status !== 200) {
+      notify.problem(inventoryRefusal(t, exists, res.body));
+      return false;
+    }
+    // Done once: the reload shows what changed, so the buttons come back at once.
+    onSaved();
+    return false;
   };
 
   return (
@@ -475,13 +484,16 @@ function TransferForm({
           <Button
             variant="outline"
             icon={Save}
+            busy={act.busy === 'save'}
+            disabled={act.busy !== null}
             onClick={() =>
-              void save().then((s) => {
-                if (s) {
-                  notify.done(t('inventory.saved'));
-                  after(s.id);
-                }
-              })
+              void act.run('save', async () => {
+                const s = await save();
+                if (!s) return false;
+                notify.done(t('inventory.saved'));
+                after(s.id);
+                return true;
+              })()
             }
           >
             {t('inventory.saveDraft')}
@@ -489,8 +501,9 @@ function TransferForm({
           {lookups.can.postTransfer && (
             <Button
               icon={Send}
-              onClick={() => void postIt()}
-              disabled={check.problems.length > 0 || locked !== null}
+              onClick={() => void act.run('post', postIt)()}
+              busy={act.busy === 'post'}
+              disabled={check.problems.length > 0 || locked !== null || act.busy !== null}
             >
               {needsReceiving ? t('inventory.transfers.send') : t('inventory.post')}
             </Button>
@@ -507,7 +520,12 @@ function TransferForm({
             value={receivedOn}
             onChange={(e) => setReceivedOn(e.target.value)}
           />
-          <Button icon={PackageCheck} onClick={() => void receiveIt()} disabled={receiveLocked !== null}>
+          <Button
+            icon={PackageCheck}
+            onClick={() => void act.run('receive', receiveIt)()}
+            busy={act.busy === 'receive'}
+            disabled={receiveLocked !== null || act.busy !== null}
+          >
             {t('inventory.transfers.receive')}
           </Button>
           <span className="text-sm text-muted-foreground">{t('inventory.transfers.receiveHint')}</span>

@@ -92,6 +92,20 @@ test('the owner records a supplier bill with a bill discount, returns part of it
   await expect(page.getByLabel('Quantity of line 1')).toHaveAttribute('aria-invalid', 'true');
   const tops = await Promise.all(boxes.map(async (b) => (await boxOf(b).boundingBox())!.y));
   expect(new Set(tops.map((y) => Math.round(y))).size).toBe(1);
+  // Two problems on one line each stay inside their own column, wrapping there, never running into the next (W2-17).
+  await page.getByLabel('Unit cost of line 1').fill('abc');
+  await page.getByLabel('Unit cost of line 1').press('Tab');
+  await expect(page.getByLabel('Unit cost of line 1')).toHaveAttribute('aria-invalid', 'true');
+  for (const name of ['Quantity of line 1', 'Unit cost of line 1']) {
+    const box = page.getByLabel(name, { exact: true });
+    const id = (await box.getAttribute('aria-describedby'))!.split(' ')[0]!;
+    const message = page.locator(`[id="${id}"]`);
+    await expect(message).toBeVisible();
+    expect(await message.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    const [m, b] = [(await message.boundingBox())!, (await box.boundingBox())!];
+    expect(m.x).toBeGreaterThanOrEqual(b.x - 1);
+    expect(m.x + m.width).toBeLessThanOrEqual(b.x + b.width + 1);
+  }
   const lefts = async () =>
     Promise.all(boxes.map(async (b) => Math.round((await boxOf(b).boundingBox())!.x)));
   const before = await lefts();

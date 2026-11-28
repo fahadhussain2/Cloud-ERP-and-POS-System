@@ -24,6 +24,7 @@ export const HEAD_FIELD: Readonly<Record<string, string>> = {
   bill_discount_invalid: 'billDiscount',
   total_required: 'billTotal',
   total_mismatch: 'billTotal',
+  total_too_large: 'billTotal',
   lines_required: 'lines',
   reason_required: 'reason',
   reason_unknown: 'reason',
@@ -37,8 +38,11 @@ const LINE_FIELD: Readonly<Record<string, LineField>> = {
   item_required: 'item',
   qty_positive: 'qty',
   qty_fraction: 'qty',
+  qty_too_large: 'qty',
   more_than_received: 'qty',
   cost_invalid: 'unitCost',
+  cost_too_large: 'unitCost',
+  line_too_large: 'unitCost',
   discount_invalid: 'discount',
 };
 export const lineFieldOf = (problem: string): LineField => LINE_FIELD[problem] ?? 'item';
@@ -62,6 +66,11 @@ export function useShownProblems(root: RefObject<HTMLElement | null>) {
     showAll: () => setAll(true),
     focusFirst: () => {
       setAll(true);
+      setTick((x) => x + 1);
+    },
+    /** Marks only these fields (as if left) and puts the cursor in the first marked one (W2-17: Save draft). */
+    mark: (keys: readonly string[]) => {
+      setTouched((s) => new Set([...s, ...keys]));
       setTick((x) => x + 1);
     },
   };
@@ -114,7 +123,12 @@ export function LineBox({
         {...props}
       />
       {error && (
-        <p id={`${id}-error`} role="alert" className="m-0 text-xs font-medium text-bad">
+        // Wraps inside its own column, never into the next one (W2-17: the shared cell doesn't wrap).
+        <p
+          id={`${id}-error`}
+          role="alert"
+          className="m-0 text-xs font-medium [overflow-wrap:anywhere] whitespace-normal text-bad"
+        >
           {error}
         </p>
       )}
@@ -123,7 +137,7 @@ export function LineBox({
           key={k}
           id={`${id}-note-${k}`}
           className={cn(
-            'm-0 text-end text-xs tabular-nums',
+            'm-0 text-end text-xs [overflow-wrap:anywhere] whitespace-normal tabular-nums',
             n.warn ? 'font-medium text-warn' : 'text-muted-foreground',
           )}
         >

@@ -22,7 +22,7 @@ import type { Api } from '../api';
 import { qtyText, qtyValue } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
 import { href, navigate, takeCarried } from '../router';
-import { Button, buttonClass, notify, Select, TextInput } from '../ui';
+import { Button, buttonClass, notify, Select, TextInput, useOneAtATime } from '../ui';
 import { LineBox } from '../purchasing/lineFields';
 import { dateProblem, inventoryRefusal, locationName, problemText, useInventoryLookups } from './data';
 import { StatusOf } from './TransferScreen';
@@ -267,9 +267,12 @@ function AdjustmentForm({
     if (!a) navigate(href.adjustment(id));
     else onSaved();
   };
+  // One save at a time (W2-17): a second quick click could carry the version the first had just replaced. An action
+  // that succeeded keeps the buttons busy until the form is reloaded with the new version.
+  const act = useOneAtATime<'save' | 'post' | 'receive' | 'approve' | 'reject'>();
   const postIt = async () => {
     const s = await save();
-    if (!s) return;
+    if (!s) return false;
     const res = await api('POST', `/api/inventory/adjustments/${encodeURIComponent(s.id)}/post`, {
       rowVersion: s.rowVersion,
     });
@@ -277,14 +280,20 @@ function AdjustmentForm({
     // outlives the reload or the move to the new draft's own address.
     if (res.status !== 200) notify.problem(inventoryRefusal(t, exists, res.body));
     after(s.id);
+    return true;
   };
   const decide = async (what: 'approve' | 'reject') => {
     const res = await api('POST', `/api/inventory/adjustments/${encodeURIComponent(a!.id)}/${what}`, {
       rowVersion: a!.rowVersion,
       ...(what === 'reject' ? { note: rejectNote } : {}),
     });
-    if (res.status !== 200) notify.problem(inventoryRefusal(t, exists, res.body));
-    else onSaved();
+    if (res.status !== 200) {
+      notify.problem(inventoryRefusal(t, exists, res.body));
+      return false;
+    }
+    // Done once: the reload shows what changed, so the buttons come back at once.
+    onSaved();
+    return false;
   };
 
   return (
@@ -440,21 +449,25 @@ function AdjustmentForm({
           <Button
             variant="outline"
             icon={Save}
+            busy={act.busy === 'save'}
+            disabled={act.busy !== null}
             onClick={() =>
-              void save().then((s) => {
-                if (s) {
-                  notify.done(t('inventory.saved'));
-                  after(s.id);
-                }
-              })
+              void act.run('save', async () => {
+                const s = await save();
+                if (!s) return false;
+                notify.done(t('inventory.saved'));
+                after(s.id);
+                return true;
+              })()
             }
           >
             {t('inventory.saveDraft')}
           </Button>
           <Button
             icon={Send}
-            onClick={() => void postIt()}
-            disabled={check.problems.length > 0 || locked !== null}
+            onClick={() => void act.run('post', postIt)()}
+            busy={act.busy === 'post'}
+            disabled={check.problems.length > 0 || locked !== null || act.busy !== null}
           >
             {waits ? t('inventory.adjustments.sendForApproval') : t('inventory.post')}
           </Button>
@@ -462,7 +475,12 @@ function AdjustmentForm({
       )}
       {a?.status === 'awaiting_approval' && lookups.can.approve && (
         <Panel className="flex flex-wrap items-end gap-3 p-3.5">
-          <Button icon={Check} onClick={() => void decide('approve')} disabled={approveLocked !== null}>
+          <Button
+            icon={Check}
+            onClick={() => void act.run('approve', () => decide('approve'))()}
+            busy={act.busy === 'approve'}
+            disabled={approveLocked !== null || act.busy !== null}
+          >
             {t('inventory.adjustments.approve')}
           </Button>
           {approveLocked && <span className="text-sm text-bad">{approveLocked}</span>}
@@ -475,8 +493,9 @@ function AdjustmentForm({
           <Button
             variant="outline"
             icon={X}
-            disabled={rejectNote.trim() === ''}
-            onClick={() => void decide('reject')}
+            busy={act.busy === 'reject'}
+            disabled={rejectNote.trim() === '' || act.busy !== null}
+            onClick={() => void act.run('reject', () => decide('reject'))()}
           >
             {t('inventory.adjustments.reject')}
           </Button>

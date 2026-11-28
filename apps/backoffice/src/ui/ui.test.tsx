@@ -17,10 +17,12 @@ import {
   IconButton,
   ListToolbar,
   notify,
+  ScreenGuard,
   SearchBox,
   Select,
   TextInput,
   Toaster,
+  useOneAtATime,
 } from './index';
 
 // The back office's own controls (W2-12 plan, "Back-office kit"): composed from packages/ui, never editing it, so the
@@ -432,5 +434,84 @@ describe('Select with a note', () => {
 describe('fields in dark mode', () => {
   it('keep a faint fill of their own, on boxes and on the controls drawn as a field', () => {
     expect(FIELD_BOX).toContain('dark:bg-input/30');
+  });
+});
+
+// W2-17 (owner's staging test, 2026-11-28): one save at a time, and an error screen in place of a blank page.
+describe('one action at a time', () => {
+  function Saver({ action }: { action: () => Promise<boolean> }) {
+    const act = useOneAtATime<'save' | 'post'>();
+    return (
+      <>
+        <Button
+          icon={Save}
+          busy={act.busy === 'save'}
+          disabled={act.busy !== null}
+          onClick={() => void act.run('save', action)()}
+        >
+          Save draft
+        </Button>
+        <Button disabled={act.busy !== null}>Post</Button>
+      </>
+    );
+  }
+
+  it('a busy button is disabled and shows a spinner in place of its icon; its name stays', () => {
+    show(
+      <Button icon={Save} busy>
+        Save draft
+      </Button>,
+    );
+    const button = screen.getByRole<HTMLButtonElement>('button', { name: 'Save draft' });
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute('aria-busy')).toBe('true');
+    expect(button.querySelector('svg')?.getAttribute('class')).toContain('animate-spin');
+  });
+
+  it('runs once for two quick clicks, and keeps the buttons busy after a save that replaces the form', async () => {
+    const action = vi.fn(() => Promise.resolve(true));
+    show(<Saver action={action} />);
+    const save = screen.getByRole<HTMLButtonElement>('button', { name: 'Save draft' });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    expect(save.disabled).toBe(true);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Post' }).disabled).toBe(true);
+  });
+
+  it('gives the buttons back when the action is refused', async () => {
+    const action = vi.fn(() => Promise.resolve(false));
+    show(<Saver action={action} />);
+    const save = screen.getByRole<HTMLButtonElement>('button', { name: 'Save draft' });
+    fireEvent.click(save);
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe('ScreenGuard', () => {
+  function Boom(): never {
+    throw new Error('a screen that fails');
+  }
+
+  it('shows the error screen with Reload where a failed screen was, and tries again at another address', () => {
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { rerender } = show(
+      <ScreenGuard at="receipt">
+        <Boom />
+      </ScreenGuard>,
+    );
+    expect(screen.getByRole('heading', { name: en.app.failed.title })).toBeDefined();
+    expect(screen.getByRole('button', { name: en.app.failed.reload })).toBeDefined();
+    rerender(
+      <I18nextProvider i18n={i18n}>
+        <ScreenGuard at="receipts">
+          <p>The list</p>
+        </ScreenGuard>
+      </I18nextProvider>,
+    );
+    expect(screen.getByText('The list')).toBeDefined();
+    quiet.mockRestore();
   });
 });

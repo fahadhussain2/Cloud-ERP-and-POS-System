@@ -543,27 +543,70 @@ describe('a goods receipt line, field by field (W2-16)', () => {
     const qty = await screen.findByLabelText('Quantity of line 2');
     fireEvent.focus(qty);
     fireEvent.change(qty, { target: { value: '0' } });
-    expect(screen.queryByText(en.purchasing.problems.qty_positive)).toBeNull();
+    expect(screen.queryByText(en.purchasing.short.qty_positive)).toBeNull();
     fireEvent.blur(qty);
     expect(qty.getAttribute('aria-invalid')).toBe('true');
-    expect(noteOf(qty)).toContain(en.purchasing.problems.qty_positive);
+    // In short words under a line's box: the column already names the field (W2-17).
+    expect(noteOf(qty)).toBe(en.purchasing.short.qty_positive);
     expect(noteOf(screen.getByRole('button', { name: 'Item of line 2' }))).not.toContain(
-      en.purchasing.problems.qty_positive,
+      en.purchasing.short.qty_positive,
     );
     // The other boxes of the line keep their places: nothing is added to their cells.
     expect(screen.getByLabelText('Discount of line 2').getAttribute('aria-invalid')).toBeNull();
   });
 
-  it('Save draft keeps a draft with problems, and marks every one at its field', async () => {
+  // W2-17 (owner answer 2): Save draft marks nothing red; it keeps the draft and says what is left before posting.
+  it('Save draft keeps a draft with problems, marks nothing, and says what is left', async () => {
     const f = fakeApi(lookups());
     show(<ReceiptScreen api={f.api} id="r1" />);
     const billNo = await screen.findByLabelText(en.purchasing.fields.billNo);
     fireEvent.change(billNo, { target: { value: '' } });
-    expect(billNo.getAttribute('aria-invalid')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: en.purchasing.saveDraft }));
-    expect(billNo.getAttribute('aria-invalid')).toBe('true');
-    expect(noteOf(billNo)).toBe(en.purchasing.problems.bill_no_required);
     await waitFor(() => expect(f.calls.some((c) => c.method === 'PUT')).toBe(true));
+    expect(billNo.getAttribute('aria-invalid')).toBeNull();
+    // The bill number, and the lines that don't add up to the bill.
+    expect(await screen.findByText('Draft saved. 2 to fix before posting.')).toBeDefined();
+  });
+
+  it('a saved draft says quietly in the bar what is left, and in red once Post is pressed', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    const bar = await screen.findByRole('region', { name: en.purchasing.bar });
+    const left = within(bar).getByText('1 to fix before posting');
+    expect(left.className).toContain('text-muted-foreground');
+    fireEvent.click(within(bar).getByRole('button', { name: en.purchasing.post }));
+    expect(within(bar).getByText('1 to fix before posting').className).toContain('text-bad');
+  });
+
+  it('says a cost over Rs 1 crore under Unit cost, and Save draft keeps nothing until it is fixed', async () => {
+    const f = fakeApi(lookups());
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    const cost = await screen.findByLabelText('Unit cost of line 2');
+    fireEvent.change(cost, { target: { value: '10000001' } });
+    fireEvent.blur(cost);
+    expect(noteOf(cost)).toMatch(/^Over Rs\s?10,000,000/);
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.saveDraft }));
+    expect(await screen.findByText(en.purchasing.cantSave)).toBeDefined();
+    expect(f.calls.some((c) => c.method !== 'GET')).toBe(false);
+  });
+
+  it('says "Not an amount" under a discount that isn\'t one, and "More than the line" when it is too big', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    const discount = await screen.findByLabelText('Discount of line 2');
+    fireEvent.change(discount, { target: { value: 's' } });
+    fireEvent.blur(discount);
+    expect(noteOf(discount)).toBe(en.purchasing.short.not_amount);
+    fireEvent.change(discount, { target: { value: '5000' } });
+    expect(noteOf(discount)).toBe(en.purchasing.short.discount_invalid);
+  });
+
+  it('names the payment: not paid yet, or paid from a bank, with the cash note in the list', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    const payment = await screen.findByRole('combobox', { name: en.purchasing.fields.paid });
+    expect(payment.textContent).toContain("Not paid yet (on the supplier's account)");
+    fireEvent.keyDown(payment, { key: 'ArrowDown' });
+    const list = await screen.findByRole('listbox');
+    expect(within(list).getByRole('option', { name: 'Paid from Bank: HBL' })).toBeDefined();
+    expect(within(list).getByText(en.purchasing.receipts.cashNote)).toBeDefined();
   });
 
   it('adds a line on Enter in the last Discount, with the cursor in its Item', async () => {
@@ -604,7 +647,7 @@ describe('a purchase return from a receipt (W2-16)', () => {
     fireEvent.change(qty, { target: { value: '8' } });
     fireEvent.blur(qty);
     expect(qty.getAttribute('aria-invalid')).toBe('true');
-    expect(noteOf(qty)).toContain(en.purchasing.problems.more_than_received);
+    expect(noteOf(qty)).toContain(en.purchasing.short.more_than_received);
     expect(f.calls.some((c) => c.method !== 'GET')).toBe(false);
   });
 
