@@ -1607,6 +1607,9 @@
     "deleteText_one": "This draft and its line go for good. This can't be undone.",
     "deleteText_other": "This draft and its {{count}} lines go for good. This can't be undone.",
     "deleted": "Draft deleted.",
+    "bar": "Save or post",
+    "toFix_one": "{{count}} to fix before posting",
+    "toFix_other": "{{count}} to fix before posting",
     "fields": {
       "code": "Code",
       "name": "Name",
@@ -1704,10 +1707,11 @@
       "bill": "The supplier's bill",
       "lines": "Lines",
       "totals": "Totals",
+      "foot": "The bill's total",
       "editHelp": "Type the bill as printed. Save keeps a draft; Post makes it final.",
       "onAccount": "On the supplier's account",
       "paidBy": "Paid by bank: {{bank}}",
-      "cashHint": "Paid in cash? Post it on the supplier's account; the cashier then pays it at the desk (Pay supplier).",
+      "cashNote": "Paid in cash? Choose On the supplier's account, then pay it at the desk (Pay supplier).",
       "due": "Due {{date}}",
       "saved": "Draft saved."
     },
@@ -1721,10 +1725,12 @@
       "of": "From {{number}}",
       "lines": "Lines",
       "total": "Supplier owes back: {{amount}}",
-      "saved": "Draft saved."
+      "saved": "Draft saved.",
+      "upTo": "Up to {{qty}}"
     },
     "line": {
       "item": "Item",
+      "number": "Line",
       "itemOf": "Item of line {{row}}",
       "pick": "Pick an item",
       "searchHint": "Code, name, barcode or OEM number",
@@ -1740,7 +1746,12 @@
       "add": "Add a line",
       "remove": "Remove",
       "results": "Items found",
-      "removeOf": "Remove line {{row}}"
+      "removeOf": "Remove line {{row}}",
+      "enterHint": "Enter in the last box adds a line",
+      "last": "Last {{cost}}",
+      "lastUp": "Last {{cost}} · {{pct}} % up",
+      "lastDown": "Last {{cost}} · {{pct}} % down",
+      "retailLow": "Retail {{retail}}: at or below the cost"
     },
     "totals": {
       "subtotal": "Lines",

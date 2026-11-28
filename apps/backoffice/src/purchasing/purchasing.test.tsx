@@ -158,21 +158,36 @@ afterEach(() => {
 });
 
 describe('a goods receipt', () => {
-  it('shows the difference from the printed total and keeps Post waiting until it matches', async () => {
+  // W2-16: the difference sits in the bar at the bottom of the window; Post stays clickable, and with problems it
+  // sends nothing, marks them at their field and puts the cursor on the first (owner, 2026-11-28).
+  it('shows the difference from the printed total in the bar, and Post sends nothing until it matches', async () => {
     const f = fakeApi(lookups());
     show(<ReceiptScreen api={f.api} id="r1" />);
-    const totals = await screen.findByLabelText(en.purchasing.receipts.totals);
+    const bar = await screen.findByRole('region', { name: en.purchasing.bar });
     // 10 × 1,250 + 2 × 450.50 = 13,401; the bill says 13,400.
-    expect(within(totals).getByRole('status').textContent).toMatch(/-Rs\s?1/);
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post }).disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText(en.purchasing.fields.billTotal), { target: { value: '13401' } });
-    expect(within(totals).getByRole('status').textContent).toBe(en.purchasing.totals.matches);
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post }).disabled).toBe(false);
+    expect(within(bar).getByRole('status').textContent).toMatch(/-Rs\s?1/);
+    const post = screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post });
+    expect(post.disabled).toBe(false);
+    fireEvent.click(post);
+    const total = screen.getByLabelText(en.purchasing.fields.billTotal);
+    expect(total.getAttribute('aria-invalid')).toBe('true');
+    expect(document.getElementById(total.getAttribute('aria-describedby')!)!.textContent).toBe(
+      en.purchasing.problems.total_mismatch,
+    );
+    expect(document.activeElement).toBe(total);
+    expect(within(bar).getByText('1 to fix before posting')).toBeDefined();
+    expect(f.calls.some((c) => c.method !== 'GET')).toBe(false);
+    fireEvent.change(total, { target: { value: '13401' } });
+    expect(within(bar).getByRole('status').textContent).toContain(en.purchasing.totals.matches);
+    expect(total.getAttribute('aria-invalid')).toBeNull();
   });
 
-  it('warns when a cost is more than 10 % above the last one', async () => {
+  it('shows the last cost under the unit cost, and how far it moved when more than 10 %', async () => {
     show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
-    expect(await screen.findByText(en.purchasing.warnings.cost_up)).toBeDefined();
+    // Line 1: 1,250 against a last cost of 1,000.
+    const cost = await screen.findByLabelText('Unit cost of line 1');
+    const note = document.getElementById(cost.getAttribute('aria-describedby')!.split(' ')[0]!)!;
+    expect(note.textContent).toMatch(/^Last Rs\s?1,000 · 25 % up$/);
   });
 
   it('saves the draft with the row version, then posts it', async () => {
@@ -200,9 +215,14 @@ describe('a goods receipt', () => {
     expect(f.calls.find((c) => c.path.endsWith('/post'))!.body).toEqual({ rowVersion: '4' });
   });
 
-  it('says a cash bill is paid at the desk, with no go-live notice (D-113)', async () => {
+  // W2-16: the note is in the Paid dropdown, where someone looking for Cash finds it, not a line on every receipt.
+  it('says a cash bill is paid at the desk, in the Paid dropdown, with no go-live notice (D-113)', async () => {
     show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
-    expect(await screen.findByText(en.purchasing.receipts.cashHint)).toBeDefined();
+    const paid = await screen.findByRole('combobox', { name: en.purchasing.fields.paid });
+    expect(screen.queryByText(en.purchasing.receipts.cashNote)).toBeNull();
+    fireEvent.keyDown(paid, { key: 'ArrowDown' });
+    const list = await screen.findByRole('listbox');
+    expect(within(list).getByText(en.purchasing.receipts.cashNote)).toBeDefined();
     expect(screen.queryByText(/legacy app/i)).toBeNull();
   });
 
@@ -217,14 +237,17 @@ describe('a goods receipt', () => {
 
   // Owner's review of W1-19: a receipt received in a locked month is greyed out before Post, so Post can't leave a
   // surprise draft. Save draft still keeps what was typed.
-  it('greys out Post and says why when Received on is on or before the lock date', async () => {
+  // W2-16: Post stays clickable; it sends nothing while the date can't post, and puts the cursor on the date.
+  it('says why and posts nothing when Received on is on or before the lock date', async () => {
     const f = fakeApi(lookups({ lockDate: '2026-11-06' }));
     show(<ReceiptScreen api={f.api} id="r1" />);
     fireEvent.change(await screen.findByLabelText(en.purchasing.fields.billTotal), {
       target: { value: '13401' },
     });
     expect(screen.getByText('The books are locked up to 2026-11-06. Pick a later date.')).toBeDefined();
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.post }));
+    expect(document.activeElement).toBe(screen.getByLabelText(en.purchasing.fields.receivedOn));
+    expect(f.calls.some((c) => c.method !== 'GET')).toBe(false);
     expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.saveDraft }).disabled).toBe(
       false,
     );
@@ -232,7 +255,8 @@ describe('a goods receipt', () => {
       target: { value: '2026-11-07' },
     });
     expect(screen.queryByText('The books are locked up to 2026-11-06. Pick a later date.')).toBeNull();
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post }).disabled).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.post }));
+    await waitFor(() => expect(f.calls.some((c) => c.path.endsWith('/post'))).toBe(true));
   });
 
   // Owner's staging test of W1-19: a receipt received in a locked month said "Something went wrong".
@@ -305,7 +329,9 @@ describe('a receipt line (owner review)', () => {
     const rows = within(screen.getByRole('table', { name: en.purchasing.receipts.lines })).getAllByRole(
       'row',
     );
-    for (const row of rows.slice(1)) expect(row.className).toContain('align-top');
+    // Every cell at the top, on the cell itself: the shared cell's own centring beat the row's (W2-16 point 4).
+    for (const row of rows.slice(1))
+      for (const cell of within(row).getAllByRole('cell')) expect(cell.className).toContain('align-top');
     // 10 × Rs 1,250 = Rs 12,500 on the first line, with the empty third line there.
     expect(within(rows[1]!).getAllByText(/Rs\s?12,500/).length).toBe(1);
   });
@@ -503,6 +529,95 @@ describe('deleting a draft, and the labels of a receipt (W2-16)', () => {
   });
 });
 
+// W2-16 (owner's review, 2026-11-28): each problem under its own field, once the field is left or on Save draft /
+// Post; Enter on the last line adds one; a return from a receipt knows how much can go back before it is saved.
+const noteOf = (el: HTMLElement) =>
+  (el.getAttribute('aria-describedby') ?? '')
+    .split(' ')
+    .map((id) => document.getElementById(id)?.textContent ?? '')
+    .join(' ');
+
+describe('a goods receipt line, field by field (W2-16)', () => {
+  it('shows a quantity problem under Quantity once you leave it, not while you type and not under Item', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    const qty = await screen.findByLabelText('Quantity of line 2');
+    fireEvent.focus(qty);
+    fireEvent.change(qty, { target: { value: '0' } });
+    expect(screen.queryByText(en.purchasing.problems.qty_positive)).toBeNull();
+    fireEvent.blur(qty);
+    expect(qty.getAttribute('aria-invalid')).toBe('true');
+    expect(noteOf(qty)).toContain(en.purchasing.problems.qty_positive);
+    expect(noteOf(screen.getByRole('button', { name: 'Item of line 2' }))).not.toContain(
+      en.purchasing.problems.qty_positive,
+    );
+    // The other boxes of the line keep their places: nothing is added to their cells.
+    expect(screen.getByLabelText('Discount of line 2').getAttribute('aria-invalid')).toBeNull();
+  });
+
+  it('Save draft keeps a draft with problems, and marks every one at its field', async () => {
+    const f = fakeApi(lookups());
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    const billNo = await screen.findByLabelText(en.purchasing.fields.billNo);
+    fireEvent.change(billNo, { target: { value: '' } });
+    expect(billNo.getAttribute('aria-invalid')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.saveDraft }));
+    expect(billNo.getAttribute('aria-invalid')).toBe('true');
+    expect(noteOf(billNo)).toBe(en.purchasing.problems.bill_no_required);
+    await waitFor(() => expect(f.calls.some((c) => c.method === 'PUT')).toBe(true));
+  });
+
+  it('adds a line on Enter in the last Discount, with the cursor in its Item', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    fireEvent.keyDown(await screen.findByLabelText('Discount of line 2'), { key: 'Enter' });
+    const item = await screen.findByRole('button', { name: 'Item of line 3' });
+    expect(document.activeElement).toBe(item);
+    // Enter in an earlier line's Discount adds nothing.
+    fireEvent.keyDown(screen.getByLabelText('Discount of line 1'), { key: 'Enter' });
+    expect(screen.queryByRole('button', { name: 'Item of line 4' })).toBeNull();
+  });
+
+  it('has a red bin on each line, and its numbers in a # column', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    const bin = await screen.findByRole('button', { name: 'Remove line 1' });
+    expect(bin.className).toContain('text-bad');
+    const table = screen.getByRole('table', { name: en.purchasing.receipts.lines });
+    expect(within(table).getByRole('columnheader', { name: en.purchasing.line.number })).toBeDefined();
+  });
+});
+
+describe('a purchase return from a receipt (W2-16)', () => {
+  const RECEIPT: ReceiptView = {
+    ...DRAFT,
+    receipt: { ...DRAFT.receipt, id: 'r9', status: 'posted', number: 'GR000009' },
+    lines: DRAFT.lines.map((l, n) => ({
+      ...l,
+      netUnitCost: l.unitCost,
+      returnable: n === 0 ? 6000 : 2000,
+    })),
+  };
+
+  it('says how many can go back, and marks more than that before saving', async () => {
+    const f = fakeApi(lookups(), { 'GET /api/purchasing/receipts/r9': { status: 200, body: RECEIPT } });
+    show(<ReturnScreen api={f.api} id="new-r9" />);
+    const qty = await screen.findByLabelText('Quantity of line 1');
+    expect(noteOf(qty)).toBe('Up to 6');
+    fireEvent.change(qty, { target: { value: '8' } });
+    fireEvent.blur(qty);
+    expect(qty.getAttribute('aria-invalid')).toBe('true');
+    expect(noteOf(qty)).toContain(en.purchasing.problems.more_than_received);
+    expect(f.calls.some((c) => c.method !== 'GET')).toBe(false);
+  });
+
+  it('keeps Save and Post in the bar at the bottom, with what the supplier owes back', async () => {
+    const f = fakeApi(lookups(), { 'GET /api/purchasing/receipts/r9': { status: 200, body: RECEIPT } });
+    show(<ReturnScreen api={f.api} id="new-r9" />);
+    const bar = await screen.findByRole('region', { name: en.purchasing.bar });
+    fireEvent.change(screen.getByLabelText('Quantity of line 1'), { target: { value: '2' } });
+    expect(within(bar).getByRole('status').textContent).toMatch(/Rs\s?2,500/);
+    expect(within(bar).getByRole('button', { name: en.purchasing.post })).toBeDefined();
+  });
+});
+
 // W2-05: every purchasing form is dated by the shop's business date from the API (04:00 cut-off), never by this
 // browser's calendar, and Post waits on a date after it. The browser's clock is set days away from the shop's day,
 // so the test holds in any time zone.
@@ -527,17 +642,18 @@ describe("the shop's business date (W2-05)", () => {
     expect(bill.max).toBe('');
   });
 
-  it('greys out Post and says why when Received on is after it', async () => {
-    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+  it('says why and posts nothing when Received on is after it', async () => {
+    const f = fakeApi(lookups());
+    show(<ReceiptScreen api={f.api} id="r1" />);
     fireEvent.change(await screen.findByLabelText(en.purchasing.fields.billTotal), {
       target: { value: '13401' },
     });
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post }).disabled).toBe(false);
     fireEvent.change(screen.getByLabelText(en.purchasing.fields.receivedOn), {
       target: { value: '2026-11-20' },
     });
     expect(screen.getByText(ahead)).toBeDefined();
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.purchasing.post }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.post }));
+    expect(f.calls.some((c) => c.method !== 'GET')).toBe(false);
   });
 
   it('says why when Post is refused for a date after it', async () => {

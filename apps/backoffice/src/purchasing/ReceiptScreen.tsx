@@ -12,14 +12,15 @@ import {
   TableHeader,
   TableRow,
 } from '@erp/ui';
-import { Plus, Save, Send, Tag, Trash2, Undo2 } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { CircleAlert, Plus, Save, Send, Tag, Trash2, Undo2 } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { moneyText, moneyValue, qtyText, qtyValue } from '../catalog/data';
 import { href, navigate, takeCarried } from '../router';
 import {
+  ActionBar,
   Button,
   buttonClass,
   ConfirmDialog,
@@ -27,18 +28,29 @@ import {
   ListPicker,
   notify,
   Select,
-  TextBox,
   TextInput,
 } from '../ui';
 import { ItemPicker } from './ItemPicker';
 import { dateProblem, problemText, purchasingRefusal, usePurchasingLookups, type PickedItem } from './data';
+import {
+  HEAD_FIELD,
+  LineBox,
+  lineFieldOf,
+  useFocusNewLine,
+  useShownProblems,
+  type LineField,
+  type LineNote,
+} from './lineFields';
 
 // Goods receipts (W1-16, PUR-02): the list, and one receipt typed from the supplier's bill. As you type, the screen
 // checks it with the same rules as the server: the difference from the bill total as printed (posting waits until
 // it is 0), the line problems, and the warnings (a cost more than 10 % off the last one, Retail at or below the new
 // cost). Save keeps a draft; Post makes it final (rule 3). Paid in cash: the cashier pays it at the desk afterwards
 // (owner answer 1). W2-14 (D-127): the back office's own controls; the supplier is searched (owner answer 3), and
-// results and refusals are toasts (owner answer 6).
+// results and refusals are toasts (owner answer 6). W2-16 (owner's review, 2026-11-28): laid out like the paper bill
+// (its head at the top, its discount and total at the foot), each problem under its own field, a # column, Enter on
+// the last line adds one, the last cost under the unit cost, and the totals with Save and Post in a bar kept at the
+// bottom of the window; Post stays clickable and marks what is left to fix.
 
 export function ReceiptsScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
@@ -264,6 +276,16 @@ function ReceiptForm({
   const set = (k: keyof typeof h, v: string) => setH((x) => ({ ...x, [k]: v }));
   const put = (n: number, patch: Partial<LineForm>) =>
     setLines((ls) => ls.map((l, i) => (i === n ? { ...l, ...patch } : l)));
+  const form = useRef<HTMLDivElement>(null);
+  const problems = useShownProblems(form);
+  // A line added with Enter gets the cursor in its item (W2-16).
+  const lineId = useId();
+  const itemFieldId = (i: number) => `${lineId}-item-${i}`;
+  const focusLater = useFocusNewLine(lines.length, itemFieldId);
+  const addLine = (focus: boolean) => {
+    setLines((ls) => [...ls, blankLine()]);
+    if (focus) focusLater(lines.length);
+  };
 
   // The same check as the server's, as you type (a field that isn't a number counts as an invalid one).
   // Empty counts as 0, not a number as NaN (an invalid value for the check).
@@ -286,8 +308,8 @@ function ReceiptForm({
       retail: l.item.retail,
     }));
   const billTotal = moneyValue(h.billTotal, m.minorUnits);
-  // A date after the shop's business date (W2-05) or on or before the lock date (D-108) can't post: Post waits, and
-  // the date says why. Save draft still works.
+  // A date after the shop's business date (W2-05) or on or before the lock date (D-108) can't post: the date says why,
+  // and Post marks it. Save draft still works.
   const locked = dateProblem(t, h.receivedOn, lookups);
   const check = checkReceipt({
     supplierId: h.supplierId || null,
@@ -296,7 +318,11 @@ function ReceiptForm({
     locationId: h.locationId || null,
     billDiscount: n(moneyValue(h.billDiscount, m.minorUnits) ?? 0),
     billTotal: billTotal === undefined ? null : billTotal,
-    lines: parsed.map((p) => ({ ...p, qty: p.qty ?? 0, unitCost: p.unitCost ?? 0 })),
+    lines: parsed.map((p) => ({
+      ...p,
+      qty: p.qty ?? 0,
+      unitCost: p.unitCost ?? 0,
+    })),
   });
   const totals =
     check.total === null
@@ -311,6 +337,47 @@ function ReceiptForm({
         });
   const show = (minor: number | null) => (minor === null ? '—' : formatMoney(minor, m));
   const exists = (k: string) => t(k) !== k;
+  const toFix = check.problems.length + (locked === null ? 0 : 1);
+
+  // Each problem under its own field, once the field is left or Save draft / Post is pressed (W2-16).
+  const headProblem = (field: string) => {
+    if (!problems.shown(field)) return undefined;
+    const p = check.problems.filter((x) => x.row === null && HEAD_FIELD[x.problem] === field);
+    return p.length === 0 ? undefined : p.map((x) => problemText(t, exists, x.problem, null)).join(' ');
+  };
+  const lineProblem = (i: number, field: LineField) => {
+    if (rowOf(i) < 0 || !problems.shown(`${i}:${field}`)) return undefined;
+    const p = check.problems.filter((x) => x.row === rowOf(i) && lineFieldOf(x.problem) === field);
+    return p.length === 0 ? undefined : p.map((x) => problemText(t, exists, x.problem, null)).join(' ');
+  };
+  // Under the unit cost: the last cost, amber with how far it moved when more than 10 %; Retail when the new cost
+  // reaches it. Warnings never stop Post.
+  const costNotes = (i: number, l: LineForm): LineNote[] => {
+    if (posted) return [];
+    const w = rowOf(i) < 0 ? [] : check.warnings.filter((x) => x.row === rowOf(i)).map((x) => x.warning);
+    const notes: LineNote[] = [];
+    const last = l.item.lastCost;
+    if (last !== null) {
+      const cost = moneyValue(l.unitCost, m.minorUnits);
+      const pct = typeof cost === 'number' && last > 0 ? Math.round((Math.abs(cost - last) * 100) / last) : 0;
+      const moved = w.includes('cost_up') ? 'lastUp' : w.includes('cost_down') ? 'lastDown' : null;
+      notes.push({
+        text: t(`purchasing.line.${moved ?? 'last'}`, {
+          cost: formatMoney(last, m),
+          pct,
+        }),
+        warn: moved !== null,
+      });
+    }
+    if (w.includes('retail_at_or_below_cost') && l.item.retail !== null)
+      notes.push({
+        text: t('purchasing.line.retailLow', {
+          retail: formatMoney(l.item.retail, m),
+        }),
+        warn: true,
+      });
+    return notes;
+  };
 
   const body = () => ({
     supplierId: h.supplierId || null,
@@ -343,12 +410,18 @@ function ReceiptForm({
           rowVersion: r.rowVersion,
         })
       : await api('POST', '/api/purchasing/receipts', body());
-    if (res.status === 200) return { id: r!.id, rowVersion: (res.body as { rowVersion: string }).rowVersion };
+    if (res.status === 200)
+      return {
+        id: r!.id,
+        rowVersion: (res.body as { rowVersion: string }).rowVersion,
+      };
     if (res.status === 201) return res.body as { id: string; rowVersion: string };
     notify.problem(purchasingRefusal(t, exists, res.body));
     return null;
   };
+  // A draft may be incomplete: Save draft keeps it and marks what is left to fix.
   const saveDraft = async () => {
+    problems.showAll();
     const s = await save();
     if (!s) return;
     if (!r) navigate(href.receipt(s.id));
@@ -357,7 +430,12 @@ function ReceiptForm({
       await onSaved();
     }
   };
+  // Post stays clickable (W2-16): with problems it sends nothing, marks them all and puts the cursor on the first.
   const postIt = async () => {
+    if (toFix > 0) {
+      problems.focusFirst();
+      return;
+    }
     const s = await save();
     if (!s) return;
     const res = await api('POST', `/api/purchasing/receipts/${encodeURIComponent(s.id)}/post`, {
@@ -389,17 +467,31 @@ function ReceiptForm({
     } else notify.problem(purchasingRefusal(t, exists, res.body));
   };
 
-  const header = check.problems.filter(
-    (p) => p.row === null && p.problem !== 'total_mismatch' && p.problem !== 'total_required',
-  );
-  const warningsOf = (i: number) => check.warnings.filter((w) => rowOf(i) >= 0 && w.row === rowOf(i));
-  const problemsOf = (i: number) => check.problems.filter((p) => rowOf(i) >= 0 && p.row === rowOf(i));
+  const difference =
+    check.difference === null
+      ? '—'
+      : check.difference === 0
+        ? t('purchasing.totals.matches')
+        : show(check.difference);
+  const differenceTone = check.difference === null ? '' : check.difference === 0 ? 'text-ok' : 'text-bad';
+  const linesProblem = headProblem('lines');
 
   return (
-    <>
+    <div ref={form} className="contents">
       <PageHeader
         eyebrow={back}
-        title={r?.number ?? t('purchasing.receipts.new')}
+        title={
+          r?.number ?? (
+            <>
+              {t('purchasing.receipts.new')}
+              {r && (
+                <span className="ms-2.5 inline-block align-middle text-base">
+                  <StatusChip tone="warn">{t('purchasing.draft')}</StatusChip>
+                </span>
+              )}
+            </>
+          )
+        }
         help={
           posted ? (
             <span className="flex flex-wrap items-center gap-2">
@@ -414,8 +506,8 @@ function ReceiptForm({
           posted &&
           r && (
             <span className="flex flex-wrap gap-2">
-              {/* W1-17: the received pieces' labels (CAT-08). */}
-              {/* By its number, which the labels page shows in its field (W2-16 point 8); a posted receipt has one. */}
+              {/* W1-17: the received pieces' labels (CAT-08), by the receipt's number, which the labels page shows
+                  in its field (W2-16 point 8); a posted receipt has one. */}
               <a href={href.receiptLabels(r.number ?? r.id)} className={buttonClass('outline')}>
                 <Tag aria-hidden="true" className="size-4" />
                 {t('labels.makeLabels')}
@@ -428,24 +520,35 @@ function ReceiptForm({
           )
         }
       />
-      <Panel role="region" aria-label={t('purchasing.receipts.bill')}>
+
+      {/* The head of the bill, in the order it is printed (W2-16). */}
+      <Panel role="region" aria-labelledby={`${lineId}-bill`}>
+        <h2 id={`${lineId}-bill`} className="m-0 px-3.5 pt-3.5 text-[15px] font-semibold">
+          {t('purchasing.receipts.bill')}
+        </h2>
         <fieldset disabled={!can} className="m-0 grid grid-cols-1 gap-3.5 border-0 p-3.5 md:grid-cols-4">
-          <ListPicker
-            className="md:col-span-2"
-            label={t('purchasing.fields.supplier')}
-            options={lookups.suppliers}
-            value={h.supplierId}
-            onChange={(v) => set('supplierId', v)}
-          />
+          <div className="md:col-span-2" onBlur={problems.touch('supplier')}>
+            <ListPicker
+              label={t('purchasing.fields.supplier')}
+              options={lookups.suppliers}
+              value={h.supplierId}
+              onChange={(v) => set('supplierId', v)}
+              error={headProblem('supplier')}
+            />
+          </div>
           <TextInput
             label={t('purchasing.fields.billNo')}
             value={h.billNo}
+            error={headProblem('billNo')}
+            onBlur={problems.touch('billNo')}
             onChange={(e) => set('billNo', e.target.value)}
           />
           <TextInput
             label={t('purchasing.fields.billDate')}
             type="date"
             value={h.billDate}
+            error={headProblem('billDate')}
+            onBlur={problems.touch('billDate')}
             onChange={(e) => set('billDate', e.target.value)}
           />
           <TextInput
@@ -460,16 +563,21 @@ function ReceiptForm({
             label={t('purchasing.fields.location')}
             disabled={!can}
             value={h.locationId}
+            error={headProblem('location')}
             onValueChange={(v) => set('locationId', v)}
             options={lookups.locations
               .filter((l) => l.code !== 'DAMAGED')
               .map((l) => ({ value: l.id, label: l.name }))}
           />
+          {/* Paid in cash: on the supplier's account, paid at the desk afterwards (owner answer 1). Said in the
+              list, where someone looking for Cash looks, not on every receipt (owner, 2026-11-28). */}
           <Select
             label={t('purchasing.fields.paid')}
+            wrapperClassName="md:col-span-2"
             disabled={!can}
             value={h.paidFrom || ON_ACCOUNT}
             onValueChange={(v) => set('paidFrom', v === ON_ACCOUNT ? '' : v)}
+            note={t('purchasing.receipts.cashNote')}
             options={[
               { value: ON_ACCOUNT, label: t('purchasing.receipts.onAccount') },
               ...lookups.bankAccounts.map((b) => ({
@@ -478,27 +586,36 @@ function ReceiptForm({
               })),
             ]}
           />
-          <TextInput
-            label={t('purchasing.fields.billTotal')}
-            hint={t('purchasing.fields.billTotalHint')}
-            inputMode="decimal"
-            value={h.billTotal}
-            onChange={(e) => set('billTotal', e.target.value)}
-          />
         </fieldset>
-        {!h.paidFrom && !posted && (
-          <p className="m-0 px-3.5 pb-3 text-sm text-muted-foreground">{t('purchasing.receipts.cashHint')}</p>
-        )}
       </Panel>
 
-      <Panel role="region" aria-label={t('purchasing.receipts.lines')} className="px-1.5 pb-2.5">
-        <Table aria-label={t('purchasing.receipts.lines')}>
+      {/* The lines: set column widths, so typing moves nothing; every cell at the top, so a problem under one box
+          leaves the others in line; each problem under its own box (W2-16 points 4-6). */}
+      <Panel role="region" aria-labelledby={`${lineId}-lines`} className="px-1.5 pb-2.5">
+        <h2 id={`${lineId}-lines`} className="m-0 px-2 pt-3.5 text-[15px] font-semibold">
+          {t('purchasing.receipts.lines')}
+        </h2>
+        <Table aria-label={t('purchasing.receipts.lines')} className="min-w-[980px] table-fixed">
+          <colgroup>
+            <col className="w-10" />
+            <col />
+            <col className="w-28" />
+            <col className="w-[148px]" />
+            <col className="w-[124px]" />
+            <col className="w-28" />
+            <col className="w-32" />
+            <col className="w-12" />
+          </colgroup>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[34%]">{t('purchasing.line.item')}</TableHead>
-              <TableHead>{t('purchasing.line.qty')}</TableHead>
-              <TableHead>{t('purchasing.line.unitCost')}</TableHead>
-              <TableHead>{t('purchasing.line.discount')}</TableHead>
+              <TableHead className="text-end">
+                <span aria-hidden="true">#</span>
+                <span className="sr-only">{t('purchasing.line.number')}</span>
+              </TableHead>
+              <TableHead>{t('purchasing.line.item')}</TableHead>
+              <TableHead className="text-end">{t('purchasing.line.qty')}</TableHead>
+              <TableHead className="text-end">{t('purchasing.line.unitCost')}</TableHead>
+              <TableHead className="text-end">{t('purchasing.line.discount')}</TableHead>
               <TableHead className="text-end">{t('purchasing.line.netCost')}</TableHead>
               <TableHead className="text-end">{t('purchasing.line.value')}</TableHead>
               <TableHead>
@@ -508,14 +625,19 @@ function ReceiptForm({
           </TableHeader>
           <TableBody>
             {lines.map((l, i) => (
-              // Every cell at the top, so a line's messages under its item don't push its fields down.
-              <TableRow key={i} className="align-top">
-                <TableCell>
+              <TableRow key={i}>
+                <TableCell className="align-top text-end leading-9 text-muted-foreground tabular-nums">
+                  {i + 1}
+                </TableCell>
+                <TableCell className="align-top">
                   <ItemPicker
                     api={api}
+                    id={itemFieldId(i)}
                     label={t('purchasing.line.itemOf', { row: i + 1 })}
                     picked={l.item}
                     disabled={!can}
+                    error={lineProblem(i, 'item')}
+                    onLeave={problems.touch(`${i}:item`)}
                     onPick={(item) =>
                       put(i, {
                         item,
@@ -526,62 +648,56 @@ function ReceiptForm({
                       })
                     }
                   />
-                  {[
-                    ...problemsOf(i).map((p) => ({
-                      text: problemText(t, exists, p.problem, null),
-                      bad: true,
-                    })),
-                    ...warningsOf(i).map((w) => ({
-                      text: t(`purchasing.warnings.${w.warning}`),
-                      bad: false,
-                    })),
-                  ].map((x, k) => (
-                    <p key={k} className={`m-0 mt-1 text-xs ${x.bad ? 'text-destructive' : 'text-warn'}`}>
-                      {x.text}
-                    </p>
-                  ))}
                 </TableCell>
-                <TableCell>
-                  <TextBox
-                    aria-label={t('purchasing.line.qtyOf', { row: i + 1 })}
-                    className="h-9 w-24"
-                    inputMode="decimal"
+                <TableCell className="align-top">
+                  <LineBox
+                    label={t('purchasing.line.qtyOf', { row: i + 1 })}
                     disabled={!can}
                     value={l.qty}
+                    error={lineProblem(i, 'qty')}
+                    onBlur={problems.touch(`${i}:qty`)}
                     onChange={(e) => put(i, { qty: e.target.value })}
                   />
                 </TableCell>
-                <TableCell>
-                  <TextBox
-                    aria-label={t('purchasing.line.unitCostOf', { row: i + 1 })}
-                    className="h-9 w-28"
-                    inputMode="decimal"
+                <TableCell className="align-top">
+                  <LineBox
+                    label={t('purchasing.line.unitCostOf', { row: i + 1 })}
                     disabled={!can}
                     value={l.unitCost}
+                    error={lineProblem(i, 'unitCost')}
+                    notes={costNotes(i, l)}
+                    onBlur={problems.touch(`${i}:unitCost`)}
                     onChange={(e) => put(i, { unitCost: e.target.value })}
                   />
                 </TableCell>
-                <TableCell>
-                  <TextBox
-                    aria-label={t('purchasing.line.discountOf', { row: i + 1 })}
-                    className="h-9 w-24"
-                    inputMode="decimal"
+                <TableCell className="align-top">
+                  <LineBox
+                    label={t('purchasing.line.discountOf', { row: i + 1 })}
                     disabled={!can}
                     value={l.lineDiscount}
+                    error={lineProblem(i, 'discount')}
+                    onBlur={problems.touch(`${i}:discount`)}
                     onChange={(e) => put(i, { lineDiscount: e.target.value })}
+                    // Enter in the last box of the last line adds a line (W2-16).
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter' || i !== lines.length - 1) return;
+                      e.preventDefault();
+                      addLine(true);
+                    }}
                   />
                 </TableCell>
-                <TableCell className="text-end leading-9 tabular-nums">
+                <TableCell className="align-top text-end leading-9 tabular-nums">
                   {show(totals?.lines[rowOf(i)]?.netUnitCost ?? null)}
                 </TableCell>
-                <TableCell className="text-end leading-9 tabular-nums">
+                <TableCell className="align-top text-end leading-9 tabular-nums">
                   {show(totals?.lines[rowOf(i)]?.value ?? null)}
                 </TableCell>
-                <TableCell>
+                <TableCell className="align-top">
                   {can && lines.length > 1 && (
                     <IconButton
                       icon={Trash2}
-                      tone="danger"
+                      tone="bad"
+                      className="mt-0.5"
                       label={t('purchasing.line.removeOf', { row: i + 1 })}
                       onClick={() => setLines(lines.filter((_, k) => k !== i))}
                     />
@@ -591,82 +707,124 @@ function ReceiptForm({
             ))}
           </TableBody>
         </Table>
+        {linesProblem && (
+          <p role="alert" className="m-0 px-2 pt-2 text-xs font-medium text-bad">
+            {linesProblem}
+          </p>
+        )}
         {can && (
-          <div className="px-2 pt-2">
-            <Button size="sm" variant="outline" icon={Plus} onClick={() => setLines([...lines, blankLine()])}>
+          <div className="flex flex-wrap items-center gap-3 px-2 pt-2">
+            <Button size="sm" variant="outline" icon={Plus} onClick={() => addLine(false)}>
               {t('purchasing.line.add')}
             </Button>
+            <span className="text-xs text-muted-foreground">{t('purchasing.line.enterHint')}</span>
           </div>
         )}
       </Panel>
 
-      <Panel className="grid grid-cols-1 gap-3.5 p-3.5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <fieldset disabled={!can} className="m-0 grid gap-3.5 border-0 p-0">
-          <TextInput
-            label={t('purchasing.fields.billDiscount')}
-            inputMode="decimal"
-            value={h.billDiscount}
-            onChange={(e) => set('billDiscount', e.target.value)}
-          />
-          <TextInput
-            label={t('purchasing.fields.notes')}
-            value={h.notes}
-            onChange={(e) => set('notes', e.target.value)}
-          />
-        </fieldset>
-        <dl
-          className="m-0 grid grid-cols-2 gap-x-4 gap-y-1 self-start text-sm"
-          aria-label={t('purchasing.receipts.totals')}
-        >
-          <dt>{t('purchasing.totals.subtotal')}</dt>
-          <dd className="m-0 text-end tabular-nums">{show(totals?.subtotal ?? null)}</dd>
-          <dt>{t('purchasing.totals.lineDiscounts')}</dt>
-          <dd className="m-0 text-end tabular-nums">{show(totals?.lineDiscountTotal ?? null)}</dd>
-          <dt>{t('purchasing.totals.billDiscount')}</dt>
-          <dd className="m-0 text-end tabular-nums">{show(totals?.billDiscount ?? null)}</dd>
-          <dt className="font-semibold">{t('purchasing.totals.total')}</dt>
-          <dd className="m-0 text-end font-semibold tabular-nums">{show(check.total)}</dd>
-          <dt>{t('purchasing.totals.printed')}</dt>
-          <dd className="m-0 text-end tabular-nums">
-            {show(typeof billTotal === 'number' ? billTotal : null)}
-          </dd>
-          <dt>{t('purchasing.totals.difference')}</dt>
-          <dd
-            role="status"
-            className={`m-0 text-end font-semibold tabular-nums ${check.difference === 0 ? 'text-ok' : 'text-destructive'}`}
+      {/* The foot of the bill: its discount and its total as printed, beside the sums (W2-16). */}
+      <Panel role="region" aria-labelledby={`${lineId}-foot`}>
+        <h2 id={`${lineId}-foot`} className="m-0 px-3.5 pt-3.5 text-[15px] font-semibold">
+          {t('purchasing.receipts.foot')}
+        </h2>
+        <div className="grid grid-cols-1 gap-6 p-3.5 md:grid-cols-2">
+          <fieldset disabled={!can} className="m-0 grid grid-cols-1 gap-3.5 border-0 p-0 sm:grid-cols-2">
+            <TextInput
+              label={t('purchasing.fields.billDiscount')}
+              inputMode="decimal"
+              className="text-end tabular-nums"
+              value={h.billDiscount}
+              error={headProblem('billDiscount')}
+              onBlur={problems.touch('billDiscount')}
+              onChange={(e) => set('billDiscount', e.target.value)}
+            />
+            <TextInput
+              label={t('purchasing.fields.billTotal')}
+              hint={t('purchasing.fields.billTotalHint')}
+              inputMode="decimal"
+              className="text-end tabular-nums"
+              value={h.billTotal}
+              error={headProblem('billTotal')}
+              onBlur={problems.touch('billTotal')}
+              onChange={(e) => set('billTotal', e.target.value)}
+            />
+            <TextInput
+              label={t('purchasing.fields.notes')}
+              wrapperClassName="sm:col-span-2"
+              value={h.notes}
+              onChange={(e) => set('notes', e.target.value)}
+            />
+          </fieldset>
+          <dl
+            className="m-0 grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-1.5 self-start rounded-lg bg-surface-2 px-3.5 py-3 text-sm"
+            aria-label={t('purchasing.receipts.totals')}
           >
-            {check.difference === null
-              ? '—'
-              : check.difference === 0
-                ? t('purchasing.totals.matches')
-                : formatMoney(check.difference, m)}
-          </dd>
-        </dl>
+            <dt className="text-muted-foreground">{t('purchasing.totals.subtotal')}</dt>
+            <dd className="m-0 text-end tabular-nums">{show(totals?.subtotal ?? null)}</dd>
+            <dt className="text-muted-foreground">{t('purchasing.totals.lineDiscounts')}</dt>
+            <dd className="m-0 text-end tabular-nums">{show(totals?.lineDiscountTotal ?? null)}</dd>
+            <dt className="text-muted-foreground">{t('purchasing.totals.billDiscount')}</dt>
+            <dd className="m-0 text-end tabular-nums">{show(totals?.billDiscount ?? null)}</dd>
+            <dt className="border-t border-line pt-1.5 font-semibold">{t('purchasing.totals.total')}</dt>
+            <dd className="m-0 border-t border-line pt-1.5 text-end font-semibold tabular-nums">
+              {show(check.total)}
+            </dd>
+            <dt className="text-muted-foreground">{t('purchasing.totals.printed')}</dt>
+            <dd className="m-0 text-end tabular-nums">
+              {show(typeof billTotal === 'number' ? billTotal : null)}
+            </dd>
+            <dt className="text-muted-foreground">{t('purchasing.totals.difference')}</dt>
+            <dd className={`m-0 text-end font-semibold tabular-nums ${differenceTone}`}>{difference}</dd>
+          </dl>
+        </div>
       </Panel>
 
-      {header.length > 0 && !posted && (
-        <p className="m-0 text-sm text-muted-foreground">
-          {header.map((p) => problemText(t, exists, p.problem, null)).join(' ')}
-        </p>
-      )}
+      {/* Always in view at the bottom of the window while the lines are typed (W2-16). Delete sits apart from Post. */}
       {can && (
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => void saveDraft()} variant="outline" icon={Save}>
-            {t('purchasing.saveDraft')}
-          </Button>
-          <Button
-            onClick={() => void postIt()}
-            icon={Send}
-            disabled={check.problems.length > 0 || locked !== null}
-          >
-            {t('purchasing.post')}
-          </Button>
+        <ActionBar label={t('purchasing.bar')}>
           {r && (
-            <Button variant="ghost" icon={Trash2} className="text-bad" onClick={() => setAsking(true)}>
+            <Button
+              variant="ghost"
+              icon={Trash2}
+              className="text-bad hover:bg-bad-soft hover:text-bad"
+              onClick={() => setAsking(true)}
+            >
               {t('purchasing.deleteDraft')}
             </Button>
           )}
-        </div>
+          {problems.all && toFix > 0 && (
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-bad">
+              <CircleAlert aria-hidden="true" className="size-4" />
+              {t('purchasing.toFix', { count: toFix })}
+            </span>
+          )}
+          <div role="status" className="ms-auto flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
+            <span className="text-muted-foreground">
+              {t('purchasing.totals.total')}{' '}
+              <strong className="ms-1 text-[15px] text-ink tabular-nums">{show(check.total)}</strong>
+            </span>
+            <span className="text-muted-foreground">
+              {t('purchasing.totals.printed')}{' '}
+              <strong className="ms-1 text-[15px] text-ink tabular-nums">
+                {show(typeof billTotal === 'number' ? billTotal : null)}
+              </strong>
+            </span>
+            <span className="text-muted-foreground">
+              {t('purchasing.totals.difference')}{' '}
+              <strong className={`ms-1 text-[15px] text-ink tabular-nums ${differenceTone}`}>
+                {difference}
+              </strong>
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => void saveDraft()} variant="outline" icon={Save}>
+              {t('purchasing.saveDraft')}
+            </Button>
+            <Button onClick={() => void postIt()} icon={Send}>
+              {t('purchasing.post')}
+            </Button>
+          </div>
+        </ActionBar>
       )}
       <ConfirmDialog
         open={asking}
@@ -681,6 +839,6 @@ function ReceiptForm({
       >
         {t('purchasing.deleteText', { count: Math.max(used.length, 1) })}
       </ConfirmDialog>
-    </>
+    </div>
   );
 }
