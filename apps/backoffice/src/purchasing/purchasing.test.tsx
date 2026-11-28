@@ -748,9 +748,28 @@ describe('the fixes from the staging test (W2-17)', () => {
   it('two quick clicks on Save draft make one new receipt, not two', async () => {
     const f = fakeApi(lookups(), {
       'POST /api/purchasing/receipts': { status: 201, body: { id: 'r1', rowVersion: '1' } },
+      'GET /api/purchasing/items': {
+        status: 200,
+        body: {
+          items: [
+            {
+              id: 'i3',
+              code: 'OIL050',
+              name: 'ENGINE OIL',
+              allowsFraction: true,
+              lastCost: null,
+              retail: null,
+            },
+          ],
+        },
+      },
     });
     show(<ReceiptScreen api={f.api} id="new" />);
-    fireEvent.change(await screen.findByLabelText('Quantity of line 1'), { target: { value: '1' } });
+    // A line with an item: a line with none is nothing to keep, and nothing would be sent at all.
+    fireEvent.click(await screen.findByRole('button', { name: 'Item of line 1' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Item of line 1' }), { target: { value: 'oil' } });
+    fireEvent.click(await screen.findByRole('option', { name: /OIL050/ }));
+    fireEvent.change(screen.getByLabelText('Quantity of line 1'), { target: { value: '1' } });
     const save = screen.getByRole('button', { name: en.purchasing.saveDraft });
     fireEvent.click(save);
     fireEvent.click(save);
