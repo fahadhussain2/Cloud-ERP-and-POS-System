@@ -218,8 +218,11 @@ export {
 } from './partner-reports';
 export { costFloor } from './floor';
 export {
+  AMOUNT_LIMIT,
+  amountLimit,
   checkReceipt,
   checkReturn,
+  QTY_LIMIT,
   receiptTotals,
   PURCHASE_RETURN_REASONS,
   type ReceiptCheckInput,

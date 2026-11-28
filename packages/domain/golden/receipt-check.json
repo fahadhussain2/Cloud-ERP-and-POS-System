@@ -1,5 +1,5 @@
 {
-  "description": "Checking a goods receipt before it is posted (PUR-02, W1-16). Problems block posting: the header (supplier, the supplier's bill number and date, the location, at least one line), each line (an item, a quantity above 0, whole for a unit without fractions, a unit cost of 0 or more in whole paisa, a line discount of 0 up to its gross), the bill discount (0 up to Σ nets), then the bill total as printed: required, and equal to the computed total (the difference = printed − computed). Warnings don't block: a net unit cost more than 10 % above or below the item's last cost, and Retail at or below the net unit cost. Rows are 0-based; null = the receipt. Totals and the difference are null when a line or a discount is invalid.",
+  "description": "Checking a goods receipt before it is posted (PUR-02, W1-16). Problems block posting: the header (supplier, the supplier's bill number and date, the location, at least one line), each line (an item, a quantity above 0, whole for a unit without fractions, a unit cost of 0 or more in whole paisa, a line discount of 0 up to its gross), the bill discount (0 up to Σ nets), then the bill total as printed: required, and equal to the computed total (the difference = printed − computed). Warnings don't block: a net unit cost more than 10 % above or below the item's last cost, and Retail at or below the net unit cost. Rows are 0-based; null = the receipt. Totals and the difference are null when a line or a discount is invalid. W2-17 (owner answer 1): with `maxAmount` (Rs 1 crore in minor units), a unit cost over it is cost_too_large, a quantity × cost over it line_too_large, the bill total as printed or the lines together over it total_too_large; a quantity over what the books hold (99,999,999,999.999) is qty_too_large. Without `maxAmount` the limit is the safe-integer range. Nothing too large is ever thrown: it is a problem.",
   "cases": [
     {
       "name": "a good receipt whose lines equal the bill",
@@ -381,6 +381,247 @@
         "warnings": [],
         "total": 100,
         "difference": 0
+      }
+    },
+    {
+      "name": "a unit cost over Rs 1 crore",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "INV-1",
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 0,
+        "billTotal": 100,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "unitCost": 1000000001,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ],
+        "maxAmount": 1000000000
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "cost_too_large",
+            "row": 0
+          }
+        ],
+        "warnings": [],
+        "total": null,
+        "difference": null
+      }
+    },
+    {
+      "name": "a unit cost of exactly Rs 1 crore is allowed",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "INV-1",
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 0,
+        "billTotal": 1000000000,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "unitCost": 1000000000,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ],
+        "maxAmount": 1000000000
+      },
+      "expected": {
+        "problems": [],
+        "warnings": [],
+        "total": 1000000000,
+        "difference": 0
+      }
+    },
+    {
+      "name": "a quantity × cost over Rs 1 crore",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "INV-1",
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 0,
+        "billTotal": 100,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 2000,
+            "unitCost": 600000000,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ],
+        "maxAmount": 1000000000
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "line_too_large",
+            "row": 0
+          }
+        ],
+        "warnings": [],
+        "total": null,
+        "difference": null
+      }
+    },
+    {
+      "name": "a bill total as printed over Rs 1 crore",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "INV-1",
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 0,
+        "billTotal": 1000000001,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "unitCost": 100,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ],
+        "maxAmount": 1000000000
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "total_too_large",
+            "row": null
+          }
+        ],
+        "warnings": [],
+        "total": 100,
+        "difference": null
+      }
+    },
+    {
+      "name": "lines that together come to more than Rs 1 crore",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "INV-1",
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 0,
+        "billTotal": 100,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "unitCost": 600000000,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          },
+          {
+            "itemId": "i2",
+            "qty": 1000,
+            "unitCost": 600000000,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ],
+        "maxAmount": 1000000000
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "total_too_large",
+            "row": null
+          }
+        ],
+        "warnings": [],
+        "total": null,
+        "difference": null
+      }
+    },
+    {
+      "name": "a quantity over what the books can hold",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "INV-1",
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 0,
+        "billTotal": 100,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 100000000000000,
+            "unitCost": 0,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ],
+        "maxAmount": 1000000000
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "qty_too_large",
+            "row": 0
+          }
+        ],
+        "warnings": [],
+        "total": null,
+        "difference": null
+      }
+    },
+    {
+      "name": "a line too big to work out is a problem, not an error, even with no limit given",
+      "input": {
+        "supplierId": "s1",
+        "billNo": "INV-1",
+        "billDate": "2026-11-05",
+        "locationId": "shop",
+        "billDiscount": 0,
+        "billTotal": 100,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 100000,
+            "unitCost": 200000000000000,
+            "lineDiscount": 0,
+            "allowsFraction": false,
+            "lastCost": null,
+            "retail": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "line_too_large",
+            "row": 0
+          }
+        ],
+        "warnings": [],
+        "total": null,
+        "difference": null
       }
     }
   ]

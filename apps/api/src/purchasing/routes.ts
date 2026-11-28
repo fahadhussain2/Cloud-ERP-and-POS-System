@@ -16,6 +16,7 @@ import {
 } from '@erp/contracts';
 import { withTenant } from '@erp/db';
 import {
+  amountLimit,
   can,
   checkReceipt,
   checkReturn,
@@ -489,6 +490,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       billTotal: num(h['bill_total']),
       // A posted receipt's warnings would compare it with itself (its cost is now the last cost).
       lines: lines.map((l) => ({ ...l, lastCost: posted ? null : l.lastCost })),
+      maxAmount: await limitOf(c),
     });
     if (check.total !== null) {
       const t = receiptTotals({ lines, billDiscount: Number(h['bill_discount']) });
@@ -520,6 +522,29 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       lines,
       check,
     };
+  };
+
+  /** Rs 1 crore in the shop's minor units (W2-17, owner answer 1; D-128). */
+  const limitOf = async (c: Client) => amountLimit((await moneyOf(c)).minorUnits);
+  /** The problems of a draft that can't be kept: an amount over the limit, a quantity the books can't hold. */
+  const tooLarge = (problems: readonly { problem: string; row: number | null }[], limit: number) => {
+    const big = problems.filter((p) => p.problem.endsWith('_too_large'));
+    if (big.length > 0) throw new Refusal(400, { error: 'too_large', problems: big, limit });
+  };
+  /** Refuses a receipt draft over the limit (W2-17), so no draft is saved that can't be opened again. */
+  const receiptFits = async (c: Client, b: ReceiptDraft) => {
+    const limit = await limitOf(c);
+    const check = checkReceipt({
+      supplierId: b.supplierId,
+      billNo: b.billNo,
+      billDate: b.billDate,
+      locationId: b.locationId,
+      billDiscount: b.billDiscount,
+      billTotal: b.billTotal,
+      lines: b.lines.map((l) => ({ ...l, allowsFraction: true, lastCost: null, retail: null })),
+      maxAmount: limit,
+    });
+    tooLarge(check.problems, limit);
   };
 
   const writeReceiptLines = async (c: Client, tenantId: string, id: string, b: ReceiptDraft) => {
@@ -587,6 +612,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     if (isEmptyDraft(parsed.data.lines)) return reply.code(400).send({ error: 'empty_draft' });
     const b = parsed.data;
     return run(req, reply, async (c) => {
+      await receiptFits(c, b);
       const branch = await branchOf(c, b.locationId);
       const { rows } = await c.query<{ id: string; rv: string }>(
         `INSERT INTO erp.goods_receipts (tenant_id, branch_id, supplier_party_id, supplier_bill_no, supplier_bill_date,
@@ -608,6 +634,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       await checkVersion(c, 'goods_receipts', id, b.rowVersion);
       // Nothing typed on any line is nothing to keep (owner's review of W1-19); posted or stale is said first.
       if (isEmptyDraft(b.lines)) throw new Refusal(400, { error: 'empty_draft' });
+      await receiptFits(c, b);
       const branch = await branchOf(c, b.locationId);
       const { rows } = await c.query<{ rv: string }>(
         `UPDATE erp.goods_receipts SET branch_id = $2, supplier_party_id = $3, supplier_bill_no = $4,
@@ -723,6 +750,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       reason: (h['reason_code'] as string | null) ?? null,
       note: (h['note'] as string | null) ?? null,
       lines,
+      maxAmount: await limitOf(c),
     });
     return {
       purchaseReturn: {
@@ -746,6 +774,19 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
   };
 
   const writeReturn = async (c: Client, tenantId: string, id: string | null, b: ReturnDraft) => {
+    // Over the limit (W2-17): refused before anything is written.
+    const limit = await limitOf(c);
+    tooLarge(
+      checkReturn({
+        supplierId: b.supplierId,
+        locationId: b.locationId,
+        reason: null,
+        note: null,
+        lines: b.lines.map((l) => ({ ...l, allowsFraction: true, returnable: null })),
+        maxAmount: limit,
+      }).problems,
+      limit,
+    );
     const branch = await branchOf(c, b.locationId);
     const reason = b.reason !== null && b.reason.trim() !== '' ? b.reason.trim() : null;
     const known = ['damaged', 'wrong_item', 'excess', 'poor_quality', 'price_dispute', 'other'];

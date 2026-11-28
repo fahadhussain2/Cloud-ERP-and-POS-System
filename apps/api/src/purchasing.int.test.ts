@@ -222,6 +222,37 @@ describe('a goods receipt (PUR-02)', () => {
     expect(back.json()).toEqual({ error: 'empty_draft' });
   });
 
+  // W2-17 (owner answer 1): no amount on a receipt or a return over Rs 1 crore, so no draft is saved that can't be
+  // opened again; the problem says which box.
+  it('a draft with an amount over Rs 1 crore is refused, and nothing is saved', async () => {
+    const before = await q<{ n: string }>('SELECT count(*)::text AS n FROM erp.goods_receipts');
+    const receipt = await send(
+      'POST',
+      '/api/purchasing/receipts',
+      'maria',
+      draft({ lines: [{ itemId: items['ABEA001'], qty: 1000, unitCost: 1_000_000_001, lineDiscount: 0 }] }),
+    );
+    expect(receipt.statusCode).toBe(400);
+    expect(receipt.json()).toMatchObject({
+      error: 'too_large',
+      problems: [{ problem: 'cost_too_large', row: 0 }],
+    });
+    expect(await q('SELECT count(*)::text AS n FROM erp.goods_receipts')).toEqual(before);
+    const back = await send('POST', '/api/purchasing/returns', 'maria', {
+      supplierId: naveed,
+      locationId: shopLocation,
+      returnedOn: '2026-11-06',
+      reason: 'damaged',
+      note: null,
+      lines: [{ itemId: items['ABEA001'], qty: 2000, unitCost: 600_000_000 }],
+    });
+    expect(back.statusCode).toBe(400);
+    expect(back.json()).toMatchObject({
+      error: 'too_large',
+      problems: [{ problem: 'line_too_large', row: 0 }],
+    });
+  });
+
   it('is saved as a draft without a number, and shows the difference from the bill', async () => {
     const res = await send('POST', '/api/purchasing/receipts', 'maria', draft());
     expect(res.statusCode).toBe(201);

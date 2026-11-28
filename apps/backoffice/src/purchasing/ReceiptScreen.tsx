@@ -1,5 +1,5 @@
 import type { DocumentRow, PurchasingLookups, ReceiptView } from '@erp/contracts';
-import { checkReceipt, isEmptyDraft, receiptTotals } from '@erp/domain';
+import { amountLimit, checkReceipt, isEmptyDraft, receiptTotals } from '@erp/domain';
 import {
   formatMoney,
   PageHeader,
@@ -29,9 +29,17 @@ import {
   notify,
   Select,
   TextInput,
+  useOneAtATime,
 } from '../ui';
 import { ItemPicker } from './ItemPicker';
-import { dateProblem, problemText, purchasingRefusal, usePurchasingLookups, type PickedItem } from './data';
+import {
+  dateProblem,
+  problemText,
+  purchasingRefusal,
+  shortProblemText,
+  usePurchasingLookups,
+  type PickedItem,
+} from './data';
 import {
   HEAD_FIELD,
   LineBox,
@@ -50,7 +58,9 @@ import {
 // results and refusals are toasts (owner answer 6). W2-16 (owner's review, 2026-11-28): laid out like the paper bill
 // (its head at the top, its discount and total at the foot), each problem under its own field, a # column, Enter on
 // the last line adds one, the last cost under the unit cost, and the totals with Save and Post in a bar kept at the
-// bottom of the window; Post stays clickable and marks what is left to fix.
+// bottom of the window; Post stays clickable and marks what is left to fix. W2-17 (owner's staging test): no amount
+// over Rs 1 crore (owner answer 1); a box that can't be read is never 0 and can't be saved; Save draft marks nothing
+// red but says what is left (owner answer 2); one save at a time; short words under a line's boxes.
 
 export function ReceiptsScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
@@ -235,6 +245,9 @@ function ReceiptForm({
 }) {
   const { t } = useTranslation();
   const m = lookups.money;
+  // No amount over Rs 1 crore, in the shop's money (W2-17, owner answer 1).
+  const limit = amountLimit(m.minorUnits);
+  const limitText = formatMoney(limit, m);
   const r = view?.receipt;
   const posted = r?.status === 'posted';
   const can = lookups.can.receive && !posted;
@@ -302,7 +315,8 @@ function ReceiptForm({
       itemId: l.item.id,
       qty: n(qtyValue(l.qty)),
       unitCost: n(moneyValue(l.unitCost, m.minorUnits)),
-      lineDiscount: n(moneyValue(l.lineDiscount, m.minorUnits) ?? 0),
+      // A discount that can't be read is a problem, never 0 (W2-17); an empty one is 0.
+      lineDiscount: n(moneyValue(l.lineDiscount, m.minorUnits)),
       allowsFraction: l.item.allowsFraction,
       lastCost: posted ? null : l.item.lastCost,
       retail: l.item.retail,
@@ -316,8 +330,9 @@ function ReceiptForm({
     billNo: h.billNo,
     billDate: h.billDate || null,
     locationId: h.locationId || null,
-    billDiscount: n(moneyValue(h.billDiscount, m.minorUnits) ?? 0),
+    billDiscount: n(moneyValue(h.billDiscount, m.minorUnits)),
     billTotal: billTotal === undefined ? null : billTotal,
+    maxAmount: limit,
     lines: parsed.map((p) => ({
       ...p,
       qty: p.qty ?? 0,
@@ -333,22 +348,62 @@ function ReceiptForm({
             unitCost: p.unitCost ?? 0,
             lineDiscount: p.lineDiscount,
           })),
-          billDiscount: n(moneyValue(h.billDiscount, m.minorUnits) ?? 0),
+          billDiscount: n(moneyValue(h.billDiscount, m.minorUnits)),
         });
   const show = (minor: number | null) => (minor === null ? '—' : formatMoney(minor, m));
   const exists = (k: string) => t(k) !== k;
   const toFix = check.problems.length + (locked === null ? 0 : 1);
 
-  // Each problem under its own field, once the field is left or Save draft / Post is pressed (W2-16).
+  // A box whose text isn't a number (W2-17): its problem says so, and Save draft can't keep it.
+  const unreadable = (text: string, value: number | null | undefined) =>
+    text.trim() !== '' && value === undefined;
+  const lineUnreadable = (i: number, field: LineField) => {
+    const l = lines[i]!;
+    if (field === 'qty') return unreadable(l.qty, qtyValue(l.qty));
+    if (field === 'unitCost') return unreadable(l.unitCost, moneyValue(l.unitCost, m.minorUnits));
+    if (field === 'discount') return unreadable(l.lineDiscount, moneyValue(l.lineDiscount, m.minorUnits));
+    return false;
+  };
+  const headUnreadable = (field: 'billDiscount' | 'billTotal') =>
+    unreadable(h[field], moneyValue(h[field], m.minorUnits));
+
+  // Each problem under its own field, once the field is left or Post is pressed (W2-16, W2-17).
   const headProblem = (field: string) => {
     if (!problems.shown(field)) return undefined;
+    if ((field === 'billDiscount' || field === 'billTotal') && headUnreadable(field))
+      return t('purchasing.problems.not_amount');
     const p = check.problems.filter((x) => x.row === null && HEAD_FIELD[x.problem] === field);
-    return p.length === 0 ? undefined : p.map((x) => problemText(t, exists, x.problem, null)).join(' ');
+    return p.length === 0
+      ? undefined
+      : p.map((x) => problemText(t, exists, x.problem, null, limitText)).join(' ');
   };
+  // Under a line's box, the short words (W2-17).
   const lineProblem = (i: number, field: LineField) => {
     if (rowOf(i) < 0 || !problems.shown(`${i}:${field}`)) return undefined;
+    if (lineUnreadable(i, field))
+      return t(`purchasing.short.${field === 'qty' ? 'not_number' : 'not_amount'}`);
     const p = check.problems.filter((x) => x.row === rowOf(i) && lineFieldOf(x.problem) === field);
-    return p.length === 0 ? undefined : p.map((x) => problemText(t, exists, x.problem, null)).join(' ');
+    return p.length === 0
+      ? undefined
+      : p.map((x) => shortProblemText(t, exists, x.problem, limitText)).join(' ');
+  };
+  /** The boxes Save draft can't keep (W2-17): text that isn't a number, and any amount over the limit. */
+  const unsaveable = () => {
+    const keys: string[] = [];
+    lines.forEach((_, i) => {
+      if (rowOf(i) < 0) return;
+      for (const f of ['qty', 'unitCost', 'discount'] as const)
+        if (lineUnreadable(i, f)) keys.push(`${i}:${f}`);
+    });
+    for (const f of ['billDiscount', 'billTotal'] as const) if (headUnreadable(f)) keys.push(f);
+    for (const x of check.problems)
+      if (x.problem.endsWith('_too_large'))
+        keys.push(
+          x.row === null
+            ? (HEAD_FIELD[x.problem] ?? 'billTotal')
+            : `${used[x.row]}:${lineFieldOf(x.problem)}`,
+        );
+    return keys;
   };
   // Under the unit cost: the last cost, amber with how far it moved when more than 10 %; Retail when the new cost
   // reaches it. Warnings never stop Post.
@@ -399,6 +454,13 @@ function ReceiptForm({
 
   /** Saves the draft; returns its id and row version, or null after showing why not. */
   const save = async (): Promise<{ id: string; rowVersion: string } | null> => {
+    // A box that can't be read, or an amount over the limit, can't be kept: only those are marked (W2-17).
+    const bad = unsaveable();
+    if (bad.length > 0) {
+      problems.mark(bad);
+      notify.problem(t('purchasing.cantSave'));
+      return null;
+    }
     // Nothing on any line is nothing to keep (owner's review of W1-19); the server refuses it too.
     if (isEmptyDraft(body().lines)) {
       notify.problem(t('purchasing.errors.empty_draft'));
@@ -416,55 +478,60 @@ function ReceiptForm({
         rowVersion: (res.body as { rowVersion: string }).rowVersion,
       };
     if (res.status === 201) return res.body as { id: string; rowVersion: string };
-    notify.problem(purchasingRefusal(t, exists, res.body));
+    notify.problem(purchasingRefusal(t, exists, res.body, m));
     return null;
   };
-  // A draft may be incomplete: Save draft keeps it and marks what is left to fix.
+  // One save at a time (W2-17): each action says whether its form is about to be replaced (true), so the buttons stay
+  // busy until the new version is on the screen.
+  const act = useOneAtATime<'save' | 'post' | 'delete'>();
+  // A draft may be incomplete: Save draft keeps it, marks nothing, and says what is left before posting (W2-17, owner
+  // answer 2).
   const saveDraft = async () => {
-    problems.showAll();
     const s = await save();
-    if (!s) return;
+    if (!s) return false;
+    notify.done(toFix > 0 ? t('purchasing.savedToFix', { count: toFix }) : t('purchasing.receipts.saved'));
     if (!r) navigate(href.receipt(s.id));
-    else {
-      notify.done(t('purchasing.receipts.saved'));
-      await onSaved();
-    }
+    else await onSaved();
+    return true;
   };
   // Post stays clickable (W2-16): with problems it sends nothing, marks them all and puts the cursor on the first.
   const postIt = async () => {
     if (toFix > 0) {
       problems.focusFirst();
-      return;
+      return false;
     }
     const s = await save();
-    if (!s) return;
+    if (!s) return false;
     const res = await api('POST', `/api/purchasing/receipts/${encodeURIComponent(s.id)}/post`, {
       rowVersion: s.rowVersion,
     });
     if (res.status === 200) {
       if (!r) navigate(href.receipt(s.id));
       else await onSaved();
-      return;
+      return true;
     }
     // The draft was saved before Post was refused: open it again, as saved, with the refusal.
-    const text = purchasingRefusal(t, exists, res.body);
+    const text = purchasingRefusal(t, exists, res.body, m);
     // A new draft opens at its own address and shows it there; a toast outlives this form's reload.
-    if (!r) return navigate(href.receipt(s.id), text);
-    notify.problem(text);
-    await onSaved();
+    if (!r) navigate(href.receipt(s.id), text);
+    else {
+      notify.problem(text);
+      await onSaved();
+    }
+    return true;
   };
   // Delete asks first (W2-16 point 7): a typed-in bill is a lot to lose to a misclick.
   const [asking, setAsking] = useState(false);
-  const [busy, setBusy] = useState(false);
   const remove = async () => {
-    if (!r) return;
-    setBusy(true);
+    if (!r) return false;
     const res = await api('DELETE', `/api/purchasing/receipts/${encodeURIComponent(r.id)}`);
-    setBusy(false);
     if (res.status === 200) {
       notify.done(t('purchasing.deleted'));
       navigate(href.receipts);
-    } else notify.problem(purchasingRefusal(t, exists, res.body));
+      return true;
+    }
+    notify.problem(purchasingRefusal(t, exists, res.body, m));
+    return false;
   };
 
   const difference =
@@ -787,13 +854,17 @@ function ReceiptForm({
               variant="ghost"
               icon={Trash2}
               className="text-bad hover:bg-bad-soft hover:text-bad"
+              disabled={act.busy !== null}
               onClick={() => setAsking(true)}
             >
               {t('purchasing.deleteDraft')}
             </Button>
           )}
-          {problems.all && toFix > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-bad">
+          {/* What is left before posting: on a saved draft, quietly; in red once Post was pressed (W2-17). */}
+          {(problems.all || r) && toFix > 0 && (
+            <span
+              className={`inline-flex items-center gap-1.5 text-sm font-semibold ${problems.all ? 'text-bad' : 'text-muted-foreground'}`}
+            >
               <CircleAlert aria-hidden="true" className="size-4" />
               {t('purchasing.toFix', { count: toFix })}
             </span>
@@ -817,10 +888,21 @@ function ReceiptForm({
             </span>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => void saveDraft()} variant="outline" icon={Save}>
+            <Button
+              onClick={() => void act.run('save', saveDraft)()}
+              variant="outline"
+              icon={Save}
+              busy={act.busy === 'save'}
+              disabled={act.busy !== null}
+            >
               {t('purchasing.saveDraft')}
             </Button>
-            <Button onClick={() => void postIt()} icon={Send}>
+            <Button
+              onClick={() => (toFix > 0 ? problems.focusFirst() : void act.run('post', postIt)())}
+              icon={Send}
+              busy={act.busy === 'post'}
+              disabled={act.busy !== null}
+            >
               {t('purchasing.post')}
             </Button>
           </div>
@@ -834,8 +916,8 @@ function ReceiptForm({
         actionIcon={Trash2}
         cancelLabel={t('purchasing.cancel')}
         tone="danger"
-        busy={busy}
-        onConfirm={() => void remove()}
+        busy={act.busy === 'delete'}
+        onConfirm={() => void act.run('delete', remove)()}
       >
         {t('purchasing.deleteText', { count: Math.max(used.length, 1) })}
       </ConfirmDialog>

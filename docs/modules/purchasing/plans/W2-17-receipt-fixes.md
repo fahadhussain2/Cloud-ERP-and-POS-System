@@ -166,3 +166,14 @@ One branch off `staging`, one PR.
 - Editing or reversing a posted receipt (a *Reverse receipt* plan later, if the owner wants it).
 - The Rs 1 crore limit on other money forms.
 - Any change to the POS or `packages/ui`.
+
+## As built (2026-11-28)
+
+- **Bugs first:** failing tests committed and locked: the golden cases for the limit (receipt and return), the screen's huge cost, the unreadable discount, the bill discount too big to read, "dsasd" in Quantity, two quick clicks on Save draft (receipt, new receipt, return, transfer, adjustment), and the API's refusal. The new-receipt double-click test first had a line without an item, which is an empty draft, so it sent nothing and failed for the wrong reason; it was corrected in its own commit (it then failed on the old screen with two new drafts) before the fix.
+- **The limit's words** show the shop's own formatting of the amount ("Over Rs 10,000,000"), not the word "crore", so they follow the tenant's locale (rule 10).
+- **`useOneAtATime`** takes a name per action, so only the pressed button shows the spinner and the others are disabled. Save draft, Post and Delete keep the buttons busy after success until the form is replaced; Receive (transfers) and Approve / Send back (adjustments) give them back at once, since their reload changes the screen anyway. Post with problems marks them without making anything busy.
+- **A return's lines** show `lines_required` and the return's `total_too_large` under the table; before, a return had no place for them.
+- **A return's line value** is worked out only within the limit, so a huge cost back can't stop the screen either.
+- **The error screen** is tested on the kit (`ui.test.tsx`), not through `App.test.tsx`; the App wraps every screen in it, and a new address clears a failure.
+- **Payment:** the keys `purchasing.receipts.onAccount` and `cashNote` are kept with the new words, not replaced. A bank option reads "Paid from {bank's name}" (the names already start with "Bank:", so "Paid from Bank: HBL").
+
