@@ -8,9 +8,11 @@ import { useId, type ComponentProps, type ReactNode } from 'react';
 /** The label of a kit field, for a group or a control that isn't a text box. */
 export const FIELD_LABEL = 'text-[13px] font-semibold text-ink';
 
-/** The box of a kit field, for a native control that needs the same look. */
+/** The box of a kit field, for a native control that needs the same look. In dark mode a faint fill of its own, so a
+ * box stands out on its panel (owner, 2026-11-28): set here, not left to the shared Input, so the controls drawn as a
+ * field (the item field, a dropdown) have it too. */
 export const FIELD_BOX =
-  'h-9 rounded-lg border border-field-line bg-surface px-3 text-sm shadow-none transition-[border-color,box-shadow] focus-visible:border-focus focus-visible:ring-[3px] focus-visible:ring-glow aria-invalid:border-bad aria-invalid:ring-bad/20';
+  'h-9 rounded-lg border border-field-line bg-surface dark:bg-input/30 px-3 text-sm shadow-none transition-[border-color,box-shadow] focus-visible:border-focus focus-visible:ring-[3px] focus-visible:ring-glow aria-invalid:border-bad aria-invalid:ring-bad/20';
 
 /** The line under a field: its problem (an alert, red) or its hint. */
 export function FieldNote({ id, hint, error }: { id: string; hint?: ReactNode; error?: ReactNode }) {

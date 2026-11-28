@@ -253,6 +253,20 @@ describe('a transfer', () => {
     expect(f.calls.find((c) => c.path.endsWith('/post'))!.body).toEqual({ rowVersion: '9' });
   });
 
+  // W2-16 (owner's review, 2026-11-28): a line's problems piled up under its item and pushed its boxes out of line.
+  it("puts a line's problem under its own box, and every cell at the top", async () => {
+    show(<TransferScreen api={fakeApi(lookups()).api} id="t1" />);
+    const qty = await screen.findByLabelText('Quantity of line 1');
+    fireEvent.change(qty, { target: { value: '0' } });
+    expect(qty.getAttribute('aria-invalid')).toBe('true');
+    expect(document.getElementById(qty.getAttribute('aria-describedby')!.split(' ')[0]!)!.textContent).toBe(
+      en.inventory.problems.qty_positive,
+    );
+    expect(screen.getByRole('button', { name: 'Item of line 1' }).getAttribute('aria-invalid')).toBeNull();
+    const row = qty.closest('tr')!;
+    for (const cell of within(row).getAllByRole('cell')) expect(cell.className).toContain('align-top');
+  });
+
   it('receives what arrived on each line', async () => {
     const sent = {
       ...TRANSFER,

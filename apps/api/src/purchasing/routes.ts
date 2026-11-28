@@ -68,6 +68,8 @@ const units = (t: number) => t / 1000;
 const likeEscape = (s: string) => s.replace(/[\\%_]/g, (x) => `\\${x}`);
 /** A date column read as text (`::text`), or null. */
 const day = (v: unknown) => (typeof v === 'string' ? v : null);
+/** No return's id: every posted return counts against a receipt line. */
+const NO_RETURN = '00000000-0000-0000-0000-000000000000';
 
 /** Adds `days` to an ISO date. */
 function addDays(date: string, days: number): string {
@@ -423,6 +425,18 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
 
   // ---- Goods receipts (PUR-02) ----
 
+  /** What each receipt line still has: received less posted returns of it (except `exceptReturn`, or none). */
+  const returnable = async (c: Client, lineIds: string[], exceptReturn: string = NO_RETURN) => {
+    const { rows } = await c.query<{ id: string; left: string }>(
+      `SELECT l.id, ((l.qty - coalesce((SELECT sum(x.qty) FROM erp.purchase_return_lines x
+           JOIN erp.purchase_returns r ON r.id = x.return_id
+           WHERE x.receipt_line_id = l.id AND r.status = 'posted' AND r.id <> $2), 0)) * 1000)::bigint AS left
+       FROM erp.goods_receipt_lines l WHERE l.id = ANY($1::uuid[])`,
+      [lineIds, exceptReturn],
+    );
+    return new Map(rows.map((r) => [r.id, Number(r.left)]));
+  };
+
   const receiptView = async (c: Client, id: string): Promise<ReceiptView | null> => {
     const h = (
       await c.query<Row>(
@@ -440,6 +454,13 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       c,
       rows.map((r) => r['item_id'] as string | null).filter((x): x is string => x !== null),
     );
+    const posted = h['status'] === 'posted';
+    const left = posted
+      ? await returnable(
+          c,
+          rows.map((r) => r['id'] as string),
+        )
+      : null;
     const lines = rows.map((r) => {
       const f = r['item_id'] ? facts.get(r['item_id'] as string) : undefined;
       return {
@@ -456,9 +477,9 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
         allowsFraction: f?.allowsFraction ?? false,
         lastCost: f?.lastCost ?? null,
         retail: f?.retail ?? null,
+        returnable: left === null ? null : (left.get(r['id'] as string) ?? 0),
       };
     });
-    const posted = h['status'] === 'posted';
     const check = checkReceipt({
       supplierId: (h['supplier_party_id'] as string | null) ?? null,
       billNo: (h['supplier_bill_no'] as string | null) ?? null,
@@ -654,18 +675,6 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
   });
 
   // ---- Purchase returns (PUR-03) ----
-
-  /** What each receipt line still has: received less posted returns of it (except `exceptReturn`). */
-  const returnable = async (c: Client, lineIds: string[], exceptReturn: string) => {
-    const { rows } = await c.query<{ id: string; left: string }>(
-      `SELECT l.id, ((l.qty - coalesce((SELECT sum(x.qty) FROM erp.purchase_return_lines x
-           JOIN erp.purchase_returns r ON r.id = x.return_id
-           WHERE x.receipt_line_id = l.id AND r.status = 'posted' AND r.id <> $2), 0)) * 1000)::bigint AS left
-       FROM erp.goods_receipt_lines l WHERE l.id = ANY($1::uuid[])`,
-      [lineIds, exceptReturn],
-    );
-    return new Map(rows.map((r) => [r.id, Number(r.left)]));
-  };
 
   const returnView = async (c: Client, id: string): Promise<ReturnView | null> => {
     const h = (

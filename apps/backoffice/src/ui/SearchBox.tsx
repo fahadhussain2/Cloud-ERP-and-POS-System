@@ -22,6 +22,12 @@ import { FIELD_BOX, FieldNote } from './Field';
 // would cut a list inside it off; owner, staging 2026-11-08); `inline` keeps it inside the box's container (a box in a
 // dialog, where a list outside the dialog couldn't be clicked).
 
+/** The list's gap from its box and from the window's edge, its full height (`max-h-64`), and the room under the box
+ * below which it opens above instead (about five rows), in px. */
+const GAP = 4;
+const LIST_MAX = 256;
+const ROOM = 160;
+
 export function SearchBox<T>({
   label,
   listLabel,
@@ -61,6 +67,13 @@ export function SearchBox<T>({
 }) {
   const listId = useId();
   const field = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  // Opened by a typed character (the item field, W2-16): the caret goes after it, so typing carries on.
+  useEffect(() => {
+    const box = input.current;
+    if (autoFocus && box) box.setSelectionRange(box.value.length, box.value.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the box opens
+  }, []);
   const [active, setActive] = useState(0);
   const [place, setPlace] = useState<CSSProperties | null>(null);
   // New results start on their first hit (compared by their keys, so a caller may pass a fresh array each time).
@@ -73,12 +86,25 @@ export function SearchBox<T>({
   const open = hits.length > 0;
   const optionId = (i: number) => `${listId}-${i}`;
 
-  // Drawn over the page: under the box, kept there while the page scrolls or resizes.
+  // Under the box, or above it when the window has no room under it (W2-16 point 3): kept there while the page
+  // scrolls or resizes. Drawn over the page (`page`), or inside the box's container (`inline`).
   useLayoutEffect(() => {
-    if (floating !== 'page' || !open) return;
+    if (!open) return;
     const follow = () => {
       const r = field.current?.getBoundingClientRect();
-      if (r) setPlace({ position: 'fixed', top: r.bottom + 4, left: r.left, width: Math.max(r.width, 280) });
+      if (!r) return;
+      const below = window.innerHeight - r.bottom - 2 * GAP;
+      const above = r.top - 2 * GAP;
+      const up = below < ROOM && above > below;
+      const maxHeight = Math.min(LIST_MAX, up ? above : below);
+      if (floating === 'inline') {
+        setPlace(
+          up ? { bottom: '100%', marginBottom: GAP, maxHeight } : { top: '100%', marginTop: GAP, maxHeight },
+        );
+        return;
+      }
+      const at = { position: 'fixed' as const, left: r.left, width: Math.max(r.width, 280), maxHeight };
+      setPlace(up ? { ...at, bottom: window.innerHeight - r.top + GAP } : { ...at, top: r.bottom + GAP });
     };
     follow();
     window.addEventListener('scroll', follow, true);
@@ -100,10 +126,10 @@ export function SearchBox<T>({
       id={listId}
       role="listbox"
       aria-label={listLabel}
-      style={floating === 'page' ? (place ?? { position: 'fixed', visibility: 'hidden' }) : undefined}
+      style={place ?? (floating === 'page' ? { position: 'fixed', visibility: 'hidden' } : { top: '100%' })}
       className={cn(
         'z-50 m-0 max-h-64 list-none overflow-auto rounded-xl border border-line bg-surface p-1 shadow-panel',
-        floating === 'inline' && 'absolute inset-x-0 top-full mt-1',
+        floating === 'inline' && 'absolute inset-x-0',
       )}
     >
       {hits.map((h, i) => (
@@ -135,6 +161,7 @@ export function SearchBox<T>({
         aria-activedescendant={open ? optionId(active) : undefined}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${listId}-note` : undefined}
+        ref={input}
         autoFocus={autoFocus}
         className={FIELD_BOX}
         value={text}

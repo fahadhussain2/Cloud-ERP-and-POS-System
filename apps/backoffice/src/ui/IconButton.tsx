@@ -21,7 +21,8 @@ export function IconButton({
 }: Omit<ComponentProps<'button'>, 'children'> & {
   icon: LucideIcon;
   label: string;
-  tone?: 'default' | 'danger';
+  /** `danger`: grey, red on hover (a row's Delete). `bad`: red at rest (a document line's bin, W2-16). */
+  tone?: 'default' | 'danger' | 'bad';
 }) {
   return (
     // Its own provider, so an icon button works anywhere (a dialog, a test).
@@ -36,6 +37,7 @@ export function IconButton({
             className={cn(
               'rounded-lg text-muted-foreground hover:bg-surface-2 hover:text-ink focus-visible:border-focus focus-visible:ring-[3px] focus-visible:ring-glow',
               tone === 'danger' && 'hover:bg-bad-soft hover:text-bad',
+              tone === 'bad' && 'text-bad hover:bg-bad-soft hover:text-bad',
               className,
             )}
             {...props}

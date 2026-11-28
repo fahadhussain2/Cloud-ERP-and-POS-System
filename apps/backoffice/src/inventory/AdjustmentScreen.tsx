@@ -22,9 +22,13 @@ import type { Api } from '../api';
 import { qtyText, qtyValue } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
 import { href, navigate, takeCarried } from '../router';
-import { Button, buttonClass, notify, Select, TextBox, TextInput } from '../ui';
+import { Button, buttonClass, notify, Select, TextInput } from '../ui';
+import { LineBox } from '../purchasing/lineFields';
 import { dateProblem, inventoryRefusal, locationName, problemText, useInventoryLookups } from './data';
 import { StatusOf } from './TransferScreen';
+
+/** Where a line's problem shows (W2-16): under the quantity, or else under the item. */
+const QTY_PROBLEMS = new Set(['qty_positive', 'qty_fraction', 'qty_zero', 'write_off_gain']);
 
 // Stock adjustments (W1-18, INV-05; owner answers 1 and 3): found (+) or gone (−) at one location, with a reason,
 // valued at the average and posted against Inventory adjustments. A loss above the shop's limit, posted by someone
@@ -361,39 +365,39 @@ function AdjustmentForm({
               const row = used.indexOf(l);
               const notes = row < 0 ? [] : check.problems.filter((p) => p.row === row);
               const below = row >= 0 && check.warnings.some((w) => w.row === row);
+              // Each problem under its own box, every cell at the top, so the line's boxes stay in line (W2-16).
+              const say = (qty: boolean) =>
+                notes
+                  .filter((p) => QTY_PROBLEMS.has(p.problem) === qty)
+                  .map((p) => problemText(t, exists, p.problem, null))
+                  .join(' ') || undefined;
               return (
-                <TableRow key={i} className="align-top">
-                  <TableCell>
+                <TableRow key={i}>
+                  <TableCell className="align-top">
                     <ItemPicker<InventoryItem>
                       api={api}
                       url="/api/inventory/items"
                       label={t('inventory.line.itemOf', { row: i + 1 })}
                       picked={l.item}
                       disabled={!canEdit}
+                      error={say(false)}
                       onPick={(item) => put(i, { item, stock: item.stock, avgCost: item.avgCost })}
                     />
-                    {notes.map((p, k) => (
-                      <p key={k} className="m-0 mt-1 text-xs text-destructive">
-                        {problemText(t, exists, p.problem, null)}
-                      </p>
-                    ))}
-                    {below && (
-                      <p className="m-0 mt-1 text-xs text-warn">{t('inventory.warnings.below_zero')}</p>
-                    )}
                   </TableCell>
                   {draft && (
-                    <TableCell className="text-end leading-9 tabular-nums">
+                    <TableCell className="align-top text-end leading-9 tabular-nums">
                       {l.stock === null ? '—' : qtyText(l.stock[h.locationId] ?? 0)}
                     </TableCell>
                   )}
-                  <TableCell>
-                    <TextBox
-                      aria-label={t('inventory.line.changeOf', { row: i + 1 })}
-                      className="h-9 w-24"
-                      inputMode="decimal"
+                  <TableCell className="align-top">
+                    <LineBox
+                      label={t('inventory.line.changeOf', { row: i + 1 })}
+                      className="w-24"
                       placeholder="-1"
                       disabled={!canEdit}
                       value={l.qty}
+                      error={say(true)}
+                      notes={below ? [{ text: t('inventory.warnings.below_zero'), warn: true }] : []}
                       onChange={(e) => put(i, { qty: e.target.value })}
                     />
                   </TableCell>

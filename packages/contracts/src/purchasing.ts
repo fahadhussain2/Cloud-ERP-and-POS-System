@@ -135,6 +135,9 @@ export interface ReceiptLineView {
   allowsFraction: boolean;
   lastCost: number | null;
   retail: number | null;
+  /** A posted receipt's line: what is still left to send back (received less posted returns), in thousandths, so a
+   * return from it is checked as it is typed (W2-16). Null on a draft. */
+  returnable: number | null;
 }
 
 export interface ReceiptView {

@@ -7,14 +7,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import {
+  ActionBar,
   Button,
   buttonClass,
   Checkbox,
   ConfirmDialog,
+  FIELD_BOX,
   FormDialog,
   IconButton,
   ListToolbar,
   notify,
+  SearchBox,
   Select,
   TextInput,
   Toaster,
@@ -169,6 +172,64 @@ describe('Select', () => {
   });
 });
 
+// Bug (owner's review of New goods receipt, 2026-11-28; W2-16 point 3): the item list always opened under its field and
+// ran past the bottom of the window when the field was near it.
+describe('SearchBox near the bottom of the window', () => {
+  const HITS = ['AFLT001', 'AFLT002', 'AFLT003'];
+  /** The box with its field's edges at `top`–`top + 36` in a 768px window; the list it draws over the page. */
+  const listAt = (top: number) => {
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(768);
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      top,
+      bottom: top + 36,
+      left: 20,
+      right: 320,
+      width: 300,
+      height: 36,
+      x: 20,
+      y: top,
+      toJSON: () => ({}),
+    });
+    show(
+      <SearchBox
+        floating="page"
+        label="Item of line 4"
+        listLabel="Items found"
+        text="a"
+        onText={() => undefined}
+        hits={HITS}
+        hitKey={(h) => h}
+        onPick={() => undefined}
+        onEscape={() => undefined}
+      >
+        {(h) => h}
+      </SearchBox>,
+    );
+    return screen.getByRole('listbox');
+  };
+  afterEach(() => vi.restoreAllMocks());
+
+  it('opens above its field when there is no room under it', () => {
+    // The field ends 100px above the window's bottom.
+    const list = listAt(632);
+    expect(list.style.top).toBe('');
+    expect(list.style.bottom).toBe(`${768 - 632 + 4}px`);
+  });
+
+  it('stays under its field when there is some room, no taller than that room', () => {
+    // The field ends 180px above the window's bottom.
+    const list = listAt(552);
+    expect(list.style.top).toBe(`${552 + 36 + 4}px`);
+    expect(parseFloat(list.style.maxHeight)).toBeLessThanOrEqual(180 - 4);
+  });
+
+  it('opens under its field, at its full height, when there is room', () => {
+    const list = listAt(200);
+    expect(list.style.top).toBe(`${200 + 36 + 4}px`);
+    expect(list.style.maxHeight).toBe('256px');
+  });
+});
+
 describe('Checkbox', () => {
   it('is named by its label and toggles', () => {
     const onChange = vi.fn();
@@ -316,5 +377,60 @@ describe('notify', () => {
     const alert = screen.getByRole('alert');
     fireEvent.click(within(alert).getByRole('button', { name: en.app.close }));
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+// W2-16 (the goods receipt layout, owner 2026-11-28): a bar kept at the bottom of the window, a red bin on a line, a
+// note under a dropdown's options, and the faint fill dark-mode fields keep.
+describe('ActionBar', () => {
+  it('is a named region kept at the bottom of the window', () => {
+    show(
+      <ActionBar label="Save or post">
+        <Button>Post</Button>
+      </ActionBar>,
+    );
+    const bar = screen.getByRole('region', { name: 'Save or post' });
+    expect(bar.className).toContain('sticky');
+    expect(bar.className).toContain('bottom-0');
+    expect(within(bar).getByRole('button', { name: 'Post' })).toBeDefined();
+  });
+});
+
+describe('IconButton, red', () => {
+  it('is red at rest with tone="bad", grey with tone="danger"', () => {
+    show(
+      <>
+        <IconButton icon={Save} tone="bad" label="Remove line 1" />
+        <IconButton icon={Save} tone="danger" label="Delete Khan Motors" />
+      </>,
+    );
+    expect(screen.getByRole('button', { name: 'Remove line 1' }).className).toContain('text-bad');
+    expect(screen.getByRole('button', { name: 'Delete Khan Motors' }).className).not.toMatch(
+      /(^|\s)text-bad(\s|$)/,
+    );
+  });
+});
+
+describe('Select with a note', () => {
+  it('shows the note under the options, not as an option', async () => {
+    show(
+      <Select
+        label="Paid"
+        value="account"
+        onValueChange={() => undefined}
+        options={[{ value: 'account', label: "On the supplier's account" }]}
+        note="Paid in cash? Pay it at the desk."
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Paid' }), { key: 'ArrowDown' });
+    const list = await screen.findByRole('listbox');
+    expect(within(list).getByText('Paid in cash? Pay it at the desk.')).toBeDefined();
+    expect(within(list).getAllByRole('option')).toHaveLength(1);
+  });
+});
+
+describe('fields in dark mode', () => {
+  it('keep a faint fill of their own, on boxes and on the controls drawn as a field', () => {
+    expect(FIELD_BOX).toContain('dark:bg-input/30');
   });
 });
