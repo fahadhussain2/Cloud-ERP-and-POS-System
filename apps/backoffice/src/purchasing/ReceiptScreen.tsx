@@ -770,15 +770,23 @@ function ReceiptForm({
                     disabled={!can}
                     error={lineProblem(i, 'item')}
                     onLeave={problems.touch(`${i}:item`)}
-                    onPick={(item) =>
+                    onPick={(item) => {
+                      // The item's last cost fills an empty box. A cost the previous item filled in, still as it
+                      // was, goes with that item: the new one's last cost, or nothing (owner's staging test,
+                      // 2026-11-28). A cost the purchaser typed stays: the bill's price doesn't change with a re-pick.
+                      const filled =
+                        l.item.lastCost !== null &&
+                        l.unitCost.trim() === moneyText(l.item.lastCost, m.minorUnits);
+                      const typed = l.unitCost.trim() !== '' && !filled;
                       put(i, {
                         item,
-                        unitCost:
-                          l.unitCost.trim() === '' && item.lastCost !== null
+                        unitCost: typed
+                          ? l.unitCost
+                          : item.lastCost !== null
                             ? moneyText(item.lastCost, m.minorUnits)
-                            : l.unitCost,
-                      })
-                    }
+                            : '',
+                      });
+                    }}
                   />
                 </TableCell>
                 <TableCell className="align-top">
