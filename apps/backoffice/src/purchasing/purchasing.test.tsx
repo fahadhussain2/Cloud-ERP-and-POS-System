@@ -689,3 +689,84 @@ describe("the shop's business date (W2-05)", () => {
     expect(f.calls.some((c) => c.method === 'POST')).toBe(false);
   });
 });
+
+// W2-17 (owner's staging test of W2-16, 2026-11-28): bugs, each test written before its fix.
+describe('the fixes from the staging test (W2-17)', () => {
+  it('a unit cost too big to work out is a problem under Unit cost, and the page stays', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    const qty = await screen.findByLabelText('Quantity of line 2');
+    fireEvent.change(qty, { target: { value: '100' } });
+    const cost = screen.getByLabelText('Unit cost of line 2');
+    fireEvent.change(cost, { target: { value: '2000000000000' } });
+    fireEvent.blur(cost);
+    expect(cost.getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByRole('button', { name: en.purchasing.post })).toBeDefined();
+  });
+
+  it('a line discount that is not a number is a problem under Discount, not 0', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    const discount = await screen.findByLabelText('Discount of line 2');
+    fireEvent.change(discount, { target: { value: 's' } });
+    fireEvent.blur(discount);
+    expect(discount.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('a bill discount too big to read never makes the bill match', async () => {
+    show(<ReceiptScreen api={fakeApi(lookups()).api} id="r1" />);
+    const bar = await screen.findByRole('region', { name: en.purchasing.bar });
+    fireEvent.change(screen.getByLabelText(en.purchasing.fields.billTotal), { target: { value: '13401' } });
+    expect(within(bar).getByRole('status').textContent).toContain(en.purchasing.totals.matches);
+    const discount = screen.getByLabelText(en.purchasing.fields.billDiscount);
+    fireEvent.change(discount, { target: { value: '100000000000000' } });
+    fireEvent.blur(discount);
+    expect(within(bar).getByRole('status').textContent).not.toContain(en.purchasing.totals.matches);
+    expect(discount.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('Save draft sends nothing while a quantity is not a number, and marks it', async () => {
+    const f = fakeApi(lookups());
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    const qty = await screen.findByLabelText('Quantity of line 2');
+    fireEvent.change(qty, { target: { value: 'dsasd' } });
+    fireEvent.click(screen.getByRole('button', { name: en.purchasing.saveDraft }));
+    expect(qty.getAttribute('aria-invalid')).toBe('true');
+    await Promise.resolve();
+    expect(f.calls.some((c) => c.method !== 'GET')).toBe(false);
+  });
+
+  it('two quick clicks on Save draft save a receipt once', async () => {
+    const f = fakeApi(lookups());
+    show(<ReceiptScreen api={f.api} id="r1" />);
+    const save = await screen.findByRole('button', { name: en.purchasing.saveDraft });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    await waitFor(() => expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1));
+    await new Promise((done) => setTimeout(done, 20));
+    expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1);
+  });
+
+  it('two quick clicks on Save draft make one new receipt, not two', async () => {
+    const f = fakeApi(lookups(), {
+      'POST /api/purchasing/receipts': { status: 201, body: { id: 'r1', rowVersion: '1' } },
+    });
+    show(<ReceiptScreen api={f.api} id="new" />);
+    fireEvent.change(await screen.findByLabelText('Quantity of line 1'), { target: { value: '1' } });
+    const save = screen.getByRole('button', { name: en.purchasing.saveDraft });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    await waitFor(() => expect(f.calls.filter((c) => c.method === 'POST')).toHaveLength(1));
+    await new Promise((done) => setTimeout(done, 20));
+    expect(f.calls.filter((c) => c.method === 'POST')).toHaveLength(1);
+  });
+
+  it('two quick clicks on Save draft save a purchase return once', async () => {
+    const f = fakeApi(lookups(), { 'GET /api/purchasing/returns/p1': { status: 200, body: RETURN_DRAFT } });
+    show(<ReturnScreen api={f.api} id="p1" />);
+    const save = await screen.findByRole('button', { name: en.purchasing.saveDraft });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    await waitFor(() => expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1));
+    await new Promise((done) => setTimeout(done, 20));
+    expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1);
+  });
+});

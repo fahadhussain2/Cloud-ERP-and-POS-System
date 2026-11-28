@@ -476,3 +476,28 @@ describe("the shop's business date (W2-05)", () => {
     expect(await screen.findByText(ahead)).toBeDefined();
   });
 });
+
+// W2-17 (owner's staging test, 2026-11-28): one save at a time, so a second quick click can't carry an old version.
+describe('saving once (W2-17)', () => {
+  it('two quick clicks on a transfer’s Save draft save it once', async () => {
+    const f = fakeApi(lookups());
+    show(<TransferScreen api={f.api} id="t1" />);
+    const save = await screen.findByRole('button', { name: en.inventory.saveDraft });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    await waitFor(() => expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1));
+    await new Promise((done) => setTimeout(done, 20));
+    expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1);
+  });
+
+  it('two quick clicks on an adjustment’s Save draft save it once', async () => {
+    const f = fakeApi(lookups());
+    show(<AdjustmentScreen api={f.api} id="a1" />);
+    const save = await screen.findByRole('button', { name: en.inventory.saveDraft });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    await waitFor(() => expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1));
+    await new Promise((done) => setTimeout(done, 20));
+    expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1);
+  });
+});

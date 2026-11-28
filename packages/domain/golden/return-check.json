@@ -1,5 +1,5 @@
 {
-  "description": "Checking a purchase return before it is posted (PUR-03, W1-16, owner answer 3). Problems: a supplier, a location, a reason from the list (damaged, wrong_item, excess, poor_quality, price_dispute, other) and a note for other, at least one line; each line an item, a quantity above 0 (whole for pieces), a unit cost of 0 or more in whole paisa, and, when the return is linked to a goods receipt, no more than that receipt line still has (received less earlier returns; null = not linked). The total = Σ qty × unit cost, half away from zero; null when a line is invalid.",
+  "description": "Checking a purchase return before it is posted (PUR-03, W1-16, owner answer 3). Problems: a supplier, a location, a reason from the list (damaged, wrong_item, excess, poor_quality, price_dispute, other) and a note for other, at least one line; each line an item, a quantity above 0 (whole for pieces), a unit cost of 0 or more in whole paisa, and, when the return is linked to a goods receipt, no more than that receipt line still has (received less earlier returns; null = not linked). The total = Σ qty × unit cost, half away from zero; null when a line is invalid. W2-17 (owner answer 1): with `maxAmount` (Rs 1 crore in minor units), a unit cost over it is cost_too_large, a quantity × cost over it line_too_large, the lines together over it total_too_large; a quantity over what the books hold is qty_too_large. Without `maxAmount` the limit is the safe-integer range; nothing too large is thrown.",
   "cases": [
     {
       "name": "a return linked to a receipt, within what it still has",
@@ -174,6 +174,152 @@
           }
         ],
         "total": 100
+      }
+    },
+    {
+      "name": "a unit cost back over Rs 1 crore",
+      "input": {
+        "supplierId": "s1",
+        "locationId": "shop",
+        "reason": "damaged",
+        "note": null,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "unitCost": 1000000001,
+            "allowsFraction": false,
+            "returnable": null
+          }
+        ],
+        "maxAmount": 1000000000
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "cost_too_large",
+            "row": 0
+          }
+        ],
+        "total": null
+      }
+    },
+    {
+      "name": "a returned line over Rs 1 crore",
+      "input": {
+        "supplierId": "s1",
+        "locationId": "shop",
+        "reason": "damaged",
+        "note": null,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 2000,
+            "unitCost": 600000000,
+            "allowsFraction": false,
+            "returnable": null
+          }
+        ],
+        "maxAmount": 1000000000
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "line_too_large",
+            "row": 0
+          }
+        ],
+        "total": null
+      }
+    },
+    {
+      "name": "returned lines that together come to more than Rs 1 crore",
+      "input": {
+        "supplierId": "s1",
+        "locationId": "shop",
+        "reason": "damaged",
+        "note": null,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 1000,
+            "unitCost": 600000000,
+            "allowsFraction": false,
+            "returnable": null
+          },
+          {
+            "itemId": "i2",
+            "qty": 1000,
+            "unitCost": 600000000,
+            "allowsFraction": false,
+            "returnable": null
+          }
+        ],
+        "maxAmount": 1000000000
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "total_too_large",
+            "row": null
+          }
+        ],
+        "total": null
+      }
+    },
+    {
+      "name": "a returned quantity over what the books can hold",
+      "input": {
+        "supplierId": "s1",
+        "locationId": "shop",
+        "reason": "damaged",
+        "note": null,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 100000000000000,
+            "unitCost": 0,
+            "allowsFraction": false,
+            "returnable": null
+          }
+        ],
+        "maxAmount": 1000000000
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "qty_too_large",
+            "row": 0
+          }
+        ],
+        "total": null
+      }
+    },
+    {
+      "name": "a returned line too big to work out is a problem, not an error, even with no limit given",
+      "input": {
+        "supplierId": "s1",
+        "locationId": "shop",
+        "reason": "damaged",
+        "note": null,
+        "lines": [
+          {
+            "itemId": "i1",
+            "qty": 100000,
+            "unitCost": 200000000000000,
+            "allowsFraction": false,
+            "returnable": null
+          }
+        ]
+      },
+      "expected": {
+        "problems": [
+          {
+            "problem": "line_too_large",
+            "row": 0
+          }
+        ],
+        "total": null
       }
     }
   ]
