@@ -1,5 +1,5 @@
 import { cn, Button as SharedButton } from '@erp/ui';
-import type { LucideIcon } from 'lucide-react';
+import { LoaderCircle, type LucideIcon } from 'lucide-react';
 import type { ComponentProps } from 'react';
 
 // The back office's buttons (W2-12, D-127): 36px (small 32px), 8px corners, 14px semibold, an optional icon before
@@ -30,7 +30,9 @@ export function buttonClass(variant: ButtonVariant = 'default', size: 'default' 
 export function Button({
   variant = 'default',
   size = 'default',
-  icon: Icon,
+  icon,
+  busy = false,
+  disabled,
   className,
   children,
   asChild,
@@ -40,13 +42,18 @@ export function Button({
   size?: 'default' | 'sm';
   /** Shown before the word, hidden from screen readers so the button's name is its word. */
   icon?: LucideIcon;
+  /** Its action is running (W2-17): disabled, with a spinner in place of its icon; its word stays. */
+  busy?: boolean;
 }) {
+  const Icon = busy ? LoaderCircle : icon;
   return (
     <SharedButton
       // The shared button's own variant too, so none of its default fill is left under a quiet one.
       variant={variant}
       size={size === 'sm' ? 'sm' : 'default'}
       className={cn(buttonClass(variant, size), className)}
+      disabled={busy || disabled}
+      aria-busy={busy || undefined}
       {...(asChild ? { asChild } : {})}
       {...props}
     >
@@ -54,7 +61,7 @@ export function Button({
         children
       ) : (
         <>
-          <Icon aria-hidden="true" className="size-4" />
+          <Icon aria-hidden="true" className={cn('size-4', busy && 'animate-spin')} />
           {children}
         </>
       )}
