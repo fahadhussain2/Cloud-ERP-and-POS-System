@@ -161,6 +161,20 @@ test('the owner records a supplier bill with a bill discount, returns part of it
   await page.getByRole('button', { name: bo.purchasing.post }).click();
   await expect(page.getByRole('heading', { name: 'PR000001' })).toBeVisible();
 
+  // The same bill typed again, in lower case: Supplier's bill no. names the receipt that has it, and Post sends nothing
+  // and goes back to it (W2-18). Nothing is saved, so the numbers below are unchanged.
+  await menu(page, bo.nav.receipts);
+  await page.getByRole('link', { name: bo.purchasing.receipts.add }).click();
+  await pick(page, bo.purchasing.fields.supplier, 'Naveed Glass');
+  const again = page.getByLabel(bo.purchasing.fields.billNo);
+  await again.fill('inv-4471');
+  await again.press('Tab');
+  await expect(page.getByRole('main').getByRole('link', { name: 'GR000001' })).toBeVisible();
+  await expect(again).toHaveAttribute('aria-invalid', 'true');
+  await page.getByRole('button', { name: bo.purchasing.post }).click();
+  await expect(again).toBeFocused();
+  await expect(page).toHaveURL(/#\/purchasing\/receipts\/new$/);
+
   // A payment by bank, and the ledger: 49,000 − 9,800 − 10,000 = 29,200 owed.
   await menu(page, bo.nav.suppliers);
   await page.getByRole('link', { name: 'Naveed Glass' }).click();

@@ -117,3 +117,14 @@ One branch off `staging`, one PR.
 - Correcting receipts already posted twice.
 - Duplicate checks on other documents (expenses, supplier payments).
 - Any change to the POS or `packages/ui`.
+
+## As built (2026-11-28)
+
+- **Bugs first:** the golden cases (`billNoKey`, `bill_no_taken`) and the API tests (the refusal at Post, the lookup, two drafts, two Posts at once) were committed and locked, then the fix. The test for another supplier passed from the start, as it should: that case was never refused.
+- **The comparison is done in TypeScript, not SQL.** The API reads the supplier's receipts that have a bill number and compares them with `billNoKey`. So the screen, the lookup and the check at Post can't disagree on what a space is.
+- **The lock** is `pg_advisory_xact_lock` on the tenant and the receipt's supplier, taken right after the version check at Post. The check runs before the receipt's own problems, so a repeated bill is said as itself (409 `bill_no_taken` with the other receipt's number), not as one problem among others.
+- **The screen** asks when *Supplier's bill no.* is left, when the supplier changes, and once when a saved draft opens. Typing in the field drops the last answer until it is left again, and only the latest answer counts.
+  - A draft opened with an already-posted bill shows the problem at once, without the field being left first.
+  - The receipt's number in the message is a link to it. The words come from one key (`purchasing.problems.bill_no_taken`), split around the number, so a translation can put the number anywhere.
+- **The contract** has `BillNoQuery` and `BillNoLookup`.
+

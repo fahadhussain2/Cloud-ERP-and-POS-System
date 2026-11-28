@@ -1,5 +1,5 @@
-import type { DocumentRow, PurchasingLookups, ReceiptView } from '@erp/contracts';
-import { amountLimit, checkReceipt, isEmptyDraft, receiptTotals } from '@erp/domain';
+import type { BillNoLookup, DocumentRow, PurchasingLookups, ReceiptView } from '@erp/contracts';
+import { amountLimit, billNoKey, checkReceipt, isEmptyDraft, receiptTotals } from '@erp/domain';
 import {
   formatMoney,
   PageHeader,
@@ -60,7 +60,8 @@ import {
 // the last line adds one, the last cost under the unit cost, and the totals with Save and Post in a bar kept at the
 // bottom of the window; Post stays clickable and marks what is left to fix. W2-17 (owner's staging test): no amount
 // over Rs 1 crore (owner answer 1); a box that can't be read is never 0 and can't be saved; Save draft marks nothing
-// red but says what is left (owner answer 2); one save at a time; short words under a line's boxes.
+// red but says what is left (owner answer 2); one save at a time; short words under a line's boxes. W2-18: a
+// supplier's bill is posted once: the bill number says which receipt already has it, or that another draft does.
 
 export function ReceiptsScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
@@ -282,6 +283,33 @@ function ReceiptForm({
   );
   // A refusal from just before this form opened (a new draft at its own address, or a reload): see `carry`. It is a
   // toast, as any refusal (owner answer 6).
+  // Who else has this supplier's bill (W2-18): asked when the bill number is left, when the supplier changes, and
+  // when a draft opens; never while typing. Only the latest answer counts.
+  const [billCheck, setBillCheck] = useState<(BillNoLookup & { opened?: boolean }) | null>(null);
+  const asked = useRef(0);
+  const askBill = (supplierId: string, billNo: string) => {
+    const n = ++asked.current;
+    if (!supplierId || billNoKey(billNo) === '') {
+      setBillCheck(null);
+      return;
+    }
+    const q = new URLSearchParams({ supplier: supplierId, billNo, ...(r ? { except: r.id } : {}) });
+    void api('GET', `/api/purchasing/receipts/bill-no?${q.toString()}`).then((res) => {
+      if (n === asked.current && res.status === 200) setBillCheck(res.body as BillNoLookup);
+    });
+  };
+  useEffect(() => {
+    if (!r || r.status === 'posted' || !r.supplierId || billNoKey(r.billNo ?? '') === '') return;
+    let live = true;
+    const q = new URLSearchParams({ supplier: r.supplierId, billNo: r.billNo ?? '', except: r.id });
+    void api('GET', `/api/purchasing/receipts/bill-no?${q.toString()}`).then((res) => {
+      // A saved draft whose bill is already posted says so at once: nothing left to type would change it.
+      if (live && res.status === 200) setBillCheck({ ...(res.body as BillNoLookup), opened: true });
+    });
+    return () => {
+      live = false;
+    };
+  }, [api, r]);
   const [carried] = useState(() => takeCarried(href.receipt(r?.id ?? 'new')));
   useEffect(() => {
     if (carried !== null) notify.problem(carried);
@@ -333,6 +361,7 @@ function ReceiptForm({
     billDiscount: n(moneyValue(h.billDiscount, m.minorUnits)),
     billTotal: billTotal === undefined ? null : billTotal,
     maxAmount: limit,
+    billNoPostedAs: billCheck?.posted?.number ?? null,
     lines: parsed.map((p) => ({
       ...p,
       qty: p.qty ?? 0,
@@ -376,6 +405,25 @@ function ReceiptForm({
     return p.length === 0
       ? undefined
       : p.map((x) => problemText(t, exists, x.problem, null, limitText)).join(' ');
+  };
+  // Under the bill number: the receipt that already has this supplier's bill, as a link to it (W2-18).
+  const billNoProblem = (): ReactNode => {
+    const taken = billCheck?.posted;
+    const shown = problems.shown('billNo') || billCheck?.opened === true;
+    if (taken && shown && check.problems.some((x) => x.problem === 'bill_no_taken')) {
+      const mark = '\u2063';
+      const [before = '', after = ''] = t('purchasing.problems.bill_no_taken', { number: mark }).split(mark);
+      return (
+        <>
+          {before}
+          <a href={href.receipt(taken.id)} className="font-mono underline underline-offset-4">
+            {taken.number}
+          </a>
+          {after}
+        </>
+      );
+    }
+    return headProblem('billNo');
   };
   // Under a line's box, the short words (W2-17).
   const lineProblem = (i: number, field: LineField) => {
@@ -599,16 +647,33 @@ function ReceiptForm({
               label={t('purchasing.fields.supplier')}
               options={lookups.suppliers}
               value={h.supplierId}
-              onChange={(v) => set('supplierId', v)}
+              onChange={(v) => {
+                set('supplierId', v);
+                // The same bill number may be another supplier's (W2-18): ask again for this one.
+                askBill(v, h.billNo);
+              }}
               error={headProblem('supplier')}
             />
           </div>
           <TextInput
             label={t('purchasing.fields.billNo')}
             value={h.billNo}
-            error={headProblem('billNo')}
-            onBlur={problems.touch('billNo')}
-            onChange={(e) => set('billNo', e.target.value)}
+            error={billNoProblem()}
+            hint={
+              billCheck && !billCheck.posted && billCheck.drafts > 0 ? (
+                <span className="font-medium text-warn">{t('purchasing.warnings.bill_no_on_draft')}</span>
+              ) : undefined
+            }
+            onBlur={() => {
+              problems.touch('billNo')();
+              askBill(h.supplierId, h.billNo);
+            }}
+            onChange={(e) => {
+              set('billNo', e.target.value);
+              // An answer about the number before this one no longer holds; asked again when the field is left.
+              asked.current++;
+              setBillCheck(null);
+            }}
           />
           <TextInput
             label={t('purchasing.fields.billDate')}

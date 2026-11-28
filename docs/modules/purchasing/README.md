@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | W1-16 built (D-105): suppliers, goods receipts with the bill-total check, purchase returns, the supplier ledger, payments by bank. W2-16: the receipt and return laid out for typing a bill (problems at their field, a bar with the totals, Save and Post; D-127). W2-17: no amount over Rs 1 crore (D-128), Save draft without red marks, one save at a time, *Payment* in place of *Paid*. POs, sharing, the run sheet, reorder and repricing are Wave 2 |
+| **Status** | W1-16 built (D-105): suppliers, goods receipts with the bill-total check, purchase returns, the supplier ledger, payments by bank. W2-16: the receipt and return laid out for typing a bill (problems at their field, a bar with the totals, Save and Post; D-127). W2-17: no amount over Rs 1 crore (D-128), Save draft without red marks, one save at a time, *Payment* in place of *Paid*. W2-18: a supplier's bill is posted once (D-105). POs, sharing, the run sheet, reorder and repricing are Wave 2 |
 | **Requirements** | 9 (PUR-01…PUR-09) |
 | **Feature spec needed** | No: the prototype and PRD are enough |
 
