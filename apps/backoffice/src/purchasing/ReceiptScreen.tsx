@@ -19,7 +19,17 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../api';
 import { moneyText, moneyValue, qtyText, qtyValue } from '../catalog/data';
 import { href, navigate, takeCarried } from '../router';
-import { Button, buttonClass, IconButton, ListPicker, notify, Select, TextBox, TextInput } from '../ui';
+import {
+  Button,
+  buttonClass,
+  ConfirmDialog,
+  IconButton,
+  ListPicker,
+  notify,
+  Select,
+  TextBox,
+  TextInput,
+} from '../ui';
 import { ItemPicker } from './ItemPicker';
 import { dateProblem, problemText, purchasingRefusal, usePurchasingLookups, type PickedItem } from './data';
 
@@ -365,11 +375,18 @@ function ReceiptForm({
     notify.problem(text);
     await onSaved();
   };
+  // Delete asks first (W2-16 point 7): a typed-in bill is a lot to lose to a misclick.
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
   const remove = async () => {
     if (!r) return;
+    setBusy(true);
     const res = await api('DELETE', `/api/purchasing/receipts/${encodeURIComponent(r.id)}`);
-    if (res.status === 200) navigate(href.receipts);
-    else notify.problem(purchasingRefusal(t, exists, res.body));
+    setBusy(false);
+    if (res.status === 200) {
+      notify.done(t('purchasing.deleted'));
+      navigate(href.receipts);
+    } else notify.problem(purchasingRefusal(t, exists, res.body));
   };
 
   const header = check.problems.filter(
@@ -398,7 +415,8 @@ function ReceiptForm({
           r && (
             <span className="flex flex-wrap gap-2">
               {/* W1-17: the received pieces' labels (CAT-08). */}
-              <a href={href.receiptLabels(r.id)} className={buttonClass('outline')}>
+              {/* By its number, which the labels page shows in its field (W2-16 point 8); a posted receipt has one. */}
+              <a href={href.receiptLabels(r.number ?? r.id)} className={buttonClass('outline')}>
                 <Tag aria-hidden="true" className="size-4" />
                 {t('labels.makeLabels')}
               </a>
@@ -644,12 +662,25 @@ function ReceiptForm({
             {t('purchasing.post')}
           </Button>
           {r && (
-            <Button variant="ghost" icon={Trash2} className="text-bad" onClick={() => void remove()}>
+            <Button variant="ghost" icon={Trash2} className="text-bad" onClick={() => setAsking(true)}>
               {t('purchasing.deleteDraft')}
             </Button>
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={asking}
+        onOpenChange={setAsking}
+        title={t('purchasing.deleteTitle')}
+        actionLabel={t('purchasing.deleteDraft')}
+        actionIcon={Trash2}
+        cancelLabel={t('purchasing.cancel')}
+        tone="danger"
+        busy={busy}
+        onConfirm={() => void remove()}
+      >
+        {t('purchasing.deleteText', { count: Math.max(used.length, 1) })}
+      </ConfirmDialog>
     </>
   );
 }

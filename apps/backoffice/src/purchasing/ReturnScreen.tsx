@@ -12,14 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from '@erp/ui';
-import { Plus, Save, Send } from 'lucide-react';
+import { Plus, Save, Send, Trash2 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { moneyText, moneyValue, qtyText, qtyValue } from '../catalog/data';
 import { href, navigate, takeCarried } from '../router';
-import { Button, buttonClass, ListPicker, notify, Select, TextBox, TextInput } from '../ui';
+import { Button, buttonClass, ConfirmDialog, ListPicker, notify, Select, TextBox, TextInput } from '../ui';
 import { ItemPicker } from './ItemPicker';
 import { DocumentList } from './ReceiptScreen';
 import { dateProblem, problemText, purchasingRefusal, usePurchasingLookups, type PickedItem } from './data';
@@ -244,6 +244,19 @@ function ReturnForm({
     notify.problem(purchasingRefusal(t, exists, res.body));
     return null;
   };
+  // A draft can be deleted, after asking (W2-16 point 7); the API refuses a posted one.
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const remove = async () => {
+    if (!r) return;
+    setBusy(true);
+    const res = await api('DELETE', `/api/purchasing/returns/${encodeURIComponent(r.id)}`);
+    setBusy(false);
+    if (res.status === 200) {
+      notify.done(t('purchasing.deleted'));
+      navigate(href.purchaseReturns);
+    } else notify.problem(purchasingRefusal(t, exists, res.body));
+  };
   const after = (id: string) => {
     if (!r) navigate(href.purchaseReturn(id));
     else onSaved();
@@ -444,8 +457,26 @@ function ReturnForm({
           >
             {t('purchasing.post')}
           </Button>
+          {r && (
+            <Button variant="ghost" icon={Trash2} className="text-bad" onClick={() => setAsking(true)}>
+              {t('purchasing.deleteDraft')}
+            </Button>
+          )}
         </div>
       )}
+      <ConfirmDialog
+        open={asking}
+        onOpenChange={setAsking}
+        title={t('purchasing.deleteTitle')}
+        actionLabel={t('purchasing.deleteDraft')}
+        actionIcon={Trash2}
+        cancelLabel={t('purchasing.cancel')}
+        tone="danger"
+        busy={busy}
+        onConfirm={() => void remove()}
+      >
+        {t('purchasing.deleteText', { count: Math.max(used.length, 1) })}
+      </ConfirmDialog>
     </>
   );
 }

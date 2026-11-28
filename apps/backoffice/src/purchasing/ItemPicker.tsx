@@ -1,5 +1,5 @@
 import { cn } from '@erp/ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
@@ -38,6 +38,24 @@ export function ItemPicker<T extends Found = PickedItem>({
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [found, setFound] = useState<T[]>([]);
+  const field = useRef<HTMLButtonElement>(null);
+  // After a pick or Esc the focus goes back to the field, so Tab moves on to the line's next field (W2-16 point 2);
+  // a click elsewhere closes the search without taking the focus back.
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (open || !refocus.current) return;
+    refocus.current = false;
+    field.current?.focus();
+  }, [open]);
+  const start = (typed: string) => {
+    setText(typed);
+    setFound([]);
+    setOpen(true);
+  };
+  const close = (back: boolean) => {
+    refocus.current = back;
+    setOpen(false);
+  };
 
   useEffect(() => {
     if (!open || text.trim() === '') return;
@@ -56,14 +74,23 @@ export function ItemPicker<T extends Found = PickedItem>({
   if (!open)
     return (
       <button
+        ref={field}
         type="button"
         className={cn(FIELD_BOX, 'flex w-full items-center gap-1.5 truncate text-start disabled:opacity-60')}
         aria-label={label}
         disabled={disabled}
-        onClick={() => {
-          setText('');
-          setFound([]);
-          setOpen(true);
+        onClick={() => start('')}
+        // Reached with Tab, the field takes typing: a character opens the search with it, ↓ or Backspace opens it
+        // empty (W2-16 point 1). Space and Enter still click; shortcuts (Ctrl, Alt, ⌘) are left alone.
+        onKeyDown={(e) => {
+          if (e.ctrlKey || e.altKey || e.metaKey) return;
+          if (e.key.length === 1 && e.key !== ' ') {
+            e.preventDefault();
+            start(e.key);
+          } else if (e.key === 'ArrowDown' || e.key === 'Backspace') {
+            e.preventDefault();
+            start('');
+          }
         }}
       >
         {picked?.code ? (
@@ -89,10 +116,10 @@ export function ItemPicker<T extends Found = PickedItem>({
       hitKey={(i) => i.id}
       onPick={(i) => {
         onPick(i);
-        setOpen(false);
+        close(true);
       }}
-      onEscape={() => setOpen(false)}
-      onBlur={() => setTimeout(() => setOpen(false), 150)}
+      onEscape={() => close(true)}
+      onBlur={() => setTimeout(() => close(false), 150)}
     >
       {(i) => (
         <>

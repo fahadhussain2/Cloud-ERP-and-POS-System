@@ -1603,6 +1603,10 @@
     "saveDraft": "Save draft",
     "post": "Post",
     "deleteDraft": "Delete draft",
+    "deleteTitle": "Delete this draft?",
+    "deleteText_one": "This draft and its line go for good. This can't be undone.",
+    "deleteText_other": "This draft and its {{count}} lines go for good. This can't be undone.",
+    "deleted": "Draft deleted.",
     "fields": {
       "code": "Code",
       "name": "Name",
