@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import pos from '../apps/pos/src/locales/en.json' with { type: 'json' };
-import { menu } from './backoffice';
+import { choose, menu, pick } from './backoffice';
 import { expect, test } from './counter-test';
 import {
   BACKOFFICE_PORT,
@@ -76,7 +76,8 @@ const addPerson = async (
   if (p.temporaryPassword) await dialog.getByLabel(bo.staff.password.optional).fill(p.temporaryPassword);
   await dialog.getByRole('checkbox', { name: role }).click();
   await dialog.getByRole('button', { name: bo.staff.create }).click();
-  await expect(page.getByRole('status')).toContainText(p.fullName);
+  // A toast, found by its words: another may still be showing (W2-15).
+  await expect(page.getByRole('status').filter({ hasText: p.fullName })).toBeVisible();
 };
 
 test('the owner signs in, adds a manager and a salesman, gives temporary PINs and a one-time counter code', async ({
@@ -274,7 +275,8 @@ test('the owner deactivates the new salesman in the back office', async ({ brows
   await expect(page.getByRole('heading', { name: NEWCOMER.fullName })).toBeVisible();
   await page.getByRole('button', { name: bo.staff.deactivate }).click();
   await page.getByRole('dialog').getByRole('button', { name: bo.staff.deactivate }).click();
-  await expect(page.getByRole('status')).toContainText(NEWCOMER.fullName);
+  // A toast, found by its words: another may still be showing (W2-15).
+  await expect(page.getByRole('status').filter({ hasText: NEWCOMER.fullName })).toBeVisible();
   await office.close();
 });
 
@@ -839,8 +841,8 @@ test('the owner changes a price and adds an item in the back office; the counter
   await bop.getByRole('link', { name: bo.catalog.items.add }).click();
   await bop.getByLabel(bo.catalog.fields.code).fill('abea050');
   await bop.getByLabel(bo.catalog.fields.name).fill('ADJUSTER BEARING VITZ');
-  await bop.getByLabel(bo.catalog.fields.category).selectOption({ label: 'BRPD · BRPD' });
-  await bop.getByLabel(bo.catalog.fields.unit).selectOption({ label: 'PCS' });
+  await pick(bop, bo.catalog.fields.category, 'BRPD');
+  await choose(bop, bo.catalog.fields.unit, 'PCS');
   await bop.getByLabel('Retail').fill('3950');
   await expect(bop.getByLabel('Mechanic')).toHaveValue('3753');
   await bop.getByRole('button', { name: bo.catalog.newItem.create }).click();
@@ -876,7 +878,7 @@ test('a customer added in the back office buys on account at a counter; credit o
   await expect(form.getByLabel(c.fields.code)).toHaveValue(/^C\d{4}$/);
   await form.getByLabel(c.fields.name).fill('Test Motors');
   await form.getByLabel(c.fields.phones).fill('0333-5550101');
-  await form.getByLabel(c.fields.tier).selectOption({ label: 'Mechanic' });
+  await choose(form, c.fields.tier, 'Mechanic');
   await form.getByLabel(c.fields.creditAllowed).check();
   await form.getByLabel(c.fields.limit).fill('10,000');
   await form.getByRole('button', { name: new RegExp(`^${c.create}`) }).click();
@@ -921,7 +923,8 @@ test('a customer added in the back office buys on account at a counter; credit o
   await bop.getByRole('button', { name: `${c.deactivate} Test Motors` }).click();
   form = bop.getByRole('dialog');
   await form.getByRole('button', { name: c.deactivate }).click();
-  await expect(form.getByRole('alert')).toHaveText(/balance is Rs\s?4,275/);
+  // The refusal is a toast, and the question stays open (W2-12, owner answer 6).
+  await expect(bop.getByRole('alert')).toHaveText(/balance is Rs\s?4,275/);
   await form.getByRole('button', { name: c.cancel }).click();
 
   // Credit off: the counter stops offering On account after its next pull.
@@ -929,7 +932,10 @@ test('a customer added in the back office buys on account at a counter; credit o
   form = bop.getByRole('dialog');
   await form.getByLabel(c.fields.creditAllowed).uncheck();
   await form.getByRole('button', { name: c.save }).click();
-  await expect(bop.getByRole('status')).toHaveText(c.saved.replace('{{name}}', 'Test Motors'));
+  // A toast, found by its words: another (the customer added) may still be showing.
+  await expect(
+    bop.getByRole('status').filter({ hasText: c.saved.replace('{{name}}', 'Test Motors') }),
+  ).toBeVisible();
   await office.close();
 
   await addToBill(page, 'brpd001');

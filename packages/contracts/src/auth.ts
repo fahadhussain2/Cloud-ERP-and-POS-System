@@ -10,6 +10,14 @@ export const LoginRequest = z.object({
 });
 export type LoginRequest = z.infer<typeof LoginRequest>;
 
+/** The back office's theme (PLT-13, W2-07): System follows the computer's setting. */
+export const Theme = z.enum(['system', 'light', 'dark']);
+export type Theme = z.infer<typeof Theme>;
+
+/** A person's own settings, saved with PUT /api/users/me/settings (W2-07). */
+export const UpdateSettingsRequest = z.object({ theme: Theme });
+export type UpdateSettingsRequest = z.infer<typeof UpdateSettingsRequest>;
+
 export const MeResponse = z.object({
   tenantId: z.uuid(),
   user: z.object({ id: z.uuid(), username: z.string(), fullName: z.string() }),
@@ -22,6 +30,8 @@ export const MeResponse = z.object({
   mustChangePassword: z.boolean(),
   /** The shop's name (W1-25), for the reports' print header (W2-01). */
   shopName: z.string(),
+  /** The person's theme, System until chosen (W2-07, D-120). */
+  theme: Theme,
 });
 export type MeResponse = z.infer<typeof MeResponse>;
 

@@ -30,8 +30,10 @@
 | **ABC class** | A for the items making the first 80% of sales (or gross profit), B the next 15%, C the last 5% (RPT-14) |
 | **Days of cover** | How many days the stock on hand lasts at the rate it sold over a period |
 | **Stock turnover** | Cost of sales ÷ the average stock value (opening and closing) over a period: how many times the stock was sold through |
-| **Gross profit** | Sales (what customers paid, after every discount) − their cost in the books (the average cost when sold); over a period it equals gross profit on the profit and loss (RPT-07) |
+| **Gross profit** | Sales (what customers paid, after every discount) − their cost in the books (the average cost when sold); over a period it equals gross profit on the profit and loss (RPT-07), once the period's cost corrections are taken off (D-124) |
 | **Margin** | Gross profit ÷ sales, as a percentage |
+| **Key figure** | One of the five cards at the top of the owner's dashboard: net sales, gross profit, cash, bank and what customers owe, each with its change against the comparison (W2-06, D-118) |
+| **Needs attention** | The dashboard's list of what the owner should look at now, the most serious first: open high-severity exceptions, negative stock, a counter not seen for 10 minutes while its session is open, items at or below their minimum, customers over their limit, open cash sessions (W2-06) |
 | **Discount given** | List price × quantity − what the customer paid: a line's own discount and its share of the bill discount together; a price above the list is a negative discount (W2-03) |
 | **Net rate** | A purchase's or sale's value after the line and bill discounts, per unit; an average rate is the total value ÷ the total quantity (RPT-09) |
 | **Spread** | An item's average net sale rate − its average net purchase rate, and as a share of the sale rate (RPT-09) |
@@ -41,3 +43,6 @@
 | **Cash flow** | Money into and out of cash and bank by what it was for (sales, customers, suppliers, expenses, the owner), month by month; moves between the shop's own cash and bank accounts are left out (ACC-07) |
 | **User activity** | Who did what: the audit log's sign-ins, edits and events, and the documents each person made (RPT-17) |
 | **Wave** | A build-order block of the MVP (Wave 0 foundations, Wave 1 critical path, Wave 2 rest of MVP) |
+| **Cost correction** | A stock movement of value with no quantity: when stock sold before it arrived (borrowed from another shop, or not yet received) comes in, the difference between what it really cost and the average it was sold at goes to cost of goods sold. Shown on the stock card and on its own line in Sales and gross profit (D-124, W2-09) |
+| **Bill details** | The back office's read-only page for one bill: its items, prices, discounts, payments, approvals, void and returns, with cost and profit for those who may see costs. Every bill number in the back office opens it (W2-10, D-125) |
+| **Bills / Returns** | The back office's lists of sales documents under Sales: *Bills* the sales bills (voided ones marked), *Returns* the returns and exchanges, each row opening its bill's details (W2-11, D-126) |

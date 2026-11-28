@@ -1,8 +1,5 @@
 import type { UserSummary } from '@erp/contracts';
 import {
-  Alert,
-  AlertDescription,
-  Button,
   PageHeader,
   Panel,
   StatusChip,
@@ -15,17 +12,19 @@ import {
   type ChipTone,
 } from '@erp/ui';
 import type { TFunction } from 'i18next';
+import { KeyRound, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { href } from '../router';
+import { Button, IconButton, notify } from '../ui';
 import { useStaffData } from './data';
 import { AddPersonDialog, TemporaryPinDialog } from './dialogs';
 
 // Staff (W1-04, owner answer 2): one list of the shop's people. With admin.users you add and change people; with
 // admin.devices (managers) you give temporary PINs (D-089), except to people you don't outrank who manage staff or
-// are Owners (`canGivePin`, D-091).
+// are Owners (`canGivePin`, D-091). W2-15 (D-127): the back office's own controls; results are toasts.
 
 export const pinChip = (t: TFunction, u: UserSummary): { tone: ChipTone; text: string } =>
   !u.hasPin
@@ -46,7 +45,6 @@ export function StaffScreen({ api, permissions }: { api: Api; permissions: reado
   const [filter, setFilter] = useState<'active' | 'disabled'>('active');
   const [adding, setAdding] = useState(false);
   const [pinFor, setPinFor] = useState<UserSummary | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
   const shown = (users ?? []).filter((u) => u.status === filter);
 
@@ -57,17 +55,12 @@ export function StaffScreen({ api, permissions }: { api: Api; permissions: reado
         help={t('staff.help')}
         actions={
           canAdmin && (
-            <Button size="lg" onClick={() => setAdding(true)}>
+            <Button icon={UserPlus} onClick={() => setAdding(true)}>
               {t('staff.add')}
             </Button>
           )
         }
       />
-      {message && (
-        <Alert>
-          <AlertDescription role="status">{message}</AlertDescription>
-        </Alert>
-      )}
       <Panel>
         <div className="flex flex-wrap gap-1.5 px-3.5 pt-3 pb-2" role="group" aria-label={t('staff.status')}>
           {(['active', 'disabled'] as const).map((f) => (
@@ -87,7 +80,7 @@ export function StaffScreen({ api, permissions }: { api: Api; permissions: reado
         ) : shown.length === 0 ? (
           <p className="px-3.5 pb-3.5 text-muted-foreground">{t('staff.empty')}</p>
         ) : (
-          <div className="px-1.5 pb-2.5">
+          <div className="overflow-x-auto px-1.5 pb-2.5">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -124,18 +117,13 @@ export function StaffScreen({ api, permissions }: { api: Api; permissions: reado
                       <TableCell>
                         <StatusChip tone={pin.tone}>{pin.text}</StatusChip>
                       </TableCell>
-                      <TableCell className="text-end">
+                      <TableCell className="w-0 text-end">
                         {u.canGivePin && u.status === 'active' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setMessage(null);
-                              setPinFor(u);
-                            }}
-                          >
-                            {t('staff.give')}
-                          </Button>
+                          <IconButton
+                            icon={KeyRound}
+                            label={`${t('staff.give')} ${u.fullName}`}
+                            onClick={() => setPinFor(u)}
+                          />
                         )}
                       </TableCell>
                     </TableRow>
@@ -156,7 +144,7 @@ export function StaffScreen({ api, permissions }: { api: Api; permissions: reado
           onOpenChange={setAdding}
           onAdded={(name) => {
             setAdding(false);
-            setMessage(t('staff.created', { name }));
+            notify.done(t('staff.created', { name }));
             void reload();
           }}
         />
@@ -167,7 +155,7 @@ export function StaffScreen({ api, permissions }: { api: Api; permissions: reado
         onOpenChange={(o) => !o && setPinFor(null)}
         onSaved={(name) => {
           setPinFor(null);
-          setMessage(t('staff.saved', { name }));
+          notify.done(t('staff.saved', { name }));
           void reload();
         }}
       />

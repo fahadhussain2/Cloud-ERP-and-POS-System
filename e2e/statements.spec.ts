@@ -1,10 +1,10 @@
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { report, signInAsOwner as signIn } from './backoffice';
+import { chooseValue, report, signInAsOwner as signIn } from './backoffice';
 import { expect, test } from './counter-test';
 
 // W2-01 plan (ACC-07, RPT-11, D-116): the owner reads the books on the report frame. After the counter's sales
 // (counter.spec) and the electricity bill (ledger.spec), this year's trial balance balances; Sales opens its ledger and
-// a line opens the bill's trace; the profit and loss month by month; the balance sheet balances; the trial balance
+// a line opens the bill's details (D-125); the profit and loss month by month; the balance sheet balances; the trial balance
 // downloads as CSV; and on paper the menu and filters go while a header names the shop. Back office only, read only.
 
 const r = bo.reports;
@@ -14,7 +14,7 @@ test.describe.configure({ mode: 'serial' });
 test('the trial balance balances; Sales opens its ledger and a line opens the bill', async ({ page }) => {
   await signIn(page);
   await report(page, bo.nav.trialBalance);
-  await page.getByLabel(r.frame.period).selectOption('thisYear');
+  await chooseValue(page, r.frame.period, 'thisYear');
   const table = page.getByRole('table', { name: bo.nav.trialBalance });
   await expect(table).toBeVisible();
   await expect(page.getByLabel(r.frame.figures).getByText(r.tb.balanced)).toBeVisible();
@@ -32,15 +32,15 @@ test('the trial balance balances; Sales opens its ledger and a line opens the bi
   const lines = page.getByRole('table', { name: bo.accounting.ledger.lines });
   await expect(lines.getByRole('row')).not.toHaveCount(1);
   await lines.getByRole('link').first().click();
-  await expect(page).toHaveURL(/#\/support\/trace\//);
-  await expect(page.getByText(/^Made on /)).toBeVisible();
+  await expect(page).toHaveURL(/#\/sales\/bills\//);
+  await expect(page.getByRole('table', { name: bo.billDetails.items })).toBeVisible();
 });
 
 test('the profit and loss month by month, and the balance sheet balances', async ({ page }) => {
   await signIn(page);
   await report(page, bo.nav.profitLoss);
-  await page.getByLabel(r.frame.period).selectOption('thisYear');
-  await page.getByLabel(r.pl.compare).selectOption('months');
+  await chooseValue(page, r.frame.period, 'thisYear');
+  await chooseValue(page, r.pl.compare, 'months');
   const pl = page.getByRole('table', { name: bo.nav.profitLoss });
   // The account column and one per month of the fiscal year so far, up to twelve.
   await expect(pl.getByRole('columnheader')).toHaveCount(13);

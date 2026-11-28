@@ -101,5 +101,27 @@ export default defineConfig(
     },
   },
 
+  // The back office's own controls (W2-12, D-127): its screens use apps/backoffice/src/ui, not packages/ui's, which
+  // stay as the POS has them. Every screen moved by W2-15; only the kit itself composes the shared ones.
+  {
+    files: ['apps/backoffice/src/**/*.{ts,tsx}'],
+    ignores: ['apps/backoffice/src/ui/**', '**/*.test.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@erp/ui',
+              importNames: ['Button', 'Input', 'TextField', 'LABEL_CLASS', 'DialogActions', 'Checkbox'],
+              message:
+                "Use the back office's own control from src/ui (W2-12, D-127); packages/ui's stay as the POS has them.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   prettier,
 );

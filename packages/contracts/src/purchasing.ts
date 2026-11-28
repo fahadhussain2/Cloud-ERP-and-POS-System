@@ -55,6 +55,20 @@ export const ReceiptDraft = z.strictObject({
 export type ReceiptDraft = z.infer<typeof ReceiptDraft>;
 export const SaveReceiptRequest = ReceiptDraft.extend({ rowVersion: RowVersion });
 
+/** Who else has this supplier's bill (W2-18): asked when the bill number is left or the supplier changes. */
+export const BillNoQuery = z.strictObject({
+  supplier: Id,
+  billNo: z.string().max(40),
+  /** The receipt being typed, left out of the answer. */
+  except: Id.optional(),
+});
+export interface BillNoLookup {
+  /** The posted receipt with this supplier's bill (compared by `billNoKey`), if any. */
+  posted: { id: string; number: string } | null;
+  /** How many other drafts have it. */
+  drafts: number;
+}
+
 const ReturnLine = z.strictObject({
   itemId: Id.nullable(),
   receiptLineId: Id.nullable().optional(),
@@ -135,6 +149,9 @@ export interface ReceiptLineView {
   allowsFraction: boolean;
   lastCost: number | null;
   retail: number | null;
+  /** A posted receipt's line: what is still left to send back (received less posted returns), in thousandths, so a
+   * return from it is checked as it is typed (W2-16). Null on a draft. */
+  returnable: number | null;
 }
 
 export interface ReceiptView {

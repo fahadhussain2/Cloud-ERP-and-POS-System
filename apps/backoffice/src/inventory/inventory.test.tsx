@@ -11,6 +11,7 @@ import { href, parseHash } from '../router';
 import { AdjustmentScreen } from './AdjustmentScreen';
 import { StockCardScreen, TransferNeededScreen } from './StockScreens';
 import { TransferScreen } from './TransferScreen';
+import { notify, Toaster } from '../ui';
 
 // The stock screens (W1-18) over a fake API: a transfer the purchaser types but can't post, a route that sends and
 // receives, an adjustment that waits for the owner above the limit, the owner's approval, the stock card's running
@@ -159,8 +160,18 @@ function fakeApi(l: InventoryLookups, answers: Record<string, { status: number; 
   return { api, calls };
 }
 
-const show = (ui: ReactElement) => render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
-afterEach(cleanup);
+// With the frame's toasts (W2-12, owner answer 6), which start empty for each test.
+const show = (ui: ReactElement) =>
+  render(
+    <I18nextProvider i18n={i18n}>
+      {ui}
+      <Toaster />
+    </I18nextProvider>,
+  );
+afterEach(() => {
+  cleanup();
+  notify.clear();
+});
 
 describe('the stock addresses', () => {
   it('open the stock screens', () => {
@@ -213,6 +224,7 @@ describe('a transfer', () => {
       expect(await screen.findByText(en.inventory.errors.empty_draft)).toBeDefined();
       expect(f.calls.some((c) => c.method === 'POST')).toBe(false);
       cleanup();
+      notify.clear();
     }
   });
 
@@ -239,6 +251,20 @@ describe('a transfer', () => {
       },
     });
     expect(f.calls.find((c) => c.path.endsWith('/post'))!.body).toEqual({ rowVersion: '9' });
+  });
+
+  // W2-16 (owner's review, 2026-11-28): a line's problems piled up under its item and pushed its boxes out of line.
+  it("puts a line's problem under its own box, and every cell at the top", async () => {
+    show(<TransferScreen api={fakeApi(lookups()).api} id="t1" />);
+    const qty = await screen.findByLabelText('Quantity of line 1');
+    fireEvent.change(qty, { target: { value: '0' } });
+    expect(qty.getAttribute('aria-invalid')).toBe('true');
+    expect(document.getElementById(qty.getAttribute('aria-describedby')!.split(' ')[0]!)!.textContent).toBe(
+      en.inventory.problems.qty_positive,
+    );
+    expect(screen.getByRole('button', { name: 'Item of line 1' }).getAttribute('aria-invalid')).toBeNull();
+    const row = qty.closest('tr')!;
+    for (const cell of within(row).getAllByRole('cell')) expect(cell.className).toContain('align-top');
   });
 
   it('receives what arrived on each line', async () => {
@@ -350,6 +376,31 @@ describe('reading the stock', () => {
     expect(within(plain).queryByText(/Rs/)).toBeNull();
   });
 
+  it('marks a movement of value with no quantity as a cost correction, with no unit cost (D-124)', async () => {
+    const correction = {
+      seq: 4,
+      date: '2026-11-09',
+      kind: 'goods_receipt',
+      documentId: 'g1',
+      number: 'GR000001',
+      locationId: 'shop',
+      qty: 0,
+      unitCost: 0,
+      value: -20000,
+      balance: 5000,
+      total: 10000,
+    };
+    const f = fakeApi(lookups(), {
+      'GET /api/inventory/items/i1/card': { status: 200, body: { ...CARD, movements: [correction] } },
+    });
+    show(<StockCardScreen api={f.api} itemId="i1" />);
+    const table = await screen.findByRole('table', { name: en.inventory.card.movements });
+    const row = within(table).getByText(en.inventory.card.costCorrection).closest('tr')!;
+    expect(within(row).getByRole('link', { name: 'GR000001' }).getAttribute('href')).toBe(href.receipt('g1'));
+    expect(within(row).getAllByText(/Rs/)).toHaveLength(1);
+    expect(within(row).getByText(/200/)).toBeTruthy();
+  });
+
   it('Transfer needed lists the short items and opens a transfer for them', async () => {
     const f = fakeApi(lookups(), {
       'GET /api/inventory/transfer-needed': {
@@ -423,5 +474,30 @@ describe("the shop's business date (W2-05)", () => {
     show(<AdjustmentScreen api={f.api} id="a1" />);
     fireEvent.click(await screen.findByRole('button', { name: en.inventory.adjustments.sendForApproval }));
     expect(await screen.findByText(ahead)).toBeDefined();
+  });
+});
+
+// W2-17 (owner's staging test, 2026-11-28): one save at a time, so a second quick click can't carry an old version.
+describe('saving once (W2-17)', () => {
+  it('two quick clicks on a transfer’s Save draft save it once', async () => {
+    const f = fakeApi(lookups());
+    show(<TransferScreen api={f.api} id="t1" />);
+    const save = await screen.findByRole('button', { name: en.inventory.saveDraft });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    await waitFor(() => expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1));
+    await new Promise((done) => setTimeout(done, 20));
+    expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1);
+  });
+
+  it('two quick clicks on an adjustment’s Save draft save it once', async () => {
+    const f = fakeApi(lookups());
+    show(<AdjustmentScreen api={f.api} id="a1" />);
+    const save = await screen.findByRole('button', { name: en.inventory.saveDraft });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    await waitFor(() => expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1));
+    await new Promise((done) => setTimeout(done, 20));
+    expect(f.calls.filter((c) => c.method === 'PUT')).toHaveLength(1);
   });
 });

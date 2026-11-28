@@ -9,9 +9,6 @@ import { checkTransfer, isEmptyDraft } from '@erp/domain';
 import {
   Alert,
   AlertDescription,
-  Button,
-  Input,
-  LABEL_CLASS,
   PageHeader,
   Panel,
   StatusChip,
@@ -21,17 +18,22 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
   type ChipTone,
 } from '@erp/ui';
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { PackageCheck, Plus, Save, Send } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { qtyText, qtyValue } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
-import { carry, href, navigate, takeCarried } from '../router';
+import { href, navigate, takeCarried } from '../router';
+import { Button, buttonClass, notify, Select, TextBox, TextInput, useOneAtATime } from '../ui';
+import { LineBox } from '../purchasing/lineFields';
 import { dateProblem, inventoryRefusal, locationName, problemText, useInventoryLookups } from './data';
+
+/** Where a line's problem shows (W2-16): under the quantity, or else under the item. */
+const QTY_PROBLEMS = new Set(['qty_positive', 'qty_fraction', 'qty_zero', 'write_off_gain']);
 
 // Stock transfers (W1-18, INV-04; owner answers 2 and 4): the storekeeper types one, the owner or the manager posts
 // it. On a route that moves at once posting moves the stock; on one that needs receiving it is sent, on the way until
@@ -72,9 +74,10 @@ export function TransfersScreen({ api }: { api: Api }) {
         help={t('inventory.transfers.help')}
         actions={
           lookups.can.transfer && (
-            <Button asChild size="lg">
-              <a href={href.transfer('new')}>{t('inventory.transfers.add')}</a>
-            </Button>
+            <a href={href.transfer('new')} className={buttonClass()}>
+              <Plus aria-hidden="true" className="size-4" />
+              {t('inventory.transfers.add')}
+            </a>
           )
         }
       />
@@ -237,12 +240,12 @@ function TransferForm({
   );
   const [received, setReceived] = useState<string[]>(view ? view.lines.map((l) => qtyText(l.qty)) : []);
   const [receivedOn, setReceivedOn] = useState(lookups.today);
-  // A refusal from just before this form opened (a new draft at its own address, or a reload): see `carry`.
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(() => {
-    const text = takeCarried(href.transfer(x?.id ?? 'new'));
-    return text === null ? null : { text, error: true };
-  });
-  const ids = { from: useId(), to: useId() };
+  // A refusal from just before this form opened (a new draft at its own address): see `carry`. A toast, as any
+  // refusal (owner answer 6).
+  const [carried] = useState(() => takeCarried(href.transfer(x?.id ?? 'new')));
+  useEffect(() => {
+    if (carried !== null) notify.problem(carried);
+  }, [carried]);
   const exists = (k: string) => t(k) !== k;
   const set = (k: keyof typeof h, v: string) => setH((s) => ({ ...s, [k]: v }));
   const put = (n: number, patch: Partial<Line>) =>
@@ -282,7 +285,7 @@ function TransferForm({
   const save = async (): Promise<{ id: string; rowVersion: string } | null> => {
     // Nothing on any line is nothing to keep (owner's review of W1-19); the server refuses it too.
     if (isEmptyDraft(body().lines)) {
-      setMessage({ text: t('inventory.errors.empty_draft'), error: true });
+      notify.problem(t('inventory.errors.empty_draft'));
       return null;
     }
     const res = x
@@ -293,26 +296,27 @@ function TransferForm({
       : await api('POST', '/api/inventory/transfers', body());
     if (res.status === 200) return { id: x!.id, rowVersion: (res.body as { rowVersion: string }).rowVersion };
     if (res.status === 201) return res.body as { id: string; rowVersion: string };
-    setMessage({ text: inventoryRefusal(t, exists, res.body), error: true });
+    notify.problem(inventoryRefusal(t, exists, res.body));
     return null;
   };
   const after = (id: string) => {
     if (!x) navigate(href.transfer(id));
     else onSaved();
   };
+  // One save at a time (W2-17): a second quick click could carry the version the first had just replaced. An action
+  // that succeeded keeps the buttons busy until the form is reloaded with the new version.
+  const act = useOneAtATime<'save' | 'post' | 'receive' | 'approve' | 'reject'>();
   const postIt = async () => {
     const s = await save();
-    if (!s) return;
+    if (!s) return false;
     const res = await api('POST', `/api/inventory/transfers/${encodeURIComponent(s.id)}/post`, {
       rowVersion: s.rowVersion,
     });
-    // The draft was saved before Post was refused: it opens again, as saved, with the refusal (`carry`).
-    if (res.status !== 200) {
-      const text = inventoryRefusal(t, exists, res.body);
-      setMessage({ text, error: true });
-      carry(href.transfer(s.id), text);
-    }
+    // The draft was saved before Post was refused: it opens again, as saved, and the refusal is a toast, which
+    // outlives the reload or the move to the new draft's own address.
+    if (res.status !== 200) notify.problem(inventoryRefusal(t, exists, res.body));
     after(s.id);
+    return true;
   };
   const receiveIt = async () => {
     const res = await api('POST', `/api/inventory/transfers/${encodeURIComponent(x!.id)}/receive`, {
@@ -320,8 +324,13 @@ function TransferForm({
       receivedOn,
       lines: view!.lines.map((l, i) => ({ lineId: l.id, receivedQty: qtyValue(received[i] ?? '') ?? 0 })),
     });
-    if (res.status !== 200) setMessage({ text: inventoryRefusal(t, exists, res.body), error: true });
-    else onSaved();
+    if (res.status !== 200) {
+      notify.problem(inventoryRefusal(t, exists, res.body));
+      return false;
+    }
+    // Done once: the reload shows what changed, so the buttons come back at once.
+    onSaved();
+    return false;
   };
 
   return (
@@ -337,11 +346,6 @@ function TransferForm({
           </span>
         }
       />
-      {message && (
-        <Alert variant={message.error ? 'destructive' : 'default'}>
-          <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>
-        </Alert>
-      )}
       {view?.shortfallAdjustment && (
         <Alert>
           <AlertDescription>
@@ -353,27 +357,18 @@ function TransferForm({
         </Alert>
       )}
       <Panel>
-        <fieldset disabled={!canEdit} className="m-0 grid gap-3.5 border-0 p-3.5 md:grid-cols-4">
+        <fieldset disabled={!canEdit} className="m-0 grid grid-cols-1 gap-3.5 border-0 p-3.5 md:grid-cols-4">
           {(['from', 'to'] as const).map((side) => (
-            <div key={side} className="flex flex-col gap-1.5">
-              <label htmlFor={ids[side]} className={LABEL_CLASS}>
-                {t(`inventory.fields.${side}`)}
-              </label>
-              <select
-                id={ids[side]}
-                className="h-11 rounded-md border border-input bg-surface-2 px-2"
-                value={side === 'from' ? h.fromLocationId : h.toLocationId}
-                onChange={(e) => set(side === 'from' ? 'fromLocationId' : 'toLocationId', e.target.value)}
-              >
-                {lookups.locations.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              key={side}
+              label={t(`inventory.fields.${side}`)}
+              disabled={!canEdit}
+              value={side === 'from' ? h.fromLocationId : h.toLocationId}
+              onValueChange={(v) => set(side === 'from' ? 'fromLocationId' : 'toLocationId', v)}
+              options={lookups.locations.map((l) => ({ value: l.id, label: l.name }))}
+            />
           ))}
-          <TextField
+          <TextInput
             label={t('inventory.fields.movedOn')}
             type="date"
             error={locked}
@@ -381,7 +376,7 @@ function TransferForm({
             value={h.movedOn}
             onChange={(e) => set('movedOn', e.target.value)}
           />
-          <TextField
+          <TextInput
             label={t('inventory.fields.note')}
             value={h.note}
             onChange={(e) => set('note', e.target.value)}
@@ -393,7 +388,7 @@ function TransferForm({
           </p>
         )}
       </Panel>
-      <Panel className="px-1.5 pb-2.5">
+      <Panel className="overflow-x-auto px-1.5 pb-2.5">
         <Table aria-label={t('inventory.transfers.lines')}>
           <TableHeader>
             <TableRow>
@@ -411,44 +406,44 @@ function TransferForm({
               const row = used.indexOf(l);
               const notes = row < 0 ? [] : check.problems.filter((p) => p.row === row);
               const below = row >= 0 && check.warnings.some((w) => w.row === row);
+              // Each problem under its own box, every cell at the top, so the line's boxes stay in line (W2-16).
+              const say = (qty: boolean) =>
+                notes
+                  .filter((p) => QTY_PROBLEMS.has(p.problem) === qty)
+                  .map((p) => problemText(t, exists, p.problem, null))
+                  .join(' ') || undefined;
               return (
-                <TableRow key={i} className="align-top">
-                  <TableCell>
+                <TableRow key={i}>
+                  <TableCell className="align-top">
                     <ItemPicker<InventoryItem>
                       api={api}
                       url="/api/inventory/items"
                       label={t('inventory.line.itemOf', { row: i + 1 })}
                       picked={l.item}
                       disabled={!canEdit}
+                      error={say(false)}
                       onPick={(item) => put(i, { item, stock: item.stock })}
                     />
-                    {notes.map((p, k) => (
-                      <p key={k} className="m-0 mt-1 text-xs text-destructive">
-                        {problemText(t, exists, p.problem, null)}
-                      </p>
-                    ))}
-                    {below && (
-                      <p className="m-0 mt-1 text-xs text-warn">{t('inventory.warnings.below_zero')}</p>
-                    )}
                   </TableCell>
                   {draft && (
-                    <TableCell className="text-end leading-9 tabular-nums">
+                    <TableCell className="align-top text-end leading-9 tabular-nums">
                       {l.stock === null ? '—' : qtyText(l.stock[h.fromLocationId] ?? 0)}
                     </TableCell>
                   )}
-                  <TableCell>
-                    <Input
-                      aria-label={t('inventory.line.qtyOf', { row: i + 1 })}
-                      className="h-9 w-24"
-                      inputMode="decimal"
+                  <TableCell className="align-top">
+                    <LineBox
+                      label={t('inventory.line.qtyOf', { row: i + 1 })}
+                      className="w-24"
                       disabled={!canEdit}
                       value={l.qty}
+                      error={say(true)}
+                      notes={below ? [{ text: t('inventory.warnings.below_zero'), warn: true }] : []}
                       onChange={(e) => put(i, { qty: e.target.value })}
                     />
                   </TableCell>
                   {x?.status === 'in_transit' && (
-                    <TableCell>
-                      <Input
+                    <TableCell className="align-top">
+                      <TextBox
                         aria-label={t('inventory.line.receivedOf', { row: i + 1 })}
                         className="h-9 w-24"
                         inputMode="decimal"
@@ -459,7 +454,7 @@ function TransferForm({
                     </TableCell>
                   )}
                   {x?.status === 'received' && (
-                    <TableCell className="text-end leading-9 tabular-nums">
+                    <TableCell className="align-top text-end leading-9 tabular-nums">
                       {qtyText(view!.lines[i]?.receivedQty ?? 0)}
                     </TableCell>
                   )}
@@ -470,7 +465,7 @@ function TransferForm({
         </Table>
         {canEdit && (
           <div className="px-2 pt-2">
-            <Button size="sm" variant="outline" onClick={() => setLines([...lines, blank()])}>
+            <Button size="sm" variant="outline" icon={Plus} onClick={() => setLines([...lines, blank()])}>
               {t('inventory.line.add')}
             </Button>
           </div>
@@ -488,19 +483,28 @@ function TransferForm({
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
+            icon={Save}
+            busy={act.busy === 'save'}
+            disabled={act.busy !== null}
             onClick={() =>
-              void save().then((s) => {
-                if (s) {
-                  setMessage({ text: t('inventory.saved'), error: false });
-                  after(s.id);
-                }
-              })
+              void act.run('save', async () => {
+                const s = await save();
+                if (!s) return false;
+                notify.done(t('inventory.saved'));
+                after(s.id);
+                return true;
+              })()
             }
           >
             {t('inventory.saveDraft')}
           </Button>
           {lookups.can.postTransfer && (
-            <Button onClick={() => void postIt()} disabled={check.problems.length > 0 || locked !== null}>
+            <Button
+              icon={Send}
+              onClick={() => void act.run('post', postIt)()}
+              busy={act.busy === 'post'}
+              disabled={check.problems.length > 0 || locked !== null || act.busy !== null}
+            >
               {needsReceiving ? t('inventory.transfers.send') : t('inventory.post')}
             </Button>
           )}
@@ -508,7 +512,7 @@ function TransferForm({
       )}
       {x?.status === 'in_transit' && lookups.can.postTransfer && (
         <Panel className="flex flex-wrap items-end gap-3 p-3.5">
-          <TextField
+          <TextInput
             label={t('inventory.fields.receivedOn')}
             type="date"
             error={receiveLocked}
@@ -516,7 +520,12 @@ function TransferForm({
             value={receivedOn}
             onChange={(e) => setReceivedOn(e.target.value)}
           />
-          <Button onClick={() => void receiveIt()} disabled={receiveLocked !== null}>
+          <Button
+            icon={PackageCheck}
+            onClick={() => void act.run('receive', receiveIt)()}
+            busy={act.busy === 'receive'}
+            disabled={receiveLocked !== null || act.busy !== null}
+          >
             {t('inventory.transfers.receive')}
           </Button>
           <span className="text-sm text-muted-foreground">{t('inventory.transfers.receiveHint')}</span>

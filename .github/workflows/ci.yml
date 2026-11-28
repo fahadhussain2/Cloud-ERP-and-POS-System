@@ -125,6 +125,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @erp/e2e exec playwright install --with-deps chromium
       - run: pnpm e2e
+      # When a flow fails, its pictures and traces, and the POS look's new or differing screenshots (W2-12), to look at
+      # or, for a baseline taken from staging, to commit.
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-results
+          path: |
+            e2e/test-results/
+            e2e/pos-look.spec.ts-snapshots/
+          retention-days: 7
+          if-no-files-found: ignore
 
   deploy:
     name: Deploy

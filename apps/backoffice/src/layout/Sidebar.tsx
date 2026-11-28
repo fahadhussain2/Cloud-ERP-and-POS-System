@@ -14,6 +14,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Route } from '../router';
+import type { Theme } from '../theme';
 import { Account } from './Account';
 import {
   menuFor,
@@ -63,7 +64,7 @@ function Count({ id, count, dot }: { id: string; count: number; dot?: boolean })
     <span
       id={id}
       aria-label={label}
-      className="ms-auto min-w-[18px] rounded-full bg-bad px-1.5 text-center text-xs leading-[18px] font-semibold text-white tabular-nums"
+      className="ms-auto min-w-[18px] rounded-full bg-bad px-1.5 text-center text-xs leading-[18px] font-semibold text-bad-ink tabular-nums"
     >
       {count}
     </span>
@@ -96,6 +97,9 @@ export function Sidebar({
   route,
   badges,
   onSignOut,
+  theme,
+  onTheme,
+  themeNotSaved,
 }: {
   fullName: string;
   username: string;
@@ -103,6 +107,9 @@ export function Sidebar({
   route: Route;
   badges: Badges;
   onSignOut: () => void;
+  theme: Theme;
+  onTheme: (theme: Theme) => void;
+  themeNotSaved: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const narrow = useNarrow();
@@ -207,7 +214,16 @@ export function Sidebar({
       )}
       {/* Keeps the account at the foot when there is no menu (someone who may open no screen still signs out). */}
       {groups.length === 0 && <div className="flex-1" />}
-      <Account fullName={fullName} username={username} rail={rail} side={side} onSignOut={onSignOut} />
+      <Account
+        fullName={fullName}
+        username={username}
+        rail={rail}
+        side={side}
+        onSignOut={onSignOut}
+        theme={theme}
+        onTheme={onTheme}
+        themeNotSaved={themeNotSaved}
+      />
     </aside>
   );
 }

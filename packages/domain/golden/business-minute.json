@@ -1,0 +1,19 @@
+{
+  "description": "Minutes since the business day began (the 04:00 cut-off, GLOSSARY), for comparing Today with last week up to the same time (W2-06 owner answer 2).",
+  "cases": [
+    { "name": "at the cut-off", "input": { "hour": 4, "minute": 0, "cutoffHour": 4 }, "expected": 0 },
+    { "name": "10:30", "input": { "hour": 10, "minute": 30, "cutoffHour": 4 }, "expected": 390 },
+    { "name": "23:59", "input": { "hour": 23, "minute": 59, "cutoffHour": 4 }, "expected": 1199 },
+    {
+      "name": "02:00 is late in the day before",
+      "input": { "hour": 2, "minute": 0, "cutoffHour": 4 },
+      "expected": 1320
+    },
+    {
+      "name": "03:59 is the day's last minute",
+      "input": { "hour": 3, "minute": 59, "cutoffHour": 4 },
+      "expected": 1439
+    },
+    { "name": "midnight cut-off", "input": { "hour": 0, "minute": 15, "cutoffHour": 0 }, "expected": 15 }
+  ]
+}

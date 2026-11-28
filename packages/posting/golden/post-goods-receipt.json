@@ -145,7 +145,7 @@
       }
     },
     {
-      "name": "on hand was below 0: the average is the receipt's own; 3 at Rs 28,408 total = Rs 9,469.33 shown as Rs 9,469",
+      "name": "on hand was below 0: 2 of the 3 cover the shortfall, sold at 9,000 each but really 28,408 × 2 ÷ 3 = 18,938.67 → 18,939, so 939 more to COGS (D-124); the average is the receipt's own, 9,469",
       "input": {
         "receipt": {
           "id": "gr-3",
@@ -175,7 +175,9 @@
             "memo": "GR000003",
             "lines": [
               { "accountId": "1300", "partyId": null, "debit": 28408, "credit": 0 },
-              { "accountId": "2100", "partyId": "sup-hafeez", "debit": 0, "credit": 28408 }
+              { "accountId": "2100", "partyId": "sup-hafeez", "debit": 0, "credit": 28408 },
+              { "accountId": "5100", "partyId": null, "debit": 939, "credit": 0 },
+              { "accountId": "1300", "partyId": null, "debit": 0, "credit": 939 }
             ]
           },
           "movements": [
@@ -186,6 +188,15 @@
               "qtyDelta": 3000,
               "unitCost": 9469,
               "valueDelta": 28408,
+              "avgCostAfter": 9469
+            },
+            {
+              "sourceLineId": "grl-4",
+              "itemId": "item-c",
+              "locationId": "loc-shop",
+              "qtyDelta": 0,
+              "unitCost": 0,
+              "valueDelta": -939,
               "avgCostAfter": 9469
             }
           ],

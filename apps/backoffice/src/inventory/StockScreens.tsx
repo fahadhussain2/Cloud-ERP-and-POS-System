@@ -1,11 +1,6 @@
 import type { InventoryItem, InventoryLookups, StockCardView, TransferNeededRow } from '@erp/contracts';
 import {
-  Alert,
-  AlertDescription,
-  Button,
-  Checkbox,
   formatMoney,
-  LABEL_CLASS,
   PageHeader,
   Panel,
   Table,
@@ -14,22 +9,28 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
 } from '@erp/ui';
-import { useEffect, useId, useState } from 'react';
+import { ArrowLeftRight, ChevronDown, NotebookTabs, Save } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { moneyText, moneyValue, qtyText } from '../catalog/data';
 import { ItemPicker } from '../purchasing/ItemPicker';
 import { href, navigate, withQuery } from '../router';
+import { Button, buttonClass, Checkbox, FIELD_LABEL, notify, Select, TextInput } from '../ui';
 import { inventoryRefusal, locationName, useInventoryLookups } from './data';
 
 // Reading and setting up the stock (W1-18): an item's stock card (INV-07), Transfer needed (PRD W13) and the owner's
-// stock settings (owner answers 3 and 4).
+// stock settings (owner answers 3 and 4). W2-14 (D-127): the back office's own controls; results and refusals are
+// toasts (owner answer 6).
+
+/** "Everywhere", as an option (a dropdown's option can't be empty). */
+const EVERYWHERE = 'all';
 
 /** Where a movement's document opens, when it is one of the back office's. */
-function documentHref(kind: string, id: string): string | null {
+function documentHref(kind: string, id: string, number: string | null): string | null {
+  if (kind === 'sale' && number) return href.bill(number);
   if (kind === 'stock_transfer' || kind === 'stock_transfer_receipt') return href.transfer(id);
   if (kind === 'stock_adjustment') return href.adjustment(id);
   if (kind === 'goods_receipt') return href.receipt(id);
@@ -43,7 +44,6 @@ export function StockCardScreen({ api, itemId }: { api: Api; itemId: string | nu
   const lookups = useInventoryLookups(api);
   const [location, setLocation] = useState('');
   const [pages, setPages] = useState<StockCardView[] | null>(null);
-  const locId = useId();
   useEffect(() => {
     if (itemId === null) return;
     let live = true;
@@ -75,15 +75,19 @@ export function StockCardScreen({ api, itemId }: { api: Api; itemId: string | nu
         actions={
           card && (
             // The same documents over any period, with the opening and the value (W2-02, owner answer 6).
-            <Button asChild variant="outline">
-              <a href={withQuery(href.stockLedger, { itemId: card.item.id })}>{t('inventory.card.ledger')}</a>
-            </Button>
+            <a
+              href={withQuery(href.stockLedger, { itemId: card.item.id })}
+              className={buttonClass('outline')}
+            >
+              <NotebookTabs aria-hidden="true" className="size-4" />
+              {t('inventory.card.ledger')}
+            </a>
           )
         }
       />
       <Panel className="flex flex-wrap items-end gap-3 p-3.5">
-        <div className="w-96 max-w-full">
-          <span className={LABEL_CLASS}>{t('inventory.card.item')}</span>
+        <div className="flex w-96 max-w-full flex-col gap-1.5">
+          <span className={FIELD_LABEL}>{t('inventory.card.item')}</span>
           <ItemPicker<InventoryItem>
             api={api}
             url="/api/inventory/items"
@@ -93,24 +97,16 @@ export function StockCardScreen({ api, itemId }: { api: Api; itemId: string | nu
           />
         </div>
         {itemId !== null && (
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={locId} className={LABEL_CLASS}>
-              {t('inventory.fields.location')}
-            </label>
-            <select
-              id={locId}
-              className="h-11 rounded-md border border-input bg-surface-2 px-2"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-            >
-              <option value="">{t('inventory.card.everywhere')}</option>
-              {lookups.locations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label={t('inventory.fields.location')}
+            wrapperClassName="w-52"
+            value={location || EVERYWHERE}
+            onValueChange={(v) => setLocation(v === EVERYWHERE ? '' : v)}
+            options={[
+              { value: EVERYWHERE, label: t('inventory.card.everywhere') },
+              ...lookups.locations.map((l) => ({ value: l.id, label: l.name })),
+            ]}
+          />
         )}
       </Panel>
       {card && (
@@ -149,7 +145,7 @@ export function StockCardScreen({ api, itemId }: { api: Api; itemId: string | nu
               </TableHeader>
               <TableBody>
                 {movements.map((v, i) => {
-                  const link = documentHref(v.kind, v.documentId);
+                  const link = documentHref(v.kind, v.documentId, v.number);
                   const label = v.number ?? t(`inventory.card.kinds.${v.kind}`, { defaultValue: v.kind });
                   return (
                     <TableRow key={`${v.seq}-${i}`}>
@@ -165,6 +161,12 @@ export function StockCardScreen({ api, itemId }: { api: Api; itemId: string | nu
                         ) : (
                           <span className="font-mono">{label}</span>
                         )}
+                        {v.qty === 0 && (
+                          // D-124: value with no quantity, for stock sold before it arrived.
+                          <span className="ms-2 text-xs text-muted-foreground">
+                            {t('inventory.card.costCorrection')}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>{name(v.locationId)}</TableCell>
                       <TableCell className="text-end tabular-nums">
@@ -175,7 +177,7 @@ export function StockCardScreen({ api, itemId }: { api: Api; itemId: string | nu
                       </TableCell>
                       {lookups.can.viewCost && (
                         <TableCell className="text-end tabular-nums">
-                          {v.unitCost === null ? '—' : formatMoney(v.unitCost, m)}
+                          {v.qty === 0 ? '' : v.unitCost === null ? '—' : formatMoney(v.unitCost, m)}
                         </TableCell>
                       )}
                       {lookups.can.viewCost && (
@@ -193,7 +195,7 @@ export function StockCardScreen({ api, itemId }: { api: Api; itemId: string | nu
           )}
           {pages?.at(-1)?.next != null && (
             <div className="px-2 pt-2">
-              <Button size="sm" variant="outline" onClick={() => void older()}>
+              <Button size="sm" variant="outline" icon={ChevronDown} onClick={() => void older()}>
                 {t('inventory.card.older')}
               </Button>
             </div>
@@ -227,9 +229,10 @@ export function TransferNeededScreen({ api }: { api: Api }) {
           lookups.can.transfer &&
           rows !== null &&
           rows.length > 0 && (
-            <Button asChild size="lg">
-              <a href={href.transfer('needed')}>{t('inventory.needed.transfer')}</a>
-            </Button>
+            <a href={href.transfer('needed')} className={buttonClass()}>
+              <ArrowLeftRight aria-hidden="true" className="size-4" />
+              {t('inventory.needed.transfer')}
+            </a>
           )
         }
       />
@@ -299,7 +302,6 @@ function SettingsForm({
   const [receiving, setReceiving] = useState(
     new Set(lookups.routes.filter((r) => r.needsReceiving).map((r) => key(r.fromLocationId, r.toLocationId))),
   );
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const exists = (k: string) => t(k) !== k;
   const value = moneyValue(limit, m.minorUnits);
   const locs = lookups.locations;
@@ -311,28 +313,27 @@ function SettingsForm({
         return { fromLocationId, toLocationId, needsReceiving: true };
       }),
     });
-    if (res.status !== 200) setMessage({ text: inventoryRefusal(t, exists, res.body), error: true });
-    else onSaved();
+    if (res.status !== 200) notify.problem(inventoryRefusal(t, exists, res.body));
+    else {
+      notify.done(t('inventory.settings.saved'));
+      onSaved();
+    }
   };
   return (
     <>
       <PageHeader title={t('inventory.settings.title')} help={t('inventory.settings.help')} />
-      {message && (
-        <Alert variant={message.error ? 'destructive' : 'default'}>
-          <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>
-        </Alert>
-      )}
       <Panel className="flex flex-col gap-1.5 p-3.5">
-        <TextField
+        <TextInput
           label={t('inventory.settings.limit')}
+          hint={t('inventory.settings.limitHelp')}
+          error={typeof value !== 'number' || value < 0 ? t('inventory.problems.amount') : undefined}
           inputMode="decimal"
           value={limit}
           onChange={(e) => setLimit(e.target.value)}
-          wrapperClassName="w-56"
+          wrapperClassName="w-full max-w-72"
         />
-        <p className="m-0 text-sm text-muted-foreground">{t('inventory.settings.limitHelp')}</p>
       </Panel>
-      <Panel className="px-1.5 pb-2.5">
+      <Panel className="overflow-x-auto px-1.5 pb-2.5">
         <p className="m-0 px-2 pt-2 text-sm text-muted-foreground">{t('inventory.settings.routesHelp')}</p>
         <Table aria-label={t('inventory.settings.routes')}>
           <TableHeader>
@@ -353,12 +354,14 @@ function SettingsForm({
                   <TableCell key={to.id} className="text-center">
                     {from.id !== to.id && (
                       <Checkbox
-                        aria-label={t('inventory.settings.needsReceiving', { from: from.name, to: to.name })}
+                        hideLabel
+                        className="justify-center"
+                        label={t('inventory.settings.needsReceiving', { from: from.name, to: to.name })}
                         checked={receiving.has(key(from.id, to.id))}
                         onCheckedChange={(on) =>
                           setReceiving((s) => {
                             const next = new Set(s);
-                            if (on === true) next.add(key(from.id, to.id));
+                            if (on) next.add(key(from.id, to.id));
                             else next.delete(key(from.id, to.id));
                             return next;
                           })
@@ -373,7 +376,7 @@ function SettingsForm({
         </Table>
       </Panel>
       <div>
-        <Button onClick={() => void save()} disabled={typeof value !== 'number' || value < 0}>
+        <Button icon={Save} onClick={() => void save()} disabled={typeof value !== 'number' || value < 0}>
           {t('inventory.settings.save')}
         </Button>
       </div>

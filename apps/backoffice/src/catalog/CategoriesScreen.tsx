@@ -1,27 +1,16 @@
 import type { CatalogLookups } from '@erp/contracts';
-import {
-  Alert,
-  AlertDescription,
-  Button,
-  Input,
-  PageHeader,
-  Panel,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@erp/ui';
+import { PageHeader, Panel, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@erp/ui';
+import { Save } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { Button, notify, TextBox } from '../ui';
 import { catalogRefusal, useLookups } from './data';
 
 // Categories (W1-15, CAT-05): each category's floor margin, the "+ 5 %" of floor = cost + margin (PRD Q2). Changing it
 // re-writes the category's floors from cost at once, so the counters get them at their next pull. The owner only
-// (cat.price.edit, owner answer 3).
+// (cat.price.edit, owner answer 3). W2-14 (D-127): the back office's own controls; results and refusals are toasts.
 
 /** Basis points as a percentage for a field: 500 → "5", 250 → "2.5". */
 export const percentText = (bp: number | null) => (bp === null ? '' : String(bp / 100));
@@ -38,17 +27,11 @@ export function percentValue(text: string): number | null | undefined {
 export function CategoriesScreen({ api }: { api: Api }) {
   const { t } = useTranslation();
   const { lookups, reload } = useLookups(api);
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   if (lookups === null) return <p className="text-muted-foreground">{t('app.loading')}</p>;
   return (
     <>
       <PageHeader title={t('catalog.categories.title')} help={t('catalog.categories.help')} />
-      {message && (
-        <Alert variant={message.error ? 'destructive' : 'default'}>
-          <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>
-        </Alert>
-      )}
-      <Panel className="px-1.5 pb-2.5">
+      <Panel className="overflow-x-auto px-1.5 pb-2.5">
         <Table aria-label={t('catalog.categories.title')}>
           <TableHeader>
             <TableRow>
@@ -69,9 +52,9 @@ export function CategoriesScreen({ api }: { api: Api }) {
                     floorMarginBp: bp,
                   });
                   if (r.status === 200) {
-                    setMessage({ text: t('catalog.categories.saved', { code: c.code }), error: false });
+                    notify.done(t('catalog.categories.saved', { code: c.code }));
                     await reload();
-                  } else setMessage({ text: catalogRefusal(t, (k) => t(k) !== k, r.body), error: true });
+                  } else notify.problem(catalogRefusal(t, (k) => t(k) !== k, r.body));
                 }}
               />
             ))}
@@ -102,17 +85,17 @@ function CategoryRow({
       <TableCell>
         {can ? (
           <span className="flex items-center gap-2">
-            <Input
+            <TextBox
               aria-label={t('catalog.categories.marginOf', { code: category.code })}
               aria-invalid={value === undefined ? true : undefined}
-              className="h-9 w-24"
+              className="w-24"
               inputMode="decimal"
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
             <span>%</span>
             {changed && (
-              <Button size="sm" onClick={() => void onSave(value)}>
+              <Button size="sm" icon={Save} onClick={() => void onSave(value)}>
                 {t('catalog.categories.save')}
               </Button>
             )}

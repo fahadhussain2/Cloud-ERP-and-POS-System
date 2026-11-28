@@ -3,7 +3,17 @@
     "title": "Back office",
     "loading": "Loading…",
     "error": "Something went wrong. Reload the page; if it stays, tell the support team.",
-    "brand": "Tijara"
+    "failed": {
+      "title": "Something went wrong on this page",
+      "text": "Your work since the last save may not be kept. Reload to open the page again.",
+      "reload": "Reload"
+    },
+    "brand": "Tijara",
+    "cancel": "Cancel",
+    "close": "Close",
+    "notifications": "Notifications",
+    "noOptions": "Nothing to choose",
+    "searchCodeName": "Type a code or name"
   },
   "login": {
     "title": "Sign in",
@@ -31,8 +41,10 @@
     "contains_username": "Do not put your username in your password."
   },
   "nav": {
+    "dashboard": "Dashboard",
     "menu": "Menu",
     "groups": {
+      "dashboard": "Dashboard",
       "sales": "Sales",
       "reports": "Reports",
       "catalog": "Catalog",
@@ -53,9 +65,10 @@
     "themes": {
       "system": "System",
       "light": "Light",
-      "dark": "Dark"
+      "dark": "Dark",
+      "followsSystem": "Follows this computer's setting, now {{mode}}."
     },
-    "themeLater": "Comes with the theme switcher",
+    "themeNotSaved": "Not saved for your other computers. It still applies here.",
     "staff": "Staff",
     "counters": "Counters",
     "shopSettings": "Shop and bill",
@@ -112,7 +125,9 @@
     "overLimit": "Customers near their limit",
     "collections": "Collections and payments",
     "userActivity": "User activity",
-    "cashFlow": "Cash flow"
+    "cashFlow": "Cash flow",
+    "bills": "Bills",
+    "returns": "Returns"
   },
   "home": {
     "nothing": "There is nothing here for your role yet."
@@ -203,7 +218,11 @@
     "notFound": "Person not found",
     "branchForNew": "Branch for roles you tick",
     "pinHelp": "Give a temporary PIN to someone new or who forgot theirs. At their first unlock the counter makes them choose their own, and a new PIN also clears a lock on every counter at its next sync.",
-    "reactivateConfirm": "{{name}} can sign in again (if they have a password) and appears on the counters at their next sync."
+    "reactivateConfirm": "{{name}} can sign in again (if they have a password) and appears on the counters at their next sync.",
+    "problems": {
+      "fullName": "Type the person's full name.",
+      "username": "Type a username."
+    }
   },
   "counters": {
     "title": "Counters",
@@ -821,7 +840,8 @@
         "purchase_return": "Purchase return",
         "stock_transfer": "Transfer",
         "stock_transfer_receipt": "Transfer received",
-        "stock_adjustment": "Adjustment"
+        "stock_adjustment": "Adjustment",
+        "costCorrection": "Cost correction: sold before it arrived"
       },
       "reorder": {
         "help": "Items whose stock in the Shop and the Godown is at or below their minimum, with the quantity that brings them up to the maximum, by supplier. Filter one supplier to print their list.",
@@ -919,6 +939,11 @@
       "changeSales": "Sales change",
       "total": "Total",
       "truncated": "Only the first 2,000 rows are shown, but every total counts them all. Narrow the filters or download the CSV to see the rest.",
+      "corrections": {
+        "title": "Cost corrections: stock sold before it arrived",
+        "help": "Parts sold before the shop had them (borrowed, or not yet received) were costed at the average then, or at nothing if never bought. When the stock came in, the difference to what it really cost went to cost of goods sold here, in the period it came in. Each bill keeps the profit it showed on the day.",
+        "profit": "Gross profit in the books"
+      },
       "beforeGoLive": "The comparison starts before {{since}}, when the system began: it holds only what was sold since then.",
       "register": {
         "kind": "Type",
@@ -927,10 +952,10 @@
           "return": "Return"
         },
         "supplierBill": "Supplier's bill",
-        "paidBy": "Paid",
+        "paidBy": "Payment",
         "paid": {
-          "bank": "By bank",
-          "account": "On account"
+          "bank": "Paid by bank",
+          "account": "Not paid yet"
         },
         "due": "Due",
         "total": "Amount",
@@ -1308,7 +1333,10 @@
       "totalValue": "Stock value of all matches (Shop and Godown)",
       "count": "{{count}} items · page {{page}} of {{pages}}",
       "previous": "Previous",
-      "next": "Next"
+      "next": "Next",
+      "allCategories": "All categories",
+      "allStatuses": "Any status",
+      "allLevels": "Any stock level"
     },
     "fields": {
       "code": "Code",
@@ -1416,7 +1444,8 @@
       "help": "The item's code becomes its barcode, as on the legacy labels.",
       "codeHint": "Letters, digits and dashes, up to 20. It can't be changed later.",
       "ownerPrices": "The owner sets the prices after you save.",
-      "create": "Create item"
+      "create": "Create item",
+      "added": "{{code}} added."
     },
     "categories": {
       "title": "Categories",
@@ -1471,6 +1500,8 @@
     "save": "Save",
     "cancel": "Cancel",
     "edit": "Edit",
+    "count_one": "{{count}} customer",
+    "count_other": "{{count}} customers",
     "search": "Search by code, name, phone or city",
     "show": "Show",
     "all": "All",
@@ -1494,7 +1525,8 @@
       "label": "Add from",
       "new": "A new customer",
       "supplier": "From an existing supplier",
-      "pick": "Supplier"
+      "pick": "Supplier",
+      "search": "Type a code or name"
     },
     "fields": {
       "code": "Code",
@@ -1549,7 +1581,9 @@
     "problems": {
       "limit": "Type the credit limit, or tick No limit.",
       "amount": "Type an amount in rupees.",
-      "terms": "Payment terms are whole days, 0 to 365."
+      "terms": "Payment terms are whole days, 0 to 365.",
+      "name": "Type the customer's name.",
+      "supplier": "Pick the supplier."
     },
     "errors": {
       "code_taken": "That code is already used by another customer or supplier.",
@@ -1574,6 +1608,29 @@
     "saveDraft": "Save draft",
     "post": "Post",
     "deleteDraft": "Delete draft",
+    "deleteTitle": "Delete this draft?",
+    "deleteText_one": "This draft and its line go for good. This can't be undone.",
+    "deleteText_other": "This draft and its {{count}} lines go for good. This can't be undone.",
+    "deleted": "Draft deleted.",
+    "bar": "Save or post",
+    "toFix_one": "{{count}} to fix before posting",
+    "toFix_other": "{{count}} to fix before posting",
+    "savedToFix_one": "Draft saved. {{count}} to fix before posting.",
+    "savedToFix_other": "Draft saved. {{count}} to fix before posting.",
+    "cantSave": "Fix the marked boxes to save the draft.",
+    "short": {
+      "item_required": "Pick the item",
+      "qty_positive": "Above 0",
+      "qty_fraction": "Whole units only",
+      "qty_too_large": "Too large",
+      "cost_invalid": "Not an amount",
+      "cost_too_large": "Over {{limit}}",
+      "line_too_large": "The line is over {{limit}}",
+      "discount_invalid": "More than the line",
+      "more_than_received": "More than the receipt has",
+      "not_number": "Not a number",
+      "not_amount": "Not an amount"
+    },
     "fields": {
       "code": "Code",
       "name": "Name",
@@ -1589,7 +1646,7 @@
       "billDate": "Bill date",
       "receivedOn": "Received on",
       "location": "Into",
-      "paid": "Paid",
+      "paid": "Payment",
       "billTotal": "Bill total as printed",
       "billTotalHint": "Posting waits until the lines add up to this",
       "billDiscount": "Discount on the whole bill",
@@ -1630,7 +1687,10 @@
       "deactivated": "{{name}} is deactivated.",
       "reactivated": "{{name}} is active again.",
       "deleted": "{{name}} is deleted.",
-      "saved": "{{name}} saved."
+      "saved": "{{name}} saved.",
+      "added": "{{name}} added.",
+      "count_one": "{{count}} supplier",
+      "count_other": "{{count}} suppliers"
     },
     "ledger": {
       "title": "Ledger",
@@ -1668,10 +1728,11 @@
       "bill": "The supplier's bill",
       "lines": "Lines",
       "totals": "Totals",
+      "foot": "The bill's total",
       "editHelp": "Type the bill as printed. Save keeps a draft; Post makes it final.",
-      "onAccount": "On the supplier's account",
-      "paidBy": "Paid by bank: {{bank}}",
-      "cashHint": "Paid in cash? Post it on the supplier's account; the cashier then pays it at the desk (Pay supplier).",
+      "onAccount": "Not paid yet (on the supplier's account)",
+      "paidBy": "Paid from {{bank}}",
+      "cashNote": "Paid in cash? Choose Not paid yet, then pay it at the desk (Pay supplier).",
       "due": "Due {{date}}",
       "saved": "Draft saved."
     },
@@ -1685,10 +1746,12 @@
       "of": "From {{number}}",
       "lines": "Lines",
       "total": "Supplier owes back: {{amount}}",
-      "saved": "Draft saved."
+      "saved": "Draft saved.",
+      "upTo": "Up to {{qty}}"
     },
     "line": {
       "item": "Item",
+      "number": "Line",
       "itemOf": "Item of line {{row}}",
       "pick": "Pick an item",
       "searchHint": "Code, name, barcode or OEM number",
@@ -1703,7 +1766,13 @@
       "returnCost": "Unit cost back",
       "add": "Add a line",
       "remove": "Remove",
-      "results": "Items found"
+      "results": "Items found",
+      "removeOf": "Remove line {{row}}",
+      "enterHint": "Enter in the last box adds a line",
+      "last": "Last {{cost}}",
+      "lastUp": "Last {{cost}} · {{pct}} % up",
+      "lastDown": "Last {{cost}} · {{pct}} % down",
+      "retailLow": "Retail {{retail}}: at or below the cost"
     },
     "totals": {
       "subtotal": "Lines",
@@ -1725,29 +1794,37 @@
     "warnings": {
       "cost_up": "The cost is more than 10 % above the last purchase.",
       "cost_down": "The cost is more than 10 % below the last purchase.",
-      "retail_at_or_below_cost": "Retail is at or below this cost: the owner should reprice it."
+      "retail_at_or_below_cost": "Retail is at or below this cost: the owner should reprice it.",
+      "bill_no_on_draft": "Another draft from this supplier has this bill number."
     },
     "problems": {
       "row": "Line {{row}}: {{text}}",
       "supplier_required": "Pick the supplier.",
       "bill_no_required": "Type the supplier's bill number.",
+      "bill_no_taken": "Already on {{number}}.",
       "bill_date_required": "Type the bill date.",
       "location_required": "Pick where the goods go.",
       "lines_required": "Add at least one line.",
       "item_required": "Pick the item.",
       "qty_positive": "Type a quantity above 0.",
       "qty_fraction": "This item has no fractions.",
+      "qty_too_large": "The quantity is too large.",
       "cost_invalid": "The cost is not a valid amount.",
+      "cost_too_large": "The unit cost is over {{limit}}.",
+      "line_too_large": "The line comes to more than {{limit}}.",
       "discount_invalid": "The discount is more than the line.",
       "bill_discount_invalid": "The bill discount is more than the lines.",
       "total_required": "Type the bill total as printed.",
       "total_mismatch": "The lines don't add up to the bill total.",
+      "total_too_large": "The total is over {{limit}}.",
+      "not_amount": "That is not an amount.",
       "reason_required": "Pick a reason.",
       "reason_unknown": "Pick a reason from the list.",
       "note_required": "Add a note for \"Other\".",
       "more_than_received": "More than the receipt still has.",
       "terms": "Terms are days, 0 to 365.",
-      "amount": "Type an amount above 0."
+      "amount": "Type an amount above 0.",
+      "name": "Type the supplier's name."
     },
     "errors": {
       "stale": "{{by}} changed this in the meantime. Reload it, then make your change again.",
@@ -1762,7 +1839,8 @@
       "date_locked": "The books are locked up to {{date}}. Pick a later date.",
       "date_in_future": "The date can't be after {{today}}, the shop's business date.",
       "balance_open": "The shop still owes this supplier {{amount}}. Settle it first, then deactivate.",
-      "empty_draft": "Add at least one item before saving."
+      "empty_draft": "Add at least one item before saving.",
+      "bill_no_taken": "This bill is already on {{number}}."
     }
   },
   "labels": {
@@ -1891,7 +1969,8 @@
       "note_required": "Add a note for \"Other\".",
       "write_off_not_damaged": "A write-off is out of Damaged: transfer the goods there first.",
       "write_off_gain": "A write-off takes stock out: type it below 0.",
-      "qty_zero": "Type a change other than 0."
+      "qty_zero": "Type a change other than 0.",
+      "amount": "Type an amount of 0 or more."
     },
     "warnings": {
       "below_zero": "More than it has now: it goes below 0. It still posts."
@@ -1970,6 +2049,7 @@
       "balance": "Balance",
       "total": "Total",
       "older": "Older movements",
+      "costCorrection": "Cost correction: sold before it arrived",
       "kinds": {
         "sale": "Sale",
         "sales_void": "Void",
@@ -1995,7 +2075,8 @@
       "routesHelp": "Tick a route when goods spend time on the way (sent, then received). Unticked routes move at once.",
       "to": "To {{name}}",
       "needsReceiving": "{{from}} to {{to}} needs receiving",
-      "save": "Save settings"
+      "save": "Save settings",
+      "saved": "Stock settings saved."
     },
     "unnumbered": "Not posted yet"
   },
@@ -2257,5 +2338,340 @@
         "reprinted_log": "Reprinted on the counter"
       }
     }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "loading": "Loading the figures…",
+    "openSince": "business day open since {{time}}",
+    "updated": "updated {{time}}",
+    "period": "Period",
+    "periods": {
+      "today": "Today",
+      "7d": "7 days",
+      "30d": "30 days"
+    },
+    "compared": {
+      "today": "Compared with last week, same day and time",
+      "7d": "Compared with the 7 days before",
+      "30d": "Compared with the 30 days before"
+    },
+    "beforeGoLive": "The comparison reaches before go-live",
+    "before": "Before: {{amount}}",
+    "keyFigures": "Key figures",
+    "none": "Nothing yet in this period.",
+    "kpi": {
+      "sales": "Net sales",
+      "salesSoFar": "Net sales so far",
+      "profit": "Gross profit",
+      "cash": "Cash",
+      "bank": "Bank",
+      "owed": "Customers owe us",
+      "today": " today",
+      "in30": " in 30 days",
+      "margin": "margin {{margin}}",
+      "marginWas": "Margin before: {{margin}}",
+      "bills_one": "{{count}} bill · average {{average}}",
+      "bills_other": "{{count}} bills · average {{average}}",
+      "drawers_one": "Drawers {{amount}} ({{count}} open)",
+      "drawers_other": "Drawers {{amount}} ({{count}} open)",
+      "safe": "Safe {{amount}}",
+      "transit": "Cash in transit {{amount}}",
+      "dayStart": "When the day began: {{amount}}",
+      "cards": "Card money not yet in the bank: {{amount}}",
+      "customers_one": "{{count}} customer owes us",
+      "customers_other": "{{count}} customers owe us",
+      "ago30": "30 days ago: {{amount}}",
+      "received": "Received today: {{amount}}"
+    },
+    "trend": {
+      "byHour": "Sales by hour",
+      "byDay": "Sales by day",
+      "now": {
+        "today": "Today",
+        "7d": "These 7 days",
+        "30d": "These 30 days"
+      },
+      "before": {
+        "today": "Same day last week",
+        "7d": "The 7 days before",
+        "30d": "The 30 days before"
+      }
+    },
+    "attention": {
+      "title": "Needs attention",
+      "none": "Nothing needs you right now.",
+      "tone": {
+        "bad": "Serious",
+        "warn": "Check",
+        "info": "For your information"
+      },
+      "exceptions_one": "{{count}} high-severity exception is open",
+      "exceptions_other": "{{count}} high-severity exceptions are open",
+      "negativeStock_one": "{{count}} item is in negative stock",
+      "negativeStock_other": "{{count}} items are in negative stock",
+      "counterUnseen": "{{name}} not seen for {{minutes}} minutes",
+      "atMinimum_one": "{{count}} item is at or below its minimum",
+      "atMinimum_other": "{{count}} items are at or below their minimum",
+      "overLimit_one": "{{count}} customer is over their credit limit",
+      "overLimit_other": "{{count}} customers are over their credit limit",
+      "openSessions_one": "{{count}} cash session is open",
+      "openSessions_other": "{{count}} cash sessions are open"
+    },
+    "busy": {
+      "title": "Busy hours",
+      "sub": "Bills per hour, average of the last {{weeks}} weeks",
+      "link": "Sales over time",
+      "bills_one": "{{count}} bill",
+      "bills_other": "{{count}} bills"
+    },
+    "categories": {
+      "title": "Top categories",
+      "link": "Sales and profit",
+      "none": "No category",
+      "rest": "Everything else"
+    },
+    "leak": {
+      "title": "Discounts, returns and voids",
+      "link": "Details",
+      "discounts": "Discounts given",
+      "belowList": "Sold below list",
+      "returns": "Returns",
+      "voids": "Voids and reissues",
+      "usual": "{{times}}× usual",
+      "approved": "Approved by others {{others}}, by you {{you}}",
+      "reason": "Most common reason: {{reason}}",
+      "reissued_one": "{{count}} reissued",
+      "reissued_other": "{{count}} reissued"
+    },
+    "donut": {
+      "title": "Expenses and net profit",
+      "sub": "This month · where gross profit went",
+      "link": "Profit and loss",
+      "net": "Net profit",
+      "other": "Other expenses",
+      "kept": "kept as profit",
+      "loss": "net loss",
+      "netLoss": "Net loss",
+      "gross": "Gross profit",
+      "slice": "{{name}}: {{amount}}, {{share}} of gross profit"
+    },
+    "owe": {
+      "title": "What customers owe us",
+      "link": "Customer balances",
+      "count_one": "{{count}} customer with a balance",
+      "count_other": "{{count}} customers with a balance",
+      "most": "Who owes the most",
+      "rest_one": "{{count}} other customer",
+      "rest_other": "{{count}} other customers"
+    },
+    "suppliers": {
+      "title": "We owe suppliers",
+      "link": "Supplier balances",
+      "overdue": "Overdue",
+      "due7": "Due in 7 days"
+    },
+    "stock": {
+      "title": "Stock",
+      "link": "Stock reports",
+      "value": "Value in the books",
+      "atMinimum": "At or below minimum",
+      "negative": "Negative stock",
+      "dead": "No sale in 90 days",
+      "items_one": "{{count}} item",
+      "items_other": "{{count}} items"
+    },
+    "items": {
+      "title": "Best-selling items",
+      "link": "Sales and profit"
+    },
+    "salesmen": {
+      "title": "Salesmen",
+      "link": "Sales and profit",
+      "row_one": "{{name}} · {{count}} bill",
+      "row_other": "{{name}} · {{count}} bills"
+    },
+    "footer": "Every card opens its report with the same filters. Only the owner sees the dashboard. Sales and profit follow the period; cash, bank, balances and stock show the position now."
+  },
+  "billDetails": {
+    "title": "Bill details",
+    "help": "One bill from the counter: its items, prices, discounts, payments and what happened to it. Read only.",
+    "notFound": "No bill {{number}} in this shop.",
+    "trace": "Trace this bill",
+    "print": "Print",
+    "printTitle": "Bill {{number}}",
+    "status": {
+      "finalized": "Finalized",
+      "voided": "Voided"
+    },
+    "kind": {
+      "sale": "Sale",
+      "return": "Return",
+      "exchange": "Exchange"
+    },
+    "meta": "{{at}} · Counter {{device}} · {{tier}} price",
+    "who": "Who and where",
+    "salesman": "Salesman",
+    "customer": "Customer",
+    "walkIn": "Walk-in",
+    "walkInPhone": "Walk-in, {{phone}}",
+    "handover": "Cash handover",
+    "handoverStates": {
+      "not_applicable": "Paid without cash",
+      "pending": "Not handed over yet",
+      "received": "{{number}} at {{desk}} by {{cashier}}, {{at}}",
+      "paid_out": "Refund paid at {{desk}} by {{cashier}}, {{at}}"
+    },
+    "businessDate": "Business date",
+    "items": "Items",
+    "lineCount_one": "{{count}} line",
+    "lineCount_other": "{{count}} lines",
+    "col": {
+      "no": "#",
+      "item": "Item",
+      "qty": "Qty",
+      "list": "List price",
+      "price": "Price",
+      "discount": "Discount",
+      "amount": "Amount",
+      "cost": "Cost",
+      "profit": "Profit"
+    },
+    "approval": {
+      "below_list": "Below list price, approved by {{by}}",
+      "below_floor": "Below floor price, approved by {{by}}"
+    },
+    "noCost": "No cost yet: sold before it was received",
+    "returnedFrom": "Returned from",
+    "noReceipt": "Returned without a receipt",
+    "returnReasons": {
+      "wrong_part": "Wrong part",
+      "unused_option": "Unused option",
+      "defective": "Defective",
+      "changed_mind": "Changed mind",
+      "other": "Other"
+    },
+    "conditions": {
+      "resellable": "Resellable (to Shop)",
+      "defective": "Defective (to Damaged)"
+    },
+    "totals": "Totals",
+    "linesTotal": "Lines",
+    "billDiscount": "Bill discount",
+    "approvedBy": "{{reason}}, approved by {{by}}",
+    "rounding": "Rounding",
+    "tax": "Tax",
+    "total": "Total",
+    "paid": "Paid",
+    "cashDetail": "received {{received}}, change {{change}}",
+    "reference": "ref {{reference}}",
+    "costProfit": "Cost and profit",
+    "cost": "Cost (average when sold)",
+    "profit": "Gross profit",
+    "noCostNote_one": "{{count}} line had no cost yet when sold. Its cost is settled when the stock is received, on Sales and gross profit's cost corrections.",
+    "noCostNote_other": "{{count}} lines had no cost yet when sold. Their cost is settled when the stock is received, on Sales and gross profit's cost corrections.",
+    "related": "Related",
+    "returns": "Returned on",
+    "returnOf": "This bill returns",
+    "reissueOf": "This bill reissues",
+    "approvals": "Other approvals",
+    "journal": "Posted to the books as journal {{number}}",
+    "notPosted": "Not posted to the books yet",
+    "nothingRelated": "Nothing else.",
+    "readOnly": "Read only: a finalized bill is never changed. Corrections are a void and reissue, or a return, on the counter.",
+    "voided": "Voided on {{number}}, {{at}}. Reason: {{reason}}. Approved by {{by}}.",
+    "reissuedAs": "Reissued as",
+    "approvalKinds": {
+      "below_list": "Below list",
+      "below_floor": "Below floor",
+      "credit_limit": "Over the credit limit",
+      "offline_cap": "Over the day's offline cap",
+      "no_receipt_return": "Return without a receipt",
+      "return_permission": "Return",
+      "return_outside_policy": "Return outside policy",
+      "void": "Void",
+      "reprint": "Reprint",
+      "refund_transfer": "Refund by transfer"
+    },
+    "reasons": {
+      "customer_bargain": "Customer bargain",
+      "old_stock": "Old or slow stock",
+      "market_price": "Matching a market price",
+      "regular_customer": "Regular customer",
+      "other": "Other",
+      "pay_soon": "Customer will pay soon",
+      "owner_instruction": "Owner’s instruction",
+      "wrong_item": "Wrong item",
+      "wrong_quantity": "Wrong quantity",
+      "wrong_price": "Wrong price or discount",
+      "wrong_customer_or_payment": "Wrong customer or payment",
+      "duplicate_bill": "Duplicate bill",
+      "customer_cancelled": "Customer cancelled",
+      "manufacturer_defect": "Manufacturer defect",
+      "lost_bill": "Lost bill",
+      "before_go_live": "Bought before go-live"
+    },
+    "voidReasons": {
+      "wrong_item": "Wrong item",
+      "wrong_quantity": "Wrong quantity",
+      "wrong_price": "Wrong price or discount",
+      "wrong_customer_or_payment": "Wrong customer or payment",
+      "duplicate_bill": "Duplicate bill",
+      "customer_cancelled": "Customer cancelled",
+      "other": "Other"
+    }
+  },
+  "salesDocuments": {
+    "help": {
+      "bills": "Sales bills from the counters, newest first. A voided bill is listed, marked, and left out of the total. Open a bill to see its items.",
+      "returns": "Returns and exchanges from the counters, newest first, with the bill they came from. Open one to see its items."
+    },
+    "search": "Bill number, customer or phone",
+    "col": {
+      "number": "Bill number",
+      "returnNumber": "Return number",
+      "at": "Date and time",
+      "customer": "Customer",
+      "items": "Items",
+      "total": "Total",
+      "paidBy": "Paid by",
+      "status": "Status",
+      "type": "Type",
+      "originalBill": "Original bill",
+      "itemsBack": "Items back",
+      "reason": "Reason",
+      "refund": "Refund / due",
+      "refundPaid": "Refund paid"
+    },
+    "filter": {
+      "salesmanId": "Salesman",
+      "method": "Paid by",
+      "status": "Status",
+      "kind": "Type",
+      "reason": "Reason"
+    },
+    "any": "All",
+    "statuses": {
+      "finalized": "Finalized",
+      "voided": "Voided"
+    },
+    "kind": {
+      "return": "Return",
+      "exchange": "Exchange"
+    },
+    "finalized": "Finalized",
+    "voided": "Voided ({{number}})",
+    "walkIn": "Walk-in",
+    "walkInPhone": "Walk-in, {{phone}}",
+    "noReceipt": "No receipt",
+    "several": "Several",
+    "paidAt": "Paid at {{desk}}",
+    "notYet": "Not yet",
+    "figures": {
+      "bills": "Bills",
+      "total": "Total",
+      "returns": "Returns",
+      "refunded": "Refunded"
+    },
+    "truncated": "Only the first 2,000 are shown, but the total and the CSV count them all. Narrow the dates or search."
   }
 }

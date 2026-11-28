@@ -16,6 +16,7 @@ import type { Api } from '../api';
 import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import { href, parseHash, queryOf } from '../router';
+import { chooseValue } from '../ui/testing/choose';
 import {
   AgeingScreen,
   ExceptionsScreen,
@@ -123,11 +124,13 @@ describe('the sales register', () => {
     // The key figures are the server's, the voided bill left out (W2-04 answer 8: no figure moves).
     const figures = screen.getByRole('region', { name: r.frame.figures });
     expect(plain(figures.textContent ?? '')).toMatch(/Bills1Net salesRs 2,400Voided1/);
-    // No support.trace: the numbers are plain text.
-    expect(within(list).queryByRole('link')).toBeNull();
+    // Every report reader opens a bill's details from its number (D-125), Trace or not.
+    expect(within(list).getByRole('link', { name: 'S-C1-000001' }).getAttribute('href')).toBe(
+      href.bill('S-C1-000001'),
+    );
   });
 
-  it("opens a bill's trace for someone who may trace, and narrows the bills by a search", async () => {
+  it("opens a bill's details from its number, and narrows the bills by a search", async () => {
     const view: SalesRegisterView = {
       money: MONEY,
       from: '2026-11-19',
@@ -157,7 +160,7 @@ describe('the sales register', () => {
     );
     const list = await screen.findByRole('table', { name: r.register.list });
     expect(within(list).getByRole('link', { name: 'S-C1-000001' }).getAttribute('href')).toBe(
-      href.trace('S-C1-000001'),
+      href.bill('S-C1-000001'),
     );
     fireEvent.change(screen.getByLabelText(r.frame.search), { target: { value: 'bilal' } });
     expect(within(list).queryByText('S-C1-000001')).toBeNull();
@@ -297,7 +300,7 @@ describe('ageing', () => {
         '/api/reports/ageing?side=customers&asOf=2026-11-19',
       ]),
     );
-    fireEvent.change(screen.getByLabelText(r.ageing.side), { target: { value: 'suppliers' } });
+    await chooseValue(r.ageing.side, 'suppliers');
     fireEvent.change(screen.getByLabelText(r.ageing.asOf), { target: { value: '2026-10-31' } });
     expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({
       side: 'suppliers',
@@ -492,7 +495,7 @@ describe('the dates of a W1 report on the frame', () => {
         '/api/reports/sales-register?from=2026-11-19&to=2026-11-19',
       ]),
     );
-    fireEvent.change(screen.getByLabelText(r.frame.period), { target: { value: 'weekToToday' } });
+    await chooseValue(r.frame.period, 'weekToToday');
     expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({ preset: 'weekToToday' });
     await waitFor(() =>
       expect(calledWith(f.calls, '/api/reports/sales-register')).toContain(

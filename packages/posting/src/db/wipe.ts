@@ -79,6 +79,8 @@ export const KEPT_TABLES = [
   'tenant_directory',
   'users',
   'user_login_state',
+  // Each person's theme (W2-07, D-120): a preference, kept with the people.
+  'user_settings',
   'roles',
   'user_roles',
   'sessions',
@@ -129,8 +131,8 @@ const SYNCED = new Set([
 export interface WipeReport {
   /** Rows removed per table. */
   removed: Record<string, number>;
-  /** Counters revoked: to be cleared and enrolled again. */
-  devicesRevoked: string[];
+  /** Counters removed (marked deleted, D-123): each PC is cleared and enrolled again, with a new code. */
+  devicesRemoved: string[];
 }
 
 const session = async (c: pg.ClientBase, tenantId: string, userId: string | null) => {
@@ -169,6 +171,24 @@ export async function wipePilot(
 
     const removed: Record<string, number> = {};
     for (const table of DOCUMENT_TABLES) {
+      if (table === 'sales_voids') continue; // removed with its bills, below
+      if (table === 'sales_documents') {
+        // A voided bill points at its void and the void at the bill (0013), and a voided bill must keep its void, so
+        // neither table can go first: one statement removes both, and the foreign keys are checked at its end.
+        for (const t of ['sales_voids', 'sales_documents'])
+          await c.query(`ALTER TABLE erp.${t} DISABLE TRIGGER refuse_delete`);
+        const both = await c.query<{ voids: string; bills: string }>(
+          `WITH v AS (DELETE FROM erp.sales_voids WHERE tenant_id = $1 RETURNING 1),
+                d AS (DELETE FROM erp.sales_documents WHERE tenant_id = $1 RETURNING 1)
+           SELECT (SELECT count(*) FROM v) AS voids, (SELECT count(*) FROM d) AS bills`,
+          [tenantId],
+        );
+        removed['sales_voids'] = Number(both.rows[0]!.voids);
+        removed['sales_documents'] = Number(both.rows[0]!.bills);
+        for (const t of ['sales_voids', 'sales_documents'])
+          await c.query(`ALTER TABLE erp.${t} ENABLE TRIGGER refuse_delete`);
+        continue;
+      }
       if (SYNCED.has(table)) await c.query(`ALTER TABLE erp.${table} DISABLE TRIGGER refuse_delete`);
       removed[table] =
         (await c.query(`DELETE FROM erp.${table} WHERE tenant_id = $1`, [tenantId])).rowCount ?? 0;
@@ -190,12 +210,17 @@ export async function wipePilot(
           [opts.now],
         )
       ).rowCount ?? 0;
-    const revoked = await c.query<{ code: string }>(
-      `UPDATE erp.devices SET status = 'revoked', revoked_at = $1, revoked_by_user_id = $2
-       WHERE status = 'active' RETURNING code`,
+    // Every counter goes, a revoked one too, so none can be re-enabled into the clean books (D-123). A soft delete: the
+    // rows keep their codes, so go-live counters get new ones and a pilot bill number never matches a go-live bill.
+    const gone = await c.query<{ code: string }>(
+      `UPDATE erp.devices SET deleted_at = $1, updated_at = $1,
+         revoked_at = CASE WHEN status = 'active' THEN $1 ELSE revoked_at END,
+         revoked_by_user_id = CASE WHEN status = 'active' THEN $2 ELSE revoked_by_user_id END,
+         status = 'revoked'
+       WHERE deleted_at IS NULL RETURNING code`,
       [opts.now, opts.userId],
     );
-    const report: WipeReport = { removed, devicesRevoked: revoked.rows.map((r) => r.code).sort() };
+    const report: WipeReport = { removed, devicesRemoved: gone.rows.map((r) => r.code).sort() };
     await c.query(
       `INSERT INTO erp.audit_log (tenant_id, user_id, action, entity, after) VALUES ($1, $2, 'pilot.wipe', 'tenants', $3)`,
       [tenantId, opts.userId, JSON.stringify({ ...report, at: opts.now })],

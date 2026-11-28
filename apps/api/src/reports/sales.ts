@@ -17,6 +17,7 @@ import {
   type SalesCompare,
   type SalesGroup,
   type SalesOverTimeView,
+  type SalesCorrections,
   type SalesProfitView,
   type SalesRanking,
   type SalesRow,
@@ -97,10 +98,17 @@ function beforeOf(p: Period, compare: SalesCompare): Period | null {
 
 // ---- One shape for every sales figure: the period's finalized bill lines, each with its credit and cost ----
 
+/** Each item's first make. */
+const MAKES = `mk AS (
+    SELECT DISTINCT ON (x.item_id) x.item_id, x.make_id FROM erp.item_compatibility x
+    WHERE x.make_id IS NOT NULL AND x.deleted_at IS NULL ORDER BY x.item_id, x.created_at, x.id
+  )`;
+
 /**
  * Per line of a finalized bill in the period: its item's category, brand and first make; the salesman and customer it
  * counts for (owner answer 2, @erp/domain's creditedTo: a returned line counts for the bill it returns, when known);
- * quantity, what was paid, its cost (Σ −value of its stock movements) and the same at list price (listAmount: a line
+ * quantity, what was paid, its cost (Σ −value of its stock movements that move stock; a cost correction is on a line of
+ * its own, correctionsOf) and the same at list price (listAmount: a line
  * with no list price at what was paid). $1 and $2 are the period.
  */
 const LINES = `
@@ -111,12 +119,9 @@ const LINES = `
   ),
   costs AS (
     SELECT m.source_line_id AS line_id, -sum(m.value_delta) AS cost FROM erp.stock_movements m
-    WHERE m.source_type = 'sale' AND m.source_id IN (SELECT id FROM docs) GROUP BY 1
+    WHERE m.source_type = 'sale' AND m.qty_delta <> 0 AND m.source_id IN (SELECT id FROM docs) GROUP BY 1
   ),
-  mk AS (
-    SELECT DISTINCT ON (x.item_id) x.item_id, x.make_id FROM erp.item_compatibility x
-    WHERE x.make_id IS NOT NULL AND x.deleted_at IS NULL ORDER BY x.item_id, x.created_at, x.id
-  ),
+  ${MAKES},
   ln AS (
     SELECT d.id AS doc_id, d.business_date, d.created_at_device, l.item_id, l.location_id, i.category_id,
       i.brand_id, mk.make_id,
@@ -136,7 +141,7 @@ const LINES = `
   )`;
 
 /** What a group's rows are keyed by; '' for none (no category, a walk-in). */
-const KEYS: Record<SalesGroup, string> = {
+export const KEYS: Record<SalesGroup, string> = {
   category: `coalesce(category_id::text, '')`,
   item: 'item_id::text',
   brand: `coalesce(brand_id::text, '')`,
@@ -181,18 +186,37 @@ function filtersOf(q: Query, params: unknown[]): string {
   return where.length ? `WHERE ${where.join(' AND ')}` : '';
 }
 
-interface Sums extends SalesSums {
+export interface Sums extends SalesSums {
   key: string;
   bills: number;
 }
 
 /**
- * Σ over the period's lines that pass the filters, by `key` (an SQL expression over the lines), and over all of them
- * in the same pass: a bill holding several groups' lines counts once in the total.
+ * Bills made up to a minute of their business day only (W2-06 owner answer 2: Today against last week to the same
+ * time), as @erp/domain's businessMinute, on the counter's clock in the shop's time zone.
  */
-async function sumsBy(c: Client, p: Period, key: string, q: Query): Promise<{ rows: Sums[]; total: Sums }> {
+function untilMinute(where: string, params: unknown[], upToMinute: number | null): string {
+  if (upToMinute === null) return where;
+  params.push(upToMinute);
+  const local = `(created_at_device AT TIME ZONE (SELECT timezone FROM erp.tenants))`;
+  const cond = `((extract(hour FROM ${local})::int - (SELECT day_cutoff_hour FROM erp.tenants) + 24) % 24) * 60
+    + extract(minute FROM ${local})::int <= $${params.length}`;
+  return where ? `${where} AND ${cond}` : `WHERE ${cond}`;
+}
+
+/**
+ * Σ over the period's lines that pass the filters, by `key` (an SQL expression over the lines), and over all of them
+ * in the same pass: a bill holding several groups' lines counts once in the total. `upToMinute`: see untilMinute.
+ */
+export async function sumsBy(
+  c: Client,
+  p: Period,
+  key: string,
+  q: Query,
+  upToMinute: number | null = null,
+): Promise<{ rows: Sums[]; total: Sums }> {
   const params: unknown[] = [p.from, p.to];
-  const where = filtersOf(q, params);
+  const where = untilMinute(filtersOf(q, params), params, upToMinute);
   const { rows } = await c.query<{
     key: string | null;
     whole: boolean;
@@ -221,7 +245,35 @@ async function sumsBy(c: Client, p: Period, key: string, q: Query): Promise<{ ro
   return { rows: rows.filter((r) => !r.whole).map(sums), total: total ? sums(total) : NONE };
 }
 
-const NONE: Sums = { key: '', bills: 0, qty: 0, sales: 0, cost: 0, listSales: 0 };
+/**
+ * Stock sold before it arrived, settled when it came in (D-124, owner answer 1 to W2-09): each item's cost corrections
+ * (the stock movements with no quantity) dated in the period, the period the stock came in, under the item filters. A
+ * voided bill's, like the bill, is left out. None with a salesman or customer filter: a correction belongs to neither.
+ */
+export async function correctionsOf(c: Client, p: Period, q: Query): Promise<SalesCorrections['items']> {
+  if (q['salesmanId'] || q['customerId']) return [];
+  const params: unknown[] = [p.from, p.to];
+  const where = filtersOf(q, params);
+  const { rows } = await c.query<{ item_id: string; code: string; name: string; cost: string }>(
+    `WITH ${MAKES},
+     cn AS (
+       SELECT m.item_id, m.location_id, i.code, i.name, i.category_id, i.brand_id, mk.make_id,
+         NULL::uuid AS salesman_id, NULL::uuid AS customer_id, -m.value_delta AS cost
+       FROM erp.stock_movements m
+       JOIN erp.items i ON i.id = m.item_id
+       LEFT JOIN mk ON mk.item_id = m.item_id
+       WHERE m.qty_delta = 0 AND m.business_date BETWEEN $1 AND $2 AND m.source_type <> 'sales_void'
+         AND (m.source_type <> 'sale' OR EXISTS (SELECT 1 FROM erp.sales_documents d
+           WHERE d.id = m.source_id AND d.status = 'finalized' AND d.deleted_at IS NULL))
+     )
+     SELECT item_id, code, name, sum(cost)::text AS cost FROM cn ${where}
+     GROUP BY 1, 2, 3 HAVING sum(cost) <> 0 ORDER BY sum(cost) DESC, code`,
+    params,
+  );
+  return rows.map((r) => ({ itemId: r.item_id, code: r.code, name: r.name, cost: Number(r.cost) }));
+}
+
+export const NONE: Sums = { key: '', bills: 0, qty: 0, sales: 0, cost: 0, listSales: 0 };
 function cellsOf(s: Sums, values: boolean): SalesCells {
   const f = salesFigures(s);
   return {
@@ -247,7 +299,7 @@ function beforeCells(now: Sums, before: Sums, values: boolean): SalesBefore {
 }
 
 /** The first business date the system has sales for: the opening's, else the first bill's, else today. */
-async function sinceOf(c: Client, today: string): Promise<string> {
+export async function salesSince(c: Client, today: string): Promise<string> {
   const { rows } = await c.query<{ d: string | null }>(
     `SELECT coalesce((SELECT min(business_date) FROM erp.stock_movements WHERE source_type = 'opening'),
        (SELECT min(business_date) FROM erp.sales_documents))::text AS d`,
@@ -257,7 +309,7 @@ async function sinceOf(c: Client, today: string): Promise<string> {
 }
 
 /** The names of a group's keys: (code, name, date) by key. */
-async function namesOf(
+export async function namesOf(
   c: Client,
   group: SalesGroup,
   keys: string[],
@@ -304,7 +356,7 @@ const NAMES = new Intl.Collator('en', { sensitivity: 'base' });
 /** Dates, numbers and ids: by their characters. */
 const byText = (a: string, b: string) => Number(a > b) - Number(a < b);
 
-interface OverTime {
+export interface OverTime {
   /** By business date, with the bills made that day. */
   days: Sums[];
   /** Each bill once: its business date, its hour on the counter's clock, and what was paid on it. */
@@ -316,7 +368,7 @@ interface OverTime {
 }
 
 /** Everything sales over time needs, in one pass over the period's lines (grouping sets). */
-async function overTime(c: Client, p: Period, q: Query): Promise<OverTime> {
+export async function overTime(c: Client, p: Period, q: Query): Promise<OverTime> {
   const params: unknown[] = [p.from, p.to];
   const where = filtersOf(q, params);
   const { rows } = await c.query<{
@@ -360,6 +412,73 @@ async function overTime(c: Client, p: Period, q: Query): Promise<OverTime> {
     items: rows.filter((r) => r.kind === 'item').map((r) => sums(r.item!, r)),
     salesmen: rows.filter((r) => r.kind === 'salesman').map((r) => sums(r.salesman!, r)),
     total: total ? sums('', total, bills.length) : NONE,
+  };
+}
+
+/** Every sum the owner's dashboard reads for a period, in one pass over the same lines (W2-06; D-118). */
+export interface SalesSets {
+  total: Sums;
+  /** Keyed as KEYS: '' for no category. */
+  categories: Sums[];
+  /** With each salesman's bills. */
+  salesmen: Sums[];
+  items: Sums[];
+  days: Sums[];
+  /** Each bill once: its business date, its hour on the counter's clock, what was paid and the same at list. */
+  bills: { date: string; hour: number; sales: number; listSales: number }[];
+}
+
+/** The period's lines (up to a minute of the business day, if given) by every dashboard grouping at once. */
+export async function salesSets(c: Client, p: Period, upToMinute: number | null = null): Promise<SalesSets> {
+  const params: unknown[] = [p.from, p.to];
+  const where = untilMinute('', params, upToMinute);
+  const { rows } = await c.query<{
+    kind: 'category' | 'salesman' | 'item' | 'day' | 'bill' | 'total';
+    key: string | null;
+    day: string | null;
+    hour: number | null;
+    bills: number;
+    qty: string;
+    sales: string;
+    cost: string;
+    list_sales: string;
+  }>(
+    `WITH ${LINES}
+     SELECT CASE WHEN grouping(doc_id) = 0 THEN 'bill' WHEN grouping(${KEYS.category}) = 0 THEN 'category'
+              WHEN grouping(salesman_id) = 0 THEN 'salesman' WHEN grouping(item_id) = 0 THEN 'item'
+              WHEN grouping(business_date) = 0 THEN 'day' ELSE 'total' END AS kind,
+       coalesce(${KEYS.category}, salesman_id::text, item_id::text, doc_id::text) AS key,
+       business_date::text AS day,
+       extract(hour FROM created_at_device AT TIME ZONE (SELECT timezone FROM erp.tenants))::int AS hour,
+       count(DISTINCT doc_id)::int AS bills,
+       sum(qty)::text AS qty, sum(sales)::text AS sales, sum(cost)::text AS cost, sum(list_sales)::text AS list_sales
+     FROM ln ${where}
+     GROUP BY GROUPING SETS ((${KEYS.category}), (salesman_id), (item_id), (business_date),
+       (doc_id, business_date, created_at_device), ())`,
+    params,
+  );
+  const sums = (key: string, r: (typeof rows)[number]): Sums => ({
+    key,
+    bills: r.bills,
+    qty: Number(r.qty ?? 0),
+    sales: Number(r.sales ?? 0),
+    cost: Number(r.cost ?? 0),
+    listSales: Number(r.list_sales ?? 0),
+  });
+  const of = (kind: (typeof rows)[number]['kind']) => rows.filter((r) => r.kind === kind);
+  const total = of('total')[0];
+  return {
+    total: total ? sums('', total) : NONE,
+    categories: of('category').map((r) => sums(r.key ?? '', r)),
+    salesmen: of('salesman').map((r) => sums(r.key ?? '', r)),
+    items: of('item').map((r) => sums(r.key ?? '', r)),
+    days: of('day').map((r) => sums(r.day!, r)),
+    bills: of('bill').map((r) => ({
+      date: r.day!,
+      hour: r.hour!,
+      sales: Number(r.sales),
+      listSales: Number(r.list_sales),
+    })),
   };
 }
 
@@ -485,6 +604,8 @@ export function registerSalesReports(scope: FastifyInstance, { pool, now, requir
         before: prior === null ? null : beforeCells(x.sums, prior.get(x.sums.key) ?? NONE, values),
       }));
       const priorTotal = earlier?.total ?? null;
+      const fixes = values ? await correctionsOf(c, p, q) : null;
+      const fixed = fixes === null ? 0 : fixes.reduce((t, x) => t + x.cost, 0);
       const result: SalesProfitView = {
         money: await moneyOf(c),
         values,
@@ -492,7 +613,7 @@ export function registerSalesReports(scope: FastifyInstance, { pool, now, requir
         group,
         compare,
         before,
-        since: await sinceOf(c, s.today),
+        since: await salesSince(c, s.today),
         rows,
         truncated: all.length > STOCK_ROWS,
         total: {
@@ -500,6 +621,8 @@ export function registerSalesReports(scope: FastifyInstance, { pool, now, requir
           cells: cellsOf(total, values),
           before: priorTotal === null ? null : beforeCells(total, priorTotal, values),
         },
+        corrections:
+          fixes === null ? null : { cost: fixed, profit: total.sales - total.cost - fixed, items: fixes },
       };
       if (!wantsCsv(req)) return result;
       const line = (code: string | null, name: string, x: Sums, b: Sums | null): Cell[] => {
@@ -515,27 +638,43 @@ export function registerSalesReports(scope: FastifyInstance, { pool, now, requir
           ...(b === null ? [] : [b.sales, ...(values ? [b.sales - b.cost] : [])]),
         ];
       };
+      const headers = [
+        'code',
+        group,
+        'bills',
+        'qty',
+        'sales',
+        'discount',
+        ...(values ? ['cost', 'profit', 'margin_percent'] : []),
+        ...(before === null ? [] : ['before_sales', ...(values ? ['before_profit'] : [])]),
+      ];
+      // D-124: each item's correction, their total, then gross profit in the books.
+      const costLine = (code: string, name: string, cost: number | null, profit: number): Cell[] => [
+        code,
+        name,
+        ...Array<Cell>(4).fill(null),
+        cost,
+        profit,
+        ...Array<Cell>(headers.length - 8).fill(null),
+      ];
+      const fixLines =
+        fixes === null || fixes.length === 0
+          ? []
+          : [
+              ...fixes.map((x) => costLine(x.code, x.name, x.cost, -x.cost)),
+              costLine('', 'cost_corrections', fixed, -fixed),
+              costLine('', 'profit_in_books', null, total.sales - total.cost - fixed),
+            ];
       return sendCsv(
         reply,
         `sales-profit-${group}-${p.from}-${p.to}.csv`,
-        csv(
-          [
-            'code',
-            group,
-            'bills',
-            'qty',
-            'sales',
-            'discount',
-            ...(values ? ['cost', 'profit', 'margin_percent'] : []),
-            ...(before === null ? [] : ['before_sales', ...(values ? ['before_profit'] : [])]),
-          ],
-          [
-            ...all.map((x) =>
-              line(x.code, x.name, x.sums, prior === null ? null : (prior.get(x.sums.key) ?? NONE)),
-            ),
-            line('', 'total', total, priorTotal),
-          ],
-        ),
+        csv(headers, [
+          ...all.map((x) =>
+            line(x.code, x.name, x.sums, prior === null ? null : (prior.get(x.sums.key) ?? NONE)),
+          ),
+          line('', 'total', total, priorTotal),
+          ...fixLines,
+        ]),
       );
     }),
   );
@@ -948,7 +1087,7 @@ export function registerSalesReports(scope: FastifyInstance, { pool, now, requir
         ...p,
         compare,
         before,
-        since: await sinceOf(c, s.today),
+        since: await salesSince(c, s.today),
         step,
         trend,
         beforeTrend,

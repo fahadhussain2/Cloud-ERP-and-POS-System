@@ -1,5 +1,5 @@
 // Zod schemas for REST DTOs, versioned sync payloads and bill code payloads, and the shared wire formats.
-export { ChangePasswordRequest, LoginRequest, MeResponse } from './auth';
+export { ChangePasswordRequest, LoginRequest, MeResponse, Theme, UpdateSettingsRequest } from './auth';
 export { canonicalJson } from './canonical';
 export {
   exportPublicKey,
@@ -115,7 +115,16 @@ export {
   ReviewExceptionRequest,
   type AgeingPartyRow,
   type AgeingView,
+  type BillApprovalView,
+  type BillLineView,
+  type BillListRow,
+  type BillListView,
+  type BillPaymentView,
   type BillTraceView,
+  type BillView,
+  type ReturnListRow,
+  type ReturnListView,
+  type SalesDocumentCustomer,
   type DiagnosticsRow,
   type ExceptionRow,
   type ExceptionStatus,
@@ -189,6 +198,7 @@ export type {
   SalesCells,
   SalesChoicesView,
   SalesCompare,
+  SalesCorrections,
   SalesGroup,
   SalesOverTimeView,
   SalesProfitView,
@@ -253,6 +263,7 @@ export {
   type StockLevel,
 } from './catalog';
 export {
+  BillNoQuery,
   CreateSupplierRequest,
   PostRequest,
   ReceiptDraft,
@@ -261,6 +272,7 @@ export {
   SaveReturnRequest,
   SupplierPaymentRequest,
   UpdateSupplierRequest,
+  type BillNoLookup,
   type DocumentRow,
   type PurchasingLookups,
   type ReceiptLineView,
@@ -334,3 +346,11 @@ export {
   type ReversibleType,
   type VoucherView,
 } from './accounting';
+export { DASHBOARD_PERIOD_VIEWS } from './dashboard';
+export type {
+  DashboardAttentionView,
+  DashboardChipView,
+  DashboardCountView,
+  DashboardPeriodView,
+  DashboardView,
+} from './dashboard';

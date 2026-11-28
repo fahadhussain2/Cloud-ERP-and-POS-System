@@ -8,6 +8,7 @@ import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import { href, queryOf } from '../router';
 import { CashVarianceScreen, DayReconciliationScreen } from './ReportsScreens';
+import { chooseValue } from '../ui/testing/choose';
 
 // The cash reports (W1-11, CSH-08, RPT-02) over a fake API: the day's status and what holds it, the sessions with
 // their variance and acknowledgement, the missing handovers, and a manager's later acknowledgement.
@@ -177,8 +178,10 @@ describe('the cash variance', () => {
     const f = fakeApi();
     wrap(<CashVarianceScreen api={f.api} />);
     expect(await screen.findByText('Ali')).toBeTruthy();
-    expect(screen.getByLabelText<HTMLSelectElement>(en.reports.frame.period).value).toBe('weekToToday');
-    fireEvent.change(screen.getByLabelText(en.reports.frame.period), { target: { value: 'lastMonth' } });
+    expect(screen.getByRole('combobox', { name: en.reports.frame.period }).textContent).toContain(
+      en.reports.frame.presets.weekToToday,
+    );
+    await chooseValue(en.reports.frame.period, 'lastMonth');
     await waitFor(() =>
       expect(f.calls).toContain('GET /api/reports/cash-variance?from=2026-10-01&to=2026-10-31'),
     );

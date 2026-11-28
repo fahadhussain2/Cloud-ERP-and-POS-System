@@ -1,5 +1,5 @@
-import { cn, Panel } from '@erp/ui';
-import { useState, type ReactNode } from 'react';
+import { cn, Panel, Tooltip, TooltipContent, TooltipTrigger } from '@erp/ui';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 
 // The reports' first charts (W2-03 plan, owner answer 5): a trend over time, the busy hours of the week and a bar list,
 // drawn as SVG and HTML by us (no chart library). Colours are the theme's chart tokens (this period, the comparison),
@@ -246,7 +246,9 @@ export function HourGridChart({
   const span = Array.from({ length: hours.last - hours.first + 1 }, (_, i) => hours.first + i);
   const max = Math.max(1, ...values.flat());
   return (
-    <div className="overflow-x-auto">
+    // Scrolls inside its card. Relative, so the cells' screen-reader figures (absolutely placed) stay inside it too:
+    // otherwise they stretch the page past a phone's width and the phone zooms the whole page out.
+    <div className="relative overflow-x-auto">
       <table aria-label={label} className="border-separate border-spacing-0.5 text-xs">
         <thead>
           <tr>
@@ -311,5 +313,209 @@ export function BarList({
         </li>
       ))}
     </ol>
+  );
+}
+
+// ---- The owner's dashboard (W2-06 plan; D-118) ----
+
+export type SeriesTone = 1 | 2 | 3 | 'muted';
+const STROKE: Record<string, string> = {
+  '1': 'stroke-chart-1',
+  '2': 'stroke-chart-2',
+  '3': 'stroke-chart-3',
+  muted: 'stroke-muted-foreground',
+};
+const FILL: Record<string, string> = {
+  '1': 'bg-chart-1',
+  '2': 'bg-chart-2',
+  '3': 'bg-chart-3',
+  muted: 'bg-muted-foreground',
+};
+
+/** A legend's colour square for a series. */
+export function Swatch({ tone }: { tone: SeriesTone }) {
+  return <span aria-hidden="true" className={cn('size-2.5 flex-none rounded-[3px]', FILL[String(tone)])} />;
+}
+
+export interface ChipValue {
+  text: string;
+  direction: 'up' | 'down' | 'flat';
+  /** Green when true, red when false, grey when null. */
+  good: boolean | null;
+}
+
+/** A change chip: an arrow and the change, green when good and red when bad (never colour alone). */
+export function ChangeChip({ chip }: { chip: ChipValue }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
+        chip.good === true && 'bg-ok-soft text-ok',
+        chip.good === false && 'bg-bad-soft text-bad',
+        chip.good === null && 'bg-surface-2 text-muted-foreground',
+      )}
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {chip.direction === 'up' ? (
+          <path d="m22 7-8.5 8.5-5-5L2 17 M16 7h6v6" />
+        ) : chip.direction === 'down' ? (
+          <path d="m22 17-8.5-8.5-5 5L2 7 M16 17h6v-6" />
+        ) : (
+          <path d="M5 12h14" />
+        )}
+      </svg>
+      {chip.text}
+    </span>
+  );
+}
+
+/**
+ * A key figure (W2-06 owner answer 4): its label with an icon at the top, the figure, one change chip, and a coloured
+ * strip on the start edge that the rounded corners clip. Details show on hover and on keyboard focus.
+ */
+export function StatCard({
+  label,
+  icon,
+  value,
+  chip,
+  aside,
+  tone,
+  href,
+  details,
+}: {
+  label: string;
+  icon: ReactNode;
+  value: string;
+  chip: ChipValue | null;
+  aside?: string;
+  tone: 1 | 2;
+  href: string;
+  details: string[];
+}) {
+  const card = (
+    <a
+      href={href}
+      className="@container relative flex min-w-0 flex-col gap-2.5 overflow-hidden rounded-xl border border-line bg-surface py-3.5 ps-[21px] pe-4 text-ink no-underline hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-focus"
+    >
+      <span
+        aria-hidden="true"
+        className={cn('absolute inset-y-0 start-0 w-1', tone === 1 ? 'bg-chart-1' : 'bg-chart-2')}
+      />
+      <span className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-muted-foreground">{label}</span>
+        <span aria-hidden="true" className="flex flex-none text-muted-foreground">
+          {icon}
+        </span>
+      </span>
+      {/* 32px when it fits; a long figure (Rs 14,428,000) shrinks to the card's width rather than being cut off. A
+          condensed figure is about half an em a character. */}
+      <span
+        className="font-display text-[min(32px,calc(100cqi/(var(--chars)*0.52)))] leading-none font-bold whitespace-nowrap tabular-nums"
+        style={{ '--chars': value.length } as CSSProperties}
+      >
+        {value}
+      </span>
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {chip && <ChangeChip chip={chip} />}
+        {aside && <span className="text-xs text-muted-foreground tabular-nums">{aside}</span>}
+      </span>
+      <span className="sr-only">{details.join('. ')}</span>
+    </a>
+  );
+  if (details.length === 0) return card;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{card}</TooltipTrigger>
+      <TooltipContent side="bottom" className="flex flex-col gap-0.5 tabular-nums">
+        {details.map((d) => (
+          <span key={d}>{d}</span>
+        ))}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+export interface DonutSliceValue {
+  key: string;
+  tone: SeriesTone;
+  /** Basis points of the ring. */
+  bp: number;
+  title: string;
+}
+
+/**
+ * A ring of up to four slices with 2px gaps, starting at the top and running clockwise; the centre holds the answer.
+ * Hovering a slice (here or in the legend, through `active`) fades the others.
+ */
+export function DonutChart({
+  label,
+  slices,
+  size,
+  centre,
+  active,
+  onActive,
+}: {
+  label: string;
+  slices: DonutSliceValue[];
+  size: number;
+  centre: ReactNode;
+  active: string | null;
+  onActive: (key: string | null) => void;
+}) {
+  const gap = slices.length > 1 ? 0.8 : 0;
+  // Where each slice starts, in hundredths of the ring.
+  const starts = slices.map((_, i) => slices.slice(0, i).reduce((t, x) => t + x.bp / 100, 0));
+  return (
+    <div
+      role="img"
+      aria-label={label}
+      className="relative flex-none self-center"
+      style={{ inlineSize: size, blockSize: size }}
+      onMouseLeave={() => onActive(null)}
+    >
+      <svg viewBox="0 0 120 120" width={size} height={size} className="block -rotate-90">
+        {slices.length === 0 && (
+          <circle cx="60" cy="60" r="52" fill="none" strokeWidth="12" className="stroke-surface-2" />
+        )}
+        {slices.map((s, i) => {
+          const pct = s.bp / 100;
+          const offset = starts[i]!;
+          return (
+            <circle
+              key={s.key}
+              cx="60"
+              cy="60"
+              r="52"
+              fill="none"
+              pathLength={100}
+              strokeWidth="12"
+              strokeDasharray={`${Math.max(pct - gap, 0)} ${100 - Math.max(pct - gap, 0)}`}
+              strokeDashoffset={-offset}
+              className={cn(
+                STROKE[String(s.tone)],
+                'cursor-pointer transition-opacity',
+                active !== null && active !== s.key && 'opacity-35',
+              )}
+              onMouseEnter={() => onActive(s.key)}
+            >
+              <title>{s.title}</title>
+            </circle>
+          );
+        })}
+      </svg>
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-0.5">
+        {centre}
+      </div>
+    </div>
   );
 }

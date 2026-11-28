@@ -1,14 +1,7 @@
 import type { CatalogLookups, ItemDetail } from '@erp/contracts';
 import { PRICE_REASONS, priceChange } from '@erp/domain';
 import {
-  Alert,
-  AlertDescription,
-  Button,
-  Checkbox,
   formatMoney,
-  Input,
-  Label,
-  LABEL_CLASS,
   PageHeader,
   Panel,
   StatusChip,
@@ -18,27 +11,38 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
 } from '@erp/ui';
-import { useCallback, useEffect, useId, useState, type FormEvent, type ReactNode } from 'react';
+import { Plus, Save, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { href } from '../router';
+import {
+  Button,
+  Checkbox,
+  FIELD_LABEL,
+  IconButton,
+  ListPicker,
+  notify,
+  Select,
+  TextBox,
+  TextInput,
+  type SelectOption,
+} from '../ui';
 import { catalogRefusal, moneyText, moneyValue, NONE, qtyText, qtyValue, useLookups } from './data';
 import { statusTone } from './ItemsScreen';
 
 // One item (W1-15): details (CAT-01), codes and vehicles (CAT-02, CAT-03), prices and floor (CAT-04, CAT-05) and the
 // price history (CAT-07). Each part saves on its own with the row version it read; prices only with cat.price.edit
-// (the owner, owner answer 3), costs only with cost.view.
-
-type Message = { text: string; error: boolean } | null;
+// (the owner, owner answer 3), costs only with cost.view. W2-14 (D-127): the back office's own controls; lists that
+// keep growing (category, brand, supplier, vehicle make) are searched (owner answer 3); problems show at their field
+// and results and refusals in a toast (owner answer 6).
 
 export function ItemScreen({ api, id }: { api: Api; id: string }) {
   const { t } = useTranslation();
   const { lookups, reload: reloadLookups } = useLookups(api);
   const [detail, setDetail] = useState<ItemDetail | null | undefined>(undefined);
-  const [message, setMessage] = useState<Message>(null);
 
   const fetchDetail = useCallback(async () => {
     const r = await api('GET', `/api/catalog/items/${encodeURIComponent(id)}`);
@@ -65,15 +69,15 @@ export function ItemScreen({ api, id }: { api: Api; id: string }) {
     return <p className="text-muted-foreground">{t('app.loading')}</p>;
   if (detail === null) return <PageHeader eyebrow={back} title={t('catalog.item.notFound')} />;
 
-  /** Sends one part; a refusal is shown, a success reloads the item. */
+  /** Sends one part; a refusal is a toast, a success says so and reloads the item. */
   const save = async (method: 'PATCH' | 'PUT', path: string, body: unknown, done: string) => {
     const r = await api(method, `/api/catalog/items/${encodeURIComponent(id)}${path}`, body);
     if (r.status === 200 || r.status === 201) {
-      setMessage({ text: done, error: false });
+      notify.done(done);
       await reload();
       return true;
     }
-    setMessage({ text: catalogRefusal(t, (k) => t(k) !== k, r.body), error: true });
+    notify.problem(catalogRefusal(t, (k) => t(k) !== k, r.body));
     return false;
   };
 
@@ -110,11 +114,6 @@ export function ItemScreen({ api, id }: { api: Api; id: string }) {
           </span>
         }
       />
-      {message && (
-        <Alert variant={message.error ? 'destructive' : 'default'}>
-          <AlertDescription role={message.error ? 'alert' : 'status'}>{message.text}</AlertDescription>
-        </Alert>
-      )}
       <DetailsPart
         key={`d${detail.item.rowVersion}`}
         detail={detail}
@@ -156,40 +155,39 @@ function Part({
   return (
     <Panel aria-label={title} role="region">
       <h2 className="m-0 px-3.5 pt-3 font-display text-lg font-semibold">{title}</h2>
-      {onSubmit ? <form onSubmit={onSubmit}>{body}</form> : body}
+      {onSubmit ? (
+        <form onSubmit={onSubmit} noValidate>
+          {body}
+        </form>
+      ) : (
+        body
+      )}
     </Panel>
   );
 }
 
-function SelectField({
+/** "None", as an option of an optional choice (a dropdown's option can't be empty). */
+const NONE_OPTION = 'none';
+
+/** A short optional list (origin) as the kit's dropdown, with "—" for none. */
+function OptionalSelect({
   label,
   value,
   onChange,
-  disabled,
-  children,
+  options,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  disabled?: boolean;
-  children: ReactNode;
+  options: SelectOption[];
 }) {
-  const id = useId();
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className={LABEL_CLASS}>
-        {label}
-      </label>
-      <select
-        id={id}
-        className="h-11 rounded-md border border-input bg-surface-2 px-2 text-base"
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {children}
-      </select>
-    </div>
+    <Select
+      label={label}
+      value={value || NONE_OPTION}
+      onValueChange={(v) => onChange(v === NONE_OPTION ? NONE : v)}
+      options={[{ value: NONE_OPTION, label: '—' }, ...options]}
+    />
   );
 }
 
@@ -208,13 +206,20 @@ function AddName({
   const [name, setName] = useState('');
   if (!open)
     return (
-      <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        icon={Plus}
+        className="self-start"
+        onClick={() => setOpen(true)}
+      >
         {t(`catalog.add.${kind}`)}
       </Button>
     );
   return (
     <span className="flex items-center gap-1.5">
-      <Input
+      <TextBox
         aria-label={t(`catalog.add.${kind}`)}
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -223,6 +228,7 @@ function AddName({
       <Button
         type="button"
         size="sm"
+        icon={Save}
         disabled={name.trim() === ''}
         onClick={() =>
           void api('POST', `/api/catalog/${kind}`, { name }).then((r) => {
@@ -230,7 +236,7 @@ function AddName({
               setOpen(false);
               setName('');
               onAdded((r.body as { id: string }).id);
-            }
+            } else notify.problem(catalogRefusal(t, (k) => t(k) !== k, r.body));
           })
         }
       >
@@ -270,16 +276,31 @@ function DetailsPart({
     excludeFromReorder: i.excludeFromReorder,
     status: i.status,
   });
-  const [error, setError] = useState<string | null>(null);
-  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
+  const [problems, setProblems] = useState<{
+    minQty?: string;
+    maxQty?: string;
+    categoryId?: string;
+  }>({});
+  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => {
+    setF((x) => ({ ...x, [k]: v }));
+    setProblems((p) => (k in p ? { ...p, [k]: undefined } : p));
+  };
   const can = lookups.can.editItems;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const minQty = qtyValue(f.minQty);
     const maxQty = qtyValue(f.maxQty);
-    if (minQty === undefined || maxQty === undefined) return setError(t('catalog.problems.qty_number'));
-    setError(null);
+    const wrong: typeof problems = {};
+    if (minQty === undefined) wrong.minQty = t('catalog.problems.qty_number');
+    if (maxQty === undefined) wrong.maxQty = t('catalog.problems.qty_number');
+    if (!f.categoryId) wrong.categoryId = t('catalog.problems.category_required');
+    setProblems(wrong);
+    if (Object.keys(wrong).length > 0 || minQty === undefined || maxQty === undefined) {
+      // Focus on the first field marked wrong (owner answer 6).
+      setTimeout(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+      return;
+    }
     void save({
       rowVersion: i.rowVersion,
       name: f.name,
@@ -300,55 +321,42 @@ function DetailsPart({
 
   return (
     <Part title={t('catalog.item.details')} onSubmit={submit}>
-      <fieldset disabled={!can} className="m-0 grid gap-3.5 border-0 p-0 md:grid-cols-3">
-        <TextField
+      <fieldset disabled={!can} className="m-0 grid grid-cols-1 gap-3.5 border-0 p-0 md:grid-cols-3">
+        <TextInput
           label={t('catalog.fields.name')}
           value={f.name}
           onChange={(e) => set('name', e.target.value)}
           wrapperClassName="md:col-span-3"
         />
-        <SelectField
+        <ListPicker
           label={t('catalog.fields.category')}
+          options={lookups.categories}
           value={f.categoryId}
+          error={problems.categoryId}
           onChange={(v) => set('categoryId', v)}
-        >
-          {lookups.categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.code} · {c.name}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField label={t('catalog.fields.unit')} value={f.unitId} onChange={(v) => set('unitId', v)}>
-          {lookups.units.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.code}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField
+        />
+        <Select
+          label={t('catalog.fields.unit')}
+          value={f.unitId}
+          onValueChange={(v) => set('unitId', v)}
+          options={lookups.units.map((u) => ({ value: u.id, label: u.code }))}
+        />
+        <Select
           label={t('catalog.fields.status')}
           value={f.status}
-          onChange={(v) => set('status', v as typeof f.status)}
-        >
-          {(['active', 'dormant', 'discontinued'] as const).map((s) => (
-            <option key={s} value={s}>
-              {t(`catalog.status.${s}`)}
-            </option>
-          ))}
-        </SelectField>
+          onValueChange={(v) => set('status', v as typeof f.status)}
+          options={(['active', 'dormant', 'discontinued'] as const).map((s) => ({
+            value: s,
+            label: t(`catalog.status.${s}`),
+          }))}
+        />
         <div className="flex flex-col gap-1">
-          <SelectField
+          <ListPicker
             label={t('catalog.fields.brand')}
+            options={lookups.brands}
             value={f.brandId}
             onChange={(v) => set('brandId', v)}
-          >
-            <option value={NONE}>—</option>
-            {lookups.brands.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </SelectField>
+          />
           {can && (
             <AddName
               api={api}
@@ -358,18 +366,15 @@ function DetailsPart({
           )}
         </div>
         <div className="flex flex-col gap-1">
-          <SelectField
+          <OptionalSelect
             label={t('catalog.fields.origin')}
             value={f.originId}
             onChange={(v) => set('originId', v)}
-          >
-            <option value={NONE}>—</option>
-            {lookups.origins.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </SelectField>
+            options={lookups.origins.map((o) => ({
+              value: o.id,
+              label: o.name,
+            }))}
+          />
           {can && (
             <AddName
               api={api}
@@ -378,70 +383,67 @@ function DetailsPart({
             />
           )}
         </div>
-        <SelectField
+        <ListPicker
           label={t('catalog.fields.supplier')}
+          options={lookups.suppliers}
           value={f.defaultSupplierId}
           onChange={(v) => set('defaultSupplierId', v)}
-        >
-          <option value={NONE}>—</option>
-          {lookups.suppliers.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </SelectField>
-        <TextField
+        />
+        <TextInput
           label={t('catalog.fields.variant')}
           value={f.variant}
           onChange={(e) => set('variant', e.target.value)}
         />
-        <TextField
+        <TextInput
           label={t('catalog.fields.spec')}
           value={f.spec}
           onChange={(e) => set('spec', e.target.value)}
         />
-        <TextField
+        <TextInput
           label={t('catalog.fields.bin')}
           value={f.binLocation}
           onChange={(e) => set('binLocation', e.target.value)}
         />
-        <TextField
+        <TextInput
           label={t('catalog.fields.minQty')}
+          error={problems.minQty}
           inputMode="decimal"
           value={f.minQty}
           onChange={(e) => set('minQty', e.target.value)}
         />
-        <TextField
+        <TextInput
           label={t('catalog.fields.maxQty')}
+          error={problems.maxQty}
           inputMode="decimal"
           value={f.maxQty}
           onChange={(e) => set('maxQty', e.target.value)}
         />
-        <div className="flex items-center gap-2 self-end pb-2.5">
-          <Checkbox
-            id={`reorder-${i.id}`}
-            checked={f.excludeFromReorder}
-            onCheckedChange={(v) => set('excludeFromReorder', v === true)}
-          />
-          <Label htmlFor={`reorder-${i.id}`}>{t('catalog.fields.excludeFromReorder')}</Label>
-        </div>
+        <Checkbox
+          className="self-end pb-2.5"
+          id={`reorder-${i.id}`}
+          label={t('catalog.fields.excludeFromReorder')}
+          checked={f.excludeFromReorder}
+          onCheckedChange={(v) => set('excludeFromReorder', v)}
+        />
       </fieldset>
-      {error && (
-        <p role="alert" className="m-0 text-sm text-destructive">
-          {error}
-        </p>
-      )}
       {can && (
         <div>
-          <Button type="submit">{t('catalog.item.saveDetails')}</Button>
+          <Button type="submit" icon={Save}>
+            {t('catalog.item.saveDetails')}
+          </Button>
         </div>
       )}
     </Part>
   );
 }
-
 type IdRow = ItemDetail['identifiers'][number];
-type VehicleRow = { makeId: string; model: string; yearFrom: string; yearTo: string; note: string };
+type VehicleRow = {
+  makeId: string;
+  model: string;
+  yearFrom: string;
+  yearTo: string;
+  note: string;
+};
 const KINDS = ['barcode', 'oem', 'alternate', 'supplier_ref'] as const;
 
 function CodesPart({
@@ -480,40 +482,36 @@ function CodesPart({
   return (
     <Part title={t('catalog.item.codes')}>
       <div className="flex flex-col gap-2">
-        <h3 className={LABEL_CLASS}>{t('catalog.item.identifiers')}</h3>
+        <h3 className={`m-0 ${FIELD_LABEL}`}>{t('catalog.item.identifiers')}</h3>
         {codes.map((c, n) => (
           <div key={n} className="flex flex-wrap items-center gap-2">
-            <select
+            <Select
               aria-label={t('catalog.item.kind')}
-              className="h-10 rounded-md border border-input bg-surface-2 px-2"
+              wrapperClassName="w-40"
               value={c.kind}
               disabled={!can || own(c.value, c.kind)}
-              onChange={(e) =>
-                setCodes(codes.map((x, m) => (m === n ? { ...x, kind: e.target.value as IdRow['kind'] } : x)))
+              onValueChange={(v) =>
+                setCodes(codes.map((x, m) => (m === n ? { ...x, kind: v as IdRow['kind'] } : x)))
               }
-            >
-              {KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {t(`catalog.kinds.${k}`)}
-                </option>
-              ))}
-            </select>
-            <Input
+              options={KINDS.map((k) => ({
+                value: k,
+                label: t(`catalog.kinds.${k}`),
+              }))}
+            />
+            <TextBox
               aria-label={t('catalog.item.value')}
-              className="h-10 w-64 font-mono"
+              className="w-64 font-mono"
               value={c.value}
               disabled={!can || own(c.value, c.kind)}
               onChange={(e) => setCodes(codes.map((x, m) => (m === n ? { ...x, value: e.target.value } : x)))}
             />
             {can && !own(c.value, c.kind) && (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
+              <IconButton
+                icon={Trash2}
+                tone="danger"
+                label={`${t('catalog.item.remove')} ${c.value}`.trim()}
                 onClick={() => setCodes(codes.filter((_, m) => m !== n))}
-              >
-                {t('catalog.item.remove')}
-              </Button>
+              />
             )}
           </div>
         ))}
@@ -523,6 +521,7 @@ function CodesPart({
               type="button"
               size="sm"
               variant="outline"
+              icon={Plus}
               onClick={() => setCodes([...codes, { kind: 'oem', value: '' }])}
             >
               {t('catalog.item.addCode')}
@@ -530,7 +529,13 @@ function CodesPart({
             <Button
               type="button"
               size="sm"
-              onClick={() => void saveCodes({ rowVersion: detail.item.rowVersion, identifiers: codes })}
+              icon={Save}
+              onClick={() =>
+                void saveCodes({
+                  rowVersion: detail.item.rowVersion,
+                  identifiers: codes,
+                })
+              }
             >
               {t('catalog.item.saveCodes')}
             </Button>
@@ -538,7 +543,7 @@ function CodesPart({
         )}
       </div>
       <div className="flex flex-col gap-2">
-        <h3 className={LABEL_CLASS}>{t('catalog.item.vehicles')}</h3>
+        <h3 className={`m-0 ${FIELD_LABEL}`}>{t('catalog.item.vehicles')}</h3>
         {vehicles.length === 0 && (
           <p className="m-0 text-sm text-muted-foreground">{t('catalog.item.noVehicles')}</p>
         )}
@@ -547,59 +552,52 @@ function CodesPart({
             setVehicles(vehicles.map((x, m) => (m === n ? { ...x, ...patch } : x)));
           return (
             <div key={n} className="flex flex-wrap items-center gap-2">
-              <select
-                aria-label={t('catalog.fields.make')}
-                className="h-10 rounded-md border border-input bg-surface-2 px-2"
+              <ListPicker
+                hideLabel
+                className="w-44"
+                label={t('catalog.fields.make')}
+                options={lookups.makes}
                 value={v.makeId}
                 disabled={!can}
-                onChange={(e) => put({ makeId: e.target.value })}
-              >
-                <option value={NONE}>—</option>
-                {lookups.makes.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              <Input
+                onChange={(id) => put({ makeId: id })}
+              />
+              <TextBox
                 aria-label={t('catalog.fields.model')}
-                className="h-10 w-40"
+                className="w-40"
                 value={v.model}
                 disabled={!can}
                 onChange={(e) => put({ model: e.target.value })}
               />
-              <Input
+              <TextBox
                 aria-label={t('catalog.fields.yearFrom')}
-                className="h-10 w-24"
+                className="w-24"
                 inputMode="numeric"
                 value={v.yearFrom}
                 disabled={!can}
                 onChange={(e) => put({ yearFrom: e.target.value })}
               />
-              <Input
+              <TextBox
                 aria-label={t('catalog.fields.yearTo')}
-                className="h-10 w-24"
+                className="w-24"
                 inputMode="numeric"
                 value={v.yearTo}
                 disabled={!can}
                 onChange={(e) => put({ yearTo: e.target.value })}
               />
-              <Input
+              <TextBox
                 aria-label={t('catalog.fields.note')}
-                className="h-10 w-48"
+                className="w-48"
                 value={v.note}
                 disabled={!can}
                 onChange={(e) => put({ note: e.target.value })}
               />
               {can && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
+                <IconButton
+                  icon={Trash2}
+                  tone="danger"
+                  label={`${t('catalog.item.remove')} ${v.model}`.trim()}
                   onClick={() => setVehicles(vehicles.filter((_, m) => m !== n))}
-                >
-                  {t('catalog.item.remove')}
-                </Button>
+                />
               )}
             </div>
           );
@@ -610,8 +608,18 @@ function CodesPart({
               type="button"
               size="sm"
               variant="outline"
+              icon={Plus}
               onClick={() =>
-                setVehicles([...vehicles, { makeId: NONE, model: '', yearFrom: '', yearTo: '', note: '' }])
+                setVehicles([
+                  ...vehicles,
+                  {
+                    makeId: NONE,
+                    model: '',
+                    yearFrom: '',
+                    yearTo: '',
+                    note: '',
+                  },
+                ])
               }
             >
               {t('catalog.item.addVehicle')}
@@ -620,6 +628,7 @@ function CodesPart({
             <Button
               type="button"
               size="sm"
+              icon={Save}
               onClick={() =>
                 void saveVehicles({
                   rowVersion: detail.item.rowVersion,
@@ -662,20 +671,25 @@ function PricesPart({
   const [floor, setFloor] = useState(moneyText(detail.floor.own, m.minorUnits));
   const [reason, setReason] = useState<string>(NONE);
   const [note, setNote] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const reasonId = useId();
+  // After Save is tried, each price that isn't an amount is marked at its field (owner answer 6).
+  const [tried, setTried] = useState(false);
 
   const values = Object.fromEntries(
     lookups.tiers.map((x) => [x.code, moneyValue(tiers[x.code] ?? '', m.minorUnits)]),
   );
   const floorValue = moneyValue(floor, m.minorUnits);
   const bad = Object.values(values).some((v) => v === undefined) || floorValue === undefined;
+  const wrong = (v: number | null | undefined) =>
+    tried && v === undefined ? t('catalog.problems.price_number') : undefined;
   // The same check as the server's, so the reason is asked for as soon as a price goes down (owner answer 2).
   const check = bad
     ? null
     : priceChange({
         before: { tiers: detail.prices, floor: detail.floor.own },
-        after: { tiers: values as Record<string, number | null>, floor: floorValue ?? null },
+        after: {
+          tiers: values as Record<string, number | null>,
+          floor: floorValue ?? null,
+        },
         reason: reason || null,
         note,
       });
@@ -684,8 +698,11 @@ function PricesPart({
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (bad) return setError(t('catalog.problems.price_number'));
-    setError(null);
+    setTried(true);
+    if (bad) {
+      setTimeout(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+      return;
+    }
     void save({
       rowVersion: detail.item.rowVersion,
       tiers: values,
@@ -698,19 +715,21 @@ function PricesPart({
   return (
     <Part title={t('catalog.item.prices')} onSubmit={submit}>
       {!can && <p className="m-0 text-sm text-muted-foreground">{t('catalog.item.pricesOwnerOnly')}</p>}
-      <fieldset disabled={!can} className="m-0 grid gap-3.5 border-0 p-0 md:grid-cols-4">
+      <fieldset disabled={!can} className="m-0 grid grid-cols-1 gap-3.5 border-0 p-0 md:grid-cols-4">
         {lookups.tiers.map((x) => (
-          <TextField
+          <TextInput
             key={x.code}
             label={x.name}
+            error={wrong(values[x.code])}
             inputMode="decimal"
             value={tiers[x.code] ?? ''}
             onChange={(e) => setTiers({ ...tiers, [x.code]: e.target.value })}
           />
         ))}
-        <TextField
+        <TextInput
           label={t('catalog.item.ownFloor')}
           hint={t('catalog.item.ownFloorHint')}
+          error={wrong(floorValue)}
           inputMode="decimal"
           value={floor}
           onChange={(e) => setFloor(e.target.value)}
@@ -726,49 +745,36 @@ function PricesPart({
         <p className="m-0 text-sm text-warn">{t('catalog.problems.floor_above_retail')}</p>
       )}
       {can && goesDown && (
-        <div className="grid gap-3.5 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={reasonId} className={LABEL_CLASS}>
-              {t('catalog.item.reason')}
-            </label>
-            <select
-              id={reasonId}
-              className="h-11 rounded-md border border-input bg-surface-2 px-2"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            >
-              <option value={NONE}>—</option>
-              {PRICE_REASONS.map((r) => (
-                <option key={r} value={r}>
-                  {t(`catalog.reasons.${r}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <TextField label={t('catalog.item.note')} value={note} onChange={(e) => setNote(e.target.value)} />
+        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <Select
+            label={t('catalog.item.reason')}
+            placeholder="—"
+            value={reason}
+            onValueChange={setReason}
+            options={PRICE_REASONS.map((r) => ({
+              value: r,
+              label: t(`catalog.reasons.${r}`),
+            }))}
+          />
+          <TextInput label={t('catalog.item.note')} value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
       )}
-      {error && (
-        <p role="alert" className="m-0 text-sm text-destructive">
-          {error}
-        </p>
-      )}
       {detail.cost && (
-        <dl className="m-0 grid gap-1 text-sm md:grid-cols-4">
+        <dl className="m-0 grid grid-cols-1 gap-1 text-sm md:grid-cols-4">
           <div>
-            <dt className={LABEL_CLASS}>{t('catalog.cost.average')}</dt>
+            <dt className={FIELD_LABEL}>{t('catalog.cost.average')}</dt>
             <dd className="m-0 tabular-nums">{show(detail.cost.avgCost)}</dd>
           </div>
           <div>
-            <dt className={LABEL_CLASS}>{t('catalog.cost.last')}</dt>
+            <dt className={FIELD_LABEL}>{t('catalog.cost.last')}</dt>
             <dd className="m-0 tabular-nums">{show(detail.cost.lastCost)}</dd>
           </div>
           <div>
-            <dt className={LABEL_CLASS}>{t('catalog.cost.supplier')}</dt>
+            <dt className={FIELD_LABEL}>{t('catalog.cost.supplier')}</dt>
             <dd className="m-0">{detail.cost.lastSupplier ?? '—'}</dd>
           </div>
           <div>
-            <dt className={LABEL_CLASS}>{t('catalog.cost.date')}</dt>
+            <dt className={FIELD_LABEL}>{t('catalog.cost.date')}</dt>
             <dd className="m-0">
               {detail.cost.lastReceiptAt
                 ? new Date(detail.cost.lastReceiptAt).toLocaleDateString(m.locale)
@@ -779,7 +785,9 @@ function PricesPart({
       )}
       {can && (
         <div>
-          <Button type="submit">{t('catalog.item.savePrices')}</Button>
+          <Button type="submit" icon={Save}>
+            {t('catalog.item.savePrices')}
+          </Button>
         </div>
       )}
     </Part>
@@ -796,35 +804,38 @@ function HistoryPart({ detail, lookups }: { detail: ItemDetail; lookups: Catalog
       {detail.history.length === 0 ? (
         <p className="m-0 text-muted-foreground">{t('catalog.item.noHistory')}</p>
       ) : (
-        <Table aria-label={t('catalog.item.history')}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('catalog.history.at')}</TableHead>
-              <TableHead>{t('catalog.history.price')}</TableHead>
-              <TableHead className="text-end">{t('catalog.history.old')}</TableHead>
-              <TableHead className="text-end">{t('catalog.history.new')}</TableHead>
-              <TableHead>{t('catalog.history.why')}</TableHead>
-              <TableHead>{t('catalog.history.by')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {detail.history.map((h, n) => (
-              <TableRow key={n}>
-                <TableCell>{new Date(h.at).toLocaleString(m.locale)}</TableCell>
-                <TableCell>
-                  {h.target === 'floor' ? t('catalog.item.ownFloor') : (tierName.get(h.target) ?? h.target)}
-                </TableCell>
-                <TableCell className="text-end tabular-nums">{show(h.old)}</TableCell>
-                <TableCell className="text-end tabular-nums">{show(h.new)}</TableCell>
-                <TableCell>
-                  {[h.reason ? t(`catalog.reasons.${h.reason}`) : null, h.note].filter(Boolean).join(' · ') ||
-                    '—'}
-                </TableCell>
-                <TableCell>{h.by ?? t(`catalog.history.sources.${h.source}`)}</TableCell>
+        <div className="overflow-x-auto">
+          <Table aria-label={t('catalog.item.history')}>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('catalog.history.at')}</TableHead>
+                <TableHead>{t('catalog.history.price')}</TableHead>
+                <TableHead className="text-end">{t('catalog.history.old')}</TableHead>
+                <TableHead className="text-end">{t('catalog.history.new')}</TableHead>
+                <TableHead>{t('catalog.history.why')}</TableHead>
+                <TableHead>{t('catalog.history.by')}</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {detail.history.map((h, n) => (
+                <TableRow key={n}>
+                  <TableCell>{new Date(h.at).toLocaleString(m.locale)}</TableCell>
+                  <TableCell>
+                    {h.target === 'floor' ? t('catalog.item.ownFloor') : (tierName.get(h.target) ?? h.target)}
+                  </TableCell>
+                  <TableCell className="text-end tabular-nums">{show(h.old)}</TableCell>
+                  <TableCell className="text-end tabular-nums">{show(h.new)}</TableCell>
+                  <TableCell>
+                    {[h.reason ? t(`catalog.reasons.${h.reason}`) : null, h.note]
+                      .filter(Boolean)
+                      .join(' · ') || '—'}
+                  </TableCell>
+                  <TableCell>{h.by ?? t(`catalog.history.sources.${h.source}`)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </Part>
   );

@@ -1,8 +1,9 @@
 /* The look of every screen (W1-03, D-066, D-067): the Tijara POS prototype's colour tokens, mapped into Tailwind's
    theme under shadcn/ui's names (primary, muted-foreground, border…), so components from the shadcn CLI take the
    prototype's look unchanged, plus our own (surface, ink, line, ok/warn/bad). Only these colours exist: Tailwind's own
-   palette is switched off. Light by default; the dark values apply under [data-theme='dark'] (the switcher is
-   PLT-13, Wave 2). Printed output never uses these tokens. Import after `@import 'tailwindcss'`. */
+   palette is switched off. Light by default; the dark values apply under [data-theme='dark'], set by the back office's
+   switcher (W2-07, PLT-13, D-120), and on screen only: paper always takes the light values. Import after
+   `@import 'tailwindcss'`. */
 
 :root {
   --bg: #eceff2;
@@ -20,6 +21,8 @@
   --warn-soft: #fbefcb;
   --bad: #b42318;
   --bad-soft: #fbe3e0;
+  /* Text on a solid --bad, e.g. the menu's count (W2-07): white here, dark in the dark theme. */
+  --bad-ink: #ffffff;
   --focus: #2b62c8;
   --select: #e5edfb;
   --shadow: 0 1px 2px rgb(22 32 42 / 0.06), 0 8px 24px rgb(22 32 42 / 0.08);
@@ -28,31 +31,38 @@
      surface with the dataviz validator, in both modes. */
   --chart-1: #c24e1a;
   --chart-2: #2b62c8;
+  /* The third series (W2-06 donut): checked with --chart-1 and --chart-2 for every pair, both modes. */
+  --chart-3: #008f82;
   color-scheme: light;
 }
 
-:root[data-theme='dark'] {
-  --bg: #0e141a;
-  --surface: #161e26;
-  --surface-2: #1c2630;
-  --ink: #e3e8ed;
-  --muted: #94a1ad;
-  --line: #2b3743;
-  --accent: #f07440;
-  --accent-ink: #1b0f08;
-  --accent-soft: #3a2116;
-  --ok: #4cc38a;
-  --ok-soft: #123020;
-  --warn: #e2b341;
-  --warn-soft: #32280c;
-  --bad: #f2786c;
-  --bad-soft: #3a1715;
-  --focus: #7ea9ff;
-  --select: #1e2c44;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
-  --chart-1: #e0622f;
-  --chart-2: #5a8ef0;
-  color-scheme: dark;
+/* On screen only (W2-07, owner answer 5): a report printed or saved as PDF from a dark screen uses the light values. */
+@media screen {
+  :root[data-theme='dark'] {
+    --bg: #0e141a;
+    --surface: #161e26;
+    --surface-2: #1c2630;
+    --ink: #e3e8ed;
+    --muted: #94a1ad;
+    --line: #2b3743;
+    --accent: #f07440;
+    --accent-ink: #1b0f08;
+    --accent-soft: #3a2116;
+    --ok: #4cc38a;
+    --ok-soft: #123020;
+    --warn: #e2b341;
+    --warn-soft: #32280c;
+    --bad: #f2786c;
+    --bad-soft: #3a1715;
+    --bad-ink: #1b0f08;
+    --focus: #7ea9ff;
+    --select: #1e2c44;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+    --chart-1: #e0622f;
+    --chart-2: #5a8ef0;
+    --chart-3: #22a99b;
+    color-scheme: dark;
+  }
 }
 
 @theme inline {
@@ -89,10 +99,12 @@
   --color-warn-soft: var(--warn-soft);
   --color-bad: var(--bad);
   --color-bad-soft: var(--bad-soft);
+  --color-bad-ink: var(--bad-ink);
   --color-focus: var(--focus);
   --color-select: var(--select);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
   --color-backdrop: rgb(10 16 22 / 0.45);
   --color-transparent: transparent;
   --color-current: currentColor;

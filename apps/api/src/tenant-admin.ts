@@ -103,9 +103,9 @@ try {
           if (n > 0) console.log(`  ${table.padEnd(24)} ${n}`);
         console.log(`${input.tenantCode}: the pilot's documents and ledgers are removed`);
         console.log(
-          r.devicesRevoked.length > 0
-            ? `revoked, to be cleared and enrolled again: ${r.devicesRevoked.join(', ')}`
-            : 'no counters to revoke',
+          r.devicesRemoved.length > 0
+            ? `counters removed; clear each PC and enrol it again: ${r.devicesRemoved.join(', ')}`
+            : 'no counters to remove',
         );
       }
     } finally {

@@ -1,6 +1,5 @@
 import type { AccountBalanceRow, AccountingLookups, LedgerView } from '@erp/contracts';
 import {
-  Button,
   formatMoney,
   PageHeader,
   Panel,
@@ -11,8 +10,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
 } from '@erp/ui';
+import { Archive, ArchiveRestore, Pencil, Plus, Save } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -30,8 +29,8 @@ import {
   useReport,
 } from '../reports/frame/ReportFrame';
 import { href } from '../router';
-import { FormDialog } from '../staff/dialogs';
-import { accountingRefusal, AccountSelect, ErrorText, useAccountingLookups } from './data';
+import { Button, Checkbox, FormDialog, IconButton, notify, TextInput } from '../ui';
+import { accountingRefusal, AccountSelect, useAccountingLookups } from './data';
 
 // The chart with each account's balance at a date, an account's ledger with its running balance (part of ACC-07, owner
 // answer 3 to W1-19), and the accountant's new accounts and expense categories (owner answer 4). Banks, wallets and
@@ -44,7 +43,6 @@ export function AccountsScreen({ api }: { api: Api }) {
   const [at, setAt] = useState('');
   const [rows, setRows] = useState<AccountBalanceRow[] | null>(null);
   const [adding, setAdding] = useState<AccountBalanceRow | null>(null);
-  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
     void api('GET', `/api/accounting/accounts${at ? `?at=${at}` : ''}`).then(
@@ -72,17 +70,14 @@ export function AccountsScreen({ api }: { api: Api }) {
     const res = await api('PATCH', `/api/accounting/accounts/${encodeURIComponent(r.id)}`, {
       active: !r.active,
     });
-    if (res.status === 200) {
-      setError(null);
-      return setVersion((v) => v + 1);
-    }
-    setError(accountingRefusal(t, res.body));
+    if (res.status === 200) return setVersion((v) => v + 1);
+    notify.problem(accountingRefusal(t, res.body));
   };
   return (
     <>
       <PageHeader title={t('accounting.accounts.title')} help={t('accounting.accounts.help')} />
       <Panel className="flex flex-wrap items-end gap-3 p-3.5">
-        <TextField
+        <TextInput
           label={t('accounting.accounts.at')}
           type="date"
           value={at || lookups.today}
@@ -90,8 +85,7 @@ export function AccountsScreen({ api }: { api: Api }) {
           wrapperClassName="w-48"
         />
       </Panel>
-      <ErrorText text={error} />
-      <Panel className="px-1.5 pb-2.5">
+      <Panel className="overflow-x-auto px-1.5 pb-2.5">
         <Table aria-label={t('accounting.accounts.title')}>
           <TableHeader>
             <TableRow>
@@ -118,16 +112,20 @@ export function AccountsScreen({ api }: { api: Api }) {
                 <TableCell className={`text-end tabular-nums ${r.postable ? '' : 'font-semibold'}`}>
                   {formatMoney(r.balance, lookups.money)}
                 </TableCell>
-                <TableCell className="text-end">
+                <TableCell className="w-0 text-end">
                   {lookups.can.chart && !r.postable && (
-                    <Button size="sm" variant="outline" onClick={() => setAdding(r)}>
-                      {t('accounting.accounts.add')}
-                    </Button>
+                    <IconButton
+                      icon={Plus}
+                      label={`${t('accounting.accounts.add')} · ${r.code} ${r.name}`}
+                      onClick={() => setAdding(r)}
+                    />
                   )}
                   {lookups.can.chart && r.postable && r.role === null && (
-                    <Button size="sm" variant="ghost" onClick={() => void deactivate(r)}>
-                      {r.active ? t('accounting.accounts.deactivate') : t('accounting.accounts.activate')}
-                    </Button>
+                    <IconButton
+                      icon={r.active ? Archive : ArchiveRestore}
+                      label={`${r.active ? t('accounting.accounts.deactivate') : t('accounting.accounts.activate')} ${r.code} ${r.name}`}
+                      onClick={() => void deactivate(r)}
+                    />
                   )}
                 </TableCell>
               </TableRow>
@@ -176,14 +174,13 @@ function NewAccountDialog({
   const { t } = useTranslation();
   const [code, setCode] = useState(nextCode(parent, rows));
   const [name, setName] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     setBusy(true);
     const r = await api('POST', '/api/accounting/accounts', { parentId: parent.id, code, name });
     setBusy(false);
     if (r.status === 201) return onDone();
-    setError(accountingRefusal(t, r.body));
+    notify.problem(accountingRefusal(t, r.body));
   };
   return (
     <FormDialog
@@ -191,23 +188,23 @@ function NewAccountDialog({
       onOpenChange={(o) => !o && onClose()}
       title={t('accounting.accounts.addTitle', { parent: `${parent.code} ${parent.name}` })}
       actionLabel={t('accounting.accounts.add')}
+      actionIcon={Plus}
       cancelLabel={t('accounting.cancel')}
       busy={busy}
       onSubmit={() => void submit()}
     >
-      <div className="grid gap-3.5 sm:grid-cols-[8rem_1fr]">
-        <TextField
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-[8rem_1fr]">
+        <TextInput
           label={t('accounting.accounts.code')}
           value={code}
           onChange={(e) => setCode(e.target.value)}
         />
-        <TextField
+        <TextInput
           label={t('accounting.accounts.name')}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
       </div>
-      <ErrorText text={error} />
     </FormDialog>
   );
 }
@@ -326,11 +323,13 @@ export function ExpenseCategoriesScreen({ api }: { api: Api }) {
         help={t('accounting.categories.help')}
         actions={
           lookups.can.chart && (
-            <Button onClick={() => setEditing('new')}>{t('accounting.categories.new')}</Button>
+            <Button icon={Plus} onClick={() => setEditing('new')}>
+              {t('accounting.categories.new')}
+            </Button>
           )
         }
       />
-      <Panel className="px-1.5 pb-2.5">
+      <Panel className="overflow-x-auto px-1.5 pb-2.5">
         <Table aria-label={t('accounting.categories.title')}>
           <TableHeader>
             <TableRow>
@@ -349,11 +348,13 @@ export function ExpenseCategoriesScreen({ api }: { api: Api }) {
                   {!c.active && <StatusChip tone="neutral">{t('accounting.accounts.inactive')}</StatusChip>}
                 </TableCell>
                 <TableCell>{accountName(c.accountId)}</TableCell>
-                <TableCell className="text-end">
+                <TableCell className="w-0 text-end">
                   {lookups.can.chart && (
-                    <Button size="sm" variant="outline" onClick={() => setEditing(c)}>
-                      {t('accounting.categories.edit')}
-                    </Button>
+                    <IconButton
+                      icon={Pencil}
+                      label={`${t('accounting.categories.edit')} ${c.name}`}
+                      onClick={() => setEditing(c)}
+                    />
                   )}
                 </TableCell>
               </TableRow>
@@ -396,9 +397,10 @@ function CategoryDialog({
   const [name, setName] = useState(category?.name ?? '');
   const [accountId, setAccountId] = useState<string | null>(category?.accountId ?? null);
   const [active, setActive] = useState(category?.active ?? true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const submit = async () => {
+    // The account's problem at the account (owner answer 6).
     if (!accountId) return setError(t('accounting.problems.account_required'));
     setBusy(true);
     const r =
@@ -411,7 +413,7 @@ function CategoryDialog({
           });
     setBusy(false);
     if (r.status === 201 || r.status === 200) return onDone();
-    setError(accountingRefusal(t, r.body));
+    notify.problem(accountingRefusal(t, r.body));
   };
   return (
     <FormDialog
@@ -420,18 +422,20 @@ function CategoryDialog({
       title={category === null ? t('accounting.categories.new') : t('accounting.categories.edit')}
       description={t('accounting.categories.dialogHelp')}
       actionLabel={t('accounting.new.save')}
+      actionIcon={Save}
       cancelLabel={t('accounting.cancel')}
       busy={busy}
+      errors={{ accountId: error }}
       onSubmit={() => void submit()}
     >
-      <div className="grid gap-3.5 sm:grid-cols-2">
-        <TextField
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <TextInput
           label={t('accounting.accounts.code')}
           value={code}
           disabled={category !== null}
           onChange={(e) => setCode(e.target.value)}
         />
-        <TextField
+        <TextInput
           label={t('accounting.accounts.name')}
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -441,17 +445,17 @@ function CategoryDialog({
             label={t('accounting.fields.account')}
             accounts={expenseAccounts}
             value={accountId}
-            onChange={setAccountId}
+            error={error}
+            onChange={(id) => {
+              setAccountId(id);
+              setError(undefined);
+            }}
           />
         </div>
         {category !== null && (
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-            {t('accounting.categories.active')}
-          </label>
+          <Checkbox label={t('accounting.categories.active')} checked={active} onCheckedChange={setActive} />
         )}
       </div>
-      <ErrorText text={error} />
     </FormDialog>
   );
 }

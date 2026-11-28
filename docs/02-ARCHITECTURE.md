@@ -309,7 +309,7 @@ docker compose:
 
 | Environment | Where | Deployed from | How |
 |---|---|---|---|
-| **CI test runs** | GitHub Actions runners (free) | Every push and pull request | Lint, type check, unit tests, integration tests against a throwaway PostgreSQL, build. Nightly: Playwright end-to-end flows and a backup-freshness check. |
+| **CI test runs** | GitHub Actions runners (free: the repository is public, D-119) | Every push and pull request | Lint, type check, unit tests, integration tests against a throwaway PostgreSQL, build. Nightly: Playwright end-to-end flows and a backup-freshness check. |
 | **Staging** | Same CX33, separate compose project with resource limits, on demand. Its own CX23 before the December pilot. | `staging` branch | **Automatic** on every merge to `staging` |
 | **Production** | Hetzner CX33, Helsinki | `main` branch | **Merging `staging` → `main` is the release.** It deploys automatically, but only **outside shop hours (10:00–20:00 Asia/Karachi)**. A merge during hours waits until after closing. Emergency override via a manual "Run workflow". |
 

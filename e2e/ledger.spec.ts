@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { menu } from './backoffice';
+import { choose, menu, pick } from './backoffice';
 import { expect, test } from './counter-test';
 import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
 
@@ -45,8 +45,6 @@ const owes = async () =>
       )
     )[0]!.b,
   );
-const accountId = async (code: string) =>
-  (await sql<{ id: string }>('SELECT id FROM erp.accounts WHERE code = $1', [code]))[0]!.id;
 
 test('the owner records money in and out, a voucher and a reversal, and locks last month', async ({
   browser,
@@ -62,21 +60,23 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   await page.getByRole('button', { name: a.money.newReceipt }).click();
   let dialog = page.getByRole('dialog');
   await dialog.getByRole('combobox', { name: a.fields.customer }).fill('Rehman');
-  await dialog.getByRole('button', { name: /Rehman Autos/ }).click();
-  await dialog.getByLabel(a.fields.intoBank).selectOption({ label: 'Bank: HBL' });
+  await dialog.getByRole('option', { name: /Rehman Autos/ }).click();
+  await choose(dialog, a.fields.intoBank, 'Bank: HBL');
   await dialog.getByLabel(a.fields.amount).fill('25,000');
   await dialog.getByRole('button', { name: a.new.save }).click();
-  await expect(page.getByRole('status')).toHaveText('CR000001 is posted.');
+  // A toast, found by its words: another may still be showing (W2-15).
+  await expect(page.getByRole('status').filter({ hasText: 'CR000001 is posted.' })).toBeVisible();
   expect(await owes()).toBe(before - 2_500_000);
 
   // The electricity bill, Rs 18,500 from Soneri.
   await page.getByRole('button', { name: a.money.newExpense }).click();
   dialog = page.getByRole('dialog');
-  await dialog.getByLabel(a.fields.category).selectOption({ label: 'Utilities' });
-  await dialog.getByLabel(a.fields.paidFrom).selectOption({ label: 'Bank: Soneri' });
+  await choose(dialog, a.fields.category, 'Utilities');
+  await choose(dialog, a.fields.paidFrom, 'Bank: Soneri');
   await dialog.getByLabel(a.fields.amount).fill('18,500');
   await dialog.getByRole('button', { name: a.new.save }).click();
-  await expect(page.getByRole('status')).toHaveText('EX000001 is posted.');
+  // A toast, found by its words: another may still be showing (W2-15).
+  await expect(page.getByRole('status').filter({ hasText: 'EX000001 is posted.' })).toBeVisible();
 
   // Partners' drawings by journal voucher: Dr 3110 / Cr HBL Rs 5,000.
   await page.getByRole('button', { name: a.money.newVoucher }).click();
@@ -85,9 +85,10 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   await page.getByRole('button', { name: a.voucher.save }).click();
   await expect(page.getByText(a.errors.empty_draft)).toBeVisible();
   await page.getByLabel(a.voucher.narration).fill("Partner's drawings, November");
-  await page.getByRole('combobox', { name: 'Account, line 1' }).selectOption(await accountId('3110'));
+  // The account is searched by its code (owner answer 3, W2-15).
+  await pick(page, 'Account, line 1', '3110');
   await page.getByLabel('Debit, line 1').fill('5,000');
-  await page.getByRole('combobox', { name: 'Account, line 2' }).selectOption(await accountId('1160'));
+  await pick(page, 'Account, line 2', '1160');
   await page.getByLabel('Credit, line 2').fill('5,000');
   // Each line says what it does: drawings lower equity, and the bank goes down (owner's review of W1-19).
   await expect(page.getByText(/^↓ Partners' drawings goes down Rs\s5,000$/)).toBeVisible();
@@ -127,7 +128,7 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   await page.getByRole('button', { name: a.money.newReceipt }).click();
   dialog = page.getByRole('dialog');
   await dialog.getByRole('combobox', { name: a.fields.customer }).fill('Rehman');
-  await dialog.getByRole('button', { name: /Rehman Autos/ }).click();
+  await dialog.getByRole('option', { name: /Rehman Autos/ }).click();
   await dialog.getByLabel(a.fields.amount).fill('100');
   await dialog.getByLabel(a.fields.date).fill(lockDate);
   await dialog.getByRole('button', { name: a.new.save }).click();
@@ -145,36 +146,35 @@ test('the owner records money in and out, a voucher and a reversal, and locks la
   await expect(page.getByRole('heading', { name: 'Late Bill Traders' })).toBeVisible();
   await menu(page, bo.nav.receipts);
   await page.getByRole('link', { name: bo.purchasing.receipts.add }).click();
-  await page
-    .getByLabel(bo.purchasing.fields.supplier, { exact: true })
-    .selectOption({ label: 'Late Bill Traders (S900)' });
+  await pick(page, bo.purchasing.fields.supplier, 'Late Bill Traders');
   await page.getByLabel(bo.purchasing.fields.billNo).fill('LATE-1');
   // The shop's business date, the form's default (W2-05): not this machine's calendar, which is a day ahead after
   // midnight in Karachi and could be refused as a future date.
   const today = await page.getByLabel(bo.purchasing.fields.receivedOn).inputValue();
   await page.getByLabel(bo.purchasing.fields.receivedOn).fill(lockDate);
   await page.getByRole('button', { name: 'Item of line 1' }).click();
-  await page.getByRole('textbox', { name: 'Item of line 1' }).fill('enol001');
+  await page.getByRole('combobox', { name: 'Item of line 1' }).fill('enol001');
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('ENOL001');
-  await page.getByRole('textbox', { name: 'Item of line 1' }).press('Enter');
+  await page.getByRole('combobox', { name: 'Item of line 1' }).press('Enter');
   await page.getByLabel('Quantity of line 1').fill('1');
   await page.getByLabel('Unit cost of line 1').fill('100');
   await page.getByLabel(bo.purchasing.fields.billTotal).fill('100');
-  // Post waits, and Received on says why; Save draft keeps what was typed (owner's review of W1-19).
+  // Received on says why it can't post. Post stays clickable but sends nothing and puts the cursor on the date
+  // (W2-16); Save draft keeps what was typed (owner's review of W1-19).
   const locked = bo.purchasing.errors.date_locked.replace('{{date}}', lockDate);
   await expect(page.getByText(locked)).toBeVisible();
-  await expect(page.getByRole('button', { name: bo.purchasing.post })).toBeDisabled();
+  await page.getByRole('button', { name: bo.purchasing.post }).click();
+  await expect(page.getByLabel(bo.purchasing.fields.receivedOn)).toBeFocused();
+  await expect(page).toHaveURL(/#\/purchasing\/receipts\/new$/);
   await page.getByRole('button', { name: bo.purchasing.saveDraft }).click();
   await expect(page).toHaveURL(/#\/purchasing\/receipts\/[0-9a-f-]{36}$/);
   await expect(page.getByText(locked)).toBeVisible();
-  await expect(page.getByRole('button', { name: bo.purchasing.post })).toBeDisabled();
   await expect(page.getByText(bo.app.error)).toHaveCount(0);
   expect(
     await sql(`SELECT 1 FROM erp.goods_receipts WHERE supplier_bill_no = 'LATE-1' AND status = 'draft'`),
   ).toHaveLength(1);
-  // A later date opens Post again (not posted here: the purchasing flow numbers the first receipt).
+  // A later date clears it (not posted here: the purchasing flow numbers the first receipt).
   await page.getByLabel(bo.purchasing.fields.receivedOn).fill(today);
   await expect(page.getByText(locked)).toHaveCount(0);
-  await expect(page.getByRole('button', { name: bo.purchasing.post })).toBeEnabled();
   await office.close();
 });

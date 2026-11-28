@@ -932,6 +932,7 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Trade-off:** two steps for a cash purchase (receipt, then the desk), and a posted mistake is corrected by a return or a journal voucher, never an edit.
 - **Owner review (2026-11-07):** a supplier is deactivated (only when nothing is owed) or, if never used anywhere, deleted (marked deleted); the forms open as dialogs; a receipt line takes the item's last purchase cost.
 - **Status:** Accepted (with the W1-16 plan, owner answers 1–5)
+- **W2-18 (owner, 2026-11-28): a supplier's bill is posted once.** A goods receipt can't be posted while another posted receipt of the same supplier has the same bill number, compared ignoring case and spaces (`billNoKey`; dashes and slashes still count). A draft with it still saves; another draft with it is only a warning; another supplier may use the same number. Post checks again under a lock per supplier (409 `bill_no_taken`). No database constraint: posted duplicates may already exist and posted receipts never change (rule 3). [Plan](modules/purchasing/plans/W2-18-bill-no-once.md).
 
 ### D-106 Item labels: the legacy 40 × 28 mm roll label, every piece of a receipt, a shop setting for the maker's barcode (2026-11-07)
 - **Evidence:** the owner's photos and a legacy label PDF: a Zebra GX420t thermal-transfer printer with a roll of single 40 × 28 mm labels; on each label the shop's abbreviation (DCAC, Delux City Auto Corner) top left, the supplier's abbreviation top right, the item code as a Code 39 barcode with the code under it, and the item name on one line.
@@ -1099,3 +1100,111 @@ To change a decision, add a new entry that supersedes it. Never edit history.
 - **Why:** one shop day for the counters and the back office, so stock, the books and the reports agree at any hour; a mistyped year can't post into the future.
 - **Trade-off:** a draft dated ahead must be re-dated before it posts; the counters are not affected (they are never refused, rule 7).
 - **Status:** Accepted (owner, 2026-11-19, the W2-05 plan's answers 1–4 as recommended). Amends D-108 (dates of purchasing and stock documents).
+
+### D-118 An owner's dashboard is the back office's first screen, built from the reports' own figures (2026-11-20)
+- **Context:** the back office has no home page: after sign-in it opens the first screen the person may open (D-114), and the owner checks the shop by opening several reports one by one. The owner asked for a modern, minimal dashboard with charts and agreed its design on a clickable prototype (2026-11-20), choosing layout A, *today first*, over an *attention first* layout.
+- **Decision:**
+  - **For the owner only:** a new permission, **`dashboard.view`**, that only the owner role holds (its `*`). The dashboard is the **first row of the menu and the owner's first screen** after sign-in. Everyone else keeps today's first screen; with custom roles (Wave 2) the permission can be given to others.
+  - **A period switch** (Today · 7 days · 30 days) for sales and profit, compared with the same time before. Balances (cash, bank, what customers owe, what the shop owes suppliers, stock) always show **the position now**; expenses and net profit show **this month**.
+  - **What it shows:**
+    - **Five key figures in one row:** net sales, gross profit (margin beside the change), cash, bank and what customers owe. Each card has an icon, the figure and one change chip, plus a coloured strip on the left that the card's rounded corners clip.
+    - **Cards, each opening its report with the same filters:**
+      - the sales trend;
+      - what needs attention;
+      - busy hours;
+      - top categories;
+      - discounts, returns and voids;
+      - where this month's gross profit went (a donut);
+      - what customers owe us (no ageing; the biggest balances);
+      - what the shop owes suppliers;
+      - stock;
+      - best-selling items;
+      - salesmen.
+  - **Every figure is the report's figure:** one read endpoint composes the report queries the reports already use (D-110). It adds no tables and no posting, and caches nothing.
+  - **Charts stay ours:** the W2-03 SVG components plus a donut, with no chart library. Colours are theme tokens checked with the dataviz validator in both modes.
+- **Alternatives:** a dashboard for every role with its own cards (the owner wants it for themself only); an *attention first* layout; sparklines on the key figures, ageing on what customers owe, and a payment-method split (each tried on the prototype and dropped by the owner).
+- **Why:** the owner sees the day, the money and what needs them on one screen, and each figure opens the report that explains it. Since the figures come from the same queries, the dashboard can't disagree with the reports.
+- **Trade-off:** one more endpoint that reads much of the shop's data on every load (timed in the plan). Other roles get nothing new until custom roles exist.
+- **Status:** Accepted (owner, 2026-11-20): the design on the prototype, and the [W2-06 plan](modules/reports/plans/W2-06-owner-dashboard.md) with its questions 1–6 as recommended (cash = drawers, safe and cash in transit; bank = bank and wallet accounts; Today compared with the same weekday last week to the same time; *unusual* at 1.5 times and at least 3; the donut names the two biggest expenses and shows a loss in red; a counter needs attention after 10 minutes unseen with its session open; figures re-read every 5 minutes while visible). Issue [#198](https://github.com/fahadhussain2/Cloud-ERP-and-POS-System/issues/198). Amends D-114 (the first screen after sign-in, for the owner).
+
+### D-119 The repository is public, so CI runs free on GitHub's machines (2026-11-21)
+- **Context:** on 20 Nov 2026 GitHub stopped starting jobs: the free plan's 2,000 Actions minutes a month for private repositories were used up (1–20 Nov: about 1,845 minutes counted, 1,780 of them CI; about 2,770 a month at that pace). A CI run takes 14–18 runner-minutes, not the 4 W0-02 planned. Paid minutes are out (D-087).
+- **Decision:** the owner made the repository **public** (2026-11-21). Standard GitHub-hosted runners are free and unlimited for public repositories; CI and deploys are unchanged.
+- **Alternatives:**
+  - **Runners on the owner's PC** ([plan](modules/devops/plans/ci-runner-on-pc.md)): built and tried in PRs #203 and #204, then dropped and reverted. GitHub ran jobs there while its own machines were blocked, but the laptop's CPU pushed timing-sensitive tests past their limits, and its connection (about 330–415 KB/s) broke downloads.
+  - **Trimming CI** (reuse a pull request's checks after its merge): about 350 minutes a month saved, still over 2,000 at this pace.
+  - **Waiting for each month's reset:** no CI or deploys for the rest of a busy month.
+- **Why:** free, unlimited and fast, with no change to how CI works.
+- **Trade-off:** the code, docs and full git history are readable by anyone. Before going public the history was checked for committed dumps, reports and `.env` files (none); a full secret scan of the history followed (result in the plan). Pull requests from forks need the owner's approval before their CI runs (GitHub's default for first-time contributors), and they never get the repository's secrets.
+- **Status:** Accepted (owner, 2026-11-21). Supersedes the PC-runner plan; amends W0-02's minutes risk.
+
+### D-120 Each back-office user's theme is kept on the server, System by default; paper always light (2026-11-21)
+- **Context:** PLT-13 and D-067 asked for Light / Dark / System per user in the back office; the account menu showed the buttons, System only, since W1-28. The owner reviewed a prototype of both themes on 21 Nov.
+- **Decision:**
+  - Each person's choice is kept **on the server** in `erp.user_settings` (tenant RLS; **not synced, not audited**, so `erp.users` and the counters are untouched), returned by `/api/auth/me` and saved with `PUT /api/users/me/settings`. No row = **System**, for new and existing users.
+  - A **copy in the browser** opens the page, and the sign-in screen, in the last theme chosen there before the server answers; the server's choice wins once the person is known.
+  - The buttons stay **icons only** (System, Light, Dark), as drawn in W1-28, each named for screen readers and in its tooltip.
+  - The dark token values apply **on screen only** (`@media screen`): a report printed or saved as PDF from a dark screen uses the light colours.
+  - One new token, `--bad-ink`, for text on a solid red (the menu's count): white in light, dark in dark.
+- **Alternatives:** the browser alone (people sharing the shop PC would share the last choice); Light as the default; an icon and a word on each button (prototype; owner chose icons only).
+- **Why:** the choice follows the person to any computer, nobody's screen changes on the day it ships unless their computer is already dark, and paper never depends on the screen.
+- **Trade-off:** one small table and one route; a new browser shows the copy's theme (or System) for a moment until the server answers.
+- **Status:** Accepted (owner, 2026-11-21, PR #205). [Plan](modules/platform/plans/W2-07-theme-switcher-back-office.md). Amends D-067 (where the choice lives, printing). The counter's per-counter theme was W2-08, dropped by D-121.
+
+### D-121 The counters stay Light: no theme switcher on the POS for now (2026-11-23)
+- **Context:** PLT-13 and D-067 asked for a per-counter theme on the POS, set by a manager, default Light. W2-08's plan (PR #210) proposed it after the back office's switcher (D-120).
+- **Decision:** **no theme switching on the counters or the cash desk for now.** The POS stays Light; nothing sets `data-theme` there. The back office keeps its switcher (D-120).
+- **Alternatives:** a per-counter theme set by a manager in the back office (the plan); set on the counter by whoever is signed in; each person's own theme on the counter.
+- **Why:** the owner sees no value in dark on the shop floor; Light suits it, and the work is better spent elsewhere before go-live.
+- **Trade-off:** none today. The POS already draws with the shared tokens, so a switcher can be added later without a redesign.
+- **Status:** Accepted (owner, 2026-11-23). Amends D-067 and PLT-13 (the POS part). W2-08 is dropped: [its plan](modules/platform/plans/W2-08-theme-per-counter.md) is kept as a record.
+
+### D-123 The pilot wipe removes every counter, as a soft delete (2026-11-24)
+- **Context:** on staging the owner revoked the cash desk while it still had documents waiting, ran the wipe, and re-enabled the desk; it pushed its old pilot documents into the wiped books. The wipe revoked only active counters, and Re-enable can't tell a wipe's revocation from a mistake.
+- **Decision:** **the wipe marks every counter deleted** (`devices.deleted_at`), active or already revoked, in its one transaction. A deleted counter can't sign in, sync or be re-enabled and is hidden from every screen; each PC is cleared and enrolled again. Codes keep counting (deleted counters included), so go-live counters follow the pilot's (C04, D02 after C01–C03, D01) and a pilot bill number on paper never matches a go-live bill.
+- **Alternatives:** a hard delete (codes would restart at C01 and match pilot bills on paper; the audit log would point at nothing); refusing Re-enable for counters the wipe revoked (a new column, the old counters stay on screen).
+- **Why:** the old PCs are locked out using checks that already exist, and history and bill numbers stay unambiguous.
+- **Trade-off:** go-live counters aren't numbered from C01.
+- **Status:** Accepted (owner, 2026-11-24). Amends D-101 (revoke becomes delete). [Plan](modules/migration/plans/W1-14-wipe-removes-counters.md).
+
+### D-124 Stock sold before it arrived is settled to cost of goods sold when it comes in (2026-11-25)
+- **Context:** a part sold while the shop has none (borrowed from another shop, or not yet received) is costed at the item's average, or at 0 when it was never bought. When the stock then comes in, nothing corrects that cost: Inventory keeps value with nothing on hand, and the bill's profit is overstated by the difference.
+- **Decision:** stock that comes in while an item's tenant-wide on-hand is below zero **first covers the shortfall**. The difference between what the covering units cost and the average they were sold at (0 when none was known) is posted Dr COGS / Cr INVENTORY (or the reverse) in the same posting, as its own stock movement with no quantity. The average stays as it is while on-hand stays below zero and becomes the incoming cost when it reaches 0 or above. It applies to goods receipts, returned lines, voids and opening stock; the sale itself is never changed (rule 3). Sales and gross profit shows the corrections on their own line, by item, in the period the stock came in (owner answer 1); the dashboard's gross profit includes them (owner, 2026-11-25).
+- **Alternatives:** leave it to journal vouchers (by hand, every time); re-cost the original sales (changes finalized postings and closed periods); value the shortfall separately per item (a new cost column for the same result).
+- **Why:** borrowing between shops is routine; without this the books carry stock that isn't there and profit is overstated from the first week after go-live.
+- **Trade-off:** a stock movement may now have value and no quantity; a partial delivery of an item never bought keeps it at no cost until the shortfall is covered.
+- **Status:** Accepted (owner, 2026-11-25). Amends INV-02 and posting rules §5.1. [Plan](modules/accounting/plans/W2-09-sold-before-received.md).
+
+### D-125 A bill's details in the back office, for anyone with reports.view; bill numbers open it (2026-11-26)
+- **Context:** the back office couldn't show one bill with its items; the sales register lists bills and Trace a bill (owner only) shows a bill's story without its lines.
+- **Decision:** a read-only **Bill details** page (`#/sales/bills/<number>`) shows a bill's header, lines, totals, payments, approvals and related documents. Anyone with `reports.view` may open it; cost, profit and margin come only with `cost.view`, left out by the API. **Every bill number in the back office opens it**; it links to Trace a bill for whoever has `support.trace`. *Print* prints the page on A4, headed with who printed it and when, never the counter's A5 bill. No bill view on the POS for now: Return / exchange and Reprint cover the counter (watch during the pilot).
+- **Alternatives:** the owner only, like Trace; numbers keep opening Trace for the owner; an A5 office copy; a bill view on the POS too.
+- **Why:** managers and the accountant answer price and customer questions without asking the counter; one bill page shows the same figures as Sales and gross profit.
+- **Trade-off:** a bill's figures are now readable by every reports role (they already saw totals in the sales register).
+- **Status:** Accepted (owner, 2026-11-26). [Plan](modules/reports/plans/W2-10-bill-details.md).
+
+### D-126 Sales lists its documents: Bills and Returns, each opening the bill's details (2026-11-26)
+- **Context:** W2-10 (D-125) put *Bill details* in the Sales menu as a box to type or scan a number. The owner: the menu should hold the documents themselves, as Purchasing lists its goods receipts and purchase returns.
+- **Decision:** the Sales menu is **Customers · Bills · Returns**. *Bills* lists sales bills (voided ones marked, left out of the total), *Returns* lists returns and exchanges; both on the report frame, opening today, up to 92 days, searched on the server by number, customer or walk-in phone, with salesman as a filter. Columns are the owner's: Bills: number, date and time, customer, items, total, paid by, status; Returns: number, date and time, type, original bill, customer, items back, reason, refund or due, refund paid, status. Every row opens the bill's details page (D-125), which stays; its menu entry goes. No profit column for now.
+- **Alternatives:** keep the lookup box; one list for every sales document; exchanges in both lists.
+- **Why:** a list is where people start; the shop's documents are found the way the purchasing documents already are.
+- **Trade-off:** none: the sales register stays under Reports as the day report.
+- **Status:** Accepted (owner, 2026-11-26). Amends D-125 (the menu entry). [Plan](modules/reports/plans/W2-11-bills-returns-lists.md).
+
+### D-127 The back office has its own controls; the POS keeps its look, pixel for pixel (2026-11-27)
+- **Context:** the owner's review of the back office (2026-11-26 and 27): buttons and fields too big, row actions as words, no pointer cursor, dialogs running off the screen, problems shown far from their field. The POS uses the same shared pieces (`packages/ui`), and the owner wants **no change at all** on the POS.
+- **Decision:** the back office gets its own controls in `apps/backoffice/src/ui`, composed from `packages/ui` without editing it: 36px buttons and fields (small 32px), labels above in normal case, its own dropdown (Radix select), a checkbox, icon row actions with a tooltip, a list toolbar, and a dialog: centred, at most 90% of the screen's height, the fields scrolling, and the D-053 bar fixed at the bottom right under a line. Owner answers: (1) no visible Esc / Enter hints in the back office (the keys still work and are announced); (2) focus is orange (the accent), set in the back office's own stylesheet; (3) short fixed lists get the dropdown, lists that can grow past about 15 a searchable picker; (5) **+** on Add, a Save icon on Save, ✕ on Cancel; (6) **problems show at their field** (every wrong field at once, focus on the first), **results and problems that aren't one field's in a toast** (top end; green fades, red stays until closed), replacing the page banners. The toasts are our own (Sonner gives no `status`/`alert` roles). A lint rule stops back-office screens from importing packages/ui's Button, Input, TextField, Checkbox, LABEL_CLASS or DialogActions; the screens not yet moved are listed in it until W2-15. **The POS is guarded** by `e2e/pos-look.spec.ts`: six counter screens compared pixel for pixel with pictures CI took before any change, and every restyle PR shows no change under `apps/pos` or `packages/ui`.
+- **Alternatives:** restyle `packages/ui` (would change the counter); a back-office copy of the shadcn components (two sets to keep in step); toasts for every problem, field ones too (far from the field, gone before they're read); Sonner for the toasts.
+- **Why:** the back office is used at a desk with a mouse and needs density; the counter is used at speed with a keyboard and big targets, and it already works.
+- **Trade-off:** two looks for the same building blocks; a change to the POS's look now needs its screenshots re-taken from staging in a PR of its own.
+- **Status:** Accepted (owner, 2026-11-27). Amends D-066 and D-053 for the back office. [Plan](modules/platform/plans/W2-12-back-office-restyle.md).
+- **W2-16 (owner, 2026-11-28):** a document typed line by line (a goods receipt, a purchase return) keeps its totals, Save draft and Post in a **bar at the bottom of the window** (the kit's `ActionBar`); **Post stays clickable** and, with problems, sends nothing, marks them at their fields and puts the cursor on the first, in place of a greyed-out button; a line's problems show under their own box once the box is left or on Save draft / Post; Delete draft asks first. Dark-mode fields keep their faint fill, now set by the kit itself. [Plan](modules/purchasing/plans/W2-16-goods-receipt-layout.md).
+- **W2-17 (owner, 2026-11-28):** **Save draft marks nothing red**: it keeps the draft and its toast says what is left ("Draft saved. 2 to fix before posting."); the bar shows the same count, quietly on a saved draft and in red once Post is pressed. Red shows when a field is left and on Post. The one exception: a box that can't be stored (text that isn't a number, an amount over the D-128 limit) stops Save draft, which marks only those boxes. This replaces "every problem on Save draft" above. Save draft, Post and Delete run **one at a time** (the kit's `useOneAtATime` and `Button busy`), and a screen that fails shows an error screen with Reload in place of a blank page (the kit's `ScreenGuard`). [Plan](modules/purchasing/plans/W2-17-receipt-fixes.md).
+
+### D-128 No amount on a goods receipt or a purchase return above Rs 1 crore (2026-11-28)
+- **Context:** the owner's staging test of W2-16: a very large unit cost blanked the New goods receipt page (`DomainError: … is outside the safe range`), a bill discount too large to read silently counted as 0 so the bill "matched", and the API had no upper limit, so a draft could be saved that would not open again.
+- **Decision:** **no amount above Rs 1,00,00,000** (owner answer 1 to W2-17) on a goods receipt or a purchase return: a unit cost, a discount, the bill total as printed, a line's amount (quantity × cost) or the document's total. The limit is `AMOUNT_LIMIT` in `packages/domain` (in the currency's major units; `amountLimit(minorUnits)` in minor units). `checkReceipt` and `checkReturn` take it as `maxAmount` and work amounts out in big integers, so anything over it is a problem at its field (`cost_too_large`, `line_too_large`, `total_too_large`), and a quantity over what `numeric(14,3)` holds is `qty_too_large`; nothing too large ever throws. The back office marks it under its box and won't save it; the API refuses a draft over it (400 `too_large`).
+- **Alternatives:** the safe-integer range only (far beyond any real bill, so a typing slip passes as an amount); Rs 10 crore (proposed; the owner chose 1 crore); a setting per shop (not needed yet).
+- **Why:** an auto-parts bill is far below Rs 1 crore, so anything above it is a typing mistake; catching it at the box is cheaper than a return or a voucher after posting (rule 3).
+- **Trade-off:** one limit for every shop and both documents; a shop that really buys more than Rs 1 crore on one bill would need it raised (or made a setting) first. Other money forms (expenses, vouchers, payments, prices) keep their own checks.
+- **Status:** Accepted (owner, 2026-11-28). [Plan](modules/purchasing/plans/W2-17-receipt-fixes.md).

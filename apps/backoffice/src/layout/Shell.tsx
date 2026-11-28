@@ -3,6 +3,8 @@ import { useState, type ReactNode } from 'react';
 
 import { mayOpen, REPORTS } from '../reports/catalog';
 import type { Route } from '../router';
+import type { Theme } from '../theme';
+import { Toaster } from '../ui';
 import { menuFor } from './menu';
 import { ScreenSearch } from './ScreenSearch';
 import { Sidebar, type Badges } from './Sidebar';
@@ -21,6 +23,9 @@ export function Shell({
   route,
   onSignOut,
   badges = {},
+  theme = 'system',
+  onTheme = () => {},
+  themeNotSaved = false,
   children,
 }: {
   fullName: string;
@@ -30,6 +35,11 @@ export function Shell({
   onSignOut: () => void;
   /** A count beside a menu entry, e.g. the open high-severity exceptions (owner answer 5 to W1-20). */
   badges?: Badges;
+  /** The person's theme and its change (W2-07, PLT-13). */
+  theme?: Theme;
+  onTheme?: (theme: Theme) => void;
+  /** The last choice could not be saved for the person's other computers. */
+  themeNotSaved?: boolean;
   children: ReactNode;
 }) {
   const [searching, setSearching] = useState(false);
@@ -45,6 +55,9 @@ export function Shell({
           route={route}
           badges={badges}
           onSignOut={onSignOut}
+          theme={theme}
+          onTheme={onTheme}
+          themeNotSaved={themeNotSaved}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar route={route} onSearch={() => setSearching(true)} />
@@ -57,6 +70,7 @@ export function Shell({
         open={searching}
         onOpenChange={setSearching}
       />
+      <Toaster />
     </TooltipProvider>
   );
 }

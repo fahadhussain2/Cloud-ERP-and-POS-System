@@ -18,6 +18,7 @@ import { href, parseHash } from '../router';
 import { DocumentScreen, MoneyScreen } from './MoneyScreen';
 import { PeriodsScreen } from './PeriodsScreen';
 import { VoucherScreen } from './VoucherScreen';
+import { notify, Toaster } from '../ui';
 
 // The accounting screens (W1-19, D-108) over a fake API: a bank receipt posted from its dialog, the duplicate warning
 // and Save anyway; a voucher that can't post until it balances, with the customer asked for on an AR line; a reversal;
@@ -118,8 +119,18 @@ function fakeApi(l: AccountingLookups, answers: Record<string, { status: number;
   return { api, calls };
 }
 
-const show = (ui: ReactElement) => render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
-afterEach(cleanup);
+// With the frame's toasts (W2-12, owner answer 6), which start empty for each test.
+const show = (ui: ReactElement) =>
+  render(
+    <I18nextProvider i18n={i18n}>
+      {ui}
+      <Toaster />
+    </I18nextProvider>,
+  );
+afterEach(() => {
+  cleanup();
+  notify.clear();
+});
 const a = en.accounting;
 
 describe('the accounting addresses', () => {
@@ -169,10 +180,11 @@ describe('the money list', () => {
     fireEvent.change(within(dialog).getByRole('combobox', { name: a.fields.customer }), {
       target: { value: 'khan' },
     });
-    fireEvent.click(await within(dialog).findByRole('button', { name: /Khan Motors/ }));
+    fireEvent.click(await within(dialog).findByRole('option', { name: /Khan Motors/ }));
     fireEvent.change(within(dialog).getByLabelText(a.fields.amount), { target: { value: '25,000' } });
     fireEvent.click(within(dialog).getByRole('button', { name: a.new.save }));
-    expect(await within(dialog).findByText(a.problems.possible_duplicate)).toBeTruthy();
+    // Not a field's problem: a toast, and the dialog stays with Save anyway (owner answer 6).
+    expect(await screen.findByText(a.problems.possible_duplicate)).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: a.new.saveAnyway }));
     expect(await screen.findByText('CR000002 is posted.')).toBeTruthy();
     const posts = calls.filter((c) => c.path === '/api/accounting/receipts');
@@ -201,18 +213,26 @@ describe('the money list', () => {
   });
 });
 
+/** Picks an account by its code in a searchable account box (owner answer 3, W2-15): types it, Enter. */
+const pickAccount = (label: string, code: string) => {
+  const box = screen.getByRole('combobox', { name: label });
+  fireEvent.change(box, { target: { value: code } });
+  fireEvent.keyDown(box, { key: 'Enter' });
+};
+
 describe('a journal voucher', () => {
   it("can't post until it balances; an AR line asks for the customer; Inventory isn't offered", async () => {
     const { api } = fakeApi(lookups());
     show(<VoucherScreen api={api} id="new" />);
     const post = await screen.findByRole('button', { name: a.voucher.post });
     expect((post as HTMLButtonElement).disabled).toBe(true);
-    const first = screen.getByRole('combobox', { name: 'Account, line 1' });
-    expect(within(first).queryByText(/Inventory/)).toBeNull();
-    fireEvent.change(first, { target: { value: 'a6300' } });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Account, line 2' }), {
-      target: { value: 'a1200' },
+    // Inventory isn't offered: searching for it finds nothing.
+    fireEvent.change(screen.getByRole('combobox', { name: 'Account, line 1' }), {
+      target: { value: 'invent' },
     });
+    expect(screen.queryByRole('option', { name: /Inventory/ })).toBeNull();
+    pickAccount('Account, line 1', '6300');
+    pickAccount('Account, line 2', '1200');
     expect(screen.getByRole('combobox', { name: 'Customer or supplier, line 2' })).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Debit, line 1'), { target: { value: '1,500' } });
     fireEvent.change(screen.getByLabelText('Credit, line 2'), { target: { value: '1,000' } });
@@ -237,21 +257,15 @@ describe('a journal voucher', () => {
     const { api } = fakeApi(lookups());
     show(<VoucherScreen api={api} id="new" />);
     await screen.findByRole('button', { name: a.voucher.post });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Account, line 1' }), {
-      target: { value: 'a6300' },
-    });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Account, line 2' }), {
-      target: { value: 'a1130' },
-    });
+    pickAccount('Account, line 1', '6300');
+    pickAccount('Account, line 2', '1130');
     fireEvent.change(screen.getByLabelText('Debit, line 1'), { target: { value: '1,500' } });
     fireEvent.change(screen.getByLabelText('Credit, line 2'), { target: { value: '1,500' } });
     // The page's text is matched with its spaces made plain; money has a non-breaking one.
     const amount = formatMoney(150000, MONEY).replace(/\s/g, ' ');
     expect(screen.getByText(`↑ General expenses goes up ${amount}`)).toBeTruthy();
     expect(screen.getByText(`↓ Cash in safe goes down ${amount}`)).toBeTruthy();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Account, line 2' }), {
-      target: { value: 'a1200' },
-    });
+    pickAccount('Account, line 2', '1200');
     expect(screen.getByText(`↓ The customer owes you less: ${amount}`)).toBeTruthy();
   });
 
@@ -279,12 +293,8 @@ describe('a journal voucher', () => {
     });
     show(<VoucherScreen api={api} id="new" />);
     await screen.findByRole('button', { name: a.voucher.post });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Account, line 1' }), {
-      target: { value: 'a6300' },
-    });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Account, line 2' }), {
-      target: { value: 'a1130' },
-    });
+    pickAccount('Account, line 1', '6300');
+    pickAccount('Account, line 2', '1130');
     fireEvent.change(screen.getByLabelText('Debit, line 1'), { target: { value: '5,000' } });
     fireEvent.change(screen.getByLabelText('Credit, line 2'), { target: { value: '5,000' } });
     fireEvent.click(screen.getByRole('button', { name: a.voucher.post }));

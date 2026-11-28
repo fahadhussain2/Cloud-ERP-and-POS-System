@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 
 export type Route =
   | { screen: 'home' }
+  | { screen: 'dashboard' }
   | { screen: 'reportsHome' }
   | { screen: 'trialBalance' }
   | { screen: 'profitLoss' }
@@ -43,6 +44,9 @@ export type Route =
   | { screen: 'ageing' }
   | { screen: 'exceptions' }
   | { screen: 'trace'; number: string | null }
+  | { screen: 'bills' }
+  | { screen: 'returns' }
+  | { screen: 'bill'; number: string }
   | { screen: 'items' }
   | { screen: 'item'; id: string }
   | { screen: 'newItem' }
@@ -72,6 +76,8 @@ export type Route =
   | { screen: 'expenseCategories' };
 
 export const href = {
+  // The owner's dashboard (W2-06, D-118).
+  dashboard: '#/dashboard',
   staff: '#/staff',
   person: (id: string) => `#/staff/${encodeURIComponent(id)}`,
   counters: '#/counters',
@@ -125,6 +131,11 @@ export const href = {
   /** A relabel of the items picked on the items screen. */
   itemLabels: (ids: readonly string[]) => `#/catalog/labels/items/${ids.map(encodeURIComponent).join(',')}`,
   customers: '#/sales/customers',
+  /** The sales documents as lists (W2-11, D-126). */
+  bills: '#/sales/bills',
+  returns: '#/sales/returns',
+  /** A bill's or a return's details (W2-10, D-125), by its number. */
+  bill: (number: string) => `#/sales/bills/${encodeURIComponent(number)}`,
   customer: (id: string) => `#/sales/customers/${encodeURIComponent(id)}`,
   suppliers: '#/purchasing/suppliers',
   supplier: (id: string) => `#/purchasing/suppliers/${encodeURIComponent(id)}`,
@@ -171,6 +182,7 @@ export function queryOf(hash: string): URLSearchParams {
 
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('?')[0]!.split('/').filter(Boolean);
+  if (parts[0] === 'dashboard' && parts.length === 1) return { screen: 'dashboard' };
   if (parts[0] === 'staff' && parts[1]) return { screen: 'person', id: decodeURIComponent(parts[1]) };
   if (parts[0] === 'staff') return { screen: 'staff' };
   if (parts[0] === 'counters') return { screen: 'counters' };
@@ -225,6 +237,10 @@ export function parseHash(hash: string): Route {
     return { screen: 'labels', source: null };
   }
   if (parts[0] === 'catalog') return { screen: 'items' };
+  if (parts[0] === 'sales' && parts[1] === 'bills' && parts[2])
+    return { screen: 'bill', number: decodeURIComponent(parts[2]) };
+  if (parts[0] === 'sales' && parts[1] === 'bills') return { screen: 'bills' };
+  if (parts[0] === 'sales' && parts[1] === 'returns') return { screen: 'returns' };
   if (parts[0] === 'sales' && parts[1] === 'customers' && parts[2])
     return { screen: 'customer', id: decodeURIComponent(parts[2]) };
   if (parts[0] === 'sales' && parts[1] === 'customers') return { screen: 'customers' };

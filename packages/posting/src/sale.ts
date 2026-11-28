@@ -1,6 +1,6 @@
 import { add, money, negate, qty, sub, sum, type Money, type PaymentMethodCode, type Qty } from '@erp/domain';
 
-import { averageAfterReceipt, costOf } from './cost';
+import { averageAfterReceipt, costOf, shortfallCorrection } from './cost';
 import { addDays, entryDateOf } from './dates';
 import type {
   CostState,
@@ -126,6 +126,7 @@ function post(sale: PostingSale, context: PostingContext, state: LedgerState) {
     balances[loc]?.[item] ?? state.balances[loc]?.[item] ?? qty(0);
   const movements: StockMovement[] = [];
   const noCost = new Set<string>();
+  let corrections = money(0);
   /**
    * A returned line comes back as a receipt at the original line's cost (D-044), or the current average when there is
    * none; with no cost at all it comes back at 0, leaves the average unknown and is flagged no_cost (W1-13).
@@ -150,6 +151,20 @@ function post(sale: PostingSale, context: PostingContext, state: LedgerState) {
       valueDelta: value,
       avgCostAfter: after.avgCost,
     });
+    // D-124: a returned unit that covers stock sold before it arrived settles it at its own cost.
+    const correction = shortfallCorrection(before, { qty: back, value });
+    if (correction !== 0) {
+      corrections = add(corrections, correction);
+      movements.push({
+        sourceLineId: l.id,
+        itemId: l.itemId,
+        locationId: l.locationId,
+        qtyDelta: qty(0),
+        unitCost: money(0),
+        valueDelta: negate(correction),
+        avgCostAfter: after.avgCost,
+      });
+    }
     if (unit === null && !noCost.has(l.itemId)) {
       noCost.add(l.itemId);
       exceptions.push({ kind: 'no_cost', details: { itemId: l.itemId } });
@@ -188,10 +203,11 @@ function post(sale: PostingSale, context: PostingContext, state: LedgerState) {
         details: { itemId: l.itemId, locationId: l.locationId, balance: after },
       });
   }
-  // COGS nets the sold lines' cost against the returned lines' (posting rules §4.3: one entry for an exchange).
-  const cost = sub(
-    sum(movements.filter((m) => m.qtyDelta < 0).map((m) => negate(m.valueDelta))),
-    returnedCost,
+  // COGS nets the sold lines' cost against the returned lines' (posting rules §4.3: one entry for an exchange), with
+  // any shortfall the returned lines settled (D-124).
+  const cost = add(
+    sub(sum(movements.filter((m) => m.qtyDelta < 0).map((m) => negate(m.valueDelta))), returnedCost),
+    corrections,
   );
   if (cost !== 0) {
     entry.add(role('COGS'), cost);

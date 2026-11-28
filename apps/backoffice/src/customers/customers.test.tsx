@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { Api } from '../api';
 import { i18n } from '../i18n';
 import en from '../locales/en.json';
+import { notify, Toaster } from '../ui';
+import { chooseOption } from '../ui/testing/choose';
 import { CustomerScreen, CustomersScreen } from './CustomersScreen';
 import { phoneToCheck } from './data';
 
@@ -113,8 +115,18 @@ function fakeApi(l: CustomerLookups, answers: Record<string, Answer> = {}, detai
   return { api, calls };
 }
 
-const show = (ui: ReactElement) => render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
-afterEach(cleanup);
+// With the frame's toasts (W2-12, owner answer 6), which start empty for each test.
+const show = (ui: ReactElement) =>
+  render(
+    <I18nextProvider i18n={i18n}>
+      {ui}
+      <Toaster />
+    </I18nextProvider>,
+  );
+afterEach(() => {
+  cleanup();
+  notify.clear();
+});
 
 describe('the customers list', () => {
   it('shows each customer with tier, credit and balance, and Delete only for one never used', async () => {
@@ -133,7 +145,7 @@ describe('the customers list', () => {
     show(<CustomersScreen api={f.api} />);
     await screen.findByRole('table');
     fireEvent.change(screen.getByLabelText(en.customers.search), { target: { value: '0300 123' } });
-    fireEvent.change(screen.getByLabelText(en.customers.show), { target: { value: 'inactive' } });
+    await chooseOption(en.customers.show, en.customers.inactive);
     await waitFor(() =>
       expect(f.calls.map((c) => c.path)).toContain('/api/customers?q=0300%20123&status=inactive'),
     );
@@ -145,7 +157,7 @@ describe('the customers list', () => {
     expect(screen.queryByRole('button', { name: en.customers.add })).toBeNull();
   });
 
-  it('says what the customer owes when Deactivate is refused', async () => {
+  it('says what the customer owes when Deactivate is refused, in a toast, and the question stays open', async () => {
     const f = fakeApi(lookups(), {
       'PATCH /api/customers/c1': { status: 409, body: { error: 'balance_open', balance: 350_000 } },
     });
@@ -153,7 +165,8 @@ describe('the customers list', () => {
     fireEvent.click(await screen.findByRole('button', { name: `${en.customers.deactivate} Khan Motors` }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: en.customers.deactivate }));
-    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/balance is Rs\s?3,500/);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/balance is Rs\s?3,500/);
+    expect(dialog.isConnected).toBe(true);
     expect(f.calls.find((c) => c.method === 'PATCH')!.body).toEqual({ rowVersion: '5', status: 'inactive' });
   });
 });
@@ -219,10 +232,50 @@ describe('adding a customer', () => {
     });
   });
 
+  it('marks every wrong field at once and puts focus on the first; sends nothing (owner answer 6)', async () => {
+    const { f, dialog } = await openAdd();
+    fireEvent.click(within(dialog).getByLabelText(en.customers.fields.creditAllowed));
+    fireEvent.change(within(dialog).getByLabelText(en.customers.fields.terms), { target: { value: '400' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: en.customers.create }));
+    const name = within(dialog).getByLabelText(en.customers.fields.name);
+    await waitFor(() => expect(document.activeElement).toBe(name));
+    expect(name.getAttribute('aria-invalid')).toBe('true');
+    expect(within(dialog).getByLabelText(en.customers.fields.limit).getAttribute('aria-invalid')).toBe(
+      'true',
+    );
+    expect(within(dialog).getByLabelText(en.customers.fields.terms).getAttribute('aria-invalid')).toBe(
+      'true',
+    );
+    expect(within(dialog).getByText(en.customers.problems.name)).toBeDefined();
+    expect(within(dialog).getByText(en.customers.problems.terms)).toBeDefined();
+    expect(f.calls.some((c) => c.method === 'POST')).toBe(false);
+    // Fixing a field clears its problem; the others stay.
+    fireEvent.change(name, { target: { value: 'Credit Co' } });
+    expect(name.getAttribute('aria-invalid')).toBeNull();
+    expect(within(dialog).getByLabelText(en.customers.fields.limit).getAttribute('aria-invalid')).toBe(
+      'true',
+    );
+  });
+
+  it("shows a taken code at the code field, and a refusal that isn't one field's in a toast", async () => {
+    const f = fakeApi(lookups(), {
+      'POST /api/customers': { status: 409, body: { error: 'code_taken' } },
+    });
+    show(<CustomersScreen api={f.api} />);
+    fireEvent.click(await screen.findByRole('button', { name: en.customers.add }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(en.customers.fields.name), { target: { value: 'Bilal' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: en.customers.create }));
+    const code = within(dialog).getByLabelText(en.customers.fields.code);
+    await waitFor(() => expect(code.getAttribute('aria-invalid')).toBe('true'));
+    expect(within(dialog).getByRole('alert').textContent).toBe(en.customers.errors.code_taken);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
   it('locks the terms and sends none without cust.terms.edit', async () => {
     const { f, dialog } = await openAdd(lookups({ can: { edit: true, terms: false } }));
     expect(within(dialog).getByText(en.customers.termsLocked)).toBeDefined();
-    expect(within(dialog).getByLabelText<HTMLSelectElement>(en.customers.fields.tier).disabled).toBe(true);
+    expect(within(dialog).getByLabelText<HTMLButtonElement>(en.customers.fields.tier).disabled).toBe(true);
     fireEvent.change(within(dialog).getByLabelText(en.customers.fields.name), { target: { value: 'Bilal' } });
     fireEvent.click(within(dialog).getByRole('button', { name: en.customers.create }));
     await waitFor(() => expect(f.calls.some((c) => c.method === 'POST')).toBe(true));
@@ -242,10 +295,17 @@ describe('adding a customer', () => {
     const { f, dialog } = await openAdd(
       lookups({ suppliers: [{ id: 's1', code: 'S0001', name: 'Naveed' }] }),
     );
-    fireEvent.change(within(dialog).getByLabelText(en.customers.source.label), {
-      target: { value: 'supplier' },
-    });
-    expect(within(dialog).getByLabelText<HTMLSelectElement>(en.customers.source.pick).value).toBe('s1');
+    await chooseOption(en.customers.source.label, en.customers.source.supplier, dialog);
+    // None picked yet: the field says so, and nothing is sent.
+    fireEvent.click(within(dialog).getByRole('button', { name: en.customers.create }));
+    const pick = within(dialog).getByRole('combobox', { name: en.customers.source.pick });
+    await waitFor(() => expect(pick.getAttribute('aria-invalid')).toBe('true'));
+    expect(within(dialog).getByText(en.customers.problems.supplier)).toBeDefined();
+    expect(f.calls.some((c) => c.method === 'POST')).toBe(false);
+    // Searched by name (owner answer 3), picked with Enter (W2-13).
+    fireEvent.change(pick, { target: { value: 'nav' } });
+    fireEvent.keyDown(pick, { key: 'Enter' });
+    expect((pick as HTMLInputElement).value).toBe('S0001 · Naveed');
     fireEvent.click(within(dialog).getByRole('button', { name: en.customers.create }));
     await waitFor(() => expect(f.calls.some((c) => c.method === 'POST')).toBe(true));
     expect(f.calls.find((c) => c.method === 'POST')!.body).toMatchObject({ partyId: 's1' });
@@ -291,6 +351,8 @@ describe("a customer's page", () => {
       accountVersion: '2',
       terms: { creditAllowed: true, creditLimit: null, noLimit: true },
     });
+    // The result is a toast (owner answer 6).
+    expect((await screen.findByRole('status')).textContent).toContain('Khan Motors saved.');
   });
 
   it('keeps the limit when credit is turned off, so turning it back on finds it (review, D-109 answer 5)', async () => {

@@ -222,6 +222,37 @@ describe('a goods receipt (PUR-02)', () => {
     expect(back.json()).toEqual({ error: 'empty_draft' });
   });
 
+  // W2-17 (owner answer 1): no amount on a receipt or a return over Rs 1 crore, so no draft is saved that can't be
+  // opened again; the problem says which box.
+  it('a draft with an amount over Rs 1 crore is refused, and nothing is saved', async () => {
+    const before = await q<{ n: string }>('SELECT count(*)::text AS n FROM erp.goods_receipts');
+    const receipt = await send(
+      'POST',
+      '/api/purchasing/receipts',
+      'maria',
+      draft({ lines: [{ itemId: items['ABEA001'], qty: 1000, unitCost: 1_000_000_001, lineDiscount: 0 }] }),
+    );
+    expect(receipt.statusCode).toBe(400);
+    expect(receipt.json()).toMatchObject({
+      error: 'too_large',
+      problems: [{ problem: 'cost_too_large', row: 0 }],
+    });
+    expect(await q('SELECT count(*)::text AS n FROM erp.goods_receipts')).toEqual(before);
+    const back = await send('POST', '/api/purchasing/returns', 'maria', {
+      supplierId: naveed,
+      locationId: shopLocation,
+      returnedOn: '2026-11-06',
+      reason: 'damaged',
+      note: null,
+      lines: [{ itemId: items['ABEA001'], qty: 2000, unitCost: 600_000_000 }],
+    });
+    expect(back.statusCode).toBe(400);
+    expect(back.json()).toMatchObject({
+      error: 'too_large',
+      problems: [{ problem: 'line_too_large', row: 0 }],
+    });
+  });
+
   it('is saved as a draft without a number, and shows the difference from the bill', async () => {
     const res = await send('POST', '/api/purchasing/receipts', 'maria', draft());
     expect(res.statusCode).toBe(201);
@@ -371,9 +402,11 @@ describe('a goods receipt (PUR-02)', () => {
 describe('a purchase return (PUR-03)', () => {
   it("can't return more than the receipt still has, and takes stock out and the debt down when posted", async () => {
     const lines = (await send('GET', `/api/purchasing/receipts/${receiptId}`, 'maria')).json<{
-      lines: { id: string; itemId: string; qty: number; netUnitCost: number }[];
+      lines: { id: string; itemId: string; qty: number; netUnitCost: number; returnable: number | null }[];
     }>().lines;
     const line = lines.find((l) => l.itemId === items['ABEA001'])!;
+    // A posted receipt's line says what is left to send back (W2-16): all 10 before any return.
+    expect(line.returnable).toBe(10000);
     const create = (qty: number) =>
       send('POST', '/api/purchasing/returns', 'maria', {
         supplierId: naveed,
@@ -407,6 +440,12 @@ describe('a purchase return (PUR-03)', () => {
     ).toEqual([{ qty: '8.000' }]);
     const l = await ledgerOf(naveed);
     expect(l.ledger.at(-1)).toMatchObject({ kind: 'purchase_return', number: 'PR000001', amount: -250000 });
+    // 2 of the 10 went back; a draft return (the refused 11) counts for nothing.
+    const left = (await send('GET', `/api/purchasing/receipts/${receiptId}`, 'maria')).json<{
+      lines: { itemId: string; returnable: number | null }[];
+    }>().lines;
+    expect(left.find((x) => x.itemId === items['ABEA001'])!.returnable).toBe(8000);
+    expect(left.find((x) => x.itemId === items['ABEA002'])!.returnable).toBe(2000);
   });
 });
 
@@ -530,5 +569,75 @@ describe('the books', () => {
     } finally {
       await q('UPDATE erp.tenants SET lock_date = NULL WHERE id = $1', [tenant]);
     }
+  });
+});
+
+// W2-18 (owner, 2026-11-28): one supplier's bill is posted once. Two numbers are the same bill when they match after
+// ignoring case and spaces; another supplier may use the same number; drafts with it still save.
+describe("a supplier's bill, posted once (W2-18)", () => {
+  const bill = (supplierId: string, billNo: string) => ({
+    supplierId,
+    billNo,
+    billDate: '2026-11-05',
+    receivedOn: '2026-11-06',
+    locationId: shopLocation,
+    paidFrom: null,
+    billDiscount: 0,
+    billTotal: 1999,
+    notes: null,
+    lines: [{ itemId: items['OIL050'], qty: 1000, unitCost: 1999, lineDiscount: 0 }],
+  });
+  const create = async (body: ReturnType<typeof bill>) => {
+    const res = await send('POST', '/api/purchasing/receipts', 'maria', body);
+    expect(res.statusCode).toBe(201);
+    return res.json<{ id: string; rowVersion: string }>();
+  };
+  const post = (r: { id: string; rowVersion: string }) =>
+    send('POST', `/api/purchasing/receipts/${r.id}/post`, 'maria', { rowVersion: r.rowVersion });
+  const supplier = async (code: string) =>
+    (await send('POST', '/api/purchasing/suppliers', 'maria', { code, name: `Supplier ${code}` })).json<{
+      id: string;
+    }>().id;
+  const lookup = async (supplierId: string, billNo: string, except: string) =>
+    (
+      await send(
+        'GET',
+        `/api/purchasing/receipts/bill-no?supplier=${supplierId}&billNo=${encodeURIComponent(billNo)}&except=${except}`,
+        'maria',
+      )
+    ).json<{ posted: { id: string; number: string } | null; drafts: number }>();
+
+  it('a second receipt with a posted bill, in another case and spacing, saves as a draft but is refused at Post', async () => {
+    const again = await create(bill(naveed, 'inv -4471 '));
+    const view = (await send('GET', `/api/purchasing/receipts/${again.id}`, 'maria')).json<{
+      check: { problems: { problem: string; row: number | null }[] };
+    }>();
+    expect(view.check.problems).toContainEqual({ problem: 'bill_no_taken', row: null });
+    expect(await lookup(naveed, 'INV-4471', again.id)).toMatchObject({
+      posted: { number: 'GR000001' },
+      drafts: 0,
+    });
+    const refused = await post(again);
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json()).toMatchObject({ error: 'bill_no_taken', number: 'GR000001' });
+  });
+
+  it('the same number from another supplier posts', async () => {
+    const other = await supplier('0310');
+    expect((await post(await create(bill(other, 'INV-4471')))).statusCode).toBe(200);
+  });
+
+  it('two drafts with the same bill both save, and each is told of the other', async () => {
+    const s = await supplier('0311');
+    const a = await create(bill(s, 'D-1'));
+    await create(bill(s, 'd-1'));
+    expect(await lookup(s, 'D-1', a.id)).toEqual({ posted: null, drafts: 1 });
+  });
+
+  it('two Posts of the same bill at the same moment: one posts, the other is refused', async () => {
+    const s = await supplier('0312');
+    const [a, b] = [await create(bill(s, 'RACE-1')), await create(bill(s, 'race-1'))];
+    const codes = (await Promise.all([post(a), post(b)])).map((r) => r.statusCode).sort();
+    expect(codes).toEqual([200, 409]);
   });
 });

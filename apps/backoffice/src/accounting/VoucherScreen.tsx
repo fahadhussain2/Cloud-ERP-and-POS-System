@@ -1,7 +1,6 @@
 import type { AccountingLookups, VoucherView } from '@erp/contracts';
 import { isEmptyDraft } from '@erp/domain';
 import {
-  Button,
   formatMoney,
   PageHeader,
   Panel,
@@ -11,19 +10,18 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
-  Input,
 } from '@erp/ui';
+import { Plus, Save, Send, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
 import { moneyText, moneyValue } from '../catalog/data';
 import { href, navigate } from '../router';
+import { Button, IconButton, notify, TextBox, TextInput } from '../ui';
 import {
   accountingRefusal,
   AccountSelect,
-  ErrorText,
   LineEffectHint,
   PartyPicker,
   problemText,
@@ -52,7 +50,6 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
   const [date, setDate] = useState('');
   const [narration, setNarration] = useState('');
   const [lines, setLines] = useState<Line[]>([blank(), blank()]);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const show = (v: VoucherView) => {
@@ -115,12 +112,12 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
   /** Saves the draft and returns it as the server checked it. A new one opens at its own address, unless it posts next. */
   const save = async (posting = false): Promise<VoucherView | null> => {
     if (amounts.some((a) => a.debit === undefined || a.credit === undefined)) {
-      setError(t('accounting.problems.amount_invalid'));
+      notify.problem(t('accounting.problems.amount_invalid'));
       return null;
     }
     // Nothing on any line is nothing to keep (owner's review of W1-19); the server refuses it too.
     if (isEmptyDraft(draft().lines)) {
-      setError(t('accounting.errors.empty_draft'));
+      notify.problem(t('accounting.errors.empty_draft'));
       return null;
     }
     setBusy(true);
@@ -144,11 +141,10 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
       return null;
     }
     if (r.status === 200) {
-      setError(null);
       show(r.body as VoucherView);
       return r.body as VoucherView;
     }
-    setError(accountingRefusal(t, r.body));
+    notify.problem(accountingRefusal(t, r.body));
     return null;
   };
   const post = async () => {
@@ -162,7 +158,7 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
     });
     setBusy(false);
     if (r.status === 200) return navigate(href.accountingDocument('journal_voucher', saved.id));
-    setError(accountingRefusal(t, r.body));
+    notify.problem(accountingRefusal(t, r.body));
   };
   const remove = async () => {
     if (!view) return;
@@ -173,7 +169,7 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
     );
     setBusy(false);
     if (r.status === 200) return navigate(href.money);
-    setError(accountingRefusal(t, r.body));
+    notify.problem(accountingRefusal(t, r.body));
   };
   const set = (i: number, patch: Partial<Line>) =>
     setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -191,14 +187,24 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
         actions={
           lookups.can.journal && (
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" disabled={busy} onClick={() => void save()}>
+              <Button variant="outline" icon={Save} disabled={busy} onClick={() => void save()}>
                 {t('accounting.voucher.save')}
               </Button>
-              <Button disabled={busy || debit !== credit || debit === 0} onClick={() => void post()}>
+              <Button
+                icon={Send}
+                disabled={busy || debit !== credit || debit === 0}
+                onClick={() => void post()}
+              >
                 {t('accounting.voucher.post')}
               </Button>
               {view && (
-                <Button variant="ghost" disabled={busy} onClick={() => void remove()}>
+                <Button
+                  variant="ghost"
+                  icon={Trash2}
+                  className="text-bad"
+                  disabled={busy}
+                  onClick={() => void remove()}
+                >
                   {t('accounting.voucher.delete')}
                 </Button>
               )}
@@ -206,21 +212,21 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
           )
         }
       />
-      <Panel className="grid gap-3.5 p-3.5 sm:grid-cols-[12rem_1fr]">
-        <TextField
+      <Panel className="grid grid-cols-1 gap-3.5 p-3.5 sm:grid-cols-[12rem_1fr]">
+        <TextInput
           label={t('accounting.fields.date')}
           type="date"
           value={day}
           max={lookups.today}
           onChange={(e) => setDate(e.target.value)}
         />
-        <TextField
+        <TextInput
           label={t('accounting.voucher.narration')}
           value={narration}
           onChange={(e) => setNarration(e.target.value)}
         />
       </Panel>
-      <Panel className="px-1.5 pb-2.5">
+      <Panel className="overflow-x-auto px-1.5 pb-2.5">
         <Table aria-label={t('accounting.voucher.lines')}>
           <TableHeader>
             <TableRow>
@@ -240,6 +246,7 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
                 <TableRow key={i}>
                   <TableCell>
                     <AccountSelect
+                      hideLabel
                       label={t('accounting.voucher.accountOf', { row: i + 1 })}
                       accounts={accounts}
                       value={l.accountId}
@@ -265,7 +272,7 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Input
+                    <TextBox
                       aria-label={t('accounting.voucher.debitOf', { row: i + 1 })}
                       inputMode="decimal"
                       className="text-end"
@@ -274,7 +281,7 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
                     />
                   </TableCell>
                   <TableCell>
-                    <Input
+                    <TextBox
                       aria-label={t('accounting.voucher.creditOf', { row: i + 1 })}
                       inputMode="decimal"
                       className="text-end"
@@ -283,7 +290,7 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
                     />
                   </TableCell>
                   <TableCell>
-                    <Input
+                    <TextBox
                       aria-label={t('accounting.voucher.memoOf', { row: i + 1 })}
                       value={l.memo}
                       onChange={(e) => set(i, { memo: e.target.value })}
@@ -291,14 +298,12 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
                   </TableCell>
                   <TableCell>
                     {lines.length > 2 && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        aria-label={t('accounting.voucher.removeLine', { row: i + 1 })}
+                      <IconButton
+                        icon={Trash2}
+                        tone="danger"
+                        label={t('accounting.voucher.removeLine', { row: i + 1 })}
                         onClick={() => setLines(lines.filter((_, j) => j !== i))}
-                      >
-                        ×
-                      </Button>
+                      />
                     )}
                   </TableCell>
                 </TableRow>
@@ -306,7 +311,7 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
             })}
             <TableRow>
               <TableCell colSpan={2}>
-                <Button size="sm" variant="outline" onClick={() => setLines([...lines, blank()])}>
+                <Button size="sm" variant="outline" icon={Plus} onClick={() => setLines([...lines, blank()])}>
                   {t('accounting.voucher.addLine')}
                 </Button>
               </TableCell>
@@ -328,7 +333,6 @@ export function VoucherScreen({ api, id }: { api: Api; id: string }) {
         </Table>
       </Panel>
       {view && view.check.problems.length > 0 && <Problems lookups={lookups} view={view} />}
-      <ErrorText text={error} />
     </>
   );
 }

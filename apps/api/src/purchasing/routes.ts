@@ -1,4 +1,5 @@
 import {
+  BillNoQuery,
   CreateSupplierRequest,
   PostRequest,
   ReceiptDraft,
@@ -7,6 +8,7 @@ import {
   SaveReturnRequest,
   SupplierPaymentRequest,
   UpdateSupplierRequest,
+  type BillNoLookup,
   type DocumentRow,
   type PurchasingLookups,
   type ReceiptView,
@@ -16,6 +18,8 @@ import {
 } from '@erp/contracts';
 import { withTenant } from '@erp/db';
 import {
+  amountLimit,
+  billNoKey,
   can,
   checkReceipt,
   checkReturn,
@@ -68,6 +72,8 @@ const units = (t: number) => t / 1000;
 const likeEscape = (s: string) => s.replace(/[\\%_]/g, (x) => `\\${x}`);
 /** A date column read as text (`::text`), or null. */
 const day = (v: unknown) => (typeof v === 'string' ? v : null);
+/** No return's id: every posted return counts against a receipt line. */
+const NO_RETURN = '00000000-0000-0000-0000-000000000000';
 
 /** Adds `days` to an ISO date. */
 function addDays(date: string, days: number): string {
@@ -423,6 +429,43 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
 
   // ---- Goods receipts (PUR-02) ----
 
+  /** What each receipt line still has: received less posted returns of it (except `exceptReturn`, or none). */
+  const returnable = async (c: Client, lineIds: string[], exceptReturn: string = NO_RETURN) => {
+    const { rows } = await c.query<{ id: string; left: string }>(
+      `SELECT l.id, ((l.qty - coalesce((SELECT sum(x.qty) FROM erp.purchase_return_lines x
+           JOIN erp.purchase_returns r ON r.id = x.return_id
+           WHERE x.receipt_line_id = l.id AND r.status = 'posted' AND r.id <> $2), 0)) * 1000)::bigint AS left
+       FROM erp.goods_receipt_lines l WHERE l.id = ANY($1::uuid[])`,
+      [lineIds, exceptReturn],
+    );
+    return new Map(rows.map((r) => [r.id, Number(r.left)]));
+  };
+
+  /**
+   * The posted receipt and the other drafts with this supplier's bill (W2-18), compared by `billNoKey` here rather than
+   * in SQL, so the screen, this lookup and the check at Post agree exactly. One supplier's receipts are few.
+   */
+  const sameBill = async (
+    c: Client,
+    supplierId: string | null,
+    billNo: string | null,
+    except: string,
+  ): Promise<BillNoLookup> => {
+    const key = billNoKey(billNo ?? '');
+    if (!supplierId || key === '') return { posted: null, drafts: 0 };
+    const { rows } = await c.query<{ id: string; number: string | null; status: string; bill: string }>(
+      `SELECT id, number, status, supplier_bill_no AS bill FROM erp.goods_receipts
+       WHERE supplier_party_id = $1 AND supplier_bill_no IS NOT NULL AND id <> $2 ORDER BY posted_at NULLS LAST`,
+      [supplierId, except],
+    );
+    const same = rows.filter((r) => billNoKey(r.bill) === key);
+    const posted = same.find((r) => r.status === 'posted');
+    return {
+      posted: posted ? { id: posted.id, number: posted.number ?? '' } : null,
+      drafts: same.filter((r) => r.status === 'draft').length,
+    };
+  };
+
   const receiptView = async (c: Client, id: string): Promise<ReceiptView | null> => {
     const h = (
       await c.query<Row>(
@@ -440,6 +483,13 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       c,
       rows.map((r) => r['item_id'] as string | null).filter((x): x is string => x !== null),
     );
+    const posted = h['status'] === 'posted';
+    const left = posted
+      ? await returnable(
+          c,
+          rows.map((r) => r['id'] as string),
+        )
+      : null;
     const lines = rows.map((r) => {
       const f = r['item_id'] ? facts.get(r['item_id'] as string) : undefined;
       return {
@@ -456,9 +506,9 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
         allowsFraction: f?.allowsFraction ?? false,
         lastCost: f?.lastCost ?? null,
         retail: f?.retail ?? null,
+        returnable: left === null ? null : (left.get(r['id'] as string) ?? 0),
       };
     });
-    const posted = h['status'] === 'posted';
     const check = checkReceipt({
       supplierId: (h['supplier_party_id'] as string | null) ?? null,
       billNo: (h['supplier_bill_no'] as string | null) ?? null,
@@ -468,6 +518,18 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       billTotal: num(h['bill_total']),
       // A posted receipt's warnings would compare it with itself (its cost is now the last cost).
       lines: lines.map((l) => ({ ...l, lastCost: posted ? null : l.lastCost })),
+      maxAmount: await limitOf(c),
+      // A draft whose bill this supplier's posted receipt already has can't post (W2-18).
+      billNoPostedAs: posted
+        ? null
+        : ((
+            await sameBill(
+              c,
+              (h['supplier_party_id'] as string | null) ?? null,
+              (h['supplier_bill_no'] as string | null) ?? null,
+              id,
+            )
+          ).posted?.number ?? null),
     });
     if (check.total !== null) {
       const t = receiptTotals({ lines, billDiscount: Number(h['bill_discount']) });
@@ -499,6 +561,29 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       lines,
       check,
     };
+  };
+
+  /** Rs 1 crore in the shop's minor units (W2-17, owner answer 1; D-128). */
+  const limitOf = async (c: Client) => amountLimit((await moneyOf(c)).minorUnits);
+  /** The problems of a draft that can't be kept: an amount over the limit, a quantity the books can't hold. */
+  const tooLarge = (problems: readonly { problem: string; row: number | null }[], limit: number) => {
+    const big = problems.filter((p) => p.problem.endsWith('_too_large'));
+    if (big.length > 0) throw new Refusal(400, { error: 'too_large', problems: big, limit });
+  };
+  /** Refuses a receipt draft over the limit (W2-17), so no draft is saved that can't be opened again. */
+  const receiptFits = async (c: Client, b: ReceiptDraft) => {
+    const limit = await limitOf(c);
+    const check = checkReceipt({
+      supplierId: b.supplierId,
+      billNo: b.billNo,
+      billDate: b.billDate,
+      locationId: b.locationId,
+      billDiscount: b.billDiscount,
+      billTotal: b.billTotal,
+      lines: b.lines.map((l) => ({ ...l, allowsFraction: true, lastCost: null, retail: null })),
+      maxAmount: limit,
+    });
+    tooLarge(check.problems, limit);
   };
 
   const writeReceiptLines = async (c: Client, tenantId: string, id: string, b: ReceiptDraft) => {
@@ -550,6 +635,14 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     });
   });
 
+  // Who else has this supplier's bill (W2-18): the screen asks when the bill number is left or the supplier changes.
+  scope.get('/purchasing/receipts/bill-no', { preHandler: receive }, async (req, reply) => {
+    const parsed = BillNoQuery.safeParse(req.query);
+    if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+    const q = parsed.data;
+    return run(req, reply, (c) => sameBill(c, q.supplier, q.billNo, q.except ?? NO_RETURN));
+  });
+
   scope.get('/purchasing/receipts/:id', { preHandler: read }, async (req, reply) => {
     const { id } = req.params as { id: string };
     return run(req, reply, async (c) => {
@@ -566,6 +659,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     if (isEmptyDraft(parsed.data.lines)) return reply.code(400).send({ error: 'empty_draft' });
     const b = parsed.data;
     return run(req, reply, async (c) => {
+      await receiptFits(c, b);
       const branch = await branchOf(c, b.locationId);
       const { rows } = await c.query<{ id: string; rv: string }>(
         `INSERT INTO erp.goods_receipts (tenant_id, branch_id, supplier_party_id, supplier_bill_no, supplier_bill_date,
@@ -587,6 +681,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       await checkVersion(c, 'goods_receipts', id, b.rowVersion);
       // Nothing typed on any line is nothing to keep (owner's review of W1-19); posted or stale is said first.
       if (isEmptyDraft(b.lines)) throw new Refusal(400, { error: 'empty_draft' });
+      await receiptFits(c, b);
       const branch = await branchOf(c, b.locationId);
       const { rows } = await c.query<{ rv: string }>(
         `UPDATE erp.goods_receipts SET branch_id = $2, supplier_party_id = $3, supplier_bill_no = $4,
@@ -622,6 +717,21 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
     return run(req, reply, async (c) => {
       await checkVersion(c, 'goods_receipts', id, parsed.data.rowVersion);
+      // One supplier's bill is posted once (W2-18): receipts of one supplier post one at a time, so two posting the
+      // same bill at the same moment can't both see it free.
+      const head = (
+        await c.query<{ supplier: string | null; bill: string | null }>(
+          'SELECT supplier_party_id AS supplier, supplier_bill_no AS bill FROM erp.goods_receipts WHERE id = $1',
+          [id],
+        )
+      ).rows[0]!;
+      if (head.supplier !== null) {
+        await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          `goods_receipt_bill:${req.auth!.tenantId}:${head.supplier}`,
+        ]);
+        const taken = (await sameBill(c, head.supplier, head.bill, id)).posted;
+        if (taken) throw new Refusal(409, { error: 'bill_no_taken', number: taken.number });
+      }
       const v = (await receiptView(c, id))!;
       if (v.check.problems.length > 0)
         throw new Refusal(400, {
@@ -654,18 +764,6 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
   });
 
   // ---- Purchase returns (PUR-03) ----
-
-  /** What each receipt line still has: received less posted returns of it (except `exceptReturn`). */
-  const returnable = async (c: Client, lineIds: string[], exceptReturn: string) => {
-    const { rows } = await c.query<{ id: string; left: string }>(
-      `SELECT l.id, ((l.qty - coalesce((SELECT sum(x.qty) FROM erp.purchase_return_lines x
-           JOIN erp.purchase_returns r ON r.id = x.return_id
-           WHERE x.receipt_line_id = l.id AND r.status = 'posted' AND r.id <> $2), 0)) * 1000)::bigint AS left
-       FROM erp.goods_receipt_lines l WHERE l.id = ANY($1::uuid[])`,
-      [lineIds, exceptReturn],
-    );
-    return new Map(rows.map((r) => [r.id, Number(r.left)]));
-  };
 
   const returnView = async (c: Client, id: string): Promise<ReturnView | null> => {
     const h = (
@@ -714,6 +812,7 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
       reason: (h['reason_code'] as string | null) ?? null,
       note: (h['note'] as string | null) ?? null,
       lines,
+      maxAmount: await limitOf(c),
     });
     return {
       purchaseReturn: {
@@ -737,6 +836,19 @@ export function registerPurchasing(scope: FastifyInstance, { pool, now, requireA
   };
 
   const writeReturn = async (c: Client, tenantId: string, id: string | null, b: ReturnDraft) => {
+    // Over the limit (W2-17): refused before anything is written.
+    const limit = await limitOf(c);
+    tooLarge(
+      checkReturn({
+        supplierId: b.supplierId,
+        locationId: b.locationId,
+        reason: null,
+        note: null,
+        lines: b.lines.map((l) => ({ ...l, allowsFraction: true, returnable: null })),
+        maxAmount: limit,
+      }).problems,
+      limit,
+    );
     const branch = await branchOf(c, b.locationId);
     const reason = b.reason !== null && b.reason.trim() !== '' ? b.reason.trim() : null;
     const known = ['damaged', 'wrong_item', 'excess', 'poor_quality', 'price_dispute', 'other'];

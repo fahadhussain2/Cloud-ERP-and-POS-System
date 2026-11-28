@@ -17,11 +17,7 @@ import type {
 import {
   Alert,
   AlertDescription,
-  Button,
-  Checkbox,
   formatMoney,
-  Label,
-  LABEL_CLASS,
   PageHeader,
   Panel,
   StatusChip,
@@ -31,7 +27,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TextField,
 } from '@erp/ui';
 import type { TFunction } from 'i18next';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -41,7 +36,7 @@ import type { Api } from '../api';
 import { qtyText } from '../catalog/data';
 import { href, navigate } from '../router';
 import { useShopToday } from '../shopDay';
-import { FormDialog } from '../staff/dialogs';
+import { Button, Checkbox, FIELD_LABEL, FormDialog, TextInput } from '../ui';
 import { apiQuery, current, only, useFilters, type Filters } from './frame/filters';
 import {
   ChoiceFilter,
@@ -125,26 +120,18 @@ function Totals({
   );
 }
 
-/** A counter bill's number, opening its trace for someone who may trace bills (PLT-12). */
-function BillNumber({ number, permissions }: { number: string; permissions: readonly string[] }) {
-  return permissions.includes('support.trace') ? (
-    <a href={href.trace(number)} className="underline-offset-4 hover:underline">
+/** A counter bill's number, opening its details (W2-10, D-125): every report reader may open a bill. */
+function BillNumber({ number }: { number: string }) {
+  return (
+    <a href={href.bill(number)} className="underline-offset-4 hover:underline">
       {number}
     </a>
-  ) : (
-    <>{number}</>
   );
 }
 
 // ---- Sales register (RPT-01, owner answer 3) ----
 
-export function SalesRegisterScreen({
-  api,
-  permissions = [],
-}: {
-  api: Api;
-  permissions?: readonly string[];
-}) {
+export function SalesRegisterScreen({ api }: { api: Api; permissions?: readonly string[] }) {
   const { t } = useTranslation();
   const days = useDays(api, 'salesRegister', []);
   const url = days.dates ? `/api/reports/sales-register?${apiQuery(days.dates)}` : null;
@@ -161,7 +148,7 @@ export function SalesRegisterScreen({
             return (
               <span className="font-mono">
                 <span className={voided ? 'line-through' : undefined}>
-                  <BillNumber number={b.number} permissions={permissions} />
+                  <BillNumber number={b.number} />
                 </span>
                 {b.kind !== 'sale' && (
                   <span className="ms-2 inline-block">
@@ -309,7 +296,7 @@ export function SalesRegisterScreen({
 
 // ---- Overrides (RPT-03) ----
 
-export function OverridesScreen({ api, permissions = [] }: { api: Api; permissions?: readonly string[] }) {
+export function OverridesScreen({ api }: { api: Api; permissions?: readonly string[] }) {
   const { t } = useTranslation();
   const days = useDays(api, 'overridesReport', []);
   const url = days.dates ? `/api/reports/overrides?${apiQuery(days.dates)}` : null;
@@ -335,7 +322,7 @@ export function OverridesScreen({ api, permissions = [] }: { api: Api; permissio
           sort: (o) => o.billNumber,
           cell: (o) => (
             <span className="font-mono">
-              <BillNumber number={o.billNumber} permissions={permissions} />
+              <BillNumber number={o.billNumber} />
             </span>
           ),
         },
@@ -444,7 +431,7 @@ const kindName = (t: TFunction, kind: string) => t(`reports.ovr.kinds.${kind}`, 
 
 // ---- Voids and returns (RPT-04) ----
 
-export function VoidsReturnsScreen({ api, permissions = [] }: { api: Api; permissions?: readonly string[] }) {
+export function VoidsReturnsScreen({ api }: { api: Api; permissions?: readonly string[] }) {
   const { t } = useTranslation();
   const days = useDays(api, 'voidsReturns', []);
   const url = days.dates ? `/api/reports/voids-returns?${apiQuery(days.dates)}` : null;
@@ -452,7 +439,7 @@ export function VoidsReturnsScreen({ api, permissions = [] }: { api: Api; permis
   const m = report?.money;
   const bill = (number: string) => (
     <span className="font-mono">
-      <BillNumber number={number} permissions={permissions} />
+      <BillNumber number={number} />
     </span>
   );
   const voidColumns: ListColumn<VoidRow>[] = m
@@ -656,7 +643,7 @@ export function VoidsReturnsScreen({ api, permissions = [] }: { api: Api; permis
  * A text the server searches (beyond the lines a list can hold): typed here, put in the address once typing stops,
  * and back to the address's on Back.
  */
-function SearchFilter({
+export function SearchFilter({
   label,
   value,
   onChange,
@@ -681,7 +668,7 @@ function SearchFilter({
     return () => clearTimeout(id);
   }, [text, value]);
   return (
-    <TextField
+    <TextInput
       type="search"
       label={label}
       value={text}
@@ -768,14 +755,13 @@ export function StockReportScreen({ api }: { api: Api }) {
       filters={
         <>
           <SearchFilter label={t('reports.stock.search')} value={text} onChange={(v) => set({ q: v })} />
-          <div className="flex h-9 items-center gap-2">
-            <Checkbox
-              id="stock-below"
-              checked={below}
-              onCheckedChange={(c) => set({ below: c === true ? '1' : '' })}
-            />
-            <Label htmlFor="stock-below">{t('reports.stock.below')}</Label>
-          </div>
+          <Checkbox
+            className="h-9 items-center"
+            id="stock-below"
+            label={t('reports.stock.below')}
+            checked={below}
+            onCheckedChange={(c) => set({ below: c ? '1' : '' })}
+          />
         </>
       }
       printFilters={[text, below ? t('reports.stock.below') : ''].filter(Boolean).join(' · ')}
@@ -996,9 +982,7 @@ export function ExceptionsScreen({ api, permissions }: { api: Api; permissions: 
       label: t('reports.exc.document'),
       sort: (e) => e.documentNumber ?? '',
       cell: (e) => (
-        <span className="font-mono">
-          {e.documentNumber ? <BillNumber number={e.documentNumber} permissions={permissions} /> : '—'}
-        </span>
+        <span className="font-mono">{e.documentNumber ? <BillNumber number={e.documentNumber} /> : '—'}</span>
       ),
     },
     {
@@ -1035,14 +1019,13 @@ export function ExceptionsScreen({ api, permissions }: { api: Api; permissions: 
       filters={
         <>
           <DaysFilter days={days} />
-          <div className="flex h-9 items-center gap-2">
-            <Checkbox
-              id="exceptions-all"
-              checked={all}
-              onCheckedChange={(c) => days.set({ status: c === true ? 'all' : '' })}
-            />
-            <Label htmlFor="exceptions-all">{t('reports.exc.showReviewed')}</Label>
-          </div>
+          <Checkbox
+            className="h-9 items-center"
+            id="exceptions-all"
+            label={t('reports.exc.showReviewed')}
+            checked={all}
+            onCheckedChange={(c) => days.set({ status: c ? 'all' : '' })}
+          />
         </>
       }
       printFilters={[periodWords(days.dates), all ? t('reports.exc.showReviewed') : '']
@@ -1128,7 +1111,7 @@ function ReviewDialog({
       onSubmit={() => void submit()}
     >
       <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
-        <legend className={LABEL_CLASS}>{t('reports.exc.status')}</legend>
+        <legend className={FIELD_LABEL}>{t('reports.exc.status')}</legend>
         {(['reviewed', 'dismissed', 'open'] as const).map((s) => (
           <label key={s} className="flex items-center gap-2">
             <input
@@ -1142,7 +1125,7 @@ function ReviewDialog({
         ))}
       </fieldset>
       {status !== 'open' && (
-        <TextField
+        <TextInput
           label={t('reports.exc.note')}
           value={note}
           maxLength={500}
@@ -1200,7 +1183,7 @@ export function TraceScreen({ api, number }: { api: Api; number: string | null }
             if (typed.trim()) navigate(href.trace(typed.trim()));
           }}
         >
-          <TextField
+          <TextInput
             label={t('support.trace.number')}
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
@@ -1212,7 +1195,12 @@ export function TraceScreen({ api, number }: { api: Api; number: string | null }
       {trace && (
         <>
           <Panel className="flex flex-wrap gap-6 p-3.5">
-            <span className="font-mono text-lg font-semibold">{trace.bill.number}</span>
+            <a
+              href={href.bill(trace.bill.number)}
+              className="font-mono text-lg font-semibold underline-offset-4 hover:underline"
+            >
+              {trace.bill.number}
+            </a>
             <span>{t(`reports.kind.${trace.bill.kind}`)}</span>
             <span>{trace.bill.businessDate}</span>
             <span>{trace.bill.deviceCode}</span>
@@ -1225,7 +1213,7 @@ export function TraceScreen({ api, number }: { api: Api; number: string | null }
           <Panel title={t('support.trace.timeline')} className="pb-2">
             <ol className="m-0 flex list-none flex-col gap-2 px-3.5 py-1">
               {trace.steps.map((s, i) => (
-                <li key={i} className="grid gap-x-3 sm:grid-cols-[11rem_7rem_1fr]">
+                <li key={i} className="grid grid-cols-1 gap-x-3 sm:grid-cols-[11rem_7rem_1fr]">
                   <span className="text-sm text-muted-foreground tabular-nums">
                     {new Date(s.at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' })}
                   </span>

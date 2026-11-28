@@ -11,6 +11,7 @@ import {
   type RatesView,
   type RateStatsView,
   type SalesChoicesView,
+  type SalesCorrections,
   type SalesGroup,
   type SalesOverTimeView,
   type SalesProfitView,
@@ -18,7 +19,9 @@ import {
   type StockChoicesView,
   type TopItemView,
 } from '@erp/contracts';
-import { Button, Checkbox, Label, LABEL_CLASS, TableCell, TableRow, type MoneyFormat } from '@erp/ui';
+import { TableCell, TableRow, type MoneyFormat } from '@erp/ui';
+
+import { Button, Checkbox, FIELD_LABEL } from '../ui';
 import type { TFunction } from 'i18next';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -177,7 +180,7 @@ function drillOf(group: SalesGroup, row: SalesRow, base: Filters): string | null
     case 'item':
       return to({ group: 'bill', itemId: row.key });
     case 'bill':
-      return row.code ? href.trace(row.code) : null;
+      return row.code ? href.bill(row.code) : null;
     case 'day':
       return to({ group: 'bill', preset: '', from: row.key, to: row.key });
     case 'month': {
@@ -342,6 +345,15 @@ export function SalesProfitScreen({ api }: { api: Api }) {
                 },
               ]
             : []),
+          ...(report.corrections && report.corrections.cost !== 0
+            ? [
+                {
+                  key: 'profitInBooks',
+                  label: s(t, 'corrections.profit'),
+                  value: moneyText(report.corrections.profit, m),
+                },
+              ]
+            : []),
           { key: 'discount', label: s(t, 'discount'), value: moneyText(report.total.cells.discount, m) },
           { key: 'bills', label: s(t, 'bills'), value: String(report.total.cells.bills) },
           ...(report.total.before
@@ -412,9 +424,42 @@ export function SalesProfitScreen({ api }: { api: Api }) {
             text={(r) => `${r.code ?? ''} ${nameOf(r)}`}
             {...(footer ? { footer } : {})}
           />
+          {report.corrections && report.corrections.items.length > 0 && (
+            <Corrections corrections={report.corrections} m={m} />
+          )}
         </>
       )}
     </ReportPage>
+  );
+}
+
+/**
+ * Stock sold before it arrived, settled when it came in (D-124, owner answer 1 to W2-09): cost of goods sold on no
+ * bill, by item, then gross profit in the books.
+ */
+function Corrections({ corrections, m }: { corrections: SalesCorrections; m: MoneyFormat }) {
+  const { t } = useTranslation();
+  type Item = SalesCorrections['items'][number];
+  const columns: ListColumn<Item>[] = [
+    { key: 'name', label: s(t, 'group.item'), sort: (r) => r.code, cell: (r) => `${r.code} ${r.name}` },
+    { key: 'cost', label: s(t, 'cost'), end: true, sort: (r) => r.cost, cell: (r) => moneyText(r.cost, m) },
+  ];
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="m-0 text-base font-semibold">{s(t, 'corrections.title')}</h3>
+      <p className="m-0 text-sm text-muted-foreground">{s(t, 'corrections.help')}</p>
+      <ListTable
+        label={s(t, 'corrections.title')}
+        columns={columns}
+        rows={corrections.items}
+        rowKey={(r) => r.itemId}
+        text={(r) => `${r.code} ${r.name}`}
+        footer={[s(t, 'total'), moneyText(corrections.cost, m)]}
+      />
+      <p className="m-0 font-semibold">
+        {s(t, 'corrections.profit')}: <span className="tabular-nums">{moneyText(corrections.profit, m)}</span>
+      </p>
+    </section>
   );
 }
 
@@ -501,14 +546,13 @@ export function PurchaseRegisterScreen({ api }: { api: Api }) {
             keys={['supplierId']}
             onChange={(k, v) => set({ [k]: v })}
           />
-          <div className="flex h-9 items-center gap-2">
-            <Checkbox
-              id="register-lines"
-              checked={withLines}
-              onCheckedChange={(c) => set({ lines: c === true ? '1' : '' })}
-            />
-            <Label htmlFor="register-lines">{s(t, 'register.withLines')}</Label>
-          </div>
+          <Checkbox
+            className="h-9 items-center"
+            id="register-lines"
+            label={s(t, 'register.withLines')}
+            checked={withLines}
+            onCheckedChange={(c) => set({ lines: c ? '1' : '' })}
+          />
         </>
       }
       printFilters={[periodWords(report), ...filterWords(t, choices, filters, ['supplierId'])].join(' · ')}
@@ -724,7 +768,7 @@ export function RatesScreen({ api }: { api: Api }) {
             const chosen = k === 'item' ? report?.item : report?.party;
             return (
               <div key={k} className="flex w-80 max-w-full flex-col gap-1">
-                <span className={LABEL_CLASS}>{s(t, `rates.${k}`)}</span>
+                <span className={FIELD_LABEL}>{s(t, `rates.${k}`)}</span>
                 <div className="flex gap-1">
                   <div className="flex-1">
                     <ItemPicker

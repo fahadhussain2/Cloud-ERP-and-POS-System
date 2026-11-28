@@ -1,13 +1,13 @@
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { report, signInAsOwner as signIn } from './backoffice';
+import { chooseValue, report, signInAsOwner as signIn } from './backoffice';
 import { expect, test } from './counter-test';
 import { SHOP } from './fixtures';
 
 // W2-02 plan (RPT-08, RPT-12, RPT-13, PUR-07 list; D-116): the owner reads the stock on the report frame. After the
 // counter's sales (counter.spec) and the supplier's bill (purchasing.spec): stock at today shows the stock the shop has;
-// a sold part's stock ledger opens the bill's trace; an item below its minimum is on the reorder list under its
+// a sold part's stock ledger opens the bill's details (D-125); an item below its minimum is on the reorder list under its
 // supplier, and prints; the stock movement downloads as CSV. Reads only, except ENOL001's reorder levels, put back after.
 
 const r = bo.reports.stockReports;
@@ -53,19 +53,20 @@ test('stock at today is the stock on hand; a sold part opens its stock ledger an
   )) as [{ q: string }];
   await expect(page.getByLabel(bo.reports.frame.figures)).toContainText(qtyText(Number(q)));
 
-  // BRPD001, sold on the counter: its ledger, and a bill line opens the trace.
+  // BRPD001, sold on the counter: its ledger, and a bill line opens its details (D-125).
   await report(page, bo.nav.stockLedger);
   await expect(page.getByText(r.ledger.pick)).toBeVisible();
   await page.getByRole('button', { name: r.item, exact: true }).click();
-  await page.getByRole('textbox', { name: r.item, exact: true }).fill('BRPD001');
+  await page.getByRole('combobox', { name: r.item, exact: true }).fill('BRPD001');
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('BRPD001');
-  await page.getByRole('textbox', { name: r.item, exact: true }).press('Enter');
+  await page.getByRole('combobox', { name: r.item, exact: true }).press('Enter');
   // This month, the default: the ledger takes up to 92 days.
   await expect(page.getByRole('heading', { level: 1 })).toContainText('BRPD001');
   const lines = page.getByRole('table', { name: r.ledger.lines });
   await expect(lines.getByRole('row').filter({ hasText: r.kinds.sale }).first()).toBeVisible();
   await lines.getByRole('row').filter({ hasText: r.kinds.sale }).first().getByRole('link').click();
-  await expect(page).toHaveURL(/#\/support\/trace\//);
+  await expect(page).toHaveURL(/#\/sales\/bills\//);
+  await expect(page.getByRole('table', { name: bo.billDetails.items })).toBeVisible();
 });
 
 test.describe('the reorder list', () => {
@@ -104,7 +105,7 @@ test.describe('the reorder list', () => {
 test('the stock movement downloads as CSV', async ({ page }) => {
   await signIn(page);
   await report(page, bo.nav.stockMovement);
-  await page.getByLabel(bo.reports.frame.period).selectOption('thisYear');
+  await chooseValue(page, bo.reports.frame.period, 'thisYear');
   await expect(page.getByRole('table', { name: bo.nav.stockMovement })).toBeVisible();
   const [download] = await Promise.all([
     page.waitForEvent('download'),

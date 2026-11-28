@@ -8,7 +8,7 @@ import type {
   StatementsView,
   UserActivityView,
 } from '@erp/contracts';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -18,6 +18,7 @@ import { i18n } from '../i18n';
 import en from '../locales/en.json';
 import { href, parseHash, queryOf } from '../router';
 import { PrintProvider } from './frame/ReportFrame';
+import { chooseValue } from '../ui/testing/choose';
 import {
   BalanceTrendScreen,
   CashFlowScreen,
@@ -173,7 +174,7 @@ describe('the partner ledger and the statement', () => {
     expect(plain(rows[1]!.textContent)).toContain(r.kinds.sale);
     expect(within(rows[2]!).getByText(r.voided)).toBeTruthy();
     expect(within(table).getByRole('link', { name: 'C01-S000012' }).getAttribute('href')).toBe(
-      href.trace('C01-S000012'),
+      href.bill('C01-S000012'),
     );
     const figures = plain(screen.getByLabelText(en.reports.frame.figures).textContent);
     expect(figures).toContain('2,400');
@@ -203,7 +204,7 @@ describe('the partner ledger and the statement', () => {
     const { api } = fakeApi({ 'GET /api/reports/partner-ledger': LEDGER });
     show(<PartnerLedgerScreen api={api} />);
     await screen.findByRole('table', { name: en.nav.partnerLedger });
-    fireEvent.change(screen.getByLabelText(r.role), { target: { value: 'supplier' } });
+    await chooseValue(r.role, 'supplier');
     const q = queryOf(window.location.hash);
     expect(q.get('role')).toBe('supplier');
     expect(q.get('partyId')).toBeNull();
@@ -296,9 +297,9 @@ describe('overdue and over the limit', () => {
     expect(row).toContain('45');
     expect(row).toContain(r.overdue.never);
     expect(row).toContain(r.noLimit);
-    fireEvent.change(screen.getByLabelText(r.overdue.by), { target: { value: '0' } });
+    await chooseValue(r.overdue.by, '0');
     expect(queryOf(window.location.hash).get('days')).toBe('0');
-    expect(screen.getByRole('option', { name: r.overdue.more_zero })).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: r.overdue.by }).textContent).toContain(r.overdue.more_zero);
     expect(untranslated()).toEqual([]);
   });
 
@@ -344,7 +345,7 @@ describe('collections and payments', () => {
     await screen.findByRole('table', { name: r.register.title.received });
     expect(screen.getByRole('heading', { name: r.register.title.received })).toBeTruthy();
     expect(plain(screen.getByRole('table', { name: r.register.byPerson }).textContent)).toContain('Nadia');
-    fireEvent.change(screen.getByLabelText(r.register.side), { target: { value: 'paid' } });
+    await chooseValue(r.register.side, 'paid');
     expect(queryOf(window.location.hash).get('side')).toBe('paid');
     expect(untranslated()).toEqual([]);
   });
@@ -392,7 +393,7 @@ describe('user activity', () => {
     expect(within(table).getByText(r.activity.actions.login.failed)).toBeTruthy();
     expect(within(table).getByText(r.backOffice)).toBeTruthy();
     expect(screen.getByText(/2,000|2000/)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText(r.kind), { target: { value: 'sign_in' } });
+    await chooseValue(r.kind, 'sign_in');
     expect(queryOf(window.location.hash).get('kind')).toBe('sign_in');
     expect(untranslated()).toEqual([]);
   });

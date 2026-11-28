@@ -1,11 +1,12 @@
 import type { AccountingLookups, AccountRow, PartyHit } from '@erp/contracts';
 import { lineEffect } from '@erp/domain';
-import { formatMoney, Input } from '@erp/ui';
+import { formatMoney } from '@erp/ui';
 import type { TFunction } from 'i18next';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api';
+import { ListPicker, SearchBox } from '../ui';
 
 // What the accounting screens share (W1-19, D-108): the lookups (banks, categories, the chart, the shop's day and lock
 // date, what this person may do), the words for a problem or a refusal, and the pickers for a party and an account.
@@ -76,25 +77,32 @@ export function ErrorText({ text }: { text: string | null }) {
   ) : null;
 }
 
-/** A customer or supplier, found by code, name or phone. */
+/**
+ * A customer or supplier, found by code, name or phone. ↑ ↓ move through the hits and Enter takes the highlighted one
+ * (W2-13); Esc closes the list until the text changes.
+ */
 export function PartyPicker({
   api,
   label,
   role,
   picked,
   onPick,
+  error,
 }: {
   api: Api;
   label: string;
   role: 'customer' | 'supplier' | 'any';
   picked: { id: string; name: string } | null;
   onPick: (party: PartyHit | null) => void;
+  /** The field's problem, shown under it (owner answer 6). */
+  error?: string | undefined;
 }) {
   const { t } = useTranslation();
   // What was typed since the last pick; null shows the picked party's name.
   const [typed, setTyped] = useState<string | null>(null);
   const [found, setFound] = useState<{ q: string; hits: PartyHit[] }>({ q: '', hits: [] });
-  const listId = useId();
+  // The text whose list Esc closed.
+  const [closedFor, setClosedFor] = useState<string | null>(null);
   const text = typed ?? picked?.name ?? '';
   const q = typed?.trim() ?? '';
   useEffect(() => {
@@ -110,80 +118,66 @@ export function PartyPicker({
       clearTimeout(timer);
     };
   }, [api, q, role]);
-  const hits = q.length >= 2 && found.q === q ? found.hits : [];
+  const hits = q.length >= 2 && found.q === q && closedFor !== q ? found.hits : NO_HITS;
   return (
-    <div className="relative">
-      <Input
-        aria-label={label}
-        role="combobox"
-        aria-expanded={hits.length > 0}
-        aria-controls={listId}
-        value={text}
-        placeholder={t('accounting.party.search')}
-        onChange={(e) => {
-          setTyped(e.target.value);
-          if (picked) onPick(null);
-        }}
-      />
-      {hits.length > 0 && (
-        <ul
-          id={listId}
-          role="listbox"
-          aria-label={label}
-          className="absolute inset-x-0 top-full z-50 m-0 max-h-64 list-none overflow-auto rounded-md border border-input bg-surface p-1 shadow-md"
-        >
-          {hits.map((p) => (
-            <li key={p.id} role="option" aria-selected={false}>
-              <button
-                type="button"
-                className="flex w-full justify-between gap-3 rounded px-2 py-1.5 text-start hover:bg-surface-2"
-                onClick={() => {
-                  setTyped(null);
-                  onPick(p);
-                }}
-              >
-                <span>
-                  <span className="font-mono text-xs text-muted-foreground">{p.code}</span> {p.name}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+    <SearchBox
+      label={label}
+      listLabel={label}
+      placeholder={t('accounting.party.search')}
+      text={text}
+      onText={(v) => {
+        setTyped(v);
+        if (picked) onPick(null);
+      }}
+      hits={hits}
+      hitKey={(p) => p.id}
+      onPick={(p) => {
+        setTyped(null);
+        onPick(p);
+      }}
+      onEscape={() => setClosedFor(q)}
+      error={error}
+    >
+      {(p) => (
+        <>
+          <span className="font-mono text-xs text-muted-foreground">{p.code}</span> {p.name}
+        </>
       )}
-    </div>
+    </SearchBox>
   );
 }
+const NO_HITS: PartyHit[] = [];
 
-/** A select of accounts, shown as code and name. */
+/**
+ * An account, searched by code or name (owner answer 3: the chart of accounts is a list that keeps growing; W2-15).
+ * `hideLabel` in a table cell, whose column names it.
+ */
 export function AccountSelect({
-  id,
   label,
   accounts,
   value,
   onChange,
+  hideLabel = false,
+  error,
 }: {
-  id?: string;
   label: string;
   accounts: readonly AccountRow[];
   value: string | null;
   onChange: (id: string | null) => void;
+  hideLabel?: boolean;
+  error?: string | undefined;
 }) {
   const { t } = useTranslation();
   return (
-    <select
-      id={id}
-      aria-label={label}
-      className="h-11 w-full rounded-md border border-input bg-surface-2 px-2"
+    <ListPicker
+      label={label}
+      hideLabel={hideLabel}
+      placeholder={t('accounting.voucher.pickAccount')}
+      options={accounts}
       value={value ?? ''}
-      onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
-    >
-      <option value="">{t('accounting.voucher.pickAccount')}</option>
-      {accounts.map((a) => (
-        <option key={a.id} value={a.id}>
-          {a.code} {a.name}
-        </option>
-      ))}
-    </select>
+      error={error}
+      onChange={(id) => onChange(id === '' ? null : id)}
+    />
   );
 }
 

@@ -15,6 +15,45 @@ body,
 }
 
 /*
+ * The back office's own look (W2-12, D-127), here and not in theme.css, so the POS keeps its own. Focus is the accent
+ * (owner answer 2): an orange ring and glow on every control reached with Tab. Fields have a slightly stronger border
+ * than the panel lines.
+ */
+:root,
+:root[data-theme='dark'] {
+  --focus: var(--accent);
+  --glow: color-mix(in srgb, var(--accent) 20%, transparent);
+  --field-line: #bcc5ce;
+}
+@media screen {
+  :root[data-theme='dark'] {
+    --glow: color-mix(in srgb, var(--accent) 28%, transparent);
+    --field-line: #3b4856;
+  }
+}
+@theme inline {
+  --color-glow: var(--glow);
+  --color-field-line: var(--field-line);
+}
+
+/* Tailwind v4 leaves buttons on the default cursor: everything you can press shows the hand (owner, 2026-11-26). */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+[role='option'],
+[role='menuitem'],
+[role='tab'],
+summary,
+label[for],
+select:not(:disabled),
+input[type='checkbox']:not(:disabled) {
+  cursor: pointer;
+}
+:disabled,
+[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+/*
  * Item labels (W1-17, CAT-08): the legacy layout (owner answer 3), black on white whatever the theme (PLT-13). On
  * screen a dashed edge shows the label's size; printed, each label is one page of the roll (owner answer 1) and only
  * the labels print.
@@ -112,4 +151,10 @@ body,
   tr {
     break-inside: avoid;
   }
+}
+
+/* A tooltip never takes a click meant for what it covers: one left showing (focus back on a row's icon after a dialog)
+   sat over the row above's icon and blocked it (e2e, W2-15). The wrapper Radix positions it in included. */
+[data-radix-popper-content-wrapper]:has(> [data-slot='tooltip-content']) {
+  pointer-events: none;
 }

@@ -9,6 +9,7 @@ import { ItemPicker } from './ItemPicker';
 
 // Bug (owner, staging 2026-11-08): on a line in a table the results were cut off by the table's scrolling container,
 // on the goods receipt, purchase return and adjustment screens alike. The list must not be inside that container.
+// Bug (owner, 2026-11-26; W2-13): ↓ didn't move through the results, and Enter always took the first one.
 
 afterEach(() => {
   cleanup();
@@ -37,12 +38,127 @@ describe('the item picker on a table line', () => {
       </I18nextProvider>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Item of line 1' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Item of line 1' }), { target: { value: 'a' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Item of line 1' }), { target: { value: 'a' } });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(300);
     });
     const list = screen.getByRole('listbox');
     expect(list.textContent).toContain('AFLT001');
     expect(list.closest('[data-slot="table-container"]')).toBeNull();
+  });
+});
+
+const THREE = [
+  { id: 'i1', code: 'FNBL001', name: 'FAN BELT CULTUS 4PK-855' },
+  { id: 'i2', code: 'FNBL002', name: 'FAN BELT MEHRAN' },
+  { id: 'i3', code: 'FNBL003', name: 'FAN BELT ALTO' },
+];
+
+/** The picker open with three results, as on a goods receipt line. */
+async function openWithThree(onPick: (item: { id: string }) => void) {
+  vi.useFakeTimers();
+  const api: Api = () => Promise.resolve({ status: 200, body: { items: THREE } });
+  render(
+    <I18nextProvider i18n={i18n}>
+      <ItemPicker api={api} label="Item of line 1" picked={null} onPick={onPick} />
+    </I18nextProvider>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Item of line 1' }));
+  const box = screen.getByRole('combobox', { name: 'Item of line 1' });
+  fireEvent.change(box, { target: { value: 'fan belt' } });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(300);
+  });
+  expect(screen.getAllByRole('option')).toHaveLength(3);
+  return box;
+}
+const highlighted = () =>
+  screen.getAllByRole('option').findIndex((o) => o.getAttribute('aria-selected') === 'true');
+
+describe('the item picker from the keyboard (W2-13)', () => {
+  it('starts on the first result; ↓ ↓ Enter picks the third', async () => {
+    const onPick = vi.fn();
+    const box = await openWithThree(onPick);
+    expect(highlighted()).toBe(0);
+    fireEvent.keyDown(box, { key: 'ArrowDown' });
+    fireEvent.keyDown(box, { key: 'ArrowDown' });
+    expect(highlighted()).toBe(2);
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(onPick).toHaveBeenCalledWith(THREE[2]);
+  });
+
+  it('stays on the first with ↑ at the top, and PageDown goes to the last', async () => {
+    const box = await openWithThree(() => undefined);
+    fireEvent.keyDown(box, { key: 'ArrowUp' });
+    expect(highlighted()).toBe(0);
+    fireEvent.keyDown(box, { key: 'PageDown' });
+    expect(highlighted()).toBe(2);
+  });
+
+  it('tells screen readers which result is highlighted', async () => {
+    const box = await openWithThree(() => undefined);
+    fireEvent.keyDown(box, { key: 'ArrowDown' });
+    const second = screen.getAllByRole('option')[1]!;
+    expect(box.getAttribute('aria-activedescendant')).toBe(second.id);
+    expect(box.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('closes on Esc without picking', async () => {
+    const onPick = vi.fn();
+    const box = await openWithThree(onPick);
+    fireEvent.keyDown(box, { key: 'ArrowDown' });
+    fireEvent.keyDown(box, { key: 'Escape' });
+    expect(onPick).not.toHaveBeenCalled();
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+});
+
+// Bugs (owner's review of New goods receipt, 2026-11-28; W2-16 points 1 and 2): the field reached with Tab took no
+// typing (only Enter or a click opened the search), and after a pick Tab went to the top of the page ("Collapse the
+// menu"), not to the line's next field.
+describe('the item picker reached with Tab (W2-16)', () => {
+  const picker = (onPick: (item: { id: string }) => void = () => undefined) => {
+    vi.useFakeTimers();
+    const api: Api = () => Promise.resolve({ status: 200, body: { items: THREE } });
+    render(
+      <I18nextProvider i18n={i18n}>
+        <ItemPicker api={api} label="Item of line 1" picked={null} onPick={onPick} />
+      </I18nextProvider>,
+    );
+    const field = screen.getByRole('button', { name: 'Item of line 1' });
+    field.focus();
+    return field;
+  };
+
+  it('opens the search with the typed character in it', () => {
+    fireEvent.keyDown(picker(), { key: 'f' });
+    const box = screen.getByRole<HTMLInputElement>('combobox', { name: 'Item of line 1' });
+    expect(box.value).toBe('f');
+    expect(document.activeElement).toBe(box);
+  });
+
+  it('opens it empty on ↓, and ignores a shortcut such as Ctrl+F', () => {
+    const field = picker();
+    fireEvent.keyDown(field, { key: 'f', ctrlKey: true });
+    expect(screen.queryByRole('combobox')).toBeNull();
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+    expect(screen.getByRole<HTMLInputElement>('combobox', { name: 'Item of line 1' }).value).toBe('');
+  });
+
+  it('gives the focus back to the field after a pick, so Tab goes on to the next field', async () => {
+    const onPick = vi.fn();
+    fireEvent.keyDown(picker(onPick), { key: 'f' });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Item of line 1' }), { key: 'Enter' });
+    expect(onPick).toHaveBeenCalledWith(THREE[0]);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Item of line 1' }));
+  });
+
+  it('gives the focus back to the field after Esc', () => {
+    fireEvent.keyDown(picker(), { key: 'f' });
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Item of line 1' }), { key: 'Escape' });
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Item of line 1' }));
   });
 });

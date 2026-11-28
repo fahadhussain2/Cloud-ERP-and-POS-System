@@ -146,7 +146,8 @@ test('the owner adds a cashier with a temporary PIN and creates a cash desk code
   await dialog.getByLabel(bo.staff.shortCodeField).fill(CASHIER.shortCode);
   await dialog.getByRole('checkbox', { name: 'Cashier' }).click();
   await dialog.getByRole('button', { name: bo.staff.create }).click();
-  await expect(page.getByRole('status')).toContainText(CASHIER.fullName);
+  // A toast, found by its words: another may still be showing (W2-15).
+  await expect(page.getByRole('status').filter({ hasText: CASHIER.fullName })).toBeVisible();
   const row = page.getByRole('row', { name: new RegExp(CASHIER.fullName) });
   await row.getByRole('button', { name: bo.staff.give }).click();
   await page.getByRole('dialog').getByLabel(bo.staff.temporaryPin).fill(CASHIER.temporaryPin);

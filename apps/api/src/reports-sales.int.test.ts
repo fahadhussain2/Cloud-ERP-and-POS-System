@@ -4,7 +4,17 @@ import {
   signCanonical,
   TenantSpec,
   uuidv7,
+  type AgeingView,
+  type BillListView,
+  type BillView,
+  type DashboardView,
+  type DeadStockView,
   type DocumentFamily,
+  type OverridesView,
+  type ProfitLossView,
+  type ReorderView,
+  type ReturnListView,
+  type VoidsReturnsView,
   type PurchaseRegisterView,
   type PushDocument,
   type PushRequest,
@@ -12,6 +22,7 @@ import {
   type SalesChoicesView,
   type SalesOverTimeView,
   type SalesProfitView,
+  type StockAtView,
 } from '@erp/contracts';
 import { setupTenant, withTenant } from '@erp/db';
 import { createTestDatabase, seedCatalog, type TestDatabase } from '@erp/db/testing';
@@ -83,6 +94,8 @@ let counter: Device;
 let items: Record<string, string> = {};
 const loc: Record<string, string> = {};
 const bills: Record<string, string> = {};
+/** The seeded sale documents themselves, for a later exchange of their lines (W2-11). */
+const docs: Record<string, SaleDocument> = {};
 const cookies: Record<string, string> = {};
 const app = () => buildApp({ pool, now: () => new Date() });
 const today = () => businessDate(Date.now(), 'Asia/Karachi', 4);
@@ -539,6 +552,7 @@ beforeAll(async () => {
   const b5 = returnOf(b2, 1);
   const b6 = oilBack();
   await push([b5, b6]);
+  Object.assign(docs, { b1, b2, b3 });
   Object.assign(bills, {
     b1: b1.number,
     b2: b2.number,
@@ -889,6 +903,115 @@ describe('sales over time (RPT-15, owner answers 5 and 6)', () => {
   });
 });
 
+describe("the owner's dashboard (W2-06; RPT-18, D-118)", () => {
+  const dash = (period = 'today', who = 'fahad', shop?: string) =>
+    view<DashboardView>(`/api/dashboard?period=${period}`, who, shop);
+
+  it('every figure is its report’s: sales, profit, discounts, returns, voids, balances, stock, the donut', async () => {
+    const d = await dash();
+    const t = today();
+    const sales = await view<SalesProfitView>(`/api/reports/sales-profit?from=${t}&to=${t}&compare=none`);
+    expect(d.current).toEqual({ from: t, to: t });
+    expect(d.comparison).toEqual({ from: daysAgo(7), to: daysAgo(7) });
+    expect(d.netSales.now).toBe(sales.total.cells.sales);
+    expect(d.netSales.bills).toBe(sales.total.cells.bills);
+    // Gross profit in the books: the bills' and any cost corrections (D-124).
+    expect(d.grossProfit.now).toBe(sales.corrections!.profit);
+    expect(d.grossProfit.marginBp).toBe(sales.total.cells.marginBp);
+    expect(d.trend.step).toBe('hour');
+    expect(d.trend.points.reduce((s, p) => s + (p.now ?? 0), 0)).toBe(d.netSales.now);
+    expect(d.topCategories.rows.reduce((s, r) => s + r.sales, 0) + d.topCategories.rest).toBe(d.netSales.now);
+
+    const vr = await view<VoidsReturnsView>(`/api/reports/voids-returns?from=${t}&to=${t}`);
+    expect(d.leak.voids.count).toBe(vr.voids.length);
+    expect(d.leak.voids.amount).toBe(vr.voids.reduce((s, v) => s + (v.saleTotal ?? 0), 0));
+    expect(d.leak.returns.count).toBe(vr.returns.length);
+    expect(d.leak.returns.amount).toBe(vr.returns.reduce((s, r) => s + r.amount, 0));
+    const ov = await view<OverridesView>(`/api/reports/overrides?from=${t}&to=${t}`);
+    expect(d.leak.belowList.count).toBe(
+      ov.overrides.filter((o) => ['below_list', 'below_floor'].includes(o.kind)).length,
+    );
+    expect(d.leak.belowList.count).toBeGreaterThan(0);
+    expect(d.leak.discounts.amount).toBe(sales.total.cells.discount);
+
+    const ar = await view<AgeingView>('/api/reports/ageing?side=customers');
+    expect(d.customersOwe.now).toBe(ar.totals.balance);
+    expect(d.owe.total).toBe(ar.totals.balance);
+    expect(d.owe.top.map((x) => x.name)).toEqual(
+      ar.rows
+        .filter((r) => r.balance > 0)
+        .sort((a, b) => b.balance - a.balance || (a.name < b.name ? -1 : 1))
+        .slice(0, 5)
+        .map((r) => r.name),
+    );
+    const ap = await view<AgeingView>('/api/reports/ageing?side=suppliers');
+    expect(d.suppliers.total).toBe(ap.totals.balance);
+    expect(d.suppliers.overdue).toBe(ap.totals.balance - ap.totals.notDue);
+
+    const reorder = await view<ReorderView>('/api/reports/reorder');
+    expect(d.stock.atMinimum).toBe(reorder.total.count);
+    const dead = await view<DeadStockView>('/api/reports/dead-stock?days=90');
+    expect(d.stock.dead.count).toBe(dead.totals.dead.count + dead.totals.notSoldSinceGoLive.count);
+
+    const pl = await view<ProfitLossView>('/api/reports/profit-loss?preset=thisMonth&compare=none');
+    expect(d.donut!.grossProfit).toBe(pl.grossProfit[0]);
+    expect(d.donut!.net).toBe(pl.netProfit[0]);
+    expect(d.donut!.slices.reduce((s, x) => s + x.amount, 0)).toBe(d.donut!.base);
+
+    const busy = await view<SalesOverTimeView>(
+      `/api/reports/sales-over-time?from=${daysAgo(27)}&to=${t}&compare=none`,
+    );
+    expect(d.busyHours.bills).toEqual(busy.grid.bills);
+  });
+
+  it('cash and bank are the books’ balances; the chip compares with the start of the business day', async () => {
+    const d = await dash();
+    const [cash] = await q<{ now: string; start: string }>(
+      `SELECT coalesce(sum(l.debit - l.credit) FILTER (WHERE e.entry_date <= $1), 0)::text AS now,
+         coalesce(sum(l.debit - l.credit) FILTER (WHERE e.entry_date < $1), 0)::text AS start
+       FROM erp.journal_lines l JOIN erp.journal_entries e ON e.id = l.entry_id
+       JOIN erp.accounts a ON a.id = l.account_id
+       WHERE a.system_role IN ('CASH_DRAWER', 'CASH_SAFE', 'CASH_IN_TRANSIT')`,
+      [today()],
+    );
+    expect(d.cash.now).toBe(Number(cash!.now));
+    expect(d.cash.atDayStart).toBe(Number(cash!.start));
+    expect(d.cash.drawers + d.cash.safe + d.cash.inTransit).toBe(d.cash.now);
+    expect(d.cash.chip.amount).toBe(d.cash.now - d.cash.atDayStart);
+    expect(d.bank.accounts.reduce((s, a) => s + a.balance, 0)).toBe(d.bank.now);
+  });
+
+  it('7 and 30 days against the days before; figures before go-live are flagged', async () => {
+    const d = await dash('30d');
+    const now = await view<SalesProfitView>(
+      `/api/reports/sales-profit?from=${daysAgo(29)}&to=${today()}&compare=none`,
+    );
+    const before = await view<SalesProfitView>(
+      `/api/reports/sales-profit?from=${daysAgo(59)}&to=${daysAgo(30)}&compare=none`,
+    );
+    expect(d.trend.step).toBe('day');
+    expect(d.trend.points).toHaveLength(30);
+    expect(d.netSales.now).toBe(now.total.cells.sales);
+    expect(d.netSales.before).toBe(before.total.cells.sales);
+    expect(d.netSales.chip.amount).toBe(now.total.cells.sales - before.total.cells.sales);
+    expect(d.beforeGoLive).toBe(true);
+    const w = await dash('7d');
+    expect(w.current).toEqual({ from: daysAgo(6), to: today() });
+    expect(w.comparison).toEqual({ from: daysAgo(13), to: daysAgo(7) });
+  });
+
+  it('only the owner may read it; another shop sees only its own; an unknown period is refused', async () => {
+    expect((await send('GET', '/api/dashboard', 'tariq')).statusCode).toBe(403);
+    expect((await send('GET', '/api/dashboard', 'noor')).statusCode).toBe(403);
+    expect((await send('GET', '/api/dashboard', 'kashif')).statusCode).toBe(403);
+    expect((await send('GET', '/api/dashboard?period=year', 'fahad')).statusCode).toBe(400);
+    const other = await dash('30d', 'fahad', OTHER);
+    expect(other.netSales.now).toBe(0);
+    expect(other.owe.total).toBe(0);
+    expect(other.leak.voids.count).toBe(0);
+  });
+});
+
 describe('a year of sales', () => {
   it('answers each report for 19,500 items and 300 lines a day in under 2 s', async () => {
     // A year of a busy counter, straight into the other shop's bills and stock ledger: 60 bills a day of 5 lines.
@@ -977,6 +1100,10 @@ describe('a year of sales', () => {
     const byItem = await timed<SalesProfitView>(`/api/reports/sales-profit?${year}&group=item`);
     const overTime = await timed<SalesOverTimeView>(`/api/reports/sales-over-time?${year}`);
     const rates = await timed<RatesView>(`/api/reports/rates?itemId=${byItem.body.rows[0]!.key}&${year}`);
+    // The owner's dashboard reads much of the same data at once (W2-06 plan): under 1.5 s.
+    const dashboard = await timed<DashboardView>('/api/dashboard?period=30d');
+    expect(dashboard.body.netSales.now).toBeGreaterThan(0);
+    expect(dashboard.ms < 1500, `the dashboard took ${Math.round(dashboard.ms)} ms`).toBe(true);
     expect(byCategory.body.total.cells).toMatchObject({
       bills: 365 * 60,
       qty: lines * 1000,
@@ -991,4 +1118,323 @@ describe('a year of sales', () => {
     for (const [name, t] of Object.entries({ byCategory, byItem, overTime, rates }))
       expect([name, t.ms < 2000], `${name} took ${Math.round(t.ms)} ms`).toEqual([name, true]);
   }, 600_000);
+});
+
+// Last, so the figures above don't move: a lamp sold before it arrived (never bought, so at no cost), then received.
+describe('stock sold before it arrived (W2-09, D-124)', () => {
+  it('settles its cost when it comes in, on a line of its own; the books and the stock still match', async () => {
+    Object.assign(
+      items,
+      await withTenant(pool, { tenantId }, (_db, c) =>
+        seedCatalog(c, tenantId, [{ code: 'LAMP001', name: 'HEAD LAMP', category: 'LAMPS' }]),
+      ),
+    );
+    await push([sale(sara, [line('l1', 'LAMP001', 1, 300000)])]);
+    await receive(oilCo, today(), 'LAMP001', 1000, 250000);
+    await postPending(pool, tenantId, { now: () => new Date() });
+
+    const r = await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}`);
+    expect(r.corrections).toEqual({
+      cost: 250000,
+      profit: r.total.cells.sales - r.total.cells.cost! - 250000,
+      items: [{ itemId: items['LAMP001'], code: 'LAMP001', name: 'HEAD LAMP', cost: 250000 }],
+    });
+    // The bills' cost and the corrections together are cost of goods sold in the books.
+    expect(r.total.cells.cost! + r.corrections!.cost).toBe(await books(['COGS'], D0(), today()));
+    // The lamp's line on its bill keeps the cost it had on the day (none).
+    const byItem = await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}&group=item`);
+    expect(byItem.rows.find((x) => x.code === 'LAMP001')!.cells.cost).toBe(0);
+
+    // Nothing left of the lamp: 0 on hand and 0 in the books.
+    const [lamp] = await q<{ qty: string; value: string }>(
+      'SELECT sum(qty_delta)::text AS qty, sum(value_delta)::text AS value FROM erp.stock_movements WHERE item_id = $1',
+      [items['LAMP001']],
+    );
+    expect([Number(lamp!.qty), Number(lamp!.value)]).toEqual([0, 0]);
+    expect((await view<StockAtView>('/api/reports/stock-at')).total.value).toBe(
+      await books(['INVENTORY'], '2000-01-01', today()),
+    );
+
+    // Filtered to another category, or to a salesman, there are none; without cost.view, none either.
+    const oil = (await q<{ id: string }>("SELECT id FROM erp.categories WHERE name = 'OIL'"))[0]!.id;
+    expect(
+      (await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}&categoryId=${oil}`)).corrections,
+    ).toMatchObject({ cost: 0, items: [] });
+    expect(
+      (await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}&salesmanId=${sara}`)).corrections,
+    ).toMatchObject({ cost: 0, items: [] });
+    expect(
+      (await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}`, 'noor')).corrections,
+    ).toBeNull();
+
+    // The dashboard's gross profit is the books', corrections included; its margin from the same profit.
+    const t = today();
+    const todays = await view<SalesProfitView>(`/api/reports/sales-profit?from=${t}&to=${t}&compare=none`);
+    const d = await view<DashboardView>('/api/dashboard?period=today');
+    expect(todays.corrections!.cost).toBe(250000);
+    expect(d.grossProfit.now).toBe(todays.corrections!.profit);
+    expect(d.grossProfit.marginBp).toBe(
+      Math.round((todays.corrections!.profit * 10000) / todays.total.cells.sales),
+    );
+
+    // The CSV ends with each item's correction, their total and the profit in the books.
+    const csv = await send('GET', `/api/reports/sales-profit?${ALL()}&format=csv`, 'fahad');
+    const tail = csv.body.trim().split('\n').slice(-3);
+    expect(tail[0]).toMatch(/^LAMP001,HEAD LAMP,/);
+    expect(tail[1]).toMatch(/^,cost_corrections,/);
+    expect(tail[2]).toMatch(/^,profit_in_books,/);
+  });
+});
+
+describe('bill details (W2-10, D-125)', () => {
+  const bill = (number: string, who = 'fahad') =>
+    view<BillView>(`/api/sales/bills/${encodeURIComponent(number)}`, who);
+
+  it("shows a bill's header, lines, approvals, totals, payments and returns, as stored", async () => {
+    const b = await bill(bills['b2']!);
+    expect(b.bill).toMatchObject({
+      number: bills['b2'],
+      kind: 'sale',
+      status: 'finalized',
+      salesman: 'Imran',
+      priceTier: 'Retail',
+      customer: { code: 'KHAN', name: 'Khan Motors' },
+    });
+    expect(b.lines.map((l) => [l.lineNo, l.code, l.qty, l.listPrice, l.unitPrice, l.amount])).toEqual([
+      [1, 'OIL001', 1000, 120000, 120000, 120000],
+      [2, 'BELT001', 1000, 30000, 30000, 30000],
+    ]);
+    for (const l of b.lines) expect(l.lineTotal).toBe(l.amount - l.billShare);
+    expect(b.lines.reduce((s, l) => s + l.billShare, 0)).toBe(5000);
+    expect(b.totals).toEqual({ lines: 150000, billDiscount: 5000, rounding: 0, tax: 0, total: 145000 });
+    expect(b.billApprovals.map((a) => [a.kind, a.reason, a.approvedBy])).toEqual([
+      ['below_list', 'regular_customer', 'Tariq'],
+    ]);
+    expect(b.payments.map((p) => [p.method, p.amount])).toEqual([['cash', 145000]]);
+    expect(b.related.returns.map((r) => [r.number, r.status])).toEqual([[bills['b5'], 'finalized']]);
+    expect(b.related.journal).toMatch(/^J\d{6}$/);
+    expect(b.void).toBeNull();
+    expect(b.canTrace).toBe(true);
+  });
+
+  it('a line below list shows its approval; its discount is list − price', async () => {
+    const b = await bill(bills['b3']!);
+    const below = b.lines.find((l) => l.lineNo === 2)!;
+    expect([below.qty, below.unitPrice, below.lineDiscount]).toEqual([2000, 110000, 20000]);
+    expect(below.approvals.map((a) => [a.kind, a.reason, a.approvedBy])).toEqual([
+      ['below_list', 'customer_bargain', 'Tariq'],
+    ]);
+    expect(b.lines.find((l) => l.lineNo === 1)!.approvals).toEqual([]);
+  });
+
+  it("costs and profit are Sales and gross profit's for the same bill", async () => {
+    const byBill = await view<SalesProfitView>(`/api/reports/sales-profit?${ALL()}&group=bill`);
+    for (const key of ['b1', 'b2', 'b3', 'b5']) {
+      const b = await bill(bills[key]!);
+      const row = byBill.rows.find((r) => r.key === b.bill.id)!;
+      expect([key, b.cost!.cost, b.cost!.profit, b.cost!.marginBp]).toEqual([
+        key,
+        row.cells.cost,
+        row.cells.profit,
+        row.cells.marginBp,
+      ]);
+      expect(b.lines.reduce((s, l) => s + l.cost!, 0)).toBe(b.cost!.cost);
+      for (const l of b.lines) expect(l.profit).toBe(l.lineTotal - l.cost!);
+    }
+  });
+
+  it('a voided bill shows its void; a return shows where its lines came from', async () => {
+    const voided = await bill(bills['b4']!);
+    expect(voided.bill.status).toBe('voided');
+    expect(voided.void).toMatchObject({ reason: 'wrong_price', approvedBy: 'Tariq' });
+    expect(voided.void!.number).toMatch(/-V\d{6}$/);
+
+    const back = await bill(bills['b5']!);
+    expect(back.bill.kind).toBe('return');
+    expect(back.related.returnOf).toBe(bills['b2']);
+    expect(back.lines.map((l) => [l.code, l.qty, l.returned])).toEqual([
+      [
+        'OIL001',
+        -1000,
+        { reason: 'wrong_part', condition: 'resellable', note: null, billNumber: bills['b2'] },
+      ],
+    ]);
+
+    const noReceipt = await bill(bills['b6']!);
+    expect(noReceipt.lines[0]!.returned).toMatchObject({ reason: 'changed_mind', billNumber: null });
+    expect(noReceipt.related.approvals.map((a) => [a.kind, a.approvedBy])).toEqual([
+      ['no_receipt_return', 'Tariq'],
+    ]);
+  });
+
+  it('a part sold before it was received is a line with no cost yet', async () => {
+    const [lamp] = await q<{ number: string }>(
+      `SELECT d.number FROM erp.sales_documents d JOIN erp.sales_lines l ON l.document_id = d.id
+       JOIN erp.items i ON i.id = l.item_id WHERE i.code = 'LAMP001' AND l.qty > 0`,
+    );
+    const b = await bill(lamp!.number);
+    expect(b.lines[0]).toMatchObject({ code: 'LAMP001', cost: 0, noCost: true });
+    expect(b.cost!.noCostLines).toBe(1);
+  });
+
+  it('without cost.view no cost or profit; a manager may not trace; others are refused', async () => {
+    const plain = await bill(bills['b2']!, 'noor');
+    expect(plain.values).toBe(false);
+    expect(plain.cost).toBeNull();
+    expect(plain.lines.every((l) => l.cost === null && l.profit === null)).toBe(true);
+    expect(plain.canTrace).toBe(false);
+    expect((await bill(bills['b2']!, 'tariq')).canTrace).toBe(false);
+    expect((await send('GET', `/api/sales/bills/${bills['b2']}`, 'kashif')).statusCode).toBe(403);
+    expect((await send('GET', '/api/sales/bills/C99-S000001', 'fahad')).statusCode).toBe(404);
+    expect((await send('GET', `/api/sales/bills/${bills['b2']}`, 'fahad', undefined, OTHER)).statusCode).toBe(
+      404,
+    );
+  });
+});
+describe('the Bills and Returns lists (W2-11, D-126)', () => {
+  let exchange = '';
+  beforeAll(async () => {
+    // An exchange today: one of each of b3's two oil lines back, for different reasons, and a fan belt sold.
+    const b3 = docs['b3']!;
+    let bill = addReturn(emptyBill(sara, retail), {
+      source: {
+        kind: 'bill',
+        id: b3.id,
+        number: b3.number,
+        businessDate: b3.businessDate,
+        customerId: null,
+      },
+      lines: b3.lines.map((l, i) => ({
+        id: `r${i}`,
+        itemId: l.itemId,
+        qty: qty(1000),
+        allowsFraction: false,
+        reason: i === 0 ? ('wrong_part' as const) : ('changed_mind' as const),
+        note: null,
+        condition: 'resellable' as const,
+        original: { line: l, returned: { qty: qty(0), refund: money(0) } },
+        price: null,
+        suggested: null,
+      })),
+      needs: [],
+      approval: null,
+    });
+    bill = { ...bill, lines: [line('s0', 'BELT001', 1, 30000)] };
+    const refund = (bill.returns?.lines ?? []).reduce((t, l) => t + l.refund, 0);
+    const doc = buildReturnDocument({
+      bill,
+      tender: {
+        payments: [{ method: 'cash', amount: money(30000 - refund), reference: null }],
+        cashReceived: null,
+      },
+      methods: METHODS,
+      sellerMaxDiscountBp: 0,
+      customer: { id: null, walkinPhone: null },
+      credit: null,
+      creditApproval: null,
+      refundApproval: null,
+      context: { ...context(counter, 'S'), increment: money(100) },
+    });
+    expect(doc.kind).toBe('exchange');
+    await push([doc]);
+    exchange = doc.number;
+  });
+
+  const listOfBills = (query = ALL(), who = 'fahad') => view<BillListView>(`/api/sales/bills?${query}`, who);
+  const listOfReturns = (query = ALL(), who = 'fahad') =>
+    view<ReturnListView>(`/api/sales/returns?${query}`, who);
+
+  it('Bills lists the sales, newest first, as stored; a voided bill is marked and left out of the total', async () => {
+    const r = await listOfBills();
+    const numbers = r.rows.map((x) => x.number);
+    for (const key of ['b1', 'b2', 'b3', 'b4']) expect(numbers).toContain(bills[key]);
+    for (const key of ['b5', 'b6']) expect(numbers).not.toContain(bills[key]);
+    expect(numbers).not.toContain(exchange);
+    expect(numbers.indexOf(bills['b3']!)).toBeLessThan(numbers.indexOf(bills['b1']!));
+    expect(r.rows.find((x) => x.number === bills['b2'])).toMatchObject({
+      customer: { code: 'KHAN', name: 'Khan Motors' },
+      items: 2,
+      total: 145000,
+      paidBy: ['Cash'],
+      status: 'finalized',
+      voidNumber: null,
+    });
+    const voided = r.rows.find((x) => x.number === bills['b4'])!;
+    expect(voided.status).toBe('voided');
+    expect(voided.voidNumber).toMatch(/-V\d{6}$/);
+    const finalized = r.rows.filter((x) => x.status === 'finalized');
+    expect(r.total).toEqual({
+      count: finalized.length,
+      amount: finalized.reduce((t, x) => t + x.total, 0),
+    });
+    expect(r.truncated).toBe(false);
+  });
+
+  it('opens on today; filters by search, salesman, payment method and status', async () => {
+    const todays = await view<BillListView>('/api/sales/bills');
+    expect([todays.from, todays.to]).toEqual([today(), today()]);
+    expect(todays.rows.map((x) => x.number)).not.toContain(bills['b1']);
+    expect((await listOfBills(`${ALL()}&q=khan`)).rows.map((x) => x.number)).toEqual([bills['b2']]);
+    expect((await listOfBills(`${ALL()}&q=${bills['b3']}`)).rows.map((x) => x.number)).toEqual([bills['b3']]);
+    expect((await listOfBills(`${ALL()}&q=${encodeURIComponent('%')}`)).rows).toEqual([]);
+    expect((await listOfBills(`${ALL()}&salesmanId=${imran}`)).rows.map((x) => x.number)).toEqual([
+      bills['b2'],
+    ]);
+    expect((await listOfBills(`${ALL()}&status=voided`)).rows.map((x) => x.number)).toEqual([bills['b4']]);
+    expect((await listOfBills(`${ALL()}&method=cash`)).rows.length).toBe((await listOfBills()).rows.length);
+    expect((await listOfBills(`${ALL()}&method=jazzcash`)).rows).toEqual([]);
+  });
+
+  it('Returns lists returns and exchanges: type, original bill, units back, reason, refund, refund paid', async () => {
+    const r = await listOfReturns();
+    const row = (n: string) => r.rows.find((x) => x.number === n)!;
+    expect(r.rows.map((x) => x.number).sort()).toEqual([bills['b5'], bills['b6'], exchange].sort());
+    expect(row(bills['b5']!)).toMatchObject({
+      kind: 'return',
+      originalBill: bills['b2'],
+      itemsBack: 1000,
+      reason: 'wrong_part',
+      status: 'finalized',
+      refund: 'pending',
+    });
+    expect(row(bills['b5']!).total).toBeLessThan(0);
+    expect(row(bills['b6']!)).toMatchObject({
+      originalBill: null,
+      reason: 'changed_mind',
+    });
+    expect(row(exchange)).toMatchObject({
+      kind: 'exchange',
+      originalBill: bills['b3'],
+      itemsBack: 2000,
+      reason: 'several',
+    });
+    expect(r.total).toEqual({
+      count: 3,
+      amount: r.rows.reduce((t, x) => t + x.total, 0),
+    });
+    expect((await listOfReturns(`${ALL()}&kind=exchange`)).rows.map((x) => x.number)).toEqual([exchange]);
+    expect((await listOfReturns(`${ALL()}&reason=changed_mind`)).rows.map((x) => x.number).sort()).toEqual(
+      [bills['b6'], exchange].sort(),
+    );
+    expect((await listOfReturns(`${ALL()}&q=${bills['b5']}`)).rows.map((x) => x.number)).toEqual([
+      bills['b5'],
+    ]);
+  });
+
+  it('refuses more than 92 days; the CSV has every row; reports.view only; another shop sees none', async () => {
+    const res = await send('GET', `/api/sales/bills?from=${daysAgo(120)}&to=${today()}`, 'fahad');
+    expect(res.statusCode).toBe(400);
+    const csv = await send('GET', `/api/sales/bills?${ALL()}&format=csv`, 'fahad');
+    expect(csv.statusCode).toBe(200);
+    expect(csv.body.trim().split('\n')).toHaveLength(1 + (await listOfBills()).rows.length);
+    const back = await send('GET', `/api/sales/returns?${ALL()}&format=csv`, 'fahad');
+    expect(back.body.trim().split('\n')).toHaveLength(1 + 3);
+    expect((await send('GET', '/api/sales/bills', 'kashif')).statusCode).toBe(403);
+    expect((await send('GET', '/api/sales/returns', 'kashif')).statusCode).toBe(403);
+    // The other shop (a generated year of its own) lists none of this shop's bills.
+    const theirs = (await view<BillListView>(`/api/sales/bills?${ALL()}`, 'fahad', OTHER)).rows.map(
+      (x) => x.number,
+    );
+    for (const key of ['b1', 'b2', 'b3', 'b4']) expect(theirs).not.toContain(bills[key]);
+  });
 });

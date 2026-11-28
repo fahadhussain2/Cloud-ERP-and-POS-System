@@ -8,6 +8,7 @@ import { httpApi } from './api';
 import { App } from './App';
 import { i18n } from './i18n';
 import './styles.css';
+import { applyTheme, readCachedTheme } from './theme';
 
 // Errors to Sentry (erp-web, D-086); the DSN and release are baked in at build time.
 initBrowserSentry({
@@ -20,6 +21,8 @@ const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root element');
 
 document.title = i18n.t('app.title');
+// This browser's last theme until the person is known (W2-07); App applies theirs from /auth/me.
+applyTheme(readCachedTheme());
 
 createRoot(root).render(
   <StrictMode>

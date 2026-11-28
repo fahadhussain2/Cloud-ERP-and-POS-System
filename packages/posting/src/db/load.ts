@@ -462,7 +462,7 @@ export async function loadSalePosting(c: pg.ClientBase, saleId: string): Promise
     `SELECT m.source_line_id, m.item_id, m.location_id, (m.qty_delta * 1000)::bigint AS qty, m.unit_cost,
        m.value_delta, m.avg_cost_after
      FROM erp.stock_movements m LEFT JOIN erp.sales_lines l ON l.id = m.source_line_id
-     WHERE m.posting_seq = $1 ORDER BY l.line_no, m.id`,
+     WHERE m.posting_seq = $1 ORDER BY l.line_no, m.qty_delta = 0, m.id`,
     [p.seq],
   );
   const parties = await c.query<{

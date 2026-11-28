@@ -921,7 +921,7 @@
       }
     },
     {
-      "name": "a return into a shelf below zero: no negative_stock, the average restarts at the returned cost",
+      "name": "a return into a shelf below zero: no negative_stock; the returned unit covers one of the 2 sold at Rs 3,200, at its own Rs 3,100, so Rs 100 comes off COGS; still short, the average stays (D-124)",
       "input": {
         "sale": {
           "id": "ret-1",
@@ -991,12 +991,12 @@
                 "accountId": "5100",
                 "partyId": null,
                 "debit": 0,
-                "credit": 310000
+                "credit": 320000
               },
               {
                 "accountId": "1300",
                 "partyId": null,
-                "debit": 310000,
+                "debit": 320000,
                 "credit": 0
               }
             ]
@@ -1009,7 +1009,16 @@
               "qtyDelta": 1000,
               "unitCost": 310000,
               "valueDelta": 310000,
-              "avgCostAfter": 310000
+              "avgCostAfter": 320000
+            },
+            {
+              "sourceLineId": "line-1",
+              "itemId": "item-pads",
+              "locationId": "loc-shop",
+              "qtyDelta": 0,
+              "unitCost": 0,
+              "valueDelta": 10000,
+              "avgCostAfter": 320000
             }
           ],
           "partyEntries": [],
@@ -1017,7 +1026,7 @@
           "state": {
             "costs": {
               "item-pads": {
-                "avgCost": 310000,
+                "avgCost": 320000,
                 "onHand": -1000
               }
             },

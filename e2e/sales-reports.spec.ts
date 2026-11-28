@@ -1,13 +1,13 @@
 import pg from 'pg';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
-import { report, signInAsOwner as signIn } from './backoffice';
+import { chooseValue, report, signInAsOwner as signIn } from './backoffice';
 import { expect, test } from './counter-test';
 import { SHOP } from './fixtures';
 
 // W2-03 plan (RPT-07, RPT-09, RPT-15; D-116): the owner reads sales and purchases on the report frame. After the
 // counter's sales (counter.spec) and the supplier's bill (purchasing.spec): sales and gross profit for today, by
-// category, opens a category's items and an item's bills, and a bill its trace; the purchase register lists the
+// category, opens a category's items and an item's bills, and a bill its details (D-125); the purchase register lists the
 // supplier's receipt and opens it; the rates show BRPD001's sale and what Naveed Glass was paid; sales over time draws
 // its charts, prints them, and downloads as CSV. Reads only.
 
@@ -46,18 +46,19 @@ test('sales and gross profit for today, by category, opens the items, their bill
   )) as [{ category: string }];
   await signIn(page);
   await report(page, bo.nav.salesProfit);
-  await page.getByLabel(bo.reports.frame.period).selectOption('today');
+  await chooseValue(page, bo.reports.frame.period, 'today');
   const table = page.getByRole('table', { name: bo.nav.salesProfit });
   await expect(table).toBeVisible();
   await expect(page.getByLabel(bo.reports.frame.figures)).toContainText(`${r.bills}${bills}`);
 
-  // The category opens its items, BRPD001 its bills, a bill its trace.
+  // The category opens its items, BRPD001 its bills, a bill its details (D-125).
   await table.getByRole('link', { name: category, exact: true }).click();
   await expect(page).toHaveURL(/group=item/);
   await table.getByRole('link', { name: /BRPD001/ }).click();
   await expect(page).toHaveURL(/group=bill/);
   await table.getByRole('link').first().click();
-  await expect(page).toHaveURL(/#\/support\/trace\//);
+  await expect(page).toHaveURL(/#\/sales\/bills\//);
+  await expect(page.getByRole('table', { name: bo.billDetails.items })).toBeVisible();
 });
 
 test("the purchase register lists the supplier's receipt and opens it", async ({ page }) => {
@@ -79,18 +80,18 @@ test("the rates show BRPD001's sale and what Naveed Glass was paid", async ({ pa
   await report(page, bo.nav.rates);
   await expect(page.getByText(r.rates.pick)).toBeVisible();
   await page.getByRole('button', { name: r.rates.item, exact: true }).click();
-  await page.getByRole('textbox', { name: r.rates.item, exact: true }).fill('BRPD001');
+  await page.getByRole('combobox', { name: r.rates.item, exact: true }).fill('BRPD001');
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('BRPD001');
-  await page.getByRole('textbox', { name: r.rates.item, exact: true }).press('Enter');
+  await page.getByRole('combobox', { name: r.rates.item, exact: true }).press('Enter');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('BRPD001');
   await expect(page.getByRole('table', { name: r.rates.sales }).getByRole('row')).not.toHaveCount(1);
 
   // Any item, and the supplier instead: ENOL001 at its rate on the bill and net of the bill discount.
   await page.getByRole('button', { name: r.rates.clear.item }).click();
   await page.getByRole('button', { name: r.rates.party, exact: true }).click();
-  await page.getByRole('textbox', { name: r.rates.party, exact: true }).fill('naveed');
+  await page.getByRole('combobox', { name: r.rates.party, exact: true }).fill('naveed');
   await expect(page.getByRole('listbox', { name: bo.purchasing.line.results })).toContainText('S100');
-  await page.getByRole('textbox', { name: r.rates.party, exact: true }).press('Enter');
+  await page.getByRole('combobox', { name: r.rates.party, exact: true }).press('Enter');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Naveed Glass');
   await expect(page.getByRole('table', { name: r.rates.purchases })).toContainText('ENOL001');
 });

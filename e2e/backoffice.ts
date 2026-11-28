@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 import bo from '../apps/backoffice/src/locales/en.json' with { type: 'json' };
 import { BACKOFFICE_PORT, OWNER, OWNER_PASSWORD, SHOP } from './fixtures';
@@ -28,6 +28,42 @@ export async function report(page: Page, name: string): Promise<void> {
     .getByRole('main')
     .getByRole('link', { name: new RegExp(`^${name}`) })
     .click();
+}
+
+/**
+ * Picks an option in one of the back office's own dropdowns (W2-12): a button and a list, not a native <select>, so
+ * `selectOption` doesn't work on it. `scope` is where the box is, e.g. a dialog.
+ */
+export async function choose(scope: Page | Locator, label: string, option: string): Promise<void> {
+  await scope.getByRole('combobox', { name: label }).click();
+  const page = 'page' in scope ? scope.page() : scope;
+  await page.getByRole('listbox').getByRole('option', { name: option, exact: true }).click();
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+}
+
+/**
+ * Picks the option whose value is `value` in one of the back office's own dropdowns (W2-15): a report's filter set
+ * by value. An empty value is a filter's "all" (`__all`).
+ */
+export async function chooseValue(scope: Page | Locator, label: string, value: string): Promise<void> {
+  await scope.getByRole('combobox', { name: label, exact: true }).click();
+  const page = 'page' in scope ? scope.page() : scope;
+  await page
+    .locator(`[role="listbox"] [role="option"][data-value="${value === '' ? '__all' : value}"]`)
+    .click();
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+}
+
+/**
+ * Picks from one of the back office's searchable pickers (W2-14, owner answer 3: the supplier on a receipt): types
+ * `text` and takes the first hit with Enter, once a hit containing `text` is shown.
+ */
+export async function pick(scope: Page | Locator, label: string, text: string): Promise<void> {
+  const box = scope.getByRole('combobox', { name: label, exact: true });
+  await box.fill(text);
+  const page = 'page' in scope ? scope.page() : scope;
+  await expect(page.getByRole('listbox', { name: label }).getByRole('option').first()).toContainText(text);
+  await box.press('Enter');
 }
 
 /** The account's button at the foot of the side menu, whoever is signed in. */

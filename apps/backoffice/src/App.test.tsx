@@ -113,7 +113,8 @@ const goTo = (hash: string) =>
   });
 
 // Most tests start on Staff. The fixture's owner holds only admin rights, and user activity (admin.users, W2-04) puts
-// the Reports row first in the menu's order for them; a real owner holds every permission and opens on Customers.
+// the Reports row first in the menu's order for them; a real owner holds every permission and opens on the Dashboard
+// (W2-06). A sign-in opens the first screen, whatever the address named.
 beforeEach(() => {
   window.location.hash = '#/staff';
 });
@@ -149,12 +150,43 @@ describe('signing in', () => {
     type(en.password.new, 'a much longer one');
     type(en.password.repeat, 'a much longer one');
     fireEvent.click(screen.getByRole('button', { name: en.password.submit }));
-    expect(await screen.findByRole('heading', { name: en.staff.title })).toBeDefined();
+    // Then the first screen they may open (the address before sign-in is not kept).
+    expect(await screen.findByRole('navigation', { name: en.nav.menu })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: en.password.title })).toBeNull();
+    expect(window.location.hash).toBe('');
     expect(calls.find((c) => c.route === 'POST /api/auth/login')?.body).toEqual({
       tenantCode: 'delux',
       username: 'fahad',
       password: 'first password',
     });
+  });
+
+  it('opens the first screen after signing in, whatever the address still names: the Dashboard for the owner', async () => {
+    // Bug: signing out on Customers left #/sales/customers in the address, so the owner's next sign-in opened Customers
+    // instead of their Dashboard (W2-06; D-118).
+    window.location.hash = '#/sales/customers';
+    let me: unknown = null;
+    const owner = { ...OWNER, permissions: [...OWNER.permissions, 'cust.edit', 'dashboard.view'] };
+    const { api } = fakeApi({
+      ...signedIn(),
+      'GET /api/auth/me': () => (me ? { status: 200, body: me } : { status: 401, body: {} }),
+      'POST /api/auth/login': () => ((me = owner), { status: 200, body: me }),
+    });
+    show(api);
+    await screen.findByRole('heading', { name: en.login.title });
+    type(en.login.shopCode, 'delux');
+    type(en.login.username, 'fahad');
+    type(en.login.password, 'a password');
+    fireEvent.click(screen.getByRole('button', { name: en.login.submit }));
+    const menu = await screen.findByRole('navigation', { name: en.nav.menu });
+    await waitFor(() =>
+      expect(within(menu).getByRole('link', { name: en.nav.dashboard }).getAttribute('aria-current')).toBe(
+        'page',
+      ),
+    );
+    expect(
+      within(menu).getByRole('link', { name: en.nav.customers }).getAttribute('aria-current'),
+    ).toBeNull();
   });
 
   it('shows a failed sign-in without saying which part was wrong', async () => {
@@ -241,7 +273,8 @@ describe('Staff', () => {
     show(api);
     const row = (await screen.findByText('Asif Khan')).closest('tr')!;
     expect(screen.queryByRole('button', { name: en.staff.add })).toBeNull();
-    fireEvent.click(within(row).getByRole('button', { name: en.staff.give }));
+    // A row action is an icon named with the person (W2-15).
+    fireEvent.click(within(row).getByRole('button', { name: `${en.staff.give} Asif Khan` }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText(en.staff.temporaryPin), { target: { value: '4831' } });
     fireEvent.click(within(dialog).getByRole('button', { name: en.staff.save }));
@@ -253,7 +286,7 @@ describe('Staff', () => {
   it('a manager has no PIN action for someone they may not give a PIN to (an Owner)', async () => {
     show(fakeApi(signedIn(MANAGER)).api);
     const row = (await screen.findByText('Fahad Owner')).closest('tr')!;
-    expect(within(row).queryByRole('button', { name: en.staff.give })).toBeNull();
+    expect(within(row).queryByRole('button', { name: new RegExp(`^${en.staff.give}`) })).toBeNull();
     fireEvent.click(within(row).getByRole('link', { name: 'Fahad Owner' }));
     expect(await screen.findByRole('heading', { name: 'Fahad Owner' })).toBeDefined();
     expect(screen.queryByRole('button', { name: en.staff.give })).toBeNull();
@@ -267,11 +300,14 @@ describe('Staff', () => {
     );
     show(api);
     const row = (await screen.findByText('Asif Khan')).closest('tr')!;
-    fireEvent.click(within(row).getByRole('button', { name: en.staff.give }));
+    // A row action is an icon named with the person (W2-15).
+    fireEvent.click(within(row).getByRole('button', { name: `${en.staff.give} Asif Khan` }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText(en.staff.temporaryPin), { target: { value: '4831' } });
     fireEvent.click(within(dialog).getByRole('button', { name: en.staff.save }));
-    expect(await within(dialog).findByText(en.staff.errors.pin_not_allowed)).toBeDefined();
+    // Not about the PIN itself: a toast, and the dialog stays open (owner answer 6).
+    expect(await screen.findByText(en.staff.errors.pin_not_allowed)).toBeDefined();
+    expect(dialog.isConnected).toBe(true);
   });
 
   it('an owner adds a person with a role and no password', async () => {
@@ -417,7 +453,7 @@ describe('Counters', () => {
       kind: 'counter',
     });
     const row = screen.getByText('C01').closest('tr')!;
-    fireEvent.click(within(row).getByRole('button', { name: en.counters.revoke }));
+    fireEvent.click(within(row).getByRole('button', { name: `${en.counters.revoke} C01` }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: en.counters.confirmRevoke }));
     await screen.findByText(i18n.t('counters.revoked', { code: 'C01' }));
@@ -538,8 +574,8 @@ describe('Counters: health and Re-enable (W1-07)', () => {
     window.location.hash = '#/counters';
     show(api);
     const row = (await screen.findByText('C01')).closest('tr')!;
-    expect(within(row).queryByRole('button', { name: en.counters.revoke })).toBeNull();
-    fireEvent.click(within(row).getByRole('button', { name: en.counters.reenable }));
+    expect(within(row).queryByRole('button', { name: `${en.counters.revoke} C01` })).toBeNull();
+    fireEvent.click(within(row).getByRole('button', { name: `${en.counters.reenable} C01` }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: en.counters.confirmReenable }));
     await screen.findByText(i18n.t('counters.reenabled', { code: 'C01' }));

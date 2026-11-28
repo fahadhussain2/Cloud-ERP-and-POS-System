@@ -17,7 +17,9 @@ import {
   type StockMovementCells,
   type StockMovementView,
 } from '@erp/contracts';
-import { Checkbox, Label, LABEL_CLASS, StatusChip } from '@erp/ui';
+import { StatusChip } from '@erp/ui';
+
+import { Checkbox, FIELD_LABEL } from '../ui';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
@@ -210,14 +212,13 @@ export function StockAtScreen({ api }: { api: Api }) {
             keys={AT_KEYS}
             onChange={(k, v) => set({ [k]: v })}
           />
-          <div className="flex h-9 items-center gap-2">
-            <Checkbox
-              id="stock-negative"
-              checked={negative}
-              onCheckedChange={(c) => set({ negative: c === true ? 'only' : '' })}
-            />
-            <Label htmlFor="stock-negative">{s(t, 'at.negative')}</Label>
-          </div>
+          <Checkbox
+            className="h-9 items-center"
+            id="stock-negative"
+            label={s(t, 'at.negative')}
+            checked={negative}
+            onCheckedChange={(c) => set({ negative: c ? 'only' : '' })}
+          />
         </>
       }
       printFilters={[report?.at ?? '', ...filterWords(t, choices, filters, AT_KEYS)].join(' · ')}
@@ -407,7 +408,13 @@ export function StockLedgerScreen({ api }: { api: Api }) {
         return to ? <a href={to}>{l.number}</a> : l.number;
       },
     },
-    { key: 'kind', label: s(t, 'ledger.kind'), sort: (l) => l.kind, cell: (l) => s(t, `kinds.${l.kind}`) },
+    {
+      key: 'kind',
+      label: s(t, 'ledger.kind'),
+      sort: (l) => l.kind,
+      // D-124: value with no quantity is a cost correction, for stock sold before it arrived.
+      cell: (l) => (l.qty === 0 ? s(t, 'kinds.costCorrection') : s(t, `kinds.${l.kind}`)),
+    },
     { key: 'location', label: s(t, 'location'), sort: (l) => l.locationCode, cell: (l) => l.locationCode },
     { key: 'in', label: s(t, 'ledger.in'), end: true, cell: (l) => (l.qty > 0 ? qtyText(l.qty) : '') },
     { key: 'out', label: s(t, 'ledger.out'), end: true, cell: (l) => (l.qty < 0 ? qtyText(-l.qty) : '') },
@@ -437,7 +444,7 @@ export function StockLedgerScreen({ api }: { api: Api }) {
       filters={
         <>
           <div className="flex w-96 max-w-full flex-col gap-1">
-            <span className={LABEL_CLASS}>{s(t, 'item')}</span>
+            <span className={FIELD_LABEL}>{s(t, 'item')}</span>
             <ItemPicker
               api={api}
               url="/api/reports/items"

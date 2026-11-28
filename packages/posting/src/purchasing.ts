@@ -1,7 +1,7 @@
-import { money, mulQty, negate, qty, sum } from '@erp/domain';
+import { add, money, mulQty, negate, qty, sum } from '@erp/domain';
 
 import { bankOf, credit, debit, dated, guarded, roleOf, signed, stockState } from './build';
-import { averageAfterValue } from './cost';
+import { averageAfterValue, settleShortfall } from './cost';
 import type {
   JournalLine,
   LastPurchase,
@@ -37,8 +37,9 @@ export function postGoodsReceipt(
     const s = stockState(state);
     const movements: StockMovement[] = [];
     const last = new Map<string, LastPurchase>();
+    let corrections = money(0);
     for (const l of receipt.lines) {
-      const after = averageAfterValue(s.costNow(l.itemId), { qty: l.qty, value: l.value });
+      const { after, correction } = settleShortfall(s.costNow(l.itemId), { qty: l.qty, value: l.value });
       s.costs[l.itemId] = after;
       s.move(l.locationId, l.itemId, l.qty);
       const unitCost = averageAfterValue(
@@ -54,6 +55,19 @@ export function postGoodsReceipt(
         valueDelta: l.value,
         avgCostAfter: after.avgCost,
       });
+      // D-124: the units that covered stock sold before it arrived, at what they really cost.
+      if (correction !== 0) {
+        corrections = add(corrections, correction);
+        movements.push({
+          sourceLineId: l.id,
+          itemId: l.itemId,
+          locationId: l.locationId,
+          qtyDelta: qty(0),
+          unitCost: money(0),
+          valueDelta: negate(correction),
+          avgCostAfter: after.avgCost,
+        });
+      }
       last.set(l.itemId, {
         itemId: l.itemId,
         lastCost: unitCost,
@@ -77,6 +91,10 @@ export function postGoodsReceipt(
         amount: negate(receipt.total),
         dueDate: entryDate,
       });
+    }
+    if (corrections !== 0) {
+      const cogs = roleOf(context, 'COGS');
+      lines.push(...signed(cogs, null, corrections), ...signed(inventory, null, negate(corrections)));
     }
     return {
       ok: true,

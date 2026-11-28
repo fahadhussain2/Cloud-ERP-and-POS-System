@@ -7,7 +7,7 @@ import type {
   SalesProfitView,
   StockChoicesView,
 } from '@erp/contracts';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -18,6 +18,7 @@ import en from '../locales/en.json';
 import { href, parseHash, queryOf } from '../router';
 import { ReportsHomeScreen } from './FinancialScreens';
 import { PrintProvider } from './frame/ReportFrame';
+import { chooseValue } from '../ui/testing/choose';
 import {
   PurchaseRegisterScreen,
   RatesScreen,
@@ -134,6 +135,7 @@ const PROFIT: SalesProfitView = {
       profitChange: { amount: 20000, bp: 4000 },
     },
   },
+  corrections: { cost: 0, profit: 70000, items: [] },
 };
 
 describe('the sales report addresses', () => {
@@ -182,14 +184,52 @@ describe('sales and gross profit', () => {
     expect(untranslated()).toEqual([]);
   });
 
+  it('shows stock sold before it arrived on its own lines, then gross profit in the books (D-124)', async () => {
+    window.location.hash = href.salesProfit;
+    const { api } = fakeApi({
+      'GET /api/reports/sales-profit': {
+        ...PROFIT,
+        corrections: {
+          cost: 250000,
+          profit: -180000,
+          items: [{ itemId: 'i9', code: 'LAMP001', name: 'HEAD LAMP', cost: 250000 }],
+        },
+      } satisfies SalesProfitView,
+      ...CHOICES,
+    });
+    show(<SalesProfitScreen api={api} />);
+    const table = await screen.findByRole('table', { name: r.corrections.title });
+    expect(plain(within(table).getByText('LAMP001 HEAD LAMP').closest('tr')!.textContent)).toContain('2,500');
+    expect(plain(within(table).getAllByRole('row').at(-1)!.textContent)).toContain('2,500');
+    const inBooks = screen.getByText(
+      (_, el) => el?.tagName === 'P' && (el.textContent ?? '').startsWith(r.corrections.profit),
+    );
+    expect(plain(inBooks.textContent)).toContain('1,800');
+    expect(plain(screen.getByLabelText(en.reports.frame.figures).textContent)).toContain(
+      r.corrections.profit,
+    );
+    expect(untranslated()).toEqual([]);
+  });
+
+  it('leaves the corrections out when there are none', async () => {
+    window.location.hash = href.salesProfit;
+    const { api } = fakeApi({ 'GET /api/reports/sales-profit': PROFIT, ...CHOICES });
+    show(<SalesProfitScreen api={api} />);
+    await screen.findByRole('table', { name: en.nav.salesProfit });
+    expect(screen.queryByRole('table', { name: r.corrections.title })).toBeNull();
+    expect(plain(screen.getByLabelText(en.reports.frame.figures).textContent)).not.toContain(
+      r.corrections.profit,
+    );
+  });
+
   it('puts the grouping, the comparison and the filters in the address', async () => {
     window.location.hash = href.salesProfit;
     const { api } = fakeApi({ 'GET /api/reports/sales-profit': PROFIT, ...CHOICES });
     show(<SalesProfitScreen api={api} />);
     await screen.findByRole('table', { name: en.nav.salesProfit });
-    fireEvent.change(screen.getByLabelText(r.groupBy), { target: { value: 'salesman' } });
-    fireEvent.change(screen.getByLabelText(en.reports.pl.compare), { target: { value: 'last-year' } });
-    fireEvent.change(await screen.findByLabelText(r.filter.customerId), { target: { value: 'walk-in' } });
+    await chooseValue(r.groupBy, 'salesman');
+    await chooseValue(en.reports.pl.compare, 'last-year');
+    await waitFor(() => chooseValue(r.filter.customerId, 'walk-in'));
     expect(Object.fromEntries(queryOf(window.location.hash))).toEqual({
       preset: 'thisMonth',
       group: 'salesman',
@@ -198,7 +238,7 @@ describe('sales and gross profit', () => {
     });
   });
 
-  it('by bill, a bill opens its trace; without cost.view there is no cost, profit or margin', async () => {
+  it('by bill, a bill opens its details (D-125); without cost.view there is no cost, profit or margin', async () => {
     window.location.hash = `${href.salesProfit}?group=bill`;
     const noCost = { ...cells(120000, null), qty: 1000 };
     const { api } = fakeApi({
@@ -219,6 +259,7 @@ describe('sales and gross profit', () => {
           },
         ],
         total: { count: 1, cells: noCost, before: null },
+        corrections: null,
       } satisfies SalesProfitView,
       ...CHOICES,
     });
@@ -228,7 +269,7 @@ describe('sales and gross profit', () => {
       within(table)
         .getByRole('link', { name: /C01-S000001/ })
         .getAttribute('href'),
-    ).toBe('#/support/trace/C01-S000001');
+    ).toBe('#/sales/bills/C01-S000001');
     expect(
       within(table)
         .getAllByRole('columnheader')
@@ -380,7 +421,7 @@ describe('purchase and sale rates', () => {
     show(<RatesScreen api={api} />);
     const sales = await screen.findByRole('table', { name: r.rates.sales });
     expect(within(sales).getByRole('link', { name: 'C01-S000001' }).getAttribute('href')).toBe(
-      '#/support/trace/C01-S000001',
+      '#/sales/bills/C01-S000001',
     );
     expect(plain(sales.textContent)).toContain(r.walkIn);
     expect(screen.getByRole('table', { name: r.rates.purchases })).toBeDefined();
@@ -464,7 +505,7 @@ describe('sales over time', () => {
     expect(within(discounts).getByRole('link', { name: '1' }).getAttribute('href')).toBe(
       href.overridesReport,
     );
-    fireEvent.change(screen.getByLabelText(r.overTime.measure), { target: { value: 'sales' } });
+    await chooseValue(r.overTime.measure, 'sales');
     expect(queryOf(window.location.hash).get('measure')).toBe('sales');
     expect(untranslated()).toEqual([]);
   });
