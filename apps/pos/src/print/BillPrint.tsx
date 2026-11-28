@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { formatQty } from '../bill/bill-state';
 import type { PrintJob } from './print-job';
+import { BILL_BARS, pageStyle } from './page-style';
 
 // The printed sale bill (POS spec §13, POS-09, the prototype's layout): black on white, no shading, A5 landscape
 // (Delux, owner answer 1) or A4 portrait. Thermal formats print the A4 layout until their templates are built
@@ -161,7 +162,7 @@ function BillPage({ job }: { job: PrintJob }) {
               <div
                 className="bill-bars"
                 dangerouslySetInnerHTML={{
-                  __html: code39Svg(code, { narrow: 1, wide: 2.5, height: 40, quiet: 10 }),
+                  __html: code39Svg(code, BILL_BARS),
                 }}
               />
               <p data-testid="bill-code">{code}</p>
@@ -241,7 +242,7 @@ export function BillPrint({ job }: { job: PrintJob }) {
   const copies = job.profile?.copies ?? 1;
   return (
     <div className="bill-print" data-page={page}>
-      <style>{`@page { size: ${page === 'a5' ? 'A5 landscape' : 'A4 portrait'}; margin: 8mm; }`}</style>
+      <style>{pageStyle(page)}</style>
       {Array.from({ length: copies }, (_, i) => (
         <BillPage key={i} job={job} />
       ))}

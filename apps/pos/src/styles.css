@@ -9,7 +9,8 @@
 @source '../../../packages/ui/src';
 
 /* The printed bill (POS spec §13): only #print-root prints, black on white, no shading. Sizes in mm and pt for paper;
-   logical properties throughout (rule 10). The page size comes from the profile (@page in BillPrint). */
+   logical properties throughout (rule 10). The page size, its margin and its white background come with the print
+   (page-style.ts, W2-19). */
 #print-root {
   display: none;
 }
@@ -119,9 +120,8 @@
   font-family: ui-monospace, monospace;
 }
 .bill-bars svg {
+  /* Its real size is on the drawing (W2-19): bars of 1/75 inch, as wide as the code needs. */
   display: block;
-  inline-size: 62mm;
-  block-size: 11mm;
 }
 .bill-policy {
   margin-block-start: 1.5mm !important;

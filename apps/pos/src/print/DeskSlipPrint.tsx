@@ -6,6 +6,7 @@ import { I18nextProvider, useTranslation } from 'react-i18next';
 
 import type { PrintProfile } from '../db/checkout';
 import { i18n } from '../i18n';
+import { pageStyle } from './page-style';
 
 // The desk's printed slips (CSH-05, CSH-06, CSH-07, owner answer 5 to W1-11): the collection receipt handed to the
 // customer, the cash-out voucher the receiver signs, and the close slip the cashier and manager sign. Black on white
@@ -153,7 +154,7 @@ export function DeskSlipPrint({ job }: { job: DeskPrintJob }) {
   const page = (job.profile?.paperFormat ?? 'a5') === 'a5' ? 'a5' : 'a4';
   return (
     <div className="bill-print" data-page={page}>
-      <style>{`@page { size: ${page === 'a5' ? 'A5 landscape' : 'A4 portrait'}; margin: 8mm; }`}</style>
+      <style>{pageStyle(page)}</style>
       <SlipPage job={job} />
     </div>
   );
