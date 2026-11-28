@@ -263,6 +263,7 @@ export {
   type StockLevel,
 } from './catalog';
 export {
+  BillNoQuery,
   CreateSupplierRequest,
   PostRequest,
   ReceiptDraft,
@@ -271,6 +272,7 @@ export {
   SaveReturnRequest,
   SupplierPaymentRequest,
   UpdateSupplierRequest,
+  type BillNoLookup,
   type DocumentRow,
   type PurchasingLookups,
   type ReceiptLineView,
